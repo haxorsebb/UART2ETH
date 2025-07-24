@@ -30,6 +30,9 @@ endif::backend-html5[]
 
 
 include::src/about-arc42.adoc[]
+// Architecture Communication Canvas
+include::src/00_architecture_communication_canvas.adoc[]
+
 
 // horizontal line
 ***
