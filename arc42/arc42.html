@@ -351,7 +351,7 @@
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+Template%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/arc42.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+Template%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/arc42.adoc%0A%23branch:%20-" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -813,104 +813,154 @@ These include</p>
 </div>
 <div class="sect2">
 <h3 id="_requirements_overview">1.1. Requirements Overview</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
+<div class="sect3">
+<h4 id="_purpose">1.1.1. Purpose</h4>
 <div class="paragraph">
-<div class="title">Contents</div>
-<p>Short description of the functional requirements, driving forces, extract (or abstract)
-of requirements. Link to (hopefully existing) requirements documents
-(with version number and information where to find it).</p>
+<p>UART2ETH provides a hardware and firmware solution for bridging UART interfaces to TCP sockets, enabling network connectivity for legacy industrial equipment and embedded systems.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_core_functional_requirements">1.1.2. Core Functional Requirements</h4>
+<div class="paragraph">
+<p><strong>Hardware Capabilities:</strong>
+* Support up to 4 independent UART interfaces
+* RPI RP2350 microcontroller platform
+* Ethernet connectivity via ENC28J60 SPI controller
+* 100Mbit network interface with RJ45 connector</p>
 </div>
 <div class="paragraph">
-<div class="title">Motivation</div>
-<p>From the point of view of the end users a system is created or modified to
-improve support of a business activity and/or improve the quality.</p>
+<p><strong>Networking Features:</strong>
+* Each UART exposed as individual TCP socket on dedicated port
+* Raw TCP socket communication for transparent data transmission
+* Support for concurrent connections (1 TCP connection per UART)</p>
 </div>
 <div class="paragraph">
-<div class="title">Form</div>
-<p>Short textual description, probably in tabular use-case format.
-If requirements documents exist this overview should refer to these documents.</p>
+<p><strong>Operating Modes:</strong>
+* Full Bridge Mode: Transparent UART-over-TCP for remote device connections
+* Gateway Mode: Add networking capabilities to existing products without firmware modifications</p>
 </div>
 <div class="paragraph">
-<p>Keep these excerpts as short as possible. Balance readability of this document with potential redundancy w.r.t to requirements documents.</p>
+<p><strong>Firmware Management:</strong>
+* Secure Over-The-Air (OTA) firmware updates
+* A/B update mechanism for rollback capability</p>
 </div>
 <div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-1/">Introduction and Goals</a> in the arc42 documentation.</p>
+<p><strong>Protocol Optimization:</strong>
+* Custom pluggable serial protocol filters for efficient TCP packaging
+* Configurable packet caching with ring buffer implementation
+* Adjustable transmit timeouts for latency or bulk transfer optimization</p>
 </div>
+</div>
+<div class="sect3">
+<h4 id="_target_use_cases">1.1.3. Target Use Cases</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Use Case</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Legacy Equipment Integration</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Connect PLCs, sensors, and measurement instruments to SCADA systems via network</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Infrastructure Problem Solving</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Overcome noise and cable length limitations in industrial environments</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System Integration</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Add networking to existing products without custom development effort</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Remote Device Access</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Enable distant connections to serial devices through Full Bridge mode</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_driving_forces">1.1.4. Driving Forces</h4>
+<div class="paragraph">
+<p><strong>Regulatory Compliance:</strong>
+* Western-only component supply chain for regulatory compliance
+* Anticipation of new regulations requiring updateable and auditable firmware
+* CE certification requirement for hardware</p>
+</div>
+<div class="paragraph">
+<p><strong>Market Requirements:</strong>
+* Address gap left by discontinued commercial UART-to-TCP solutions
+* Provide open source alternative to expensive or black-box commercial products
+* Enable cost-effective networking solutions for system integrators
+* Substantial per-unit cost savings when deploying multiple units in-house compared to commercial alternatives</p>
+</div>
+<div class="paragraph">
+<p><strong>Technical Requirements:</strong>
+* 500kBaud sustained throughput capability
+* Sub-5ms latency for real-time applications
+* Critical system uptime within environmental specifications</p>
 </div>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_quality_goals">1.2. Quality Goals</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
 <div class="paragraph">
-<div class="title">Contents</div>
-<p>The top three (max five) quality goals for the architecture whose fulfillment is of highest importance to the major stakeholders.
-We really mean quality goals for the architecture. Don&#8217;t confuse them with project goals.
-They are not necessarily identical.</p>
+<p>The following quality goals are prioritized by importance to our major stakeholders (industrial engineers and system integrators):</p>
 </div>
-<div class="paragraph">
-<p>Consider this overview of potential topics (based upon the ISO 25010 standard):</p>
-</div>
-<div class="imageblock">
-<div class="content">
-<img src="./images/01_2_iso-25010-topics-EN.drawio.png" alt="Categories of Quality Requirements">
-</div>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>You should know the quality goals of your most important stakeholders, since they will influence fundamental architectural decisions.
-Make sure to be very concrete about these qualities, avoid buzzwords.
-If you as an architect do not know how the quality of your work will be judged&#8230;&#8203;</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>A table with quality goals and concrete scenarios, ordered by priorities</p>
-</div>
-</div>
-</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 16.6666%;">
+<col style="width: 33.3333%;">
+<col style="width: 50.0001%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Priority</th>
+<th class="tableblock halign-left valign-top">Quality Goal</th>
+<th class="tableblock halign-left valign-top">Concrete Scenario</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reliability</strong><br>
+Critical system uptime for industrial applications</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A UART2ETH device deployed in a manufacturing line must maintain continuous operation for the duration that the connected hardware operates within environmental specifications. System failure should not occur due to software issues during normal operation.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance</strong><br>
+Real-time data transmission capabilities</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The system must sustain 500kBaud throughput with less than 5ms latency end-to-end. A PLC sending time-critical control data to a SCADA system must not experience delays that could affect industrial process control.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Compatibility</strong><br>
+Seamless integration with diverse industrial systems</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The device must work transparently with various PLCs, SCADA systems, measurement instruments, and legacy equipment without requiring custom drivers or protocol modifications. A technician connecting an existing Siemens PLC to a Wonderware SCADA system should achieve immediate data flow without configuration conflicts.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Usability</strong><br>
+Simple deployment without specialized knowledge</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A system integrator with basic understanding of serial communication and TCP/IP should be able to deploy and configure the device without extensive training. Configuration should be straightforward with clear error messages for common misconfigurations.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">5</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Maintainability</strong><br>
+Secure field updates without physical access</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Firmware updates must be deployable remotely via OTA mechanism with A/B rollback capability. A device installed in a remote location must be updatable without requiring on-site technician visits, while ensuring update integrity and system recovery from failed updates.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="sect2">
 <h3 id="_stakeholders">1.3. Stakeholders</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<div class="title">Contents</div>
-<p>Explicit overview of stakeholders of the system, i.e. all person, roles or organizations that</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>should know the architecture</p>
-</li>
-<li>
-<p>have to be convinced of the architecture</p>
-</li>
-<li>
-<p>have to work with the architecture or with code</p>
-</li>
-<li>
-<p>need the documentation of the architecture for their work</p>
-</li>
-<li>
-<p>have to come up with decisions about the system or its development</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>You should know all parties involved in development of the system or affected by the system.
-Otherwise, you may get nasty surprises later in the development process.
-These stakeholders determine the extent and the level of detail of your work and its results.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>Table with role names, person names, and their expectations with respect to the architecture and its documentation.</p>
-</div>
-</div>
-</div>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 20%;">
@@ -926,14 +976,39 @@ These stakeholders determine the extent and the level of detail of your work and
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Role-1&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Contact-1&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Expectation-1&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Engineers</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">End user organizations, manufacturing facilities</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Clear documentation of network integration capabilities, performance specifications, and compatibility with existing industrial equipment. Need confidence in reliability and uptime guarantees.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Role-2&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Contact-2&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Expectation-2&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>System Integrators</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Engineering consultancies, automation solution providers</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Comprehensive deployment guides, configuration documentation, and troubleshooting procedures. Expect regulatory compliance documentation (CE certification) and clear cost-benefit analysis.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Team</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Internal project contributors</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Detailed architectural decisions, coding standards, build procedures, and testing frameworks. Need clear module interfaces and dependencies for parallel development work.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hardware Engineers</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PCB designers, component selection specialists</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware interface specifications, power requirements, environmental constraints, and component selection rationale. Need mechanical and electrical interface documentation.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Field Technicians</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Installation and maintenance personnel</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Simple installation procedures, diagnostic capabilities, and field troubleshooting guides. Need clear error indicators and recovery procedures for common failure modes.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Regulatory Authorities</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CE certification bodies, industrial standards organizations</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Compliance documentation, safety analysis, electromagnetic compatibility evidence, and audit trails for component sourcing and manufacturing processes.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Open Source Community</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Contributors, adopters, derivative projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Clear licensing terms (GPL), contribution guidelines, architectural documentation enabling modifications and extensions. Expect maintainable and well-documented code structure.</p></td>
 </tr>
 </tbody>
 </table>
