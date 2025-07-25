@@ -25,25 +25,28 @@ UART2ETH provides a hardware and firmware solution for bridging UART interfaces 
 ==== Core Functional Requirements
 
 *Hardware Capabilities:*
+
 * Support up to 4 independent UART interfaces
-* RPI RP2350 microcontroller platform
-* Ethernet connectivity via ENC28J60 SPI controller
 * 100Mbit network interface with RJ45 connector
 
 *Networking Features:*
+
 * Each UART exposed as individual TCP socket on dedicated port
 * Raw TCP socket communication for transparent data transmission
 * Support for concurrent connections (1 TCP connection per UART)
 
 *Operating Modes:*
+
 * Full Bridge Mode: Transparent UART-over-TCP for remote device connections
 * Gateway Mode: Add networking capabilities to existing products without firmware modifications
 
 *Firmware Management:*
+
 * Secure Over-The-Air (OTA) firmware updates
 * A/B update mechanism for rollback capability
 
 *Protocol Optimization:*
+
 * Custom pluggable serial protocol filters for efficient TCP packaging
 * Configurable packet caching with ring buffer implementation
 * Adjustable transmit timeouts for latency or bulk transfer optimization
@@ -62,17 +65,20 @@ UART2ETH provides a hardware and firmware solution for bridging UART interfaces 
 ==== Driving Forces
 
 *Regulatory Compliance:*
+
 * Western-only component supply chain for regulatory compliance
 * Anticipation of new regulations requiring updateable and auditable firmware
 * CE certification requirement for hardware
 
 *Market Requirements:*
+
 * Address gap left by discontinued commercial UART-to-TCP solutions
 * Provide open source alternative to expensive or black-box commercial products
 * Enable cost-effective networking solutions for system integrators
 * Substantial per-unit cost savings when deploying multiple units in-house compared to commercial alternatives
 
 *Technical Requirements:*
+
 * 500kBaud sustained throughput capability
 * Sub-5ms latency for real-time applications
 * Critical system uptime within environmental specifications
@@ -94,7 +100,7 @@ Real-time data transmission capabilities
 
 |3|*Compatibility* +
 Seamless integration with diverse industrial systems
-|The device must work transparently with various PLCs, SCADA systems, measurement instruments, and legacy equipment without requiring custom drivers or protocol modifications. A technician connecting an existing Siemens PLC to a Wonderware SCADA system should achieve immediate data flow without configuration conflicts.
+|The system must work reliably with a broad range of custom baud rates and protocol parameters. It should reliably auto-negotiate ethernet connection parameters.
 
 |4|*Usability* +
 Simple deployment without specialized knowledge
