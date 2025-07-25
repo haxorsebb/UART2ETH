@@ -351,7 +351,7 @@
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27Introduction+and+Goals%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/src/01_introduction_and_goals.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27Introduction+and+Goals%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/src/01_introduction_and_goals.adoc%0A%23branch:%20-" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -404,33 +404,75 @@
 <div class="sect3">
 <h4 id="_core_functional_requirements">Core Functional Requirements</h4>
 <div class="paragraph">
-<p><strong>Hardware Capabilities:</strong>
-* Support up to 4 independent UART interfaces
-* RPI RP2350 microcontroller platform
-* Ethernet connectivity via ENC28J60 SPI controller
-* 100Mbit network interface with RJ45 connector</p>
+<p><strong>Hardware Capabilities:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Support up to 4 independent UART interfaces</p>
+</li>
+<li>
+<p>100Mbit network interface with RJ45 connector</p>
+</li>
+</ul>
 </div>
 <div class="paragraph">
-<p><strong>Networking Features:</strong>
-* Each UART exposed as individual TCP socket on dedicated port
-* Raw TCP socket communication for transparent data transmission
-* Support for concurrent connections (1 TCP connection per UART)</p>
+<p><strong>Networking Features:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Each UART exposed as individual TCP socket on dedicated port</p>
+</li>
+<li>
+<p>Raw TCP socket communication for transparent data transmission</p>
+</li>
+<li>
+<p>Support for concurrent connections (1 TCP connection per UART)</p>
+</li>
+</ul>
 </div>
 <div class="paragraph">
-<p><strong>Operating Modes:</strong>
-* Full Bridge Mode: Transparent UART-over-TCP for remote device connections
-* Gateway Mode: Add networking capabilities to existing products without firmware modifications</p>
+<p><strong>Operating Modes:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Full Bridge Mode: Transparent UART-over-TCP for remote device connections</p>
+</li>
+<li>
+<p>Gateway Mode: Add networking capabilities to existing products without firmware modifications</p>
+</li>
+</ul>
 </div>
 <div class="paragraph">
-<p><strong>Firmware Management:</strong>
-* Secure Over-The-Air (OTA) firmware updates
-* A/B update mechanism for rollback capability</p>
+<p><strong>Firmware Management:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Secure Over-The-Air (OTA) firmware updates</p>
+</li>
+<li>
+<p>A/B update mechanism for rollback capability</p>
+</li>
+</ul>
 </div>
 <div class="paragraph">
-<p><strong>Protocol Optimization:</strong>
-* Custom pluggable serial protocol filters for efficient TCP packaging
-* Configurable packet caching with ring buffer implementation
-* Adjustable transmit timeouts for latency or bulk transfer optimization</p>
+<p><strong>Protocol Optimization:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Custom pluggable serial protocol filters for efficient TCP packaging</p>
+</li>
+<li>
+<p>Configurable packet caching with ring buffer implementation</p>
+</li>
+<li>
+<p>Adjustable transmit timeouts for latency or bulk transfer optimization</p>
+</li>
+</ul>
 </div>
 </div>
 <div class="sect3">
@@ -469,23 +511,55 @@
 <div class="sect3">
 <h4 id="_driving_forces">Driving Forces</h4>
 <div class="paragraph">
-<p><strong>Regulatory Compliance:</strong>
-* Western-only component supply chain for regulatory compliance
-* Anticipation of new regulations requiring updateable and auditable firmware
-* CE certification requirement for hardware</p>
+<p><strong>Regulatory Compliance:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Western-only component supply chain for regulatory compliance</p>
+</li>
+<li>
+<p>Anticipation of new regulations requiring updateable and auditable firmware</p>
+</li>
+<li>
+<p>CE certification requirement for hardware</p>
+</li>
+</ul>
 </div>
 <div class="paragraph">
-<p><strong>Market Requirements:</strong>
-* Address gap left by discontinued commercial UART-to-TCP solutions
-* Provide open source alternative to expensive or black-box commercial products
-* Enable cost-effective networking solutions for system integrators
-* Substantial per-unit cost savings when deploying multiple units in-house compared to commercial alternatives</p>
+<p><strong>Market Requirements:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Address gap left by discontinued commercial UART-to-TCP solutions</p>
+</li>
+<li>
+<p>Provide open source alternative to expensive or black-box commercial products</p>
+</li>
+<li>
+<p>Enable cost-effective networking solutions for system integrators</p>
+</li>
+<li>
+<p>Substantial per-unit cost savings when deploying multiple units in-house compared to commercial alternatives</p>
+</li>
+</ul>
 </div>
 <div class="paragraph">
-<p><strong>Technical Requirements:</strong>
-* 500kBaud sustained throughput capability
-* Sub-5ms latency for real-time applications
-* Critical system uptime within environmental specifications</p>
+<p><strong>Technical Requirements:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>500kBaud sustained throughput capability</p>
+</li>
+<li>
+<p>Sub-5ms latency for real-time applications</p>
+</li>
+<li>
+<p>Critical system uptime within environmental specifications</p>
+</li>
+</ul>
 </div>
 </div>
 </div>
@@ -524,7 +598,7 @@ Real-time data transmission capabilities</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Compatibility</strong><br>
 Seamless integration with diverse industrial systems</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The device must work transparently with various PLCs, SCADA systems, measurement instruments, and legacy equipment without requiring custom drivers or protocol modifications. A technician connecting an existing Siemens PLC to a Wonderware SCADA system should achieve immediate data flow without configuration conflicts.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The system must work reliably with a broad range of custom baud rates and protocol parameters. It should reliably auto-negotiate ethernet connection parameters.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
