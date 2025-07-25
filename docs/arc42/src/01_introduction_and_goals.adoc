@@ -26,8 +26,6 @@ UART2ETH provides a hardware and firmware solution for bridging UART interfaces 
 
 *Hardware Capabilities:*
 * Support up to 4 independent UART interfaces
-* RPI RP2350 microcontroller platform
-* Ethernet connectivity via ENC28J60 SPI controller
 * 100Mbit network interface with RJ45 connector
 
 *Networking Features:*
