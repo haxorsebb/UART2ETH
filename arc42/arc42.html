@@ -351,7 +351,7 @@
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+Template%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/arc42.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+Template%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/arc42.adoc%0A%23branch:%20-" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -373,8 +373,13 @@
 <li><a href="#section-architecture-constraints">2. Architecture Constraints</a></li>
 <li><a href="#section-context-and-scope">3. Context and Scope</a>
 <ul class="sectlevel2">
-<li><a href="#_business_context">3.1. Business Context</a></li>
-<li><a href="#_technical_context">3.2. Technical Context</a></li>
+<li><a href="#_system_overview">3.1. System Overview</a></li>
+<li><a href="#_system_scope_and_boundaries">3.2. System Scope and Boundaries</a></li>
+<li><a href="#_business_context">3.3. Business Context</a></li>
+<li><a href="#_technical_context">3.4. Technical Context</a></li>
+<li><a href="#_operating_mode_contexts">3.5. Operating Mode Contexts</a></li>
+<li><a href="#_integration_architecture">3.6. Integration Architecture</a></li>
+<li><a href="#_future_state_considerations">3.7. Future State Considerations</a></li>
 </ul>
 </li>
 <li><a href="#section-solution-strategy">4. Solution Strategy</a></li>
@@ -1158,64 +1163,442 @@ conventions (e.g. programming or versioning guidelines, documentation or naming 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_business_context">3.1. Business Context</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
+<h3 id="_system_overview">3.1. System Overview</h3>
 <div class="paragraph">
-<div class="title">Contents</div>
-<p>Specification of <strong>all</strong> communication partners (users, IT-systems, &#8230;&#8203;) with explanations of domain specific inputs and outputs or interfaces.
-Optionally you can add domain specific formats or communication protocols.</p>
+<p>UART2ETH operates as a networking bridge that enables legacy industrial equipment with UART interfaces to communicate over TCP/IP networks. The system serves as a critical integration point in industrial automation environments, supporting two distinct operating modes:</p>
 </div>
 <div class="paragraph">
-<div class="title">Motivation</div>
-<p>All stakeholders should understand which data are exchanged with the environment of the system.</p>
+<p><strong>Gateway Mode</strong>: UART2ETH adds networking capabilities to existing Host Systems without requiring firmware modifications. The Host System maintains its original UART-based communication while Client Systems access it via TCP sockets over the network.</p>
 </div>
 <div class="paragraph">
-<div class="title">Form</div>
-<p>All kinds of diagrams that show the system as a black box and specify the domain interfaces to communication partners.</p>
-</div>
-<div class="paragraph">
-<p>Alternatively (or additionally) you can use a table.
-The title of the table is the name of your system, the three columns contain the name of the communication partner, the inputs, and the outputs.</p>
-</div>
-</div>
-</div>
-<div class="paragraph">
-<p><strong>&lt;Diagram or Table&gt;</strong></p>
-</div>
-<div class="paragraph">
-<p><strong>&lt;optionally: Explanation of external domain interfaces&gt;</strong></p>
+<p><strong>Full Bridge Mode</strong>: UART2ETH provides transparent UART-over-TCP connectivity, allowing two Host Systems with UART interfaces to communicate over network infrastructure as if they were directly connected via serial cable.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_technical_context">3.2. Technical Context</h3>
-<div class="sidebarblock arc42help">
+<h3 id="_system_scope_and_boundaries">3.2. System Scope and Boundaries</h3>
+<div class="paragraph">
+<p><strong>Inside the System Boundary:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>RP2350 microcontroller</p>
+</li>
+<li>
+<p>Up to 4 UART interfaces</p>
+</li>
+<li>
+<p>Network interface controller (100Mbit Ethernet)</p>
+</li>
+<li>
+<p>Protocol filtering and optimization engines</p>
+</li>
+<li>
+<p>OTA update mechanism with A/B partitioning</p>
+</li>
+<li>
+<p>Device configuration and management interfaces</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Outside the System Boundary:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Host Systems (PLCs, sensors, measurement instruments)</p>
+</li>
+<li>
+<p>Client Systems (SCADA systems, monitoring applications)</p>
+</li>
+<li>
+<p>Network infrastructure (switches, routers, firewalls)</p>
+</li>
+<li>
+<p>Firmware update servers and management systems</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_business_context">3.3. Business Context</h3>
+<div class="imageblock">
 <div class="content">
+<img src="./images/system-context-business.svg" alt="system context business" width="1380" height="888">
+</div>
+</div>
+<div class="sect3">
+<h4 id="_primary_stakeholders">3.3.1. Primary Stakeholders</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Stakeholder</th>
+<th class="tableblock halign-left valign-top">Role</th>
+<th class="tableblock halign-left valign-top">Primary Business Interactions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial Engineers</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Solution designers and specifiers</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Define networking requirements for automation projects, specify UART2ETH configurations for integrating legacy equipment into modern networks</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System Integrators</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implementation specialists</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deploy UART2ETH devices in customer facilities, configure networking parameters, integrate with existing SCADA and monitoring systems</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Field Technicians</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Installation and maintenance personnel</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Physical installation of devices, diagnostic troubleshooting, basic configuration changes, routine maintenance procedures</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Equipment Manufacturers</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Original equipment makers</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Embed UART2ETH into products to add networking capabilities, specify custom protocol filters, integrate with product lifecycle management</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_business_use_cases">3.3.2. Business Use Cases</h4>
 <div class="paragraph">
-<div class="title">Contents</div>
-<p>Technical interfaces (channels and transmission media) linking your system to its environment. In addition a mapping of domain specific input/output to the channels, i.e. an explanation which I/O uses which channel.</p>
+<p><strong>Legacy Equipment Integration:</strong>
+Industrial Engineers specify UART2ETH to network aging PLCs, sensors, and measurement instruments that lack modern connectivity. System Integrators deploy these solutions to extend equipment lifecycles and enable remote monitoring without costly equipment replacement.</p>
 </div>
 <div class="paragraph">
-<div class="title">Motivation</div>
-<p>Many stakeholders make architectural decision based on the technical interfaces between the system and its context. Especially infrastructure or hardware designers decide these technical interfaces.</p>
+<p><strong>Infrastructure Problem Solving:</strong>
+Field installations requiring long cable runs or operating in electrically noisy environments use UART2ETH to overcome serial communication limitations through network-based transmission.</p>
 </div>
 <div class="paragraph">
-<div class="title">Form</div>
-<p>E.g. UML deployment diagram describing channels to neighboring systems,
-together with a mapping table showing the relationships between channels and input/output.</p>
+<p><strong>Remote Access Enablement:</strong>
+SCADA systems and monitoring applications access distributed serial devices through UART2ETH bridges, enabling centralized control and data collection across geographically dispersed facilities.</p>
 </div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_technical_context">3.4. Technical Context</h3>
+<div class="imageblock">
+<div class="content">
+<img src="./images/system-context-technical.svg" alt="system context technical" width="1357" height="1453">
+</div>
+</div>
+<div class="sect3">
+<h4 id="_technical_interface_specifications">3.4.1. Technical Interface Specifications</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 30%;">
+<col style="width: 30%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Interface</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Technical Details</th>
+<th class="tableblock halign-left valign-top">Communication Pattern</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART Ports (4x)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Host System Interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART/RS232/RS422, 300-500k baud, configurable parameters</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Bidirectional serial, protocol-agnostic</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ethernet Port</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Network Interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">100BASE-TX, RJ45 connector, Auto-MDIX</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TCP/IP networking, DHCP/Static IP</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TCP Sockets</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Client Interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ports configurable, single connection per port</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TCP client connections, application protocols</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Management Interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration Interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Web UI (HTTP), configuration interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP, JSON configuration</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OTA Update Interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Firmware Interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Secure update server, A/B partition management</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP, signed firmware images</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_communication_protocols_and_data_formats">3.4.2. Communication Protocols and Data Formats</h4>
+<div class="paragraph">
+<p><strong>UART Communication:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Raw serial data transmission (protocol-agnostic)</p>
+</li>
+<li>
+<p>Configurable baud rates: 300 bps to 500 kbps</p>
+</li>
+<li>
+<p>Support for custom frame formats and timing requirements</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Network Communication:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>TCP socket connections for data transmission</p>
+</li>
+<li>
+<p>JSON for configuration and management data</p>
+</li>
+<li>
+<p>Binary protocol passthrough with optional filtering</p>
+</li>
+<li>
+<p>HTTP for management and OTA updates</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Network Protocols:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>IPv4 with DHCP or static configuration</p>
+</li>
+<li>
+<p>NTP for time synchronization</p>
+</li>
+<li>
+<p>DNS for name resolution</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_operating_mode_contexts">3.5. Operating Mode Contexts</h3>
+<div class="sect3">
+<h4 id="_gateway_mode_context">3.5.1. Gateway Mode Context</h4>
+<div class="imageblock">
+<div class="content">
+<img src="./images/gateway-mode-context.svg" alt="gateway mode context" width="710" height="720">
 </div>
 </div>
 <div class="paragraph">
-<p><strong>&lt;Diagram or Table&gt;</strong></p>
+<p><strong>Gateway Mode Data Flow:</strong>
+1. Host System sends serial data using original protocol to UART2ETH
+2. UART2ETH receives serial data and applies protocol filtering/optimization
+3. Processed data is transmitted to Client Systems via TCP sockets
+4. Client Systems send responses back through TCP connections
+5. UART2ETH forwards responses to Host System via UART interface</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_full_bridge_mode_context">3.5.2. Full Bridge Mode Context</h4>
+<div class="imageblock">
+<div class="content">
+<img src="./images/bridge-mode-context.svg" alt="bridge mode context" width="689" height="834">
+</div>
 </div>
 <div class="paragraph">
-<p><strong>&lt;optionally: Explanation of technical interfaces&gt;</strong></p>
+<p><strong>Full Bridge Mode Data Flow:</strong>
+1. Host System A sends serial data to UART2ETH A
+2. UART2ETH A encapsulates serial data in TCP packets and transmits over network
+3. UART2ETH B receives TCP packets and extracts original serial data
+4. UART2ETH B forwards serial data to Host System B via UART
+5. Bidirectional communication maintains transparent serial connection</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_integration_architecture">3.6. Integration Architecture</h3>
+<div class="sect3">
+<h4 id="_critical_dependencies">3.6.1. Critical Dependencies</h4>
+<div class="paragraph">
+<p><strong>Network Infrastructure Dependencies:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Reliable Ethernet connectivity for TCP/IP communication</p>
+</li>
+<li>
+<p>Network switches with appropriate bandwidth and latency characteristics</p>
+</li>
+<li>
+<p>DHCP services for automatic IP configuration (or static IP management)</p>
+</li>
+<li>
+<p>Network time synchronization for accurate timestamping</p>
+</li>
+</ul>
 </div>
 <div class="paragraph">
-<p><strong>&lt;Mapping Input/Output to Channels&gt;</strong></p>
+<p><strong>Power and Environmental Dependencies:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>3.3V-24V power supply within industrial specifications</p>
+</li>
+<li>
+<p>Operating temperature range suitable for industrial environments</p>
+</li>
+<li>
+<p>Protection from electromagnetic interference in industrial settings</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Security Dependencies:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Network firewall configuration to allow necessary TCP ports</p>
+</li>
+<li>
+<p>Firmware signing infrastructure for secure OTA updates</p>
+</li>
+<li>
+<p>Network segmentation appropriate for industrial security requirements</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_security_and_compliance_boundaries">3.6.2. Security and Compliance Boundaries</h4>
+<div class="paragraph">
+<p><strong>Network Security:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Cryptographic signatures for firmware validation and integrity</p>
+</li>
+<li>
+<p>Configurable TCP port ranges to support firewall policies</p>
+</li>
+<li>
+<p>Input validation and sanitization for all network interfaces</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Industrial Compliance:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>CE certification for European industrial markets</p>
+</li>
+<li>
+<p>Electromagnetic compatibility (EMC) for industrial environments</p>
+</li>
+<li>
+<p>Component sourcing from Western suppliers for regulatory compliance</p>
+</li>
+<li>
+<p>Audit trail for firmware updates and configuration changes</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_performance_and_scalability_characteristics">3.6.3. Performance and Scalability Characteristics</h4>
+<div class="paragraph">
+<p><strong>Performance Requirements:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>500 kbps sustained throughput per UART port</p>
+</li>
+<li>
+<p>Sub-5ms end-to-end latency for real-time applications</p>
+</li>
+<li>
+<p>Concurrent TCP connections (one per UART port)</p>
+</li>
+<li>
+<p>Configurable buffering for latency vs. throughput optimization</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Scalability Considerations:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Up to 4 simultaneous UART-to-TCP bridges per device</p>
+</li>
+<li>
+<p>Network deployment limited by IP address availability and network bandwidth</p>
+</li>
+<li>
+<p>Protocol filtering reduces network traffic for efficient bulk transfers</p>
+</li>
+<li>
+<p>A/B firmware updates enable fleet-wide updates without service interruption</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_future_state_considerations">3.7. Future State Considerations</h3>
+<div class="sect3">
+<h4 id="_planned_integrations">3.7.1. Planned Integrations</h4>
+<div class="paragraph">
+<p><strong>Enhanced Protocol Support:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Additional protocol filters for common industrial protocols (Modbus, DNP3, IEC 61850)</p>
+</li>
+<li>
+<p>HTTPS/TLS on-the-wire encryption</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Advanced Management Features:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Integration with network management systems (SNMP, NETCONF)</p>
+</li>
+<li>
+<p>Enhanced diagnostic and monitoring capabilities</p>
+</li>
+</ul>
 </div>
 <div style="page-break-after: always;"></div>
+</div>
 </div>
 </div>
 </div>
@@ -2162,12 +2545,56 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Term-1&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;definition-1&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A/B Updates</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Firmware update mechanism that maintains two separate firmware partitions, allowing safe rollback to previous version if new firmware fails</em></p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Term-2&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;definition-2&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Client System</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>In Gateway Mode, the system connected to the network side of UART2ETH that communicates via TCP sockets</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Full Bridge Mode</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Operating mode where UART2ETH provides transparent UART-over-TCP connectivity, allowing two Host Systems with UART interfaces to communicate over network as if directly connected</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Gateway Mode</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Operating mode where UART2ETH adds networking capabilities to existing products by bridging between a Host System&#8217;s UART interface and Client Systems on the network</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Host System</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>System connected to the UART side of UART2ETH. In Gateway Mode, this is the legacy equipment being networked. In Full Bridge Mode, both connected systems are Host Systems</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>OTA (Over-The-Air)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Firmware update mechanism allowing remote updates without physical access to the device</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>PLC (Programmable Logic Controller)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Industrial control system used in manufacturing and automation applications</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Protocol Filter</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Pluggable software component that processes and optimizes serial data streams for efficient TCP transmission</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>RPI RP2350</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Raspberry Pi microcontroller chip serving as the main processing unit for UART2ETH hardware</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>SCADA (Supervisory Control and Data Acquisition)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Industrial control system architecture for monitoring and controlling industrial processes</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>TCP Socket</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Network communication endpoint using Transmission Control Protocol for reliable data transmission</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>UART (Universal Asynchronous Receiver-Transmitter)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Serial communication protocol commonly used in embedded systems and industrial equipment</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>UART2ETH</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The complete hardware and firmware solution for bridging UART interfaces to TCP sockets, supporting up to 4 UART ports</em></p></td>
 </tr>
 </tbody>
 </table>

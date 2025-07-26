@@ -351,7 +351,7 @@
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27Glossary%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/src/12_glossary.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27Glossary%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/src/12_glossary.adoc%0A%23branch:%20-" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -400,12 +400,56 @@
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Term-1&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;definition-1&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A/B Updates</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Firmware update mechanism that maintains two separate firmware partitions, allowing safe rollback to previous version if new firmware fails</em></p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Term-2&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;definition-2&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Client System</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>In Gateway Mode, the system connected to the network side of UART2ETH that communicates via TCP sockets</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Full Bridge Mode</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Operating mode where UART2ETH provides transparent UART-over-TCP connectivity, allowing two Host Systems with UART interfaces to communicate over network as if directly connected</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Gateway Mode</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Operating mode where UART2ETH adds networking capabilities to existing products by bridging between a Host System&#8217;s UART interface and Client Systems on the network</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Host System</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>System connected to the UART side of UART2ETH. In Gateway Mode, this is the legacy equipment being networked. In Full Bridge Mode, both connected systems are Host Systems</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>OTA (Over-The-Air)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Firmware update mechanism allowing remote updates without physical access to the device</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>PLC (Programmable Logic Controller)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Industrial control system used in manufacturing and automation applications</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Protocol Filter</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Pluggable software component that processes and optimizes serial data streams for efficient TCP transmission</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>RPI RP2350</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Raspberry Pi microcontroller chip serving as the main processing unit for UART2ETH hardware</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>SCADA (Supervisory Control and Data Acquisition)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Industrial control system architecture for monitoring and controlling industrial processes</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>TCP Socket</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Network communication endpoint using Transmission Control Protocol for reliable data transmission</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>UART (Universal Asynchronous Receiver-Transmitter)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Serial communication protocol commonly used in embedded systems and industrial equipment</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>UART2ETH</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The complete hardware and firmware solution for bridging UART interfaces to TCP sockets, supporting up to 4 UART ports</em></p></td>
 </tr>
 </tbody>
 </table>
