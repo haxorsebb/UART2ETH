@@ -370,7 +370,14 @@
 <li><a href="#_stakeholders">1.3. Stakeholders</a></li>
 </ul>
 </li>
-<li><a href="#section-architecture-constraints">2. Architecture Constraints</a></li>
+<li><a href="#section-architecture-constraints">2. Architecture Constraints</a>
+<ul class="sectlevel2">
+<li><a href="#_technical_constraints">2.1. Technical Constraints</a></li>
+<li><a href="#_organizational_constraints">2.2. Organizational Constraints</a></li>
+<li><a href="#_economic_constraints">2.3. Economic Constraints</a></li>
+<li><a href="#_regulatory_and_legal_constraints">2.4. Regulatory and Legal Constraints</a></li>
+</ul>
+</li>
 <li><a href="#section-context-and-scope">3. Context and Scope</a>
 <ul class="sectlevel2">
 <li><a href="#_system_overview">3.1. System Overview</a></li>
@@ -1122,7 +1129,163 @@ conventions (e.g. programming or versioning guidelines, documentation or naming 
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_technical_constraints">2.1. Technical Constraints</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 16.6666%;">
+<col style="width: 50%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Constraint</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hardware Platform</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Must use RP2350 microcontroller as primary processing unit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides required security features for OTA updates, sufficient processing power for 4 UART channels, and western supply chain compliance</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Component Sourcing</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All components must be sourced from western suppliers only</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Regulatory compliance requirement for target markets and supply chain security considerations</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance Requirements</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Minimum 500kBaud sustained throughput with sub-5ms latency per UART channel</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial application requirements for real-time data transmission</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">100Mbit Ethernet connectivity via SPI-based controller</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Cost constraints and sufficient bandwidth for target applications while maintaining hardware simplicity</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Channel Limit</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maximum 4 independent UART interfaces</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware resource limitations of chosen microcontroller platform and cost optimization</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_organizational_constraints">2.2. Organizational Constraints</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 16.6666%;">
+<col style="width: 50%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Constraint</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Open Source License</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Complete system must be released under GPL license</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Leverage existing open source libraries and reduce implementation effort by reusing proven components</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Process</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Test-driven development (TDD) approach mandatory for all production code</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality assurance and maintainability requirements for industrial application reliability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Documentation Standard</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Architecture documentation must follow arc42 template structure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standardized documentation approach for future maintainers and contributors</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Version Control</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GitHub-based development workflow with mandatory pull request reviews</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Code quality control and collaborative development coordination</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_economic_constraints">2.3. Economic Constraints</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 16.6666%;">
+<col style="width: 50%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Constraint</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hardware Cost</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware target price per unit must be significantly below commercially available solutions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Competitive market positioning requires substantial cost advantage to justify adoption over established commercial products</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Effort</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Development effort must achieve return on investment within first year of deployment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Resource allocation constraint limits project scope and complexity to ensure economic viability and timely market entry</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_regulatory_and_legal_constraints">2.4. Regulatory and Legal Constraints</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 16.6666%;">
+<col style="width: 50%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Constraint</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>CE Certification</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware must achieve CE compliance for European market</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Legal requirement for commercial deployment in target markets</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Firmware Security</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Must implement secure boot and signed firmware update mechanisms</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Anticipated regulatory requirements for updateable industrial devices</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>EMC Compliance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Electromagnetic compatibility requirements for industrial environments</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Regulatory requirement and operational necessity in electrically noisy industrial settings</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Export Control</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No components or technologies subject to export restrictions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Unrestricted distribution and deployment capability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Patent Avoidance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Must not infringe on existing patents in communication protocols or hardware interfaces</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Legal risk mitigation and freedom to operate requirements</p></td>
+</tr>
+</tbody>
+</table>
 <div style="page-break-after: always;"></div>
+</div>
 </div>
 </div>
 <div class="sect1">
