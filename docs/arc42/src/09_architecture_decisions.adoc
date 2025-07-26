@@ -41,6 +41,10 @@ This section references the Architecture Decision Records (ADRs) that document k
 === Hardware Platform Decisions
 
 * link:../../adrs/ADR-001-microcontroller-selection.adoc[ADR-001: Microcontroller Platform Selection] - Documents the decision to use the Raspberry Pi RP2350 as the core microcontroller platform.
-* link:../../adrs/ADR-002-ethernet-controller-selection.adoc[ADR-002: Ethernet Controller Selection] - Documents the decision to use the WIZnet W5500 as the Ethernet controller.
+* link:../../adrs/ADR-002-ethernet-controller-selection.adoc[ADR-002: Ethernet Controller Selection] - Documents the decision to use the ENC28J60 as the Ethernet controller.
 
-These decisions form the foundation of the hardware architecture and significantly influence the system's capabilities, performance characteristics, and development approach.
+=== Software Platform Decisions
+
+* link:../../adrs/ADR-003-programming-language-selection.adoc[ADR-003: Programming Language Selection] - Documents the decision to use C programming language for firmware development, considering team expertise, delivery timeline, and memory model constraints.
+
+These decisions form the foundation of the hardware and software architecture and significantly influence the system's capabilities, performance characteristics, and development approach.

@@ -220,7 +220,7 @@ FreeRTOS support
 | **WIZnet W5500 Ethernet Controller** - Hardware TCP/IP stack offloads networking processing from main CPU, proven industrial reliability, SPI interface
 
 | *Development Framework*
-| **Pico SDK (C/C++)** - Official Raspberry Pi SDK provides direct hardware access, real-time performance, comprehensive documentation and examples
+| **Pico SDK (C)** - Official Raspberry Pi SDK provides direct hardware access, real-time performance, comprehensive documentation and examples (see ADR-003)
 
 | *UART Implementation*
 | **Hybrid Hardware + PIO UARTs** - 2 hardware UARTs for primary connections, PIO state machines for additional UARTs with custom protocol timing

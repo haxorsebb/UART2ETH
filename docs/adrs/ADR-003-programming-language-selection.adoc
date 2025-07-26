@@ -1,0 +1,252 @@
+= ADR-003: Programming Language Selection for UART2ETH
+
+*Status:* PROPOSED +
+*Date:* 2025-07-26 +
+*Deciders:* Architecture Team +
+*Consulted:* Senior Developer +
+*Informed:* Development Team
+
+== Context
+
+The UART2ETH system requires selecting a programming language for firmware development on the RP2350 microcontroller. This decision directly impacts development velocity, system reliability, maintainability, and the ability to meet project delivery timelines.
+
+Based on hardware platform decisions (ADR-001: RP2350 selection, ADR-002: ENC28J60 selection), we need a programming language that can:
+
+* Deliver industrial-grade reliability for 4 concurrent UART-to-TCP bridges
+* Support real-time performance requirements (500 kbps per port, sub-5ms latency)
+* Enable rapid development with existing team expertise
+* Operate efficiently in severely memory-constrained environment (520KB SRAM, static allocation)
+* Provide adequate safety guarantees for industrial deployment
+* Meet aggressive project delivery timeline ("deliver yesterday")
+* Must operate reliably in industrial environments (-40°C to +85°C) 😉
+
+The programming language selection fundamentally determines development productivity, code maintainability, and the feasibility of meeting project deadlines with current team capabilities.
+
+== Decision Drivers
+
+=== Primary Requirements
+
+* *Development Velocity*: Critical time-to-market pressure requiring immediate productivity
+* *Team Expertise*: Leveraging existing microcontroller team's deep C experience
+* *Industrial Reliability*: Proven track record in embedded industrial applications
+* *Memory Model Fit*: Optimal performance in static memory allocation environment
+* *Ecosystem Maturity*: Comprehensive tooling, libraries, and vendor support
+* *Real-time Determinism*: Predictable behavior for latency-critical applications
+* *Hardware Integration*: Direct access to RP2350 and ENC28J60 peripherals
+* *Debugging Capabilities*: Mature debugging tools for embedded development
+
+=== Constraints
+
+* Aggressive delivery timeline with no room for learning curve delays
+* Small project scope where complexity management is achievable
+* Static memory allocation model (no dynamic allocation)
+* Team expertise concentrated in C/C++ embedded development
+* Must operate reliably in industrial environments (-40°C to +85°C) 😉
+
+== Options Considered
+
+=== Option A: C Programming Language
+
+* *Ecosystem*: Mature ecosystem with comprehensive RP2350 Pico SDK support
+* *Team Expertise*: Deep existing knowledge in microcontroller team
+* *Development Velocity*: Immediate productivity, no learning curve
+* *Memory Model*: Direct, predictable memory management with static allocation
+* *Tooling*: Mature debugging (GDB, OpenOCD), profiling, and analysis tools
+* *Hardware Support*: Full vendor support for RP2350 and ENC28J60
+* *Industrial Track Record*: Decades of proven deployment in embedded systems
+* *Real-time Performance*: Deterministic, low-level control over hardware
+* *Memory Safety*: Achievable through disciplined practices and comprehensive testing
+* *Standards Compliance*: MISRA-C guidelines for industrial safety
+
+=== Option B: Rust Programming Language
+
+* *Ecosystem*: Emerging ecosystem with excellent RP2350 day-one support (rp235x-hal)
+* *Team Expertise*: No existing knowledge, 6-12 month learning curve to proficiency
+* *Development Velocity*: Significant initial productivity loss during team transition
+* *Memory Model*: Memory safety guarantees less relevant in static allocation environment
+* *Tooling*: Improving but less mature debugging tools (probe-rs vs GDB)
+* *Hardware Support*: Good RP2350 support, limited ENC28J60 ecosystem
+* *Industrial Track Record*: Limited embedded deployment history
+* *Real-time Performance*: Embassy framework provides async capabilities
+* *Memory Safety*: Compile-time guarantees prevent entire classes of bugs
+* *Modern Features*: Advanced type system, zero-cost abstractions
+
+== PUGH Matrix Analysis
+
+_Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)_ +
+_Baseline: C Programming Language (all scores = 0)_
+
+[cols="25,10,15,15"]
+|===
+| *Criteria* | *Weight* | *C Language* | *Rust Language*
+
+| *Development Velocity*
+| 3
+| 0 (baseline)
+| -2 (6-12 month learning curve)
+
+| *Team Expertise*
+| 3
+| 0 (baseline)
+| -2 (zero existing knowledge)
+
+| *Time to Market*
+| 3
+| 0 (baseline)
+| -2 (immediate productivity loss)
+
+| *Ecosystem Maturity*
+| 2
+| 0 (baseline)
+| -1 (emerging, less comprehensive)
+
+| *Memory Safety in Static Environment*
+| 2
+| 0 (baseline)
+| +1 (compile-time checks, limited benefit)
+
+| *Industrial Track Record*
+| 2
+| 0 (baseline)
+| -1 (limited embedded deployment)
+
+| *Hardware Vendor Support*
+| 2
+| 0 (baseline)
+| -1 (good RP2350, limited ENC28J60)
+
+| *Debugging Maturity*
+| 2
+| 0 (baseline)
+| -1 (improving but less mature)
+
+| *Real-time Determinism*
+| 2
+| 0 (baseline)
+| 0 (comparable with Embassy)
+
+| *Code Maintainability*
+| 3
+| 0 (baseline)
+| +1 (better type system)
+
+| *Future Proofing*
+| 4
+| 0 (baseline)
+| +2 (modern language, industry trend)
+
+| *TOTAL WEIGHTED SCORE*
+| 
+| *0*
+| *-13*
+
+|===
+
+== Decision
+
+*Selected: C Programming Language*
+
+The C programming language provides the optimal balance of development velocity, team productivity, and technical capability for the UART2ETH project, scoring significantly higher in our weighted analysis.
+
+== Rationale
+
+=== Why C Over Rust
+
+* *Immediate Productivity*: Team can begin productive development immediately without learning curve delays
+
+* *Time-Critical Delivery*: Project timeline ("deliver yesterday") cannot accommodate 6-12 month Rust learning curve
+
+* *Static Memory Context*: Rust's primary advantages (memory safety) are significantly diminished in our static allocation environment where:
+  - No dynamic allocation eliminates use-after-free, double-free, memory leaks
+  - Fixed buffer sizes and lifetimes reduce dangling pointer risks
+  - Predictable memory layout simplifies debugging and validation
+
+* *Team Expertise Leverage*: Deep microcontroller C experience translates to immediate high-quality code
+
+* *Ecosystem Maturity*: Comprehensive vendor support, mature tooling, extensive industrial deployment history
+
+* *Manageable Complexity*: Small project scope where C complexity is controllable through:
+  - Disciplined coding practices (MISRA-C guidelines)
+  - Comprehensive unit and integration testing
+  - Code reviews focused on memory safety patterns
+  - Static analysis tools
+
+=== Memory Safety Strategy in C
+
+* *Static Allocation*: All memory allocated at compile time, eliminating dynamic memory risks
+* *Defensive Programming*: Bounds checking, input validation, error handling
+* *Testing Strategy*: 100% code coverage, stress testing, hardware-in-the-loop validation
+* *Code Standards*: MISRA-C compliance for industrial safety
+* *Review Process*: Mandatory security-focused code reviews
+
+=== Rust Advantages Acknowledged But Outweighed
+
+* *Compile-time Memory Safety*: Valuable but less critical in static allocation environment
+* *Modern Type System*: Benefits outweighed by learning curve and timeline pressure
+* *Future-proofing*: Theoretical benefit cannot justify immediate delivery risk
+
+== Consequences
+
+=== Positive
+
+* ✅ *Immediate Development Start*: No productivity loss during language transition
+* ✅ *Team Expertise Utilized*: Deep C knowledge translates to high-quality embedded code
+* ✅ *Mature Ecosystem*: Full vendor support, comprehensive tooling, extensive libraries
+* ✅ *Proven Industrial Reliability*: Decades of successful embedded deployments
+* ✅ *Debugging Efficiency*: Mature GDB/OpenOCD toolchain familiar to team
+* ✅ *Timeline Compliance*: Meets aggressive delivery requirements
+
+=== Negative
+
+* ⚠️ *Manual Memory Management*: Requires disciplined practices and comprehensive testing
+* ⚠️ *Potential Security Vulnerabilities*: Manual bounds checking, pointer management
+* ⚠️ *Future Technology Debt*: May require reevaluation for future projects
+* ⚠️ *Missing Modern Features*: Less expressive type system than Rust
+
+=== Risks and Mitigation
+
+* *Memory Safety Risk*: Mitigate through MISRA-C compliance, static analysis, comprehensive testing
+* *Code Quality Risk*: Mitigate through mandatory code reviews, automated testing, continuous integration
+* *Future Maintenance Risk*: Document rationale, plan Rust evaluation for future projects
+
+== Implementation Notes
+
+=== Development Standards
+
+* *MISRA-C Compliance*: Follow MISRA-C:2012 guidelines for industrial safety
+* *Static Analysis*: Integrate PC-lint, Cppcheck, or equivalent in CI pipeline
+* *Memory Management*: Strictly static allocation, no malloc/free usage
+* *Error Handling*: Consistent error codes, graceful degradation strategies
+
+=== Testing Strategy
+
+* *Unit Testing*: 100% code coverage requirement
+* *Integration Testing*: Hardware-in-the-loop validation
+* *Stress Testing*: Extended operation under maximum load conditions
+* *Memory Validation*: Static analysis tools, runtime bounds checking in debug builds
+
+=== Security Practices
+
+* *Input Validation*: All network and UART inputs validated
+* *Buffer Management*: Fixed-size buffers with explicit bounds checking
+* *Secure Coding*: Follow SEI CERT C guidelines
+* *Code Reviews*: Security-focused review process for all code changes
+
+== Follow-up Actions
+
+1. *Development Environment*: Configure MISRA-C checking in build system
+2. *Testing Framework*: Establish unit testing framework with coverage reporting
+3. *Code Standards*: Document project-specific C coding guidelines
+4. *Static Analysis*: Integrate static analysis tools in CI/CD pipeline
+5. *Team Training*: Brief refresher on secure C practices for embedded systems
+6. *Future Evaluation*: Plan Rust reassessment for next major project
+
+---
+
+*Review Notes:*
+
+* [ ] Confirm MISRA-C compliance requirements with quality team
+* [ ] Validate static analysis tool selection
+* [ ] Review memory safety testing strategy
+* [ ] Document specific secure coding guidelines
+* [ ] Plan future Rust evaluation timeline
