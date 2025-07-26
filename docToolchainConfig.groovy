@@ -39,6 +39,7 @@ inputFiles = [
 // as doctoolchain defines :imagesdir: during generation
 imageDirs = [
     /** imageDirs **/
+	"../images",
 ]
 
 // whether the build should fail when detecting broken image references
