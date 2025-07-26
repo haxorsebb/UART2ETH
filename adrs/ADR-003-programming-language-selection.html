@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: adrs/ADR-002-ethernet-controller-selection.html -->
+    <!-- sourceuri: adrs/ADR-003-programming-language-selection.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-002-ethernet-controller-selection.adoc</title>
+    <title>ADR-003: Programming Language Selection for UART2ETH</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -267,12 +267,12 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../adrs/ADR-002-ethernet-controller-selection.html" title="ADR-002-ethernet-controller-selection.adoc">ADR-002-ethernet-controller-selection.adoc</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../adrs/ADR-003-programming-language-selection.html" title="ADR-003: Programming Language Selection for UART2ETH">ADR-003: Programming Language Selection for UART2ETH</a>
                                 
                             </li>
@@ -288,11 +288,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/adrs/ADR-002-ethernet-controller-selection.adoc"
+        <a href="##git-repo-url##/adrs/ADR-003-programming-language-selection.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-002-ethernet-controller-selection.adoc%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/adrs/ADR-002-ethernet-controller-selection.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-003%3A+Programming+Language+Selection+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/adrs/ADR-003-programming-language-selection.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -301,42 +301,17 @@
 
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
-<ul class="sectlevel0">
-<li><a href="#_adr_002_ethernet_controller_selection_for_uart2eth">ADR-002: Ethernet Controller Selection for UART2ETH</a>
 <ul class="sectlevel1">
+<li><a href="#_adr_003_programming_language_selection_for_uart2eth">ADR-003: Programming Language Selection for UART2ETH</a>
+<ul class="sectlevel2">
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision_drivers">Decision Drivers</a>
-<ul class="sectlevel2">
-<li><a href="#_primary_requirements">Primary Requirements</a></li>
-<li><a href="#_constraints">Constraints</a></li>
-</ul>
-</li>
-<li><a href="#_options_considered">Options Considered</a>
-<ul class="sectlevel2">
-<li><a href="#_option_a_wiznet_w5500">Option A: WIZnet W5500</a></li>
-<li><a href="#_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</a></li>
-</ul>
-</li>
+<li><a href="#_decision_drivers">Decision Drivers</a></li>
+<li><a href="#_options_considered">Options Considered</a></li>
 <li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
 <li><a href="#_decision">Decision</a></li>
-<li><a href="#_rationale">Rationale</a>
-<ul class="sectlevel2">
-<li><a href="#_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</a></li>
-<li><a href="#_trade_offs_accepted">Trade-offs Accepted</a></li>
-</ul>
-</li>
-<li><a href="#_consequences">Consequences</a>
-<ul class="sectlevel2">
-<li><a href="#_positive">Positive</a></li>
-<li><a href="#_negative">Negative</a></li>
-<li><a href="#_risks_and_mitigation">Risks and Mitigation</a></li>
-</ul>
-</li>
-<li><a href="#_implementation_notes">Implementation Notes</a>
-<ul class="sectlevel2">
-<li><a href="#_performance_optimization">Performance Optimization</a></li>
-</ul>
-</li>
+<li><a href="#_rationale">Rationale</a></li>
+<li><a href="#_consequences">Consequences</a></li>
+<li><a href="#_implementation_notes">Implementation Notes</a></li>
 <li><a href="#_follow_up_actions">Follow-up Actions</a></li>
 </ul>
 </li>
@@ -362,7 +337,9 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_002_ethernet_controller_selection_for_uart2eth" class="sect0">ADR-002: Ethernet Controller Selection for UART2ETH</h1>
+<div class="sect1">
+<h2 id="_adr_003_programming_language_selection_for_uart2eth">ADR-003: Programming Language Selection for UART2ETH</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p><strong>Status:</strong> PROPOSED<br>
 <strong>Date:</strong> 2025-07-26<br>
@@ -370,203 +347,181 @@
 <strong>Consulted:</strong> Senior Developer<br>
 <strong>Informed:</strong> Development Team</p>
 </div>
-<div class="sect1">
-<h2 id="_context">Context</h2>
-<div class="sectionbody">
+<div class="sect2">
+<h3 id="_context">Context</h3>
 <div class="paragraph">
-<p>The UART2ETH system requires an Ethernet controller that interfaces with the RP2350 microcontroller via SPI to provide reliable TCP/IP connectivity. This component is critical for the core networking functionality of our product.</p>
+<p>The UART2ETH system requires selecting a programming language for firmware development on the RP2350 microcontroller. This decision directly impacts development velocity, system reliability, maintainability, and the ability to meet project delivery timelines.</p>
 </div>
 <div class="paragraph">
-<p>Based on our microcontroller selection (ADR-001), we need to determine the most appropriate Ethernet controller solution that can:</p>
+<p>Based on hardware platform decisions (ADR-001: RP2350 selection, ADR-002: ENC28J60 selection), we need a programming language that can:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>Support 100 Mbps Ethernet connectivity</p>
+<p>Deliver industrial-grade reliability for 4 concurrent UART-to-TCP bridges</p>
 </li>
 <li>
-<p>Interface with the RP2350 via SPI</p>
+<p>Support real-time performance requirements (500 kbps per port, sub-5ms latency)</p>
 </li>
 <li>
-<p>Handle the networking requirements of up to 4 concurrent UART-to-TCP bridges</p>
+<p>Enable rapid development with existing team expertise</p>
 </li>
 <li>
-<p>Operate reliably in industrial environments (-40°C to +85°C)</p>
+<p>Operate efficiently in severely memory-constrained environment (520KB SRAM, static allocation)</p>
 </li>
 <li>
-<p>Maintain low latency while supporting our 500 kbps per port requirement</p>
+<p>Provide adequate safety guarantees for industrial deployment</p>
 </li>
 <li>
-<p>Simplify firmware development with minimal microcontroller overhead</p>
+<p>Meet aggressive project delivery timeline ("deliver yesterday")</p>
 </li>
 <li>
-<p>Meet our cost target for volume production</p>
-</li>
-<li>
-<p>Does not contain firmware on its own</p>
-</li>
-<li>
-<p>Comes from a 'western' supplier</p>
+<p>Must operate reliably in industrial environments (-40°C to +85°C) 😉</p>
 </li>
 </ul>
 </div>
 <div class="paragraph">
-<p>The Ethernet controller selection impacts system performance, reliability, development complexity, and overall BOM cost.</p>
+<p>The programming language selection fundamentally determines development productivity, code maintainability, and the feasibility of meeting project deadlines with current team capabilities.</p>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_decision_drivers">Decision Drivers</h2>
-<div class="sectionbody">
 <div class="sect2">
-<h3 id="_primary_requirements">Primary Requirements</h3>
+<h3 id="_decision_drivers">Decision Drivers</h3>
+<div class="sect3">
+<h4 id="_primary_requirements">Primary Requirements</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Network Performance</strong>: Support for full 100 Mbps Ethernet with sufficient throughput for our use case</p>
+<p><strong>Development Velocity</strong>: Critical time-to-market pressure requiring immediate productivity</p>
 </li>
 <li>
-<p><strong>Memory Buffer Size</strong>: Sufficient buffer for packet handling and multiple connections</p>
+<p><strong>Team Expertise</strong>: Leveraging existing microcontroller team&#8217;s deep C experience</p>
 </li>
 <li>
-<p><strong>SPI Interface Speed</strong>: Fast and efficient communication with the microcontroller</p>
+<p><strong>Industrial Reliability</strong>: Proven track record in embedded industrial applications</p>
 </li>
 <li>
-<p><strong>Industrial Reliability</strong>: Operating temperature range and robustness for industrial use</p>
+<p><strong>Memory Model Fit</strong>: Optimal performance in static memory allocation environment</p>
 </li>
 <li>
-<p><strong>Cost Effectiveness</strong>: Component cost for volume production</p>
+<p><strong>Ecosystem Maturity</strong>: Comprehensive tooling, libraries, and vendor support</p>
 </li>
 <li>
-<p><strong>Development Complexity</strong>: Readily available OpenSource library for integration</p>
+<p><strong>Real-time Determinism</strong>: Predictable behavior for latency-critical applications</p>
+</li>
+<li>
+<p><strong>Hardware Integration</strong>: Direct access to RP2350 and ENC28J60 peripherals</p>
+</li>
+<li>
+<p><strong>Debugging Capabilities</strong>: Mature debugging tools for embedded development</p>
 </li>
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_constraints">Constraints</h3>
+<div class="sect3">
+<h4 id="_constraints">Constraints</h4>
 <div class="ulist">
 <ul>
 <li>
-<p>Must use SPI interface to connect with the RP2350 microcontroller</p>
+<p>Aggressive delivery timeline with no room for learning curve delays</p>
 </li>
 <li>
-<p>Must operate reliably in industrial environments (-40°C to +85°C)</p>
+<p>Small project scope where complexity management is achievable</p>
 </li>
 <li>
-<p>Must fit within the overall $10 system cost target for volume production</p>
+<p>Static memory allocation model (no dynamic allocation)</p>
 </li>
 <li>
-<p>Must use open-source compatible software stacks (GPL license compatible)</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_options_considered">Options Considered</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_option_a_wiznet_w5500">Option A: WIZnet W5500</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Interface</strong>: SPI (up to 80 MHz)</p>
+<p>Team expertise concentrated in C/C++ embedded development</p>
 </li>
 <li>
-<p><strong>Network Speed</strong>: 10/100 Mbps Ethernet</p>
-</li>
-<li>
-<p><strong>TCP/IP Stack</strong>: Hardwired TCP/IP stack (integrated)</p>
-</li>
-<li>
-<p><strong>Buffer Memory</strong>: 32 KB internal buffer</p>
-</li>
-<li>
-<p><strong>Concurrent Connections</strong>: 8 independent hardware sockets</p>
-</li>
-<li>
-<p><strong>Protocols Support</strong>: TCP, UDP, IPv4, ICMP, ARP, IGMP, PPPoE</p>
-</li>
-<li>
-<p><strong>Temperature Range</strong>: -40°C to +85°C</p>
-</li>
-<li>
-<p><strong>Voltage Supply</strong>: 2.97V to 3.63V</p>
-</li>
-<li>
-<p><strong>Power Consumption</strong>: 132mA typical</p>
-</li>
-<li>
-<p><strong>Package Options</strong>: 48-LQFP (7x7mm)</p>
-</li>
-<li>
-<p><strong>Cost (Volume)</strong>: ~$2.00 per unit</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Extensive documentation, libraries for multiple platforms</p>
-</li>
-<li>
-<p><strong>Manufacturer</strong>: WIZnet.io (South Korea)</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Interface</strong>: SPI (up to 20 MHz)</p>
-</li>
-<li>
-<p><strong>Network Speed</strong>: 10 Mbps Ethernet only</p>
-</li>
-<li>
-<p><strong>TCP/IP Stack</strong>: Software stack required (on microcontroller)</p>
-</li>
-<li>
-<p><strong>Buffer Memory</strong>: 8 KB internal buffer</p>
-</li>
-<li>
-<p><strong>Concurrent Connections</strong>: Limited by microcontroller implementation</p>
-</li>
-<li>
-<p><strong>Protocols Support</strong>: Requires microcontroller implementation (typically lwIP)</p>
-</li>
-<li>
-<p><strong>Temperature Range</strong>: 0°C to +70°C (commercial), -40°C to +85°C (industrial version)</p>
-</li>
-<li>
-<p><strong>Voltage Supply</strong>: 3.1V to 3.6V</p>
-</li>
-<li>
-<p><strong>Power Consumption</strong>: 160mA typical</p>
-</li>
-<li>
-<p><strong>Package Options</strong>: 28-pin SPDIP, SOIC, SSOP, QFN</p>
-</li>
-<li>
-<p><strong>Cost (Volume)</strong>: ~$2.50 per unit</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Mature, widely used in Arduino and other platforms</p>
-</li>
-<li>
-<p><strong>Manufacturer</strong>: Microchip Technology (USA)</p>
+<p>Must operate reliably in industrial environments (-40°C to +85°C) 😉</p>
 </li>
 </ul>
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_options_considered">Options Considered</h3>
+<div class="sect3">
+<h4 id="_option_a_c_programming_language">Option A: C Programming Language</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Ecosystem</strong>: Mature ecosystem with comprehensive RP2350 Pico SDK support</p>
+</li>
+<li>
+<p><strong>Team Expertise</strong>: Deep existing knowledge in microcontroller team</p>
+</li>
+<li>
+<p><strong>Development Velocity</strong>: Immediate productivity, no learning curve</p>
+</li>
+<li>
+<p><strong>Memory Model</strong>: Direct, predictable memory management with static allocation</p>
+</li>
+<li>
+<p><strong>Tooling</strong>: Mature debugging (GDB, OpenOCD), profiling, and analysis tools</p>
+</li>
+<li>
+<p><strong>Hardware Support</strong>: Full vendor support for RP2350 and ENC28J60</p>
+</li>
+<li>
+<p><strong>Industrial Track Record</strong>: Decades of proven deployment in embedded systems</p>
+</li>
+<li>
+<p><strong>Real-time Performance</strong>: Deterministic, low-level control over hardware</p>
+</li>
+<li>
+<p><strong>Memory Safety</strong>: Achievable through disciplined practices and comprehensive testing</p>
+</li>
+<li>
+<p><strong>Standards Compliance</strong>: MISRA-C guidelines for industrial safety</p>
+</li>
+</ul>
 </div>
-<div class="sect1">
-<h2 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h2>
-<div class="sectionbody">
+</div>
+<div class="sect3">
+<h4 id="_option_b_rust_programming_language">Option B: Rust Programming Language</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Ecosystem</strong>: Emerging ecosystem with excellent RP2350 day-one support (rp235x-hal)</p>
+</li>
+<li>
+<p><strong>Team Expertise</strong>: No existing knowledge, 6-12 month learning curve to proficiency</p>
+</li>
+<li>
+<p><strong>Development Velocity</strong>: Significant initial productivity loss during team transition</p>
+</li>
+<li>
+<p><strong>Memory Model</strong>: Memory safety guarantees less relevant in static allocation environment</p>
+</li>
+<li>
+<p><strong>Tooling</strong>: Improving but less mature debugging tools (probe-rs vs GDB)</p>
+</li>
+<li>
+<p><strong>Hardware Support</strong>: Good RP2350 support, limited ENC28J60 ecosystem</p>
+</li>
+<li>
+<p><strong>Industrial Track Record</strong>: Limited embedded deployment history</p>
+</li>
+<li>
+<p><strong>Real-time Performance</strong>: Embassy framework provides async capabilities</p>
+</li>
+<li>
+<p><strong>Memory Safety</strong>: Compile-time guarantees prevent entire classes of bugs</p>
+</li>
+<li>
+<p><strong>Modern Features</strong>: Advanced type system, zero-cost abstractions</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h3>
 <div class="paragraph">
 <p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
-<em>Baseline: ENC28J60 (all scores = 0)</em></p>
+<em>Baseline: C Programming Language (all scores = 0)</em></p>
 </div>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
@@ -579,222 +534,334 @@
 <tr>
 <th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
 <th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
-<th class="tableblock halign-left valign-top"><strong>ENC28J60</strong></th>
-<th class="tableblock halign-left valign-top"><strong>W5500</strong></th>
+<th class="tableblock halign-left valign-top"><strong>C Language</strong></th>
+<th class="tableblock halign-left valign-top"><strong>Rust Language</strong></th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Speed</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (100 Mbps vs 10 Mbps)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>TCP/IP Implementation</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (hardwired vs software)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Microcontroller Overhead</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (minimal vs significant)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Buffer Size</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (32KB vs 8KB)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>SPI Interface Performance</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (80MHz vs 20MHz)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Temperature Range</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (standard -40°C to +85°C)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Ecosystem</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (both well-supported)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Firmware Complexity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (simple socket programming)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Open Internal Firmware</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Velocity</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (Complex, Closed Source)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (6-12 month learning curve)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Western Manufacturer</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Team Expertise</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (South Korea)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (zero existing knowledge)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Auditable Sourcecode</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Time to Market</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (Closed Source)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (immediate productivity loss)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total PUGH Score</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ecosystem Maturity</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-6</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (emerging, less comprehensive)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Safety in Static Environment</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (compile-time checks, limited benefit)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Track Record</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (limited embedded deployment)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hardware Vendor Support</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (good RP2350, limited ENC28J60)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Debugging Maturity</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (improving but less mature)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Real-time Determinism</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (comparable with Embassy)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Code Maintainability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (better type system)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Future Proofing</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (modern language, industry trend)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>TOTAL WEIGHTED SCORE</strong></p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>0</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>-13</strong></p></td>
 </tr>
 </tbody>
 </table>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_decision">Decision</h2>
-<div class="sectionbody">
+<div class="sect2">
+<h3 id="_decision">Decision</h3>
 <div class="paragraph">
-<p><strong>Selected: ENC28J60</strong></p>
+<p><strong>Selected: C Programming Language</strong></p>
 </div>
 <div class="paragraph">
-<p>While the W5500 is technically superior in every aspect and more easy to integrate, the ENC28J60 is a <strong>dumb</strong> device, which is, given to goal of maximum control, auditable software and upgradeable software, exactly what we want. And additionally it is from a 'western' manufacturer.</p>
+<p>The C programming language provides the optimal balance of development velocity, team productivity, and technical capability for the UART2ETH project, scoring significantly higher in our weighted analysis.</p>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_rationale">Rationale</h2>
-<div class="sectionbody">
 <div class="sect2">
-<h3 id="_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</h3>
+<h3 id="_rationale">Rationale</h3>
+<div class="sect3">
+<h4 id="_why_c_over_rust">Why C Over Rust</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Dumb</strong>: The ENC28J60 has no complex firmware.</p>
+<p><strong>Immediate Productivity</strong>: Team can begin productive development immediately without learning curve delays</p>
 </li>
 <li>
-<p><strong>Auditable Sourcecode</strong>: The main network code is in the microcontrollers firmware, which we have total control over. This allows us to show <strong>all</strong> relevant code for audits.</p>
+<p><strong>Time-Critical Delivery</strong>: Project timeline ("deliver yesterday") cannot accommodate 6-12 month Rust learning curve</p>
 </li>
 <li>
-<p><strong>Western Manufacturer</strong>: Because of supply chain considerations we want this project to contain only 'western' manufacturers. While technically South Korea is a western ally, it is still in the east.</p>
+<p><strong>Static Memory Context</strong>: Rust&#8217;s primary advantages (memory safety) are significantly diminished in our static allocation environment where:</p>
+<div class="ulist">
+<ul>
+<li>
+<p>No dynamic allocation eliminates use-after-free, double-free, memory leaks</p>
+</li>
+<li>
+<p>Fixed buffer sizes and lifetimes reduce dangling pointer risks</p>
+</li>
+<li>
+<p>Predictable memory layout simplifies debugging and validation</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>Team Expertise Leverage</strong>: Deep microcontroller C experience translates to immediate high-quality code</p>
+</li>
+<li>
+<p><strong>Ecosystem Maturity</strong>: Comprehensive vendor support, mature tooling, extensive industrial deployment history</p>
+</li>
+<li>
+<p><strong>Manageable Complexity</strong>: Small project scope where C complexity is controllable through:</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Disciplined coding practices (MISRA-C guidelines)</p>
+</li>
+<li>
+<p>Comprehensive unit and integration testing</p>
+</li>
+<li>
+<p>Code reviews focused on memory safety patterns</p>
+</li>
+<li>
+<p>Static analysis tools</p>
+</li>
+</ul>
+</div>
 </li>
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_trade_offs_accepted">Trade-offs Accepted</h3>
+<div class="sect3">
+<h4 id="_memory_safety_strategy_in_c">Memory Safety Strategy in C</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Cost Premium</strong>: The $0.50 additional cost per unit for the W5500 is justified by the significant performance advantages, reduced development complexity, and system resource savings.</p>
+<p><strong>Static Allocation</strong>: All memory allocated at compile time, eliminating dynamic memory risks</p>
 </li>
 <li>
-<p><strong>Lower Performance</strong>: The W5500 is superior in all aspects of performance. But the ENC28J60 is <strong>good enough</strong> to match the performance criteria.</p>
+<p><strong>Defensive Programming</strong>: Bounds checking, input validation, error handling</p>
+</li>
+<li>
+<p><strong>Testing Strategy</strong>: 100% code coverage, stress testing, hardware-in-the-loop validation</p>
+</li>
+<li>
+<p><strong>Code Standards</strong>: MISRA-C compliance for industrial safety</p>
+</li>
+<li>
+<p><strong>Review Process</strong>: Mandatory security-focused code reviews</p>
 </li>
 </ul>
 </div>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_consequences">Consequences</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_positive">Positive</h3>
+<div class="sect3">
+<h4 id="_rust_advantages_acknowledged_but_outweighed">Rust Advantages Acknowledged But Outweighed</h4>
 <div class="ulist">
 <ul>
 <li>
-<p>✅ <strong>Minimal Performance</strong>: ENC28J60 provides enough network bandwidth for current needs</p>
+<p><strong>Compile-time Memory Safety</strong>: Valuable but less critical in static allocation environment</p>
 </li>
 <li>
-<p>✅ <strong>Physical Size</strong>: 28SSOP package requires slightly less PCB space</p>
+<p><strong>Modern Type System</strong>: Benefits outweighed by learning curve and timeline pressure</p>
 </li>
 <li>
-<p>✅ <strong>Industrial Reliability</strong>: Full industrial temperature range support</p>
-</li>
-<li>
-<p>✅ <strong>External Dependency</strong>: Reliance on a more generic controller with more alternatives</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_negative">Negative</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>⚠️ <strong>Resource Spending</strong>: More microcontroller overhead diminishes resources for other features</p>
-</li>
-<li>
-<p>⚠️ <strong>Slightly Higher Cost</strong>: $0.50 cost premium per unit compared to W5500</p>
-</li>
-<li>
-<p>⚠️ <strong>More Complex Development</strong>: Software TCP/IP stack incraeses code complexity and development time</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_risks_and_mitigation">Risks and Mitigation</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Supply Chain Risk</strong>: Establish multiple supplier relationships, consider inventory strategy</p>
-</li>
-<li>
-<p><strong>Single-Source Component</strong>: Document adaptation path to alternative controllers if necessary</p>
-</li>
-<li>
-<p><strong>Integration Complexity</strong>: Thoroughly validate the ENC28J60-RP2350 integration early in development</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_implementation_notes">Implementation Notes</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_performance_optimization">Performance Optimization</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Use burst SPI mode for maximum throughput (up to 25 MHz)</p>
-</li>
-<li>
-<p>Optimize buffer management for latency-sensitive applications)</p>
+<p><strong>Future-proofing</strong>: Theoretical benefit cannot justify immediate delivery risk</p>
 </li>
 </ul>
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_consequences">Consequences</h3>
+<div class="sect3">
+<h4 id="_positive">Positive</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>✅ <strong>Immediate Development Start</strong>: No productivity loss during language transition</p>
+</li>
+<li>
+<p>✅ <strong>Team Expertise Utilized</strong>: Deep C knowledge translates to high-quality embedded code</p>
+</li>
+<li>
+<p>✅ <strong>Mature Ecosystem</strong>: Full vendor support, comprehensive tooling, extensive libraries</p>
+</li>
+<li>
+<p>✅ <strong>Proven Industrial Reliability</strong>: Decades of successful embedded deployments</p>
+</li>
+<li>
+<p>✅ <strong>Debugging Efficiency</strong>: Mature GDB/OpenOCD toolchain familiar to team</p>
+</li>
+<li>
+<p>✅ <strong>Timeline Compliance</strong>: Meets aggressive delivery requirements</p>
+</li>
+</ul>
 </div>
-<div class="sect1">
-<h2 id="_follow_up_actions">Follow-up Actions</h2>
-<div class="sectionbody">
+</div>
+<div class="sect3">
+<h4 id="_negative">Negative</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>⚠️ <strong>Manual Memory Management</strong>: Requires disciplined practices and comprehensive testing</p>
+</li>
+<li>
+<p>⚠️ <strong>Potential Security Vulnerabilities</strong>: Manual bounds checking, pointer management</p>
+</li>
+<li>
+<p>⚠️ <strong>Future Technology Debt</strong>: May require reevaluation for future projects</p>
+</li>
+<li>
+<p>⚠️ <strong>Missing Modern Features</strong>: Less expressive type system than Rust</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_risks_and_mitigation">Risks and Mitigation</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Memory Safety Risk</strong>: Mitigate through MISRA-C compliance, static analysis, comprehensive testing</p>
+</li>
+<li>
+<p><strong>Code Quality Risk</strong>: Mitigate through mandatory code reviews, automated testing, continuous integration</p>
+</li>
+<li>
+<p><strong>Future Maintenance Risk</strong>: Document rationale, plan Rust evaluation for future projects</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_notes">Implementation Notes</h3>
+<div class="sect3">
+<h4 id="_development_standards">Development Standards</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>MISRA-C Compliance</strong>: Follow MISRA-C:2012 guidelines for industrial safety</p>
+</li>
+<li>
+<p><strong>Static Analysis</strong>: Integrate PC-lint, Cppcheck, or equivalent in CI pipeline</p>
+</li>
+<li>
+<p><strong>Memory Management</strong>: Strictly static allocation, no malloc/free usage</p>
+</li>
+<li>
+<p><strong>Error Handling</strong>: Consistent error codes, graceful degradation strategies</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_testing_strategy">Testing Strategy</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Unit Testing</strong>: 100% code coverage requirement</p>
+</li>
+<li>
+<p><strong>Integration Testing</strong>: Hardware-in-the-loop validation</p>
+</li>
+<li>
+<p><strong>Stress Testing</strong>: Extended operation under maximum load conditions</p>
+</li>
+<li>
+<p><strong>Memory Validation</strong>: Static analysis tools, runtime bounds checking in debug builds</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_security_practices">Security Practices</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Input Validation</strong>: All network and UART inputs validated</p>
+</li>
+<li>
+<p><strong>Buffer Management</strong>: Fixed-size buffers with explicit bounds checking</p>
+</li>
+<li>
+<p><strong>Secure Coding</strong>: Follow SEI CERT C guidelines</p>
+</li>
+<li>
+<p><strong>Code Reviews</strong>: Security-focused review process for all code changes</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_follow_up_actions">Follow-up Actions</h3>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><strong>Procurement</strong>: Source ENC28J60 components from multiple suppliers to validate availability</p>
+<p><strong>Development Environment</strong>: Configure MISRA-C checking in build system</p>
 </li>
 <li>
-<p><strong>Prototyping</strong>: Develop initial integration test for RP2350 + ENC28J60 communication</p>
+<p><strong>Testing Framework</strong>: Establish unit testing framework with coverage reporting</p>
 </li>
 <li>
-<p><strong>Performance Testing</strong>: Benchmark SPI communication speeds and TCP throughput</p>
+<p><strong>Code Standards</strong>: Document project-specific C coding guidelines</p>
 </li>
 <li>
-<p><strong>Industrial Validation</strong>: Test operation across full temperature range</p>
+<p><strong>Static Analysis</strong>: Integrate static analysis tools in CI/CD pipeline</p>
+</li>
+<li>
+<p><strong>Team Training</strong>: Brief refresher on secure C practices for embedded systems</p>
+</li>
+<li>
+<p><strong>Future Evaluation</strong>: Plan Rust reassessment for next major project</p>
 </li>
 </ol>
 </div>
@@ -805,18 +872,22 @@
 <div class="ulist checklist">
 <ul class="checklist">
 <li>
-<p>&#10063; Validate pricing from multiple suppliers</p>
+<p>&#10063; Confirm MISRA-C compliance requirements with quality team</p>
 </li>
 <li>
-<p>&#10063; Confirm SPI bus configuration with other peripherals</p>
+<p>&#10063; Validate static analysis tool selection</p>
 </li>
 <li>
-<p>&#10063; Verify EMI/EMC considerations with ENC28J60 placement</p>
+<p>&#10063; Review memory safety testing strategy</p>
 </li>
 <li>
-<p>&#10063; Test actual power consumption under various load scenarios</p>
+<p>&#10063; Document specific secure coding guidelines</p>
+</li>
+<li>
+<p>&#10063; Plan future Rust evaluation timeline</p>
 </li>
 </ul>
+</div>
 </div>
 </div>
 </div>
@@ -847,11 +918,11 @@
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-002-ethernet-controller-selection.adoc%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-002-ethernet-controller-selection.adoc">tell us
+        Glad to hear it! Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-003%3A+Programming+Language+Selection+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-003-programming-language-selection.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-002-ethernet-controller-selection.adoc%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-002-ethernet-controller-selection.adoc">tell
+        Sorry to hear that. Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-003%3A+Programming+Language+Selection+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-003-programming-language-selection.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
