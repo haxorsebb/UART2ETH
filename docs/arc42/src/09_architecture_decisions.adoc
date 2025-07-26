@@ -35,3 +35,12 @@ There you will find links and examples about ADR.
 
 ****
 endif::arc42help[]
+
+This section references the Architecture Decision Records (ADRs) that document key technical decisions for the UART2ETH project.
+
+=== Hardware Platform Decisions
+
+* link:../../adrs/ADR-001-microcontroller-selection.adoc[ADR-001: Microcontroller Platform Selection] - Documents the decision to use the Raspberry Pi RP2350 as the core microcontroller platform.
+* link:../../adrs/ADR-002-ethernet-controller-selection.adoc[ADR-002: Ethernet Controller Selection] - Documents the decision to use the WIZnet W5500 as the Ethernet controller.
+
+These decisions form the foundation of the hardware architecture and significantly influence the system's capabilities, performance characteristics, and development approach.
