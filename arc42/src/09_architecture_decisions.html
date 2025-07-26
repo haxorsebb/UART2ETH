@@ -360,7 +360,11 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
-<li><a href="#section-design-decisions">Architecture Decisions</a></li>
+<li><a href="#section-design-decisions">Architecture Decisions</a>
+<ul class="sectlevel2">
+<li><a href="#_hardware_platform_decisions">Hardware Platform Decisions</a></li>
+</ul>
+</li>
 </ul>
 </div>
 
@@ -386,7 +390,25 @@
 <div class="sect1">
 <h2 id="section-design-decisions">Architecture Decisions</h2>
 <div class="sectionbody">
-
+<div class="paragraph">
+<p>This section references the Architecture Decision Records (ADRs) that document key technical decisions for the UART2ETH project.</p>
+</div>
+<div class="sect2">
+<h3 id="_hardware_platform_decisions">Hardware Platform Decisions</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="../../adrs/ADR-001-microcontroller-selection.adoc">ADR-001: Microcontroller Platform Selection</a> - Documents the decision to use the Raspberry Pi RP2350 as the core microcontroller platform.</p>
+</li>
+<li>
+<p><a href="../../adrs/ADR-002-ethernet-controller-selection.adoc">ADR-002: Ethernet Controller Selection</a> - Documents the decision to use the WIZnet W5500 as the Ethernet controller.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>These decisions form the foundation of the hardware architecture and significantly influence the system&#8217;s capabilities, performance characteristics, and development approach.</p>
+</div>
+</div>
 </div>
 </div>
         </p>
