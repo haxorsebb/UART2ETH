@@ -1,0 +1,1140 @@
+<!doctype html>
+<html lang="de">
+<head>
+    
+    <!-- sourceuri: adrs/ADR-001-microcontroller-selection.html -->
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+    <meta content="jbake" name="generator">
+    <meta content="INDEX, FOLLOW" name="ROBOTS">
+
+    <title>ADR-001: Microcontroller Platform Selection for UART2ETH</title>
+    <meta content="docToolchain" property="og:title">
+    <meta content="build your dev docs the easy way..." property="og:description">
+    <meta content="website" property="og:type">
+    <meta content="docToolchain" property="og:site_name">
+    <meta content="docToolchain" itemprop="name">
+    <meta content="build your dev docs the easy way..." itemprop="description">
+    <meta content="summary" name="twitter:card">
+    <meta content="docToolchain" name="twitter:title">
+    <meta content="build your dev docs the easy way..." name="twitter:description">
+
+    <link as="style"
+        href="../css/main.min.881fe5f7b53609f55ebfb496c7097c3b30b2e8ceb20a54bc6a48350ded67224f.css"
+        rel="preload">
+    <link href="../css/main.min.881fe5f7b53609f55ebfb496c7097c3b30b2e8ceb20a54bc6a48350ded67224f.css"
+        integrity=""
+        rel="stylesheet">
+    <link href="../css/asciidoctor.css" rel="stylesheet">
+    <link href="../css/prettify.css" rel="stylesheet">
+
+    <!-- favicon generated with https://www.favicon-generator.org/ -->
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="apple-touch-icon" sizes="57x57" href="../apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="../apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="../apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="../apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="../apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="../apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="../apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="../apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="../android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+    <link rel="manifest" href="../manifest.json">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="../ms-icon-144x144.png">
+    <meta name="theme-color" content="#ffffff">
+
+    <script src="../js/jquery-3.5.1.min.js"></script>
+    <style>
+    div.bg-light {
+        background-color: rgba(127, 180, 224, 0.3) !important;
+    }
+
+    /* for blog posts */
+    span.blogtag {
+        border-radius: 10px;
+        background-color: #30638E;
+        color: white;
+        padding: 5px 10px;
+    }
+
+    span.blogblogtag a {
+        color: white;
+        padding: 0
+    }
+
+    span.blogtag span {
+        margin-left: 10px;
+        border-radius: 10px;
+        background-color: white;
+        color: #30638E;
+    }
+
+    div.td-toc {
+        height: calc(100vh - 5rem) !important;
+    }
+
+    div#toctitle {
+        display: none
+    }
+
+    #td-section-nav {
+        max-height: calc(100vh - 4rem);
+        font-size: smaller;
+        line-height: 1.1;
+    }
+
+    .td-page-meta {
+        font-size: smaller;
+        line-height: 1.1;
+    }
+
+    #td-section-nav ul.td-sidebar-nav__section {
+        padding-left: 0;
+    }
+
+    span.navbar-logo {
+        padding-right: 1.5em;
+    }
+
+    .match {
+        font-size: smaller;
+    }
+
+    .admonitionblock td.icon .fa:before {
+        font-size: xxx-large;
+    }
+    </style>
+
+    <style>
+    div.openblock.primary div.content, div.openblock.secondary div.content {
+        border: 1px solid #7a2518;
+        padding: 5px;
+    }
+
+    div.openblock.primary div.content div.content, div.openblock.secondary div.content div.content {
+        border: 0 solid #7a2518;
+        padding: 0;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .switch {
+        border-width: 1px 1px 0 1px;
+        border-style: solid;
+        border-color: #7a2518;
+        display: inline-block;
+    }
+
+    .switch--item {
+        padding: 2px 10px;
+        background-color: #ffffff;
+        color: #7a2518;
+        display: inline-block;
+        cursor: pointer;
+    }
+
+    .switch--item:not(:first-child) {
+        border-width: 0 0 0 1px;
+        border-style: solid;
+        border-color: #7a2518;
+    }
+
+    .switch--item.selected {
+        background-color: #7a2519;
+        color: #ffffff;
+    }
+    </style>
+
+    <!-- copy-n-paste.js -->
+    <style>
+        div.listingblock {
+            position: relative;
+        }
+        div.listingblock > span.icon {
+            position: absolute;
+            top: 2px;
+            right: 6px;
+            visibility: hidden;
+            z-index: 2;
+            cursor: pointer;
+        }
+        div.listingblock:hover > span.icon {
+            visibility: visible;
+        }
+        div.listingblock div.content pre {
+            margin: 0;
+        }
+    </style>
+    <style>
+        .td-sidebar-nav__section {
+            padding-left: 9px;
+        }
+        details {
+            margin-left: 10px;
+        }
+        summary {
+            cursor: pointer;
+            padding-left: 10px; /* Erhöhter linker Padding für den Pfeil */
+            list-style: none;
+            position: relative; /* Für absolute Positionierung des Pfeils */
+        }
+        summary::before {
+            content: '>';
+            position: absolute;
+            left: 10px; /* Position des Pfeils */
+            top: 50%;
+            transform: translateY(-50%) translateX(-120%);
+            transition: transform 0.3s;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) translateX(-120%) rotate(90deg);
+        }
+    </style>
+</head>
+
+<body onload="prettyPrint()" class="td-section">
+<header>
+	
+<nav class="js-navbar-scroll navbar navbar-expand navbar-dark flex-column flex-md-row td-navbar">
+    <a class="navbar-brand" href="../index.html">
+        <span class="navbar-logo"><img src="../images/doctoolchain-logo-blue.png" alt="docToolchain" width="32px" /></span><span
+            class="font-weight-bold">docToolchain</span>
+    </a>
+    <div class="td-navbar-nav-scroll ml-md-auto" id="main_navbar">
+        <ul class="navbar-nav mt-2 mt-lg-0">
+    <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
+
+            <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a class="nav-link active" href="../adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+            </li>
+
+            <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a class="nav-link " href="../arc42/arc42.html"><span>arc42</span></a>
+            </li>
+
+        </ul>
+    </div>
+    <div class="navbar-nav d-none d-lg-block" >
+        <form action="../search.html">
+        <input aria-label="Search this site…" autocomplete="off" class="form-control td-search-input"
+               placeholder=" Search this site…" type="search" name="q">
+        </form>
+    </div>
+</nav>
+
+</header>
+<div class="container-fluid td-outer">
+	<div class="td-main">
+		<div class="row flex-xl-nowrap">
+			<div class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">
+				<div class="td-sidebar__inner" id="td-sidebar-menu" >
+					
+
+        <form class="td-sidebar__search d-flex align-items-center d-lg-none" action="../search.html">
+
+            <input aria-label="Search this site…" name="q" autocomplete="off" class="form-control td-search-input"
+                   placeholder=" Search this site…" type="search">
+
+
+            <button aria-controls="td-docs-nav" aria-expanded="false"
+                    aria-label="Toggle section navigation" class="btn btn-link td-sidebar__toggle d-md-none p-0 ml-3 fas fa-bars" data-target="#td-section-nav"
+                    data-toggle="collapse" type="button">
+            </button>
+        </form>
+
+        <nav aria-label="Submenu" class="collapse td-sidebar-nav" id="td-section-nav" >
+
+            <ul class="td-sidebar-nav__section">
+                <li class="td-sidebar-nav__section-title">
+                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">adrs</span>
+                </li>
+                <li>
+                  <ul>
+                      <li class="collapse show" id="docs">
+                          
+                        <ul class="td-sidebar-nav__section ul-0">
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                   href="../adrs/ADR-001-microcontroller-selection.html" title="ADR-001: Microcontroller Platform Selection for UART2ETH">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
+                                
+                            </li>
+                        </ul>
+                      </li>
+                  </ul>
+                <li>
+        </nav>
+
+				</div>
+			</div>
+			<div class="d-none d-xl-block col-xl-2 td-toc d-print-none">
+				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
+					
+
+        <a href="##git-repo-url##/adrs/ADR-001-microcontroller-selection.adoc"
+           target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
+
+
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-001%3A+Microcontroller+Platform+Selection+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/adrs/ADR-001-microcontroller-selection.adoc%0A%23branch:%20main" target="_blank"><i
+                class="fab fa-github fa-fw"></i> Create an issue</a>
+
+        
+
+        <hr />
+
+        <div id="toc" class="toc">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel1">
+<li><a href="#_adr_001_microcontroller_platform_selection_for_uart2eth">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
+<ul class="sectlevel2">
+<li><a href="#_context">Context</a></li>
+<li><a href="#_decision_drivers">Decision Drivers</a></li>
+<li><a href="#_options_considered">Options Considered</a></li>
+<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
+<li><a href="#_decision">Decision</a></li>
+<li><a href="#_rationale">Rationale</a></li>
+<li><a href="#_consequences">Consequences</a></li>
+<li><a href="#_implementation_notes">Implementation Notes</a></li>
+<li><a href="#_follow_up_actions">Follow-up Actions</a></li>
+</ul>
+</li>
+</ul>
+</div>
+
+
+
+
+				</div>
+			</div>
+			<main class="col-12 col-md-9 col-xl-8 pl-md-5" role="main">
+				    <nav aria-label="breadcrumb" class="d-none d-md-block d-print-none">
+        <ol class="breadcrumb spb-1">
+            <!--li aria-current="page" class="breadcrumb-item active">
+                <a href="https://example.docsy.dev/docs/">Documentation</a>
+            </li-->
+
+        </ol>
+    </nav>
+
+
+    <div class="td-content">
+        <p>
+            
+<div class="sect1">
+<h2 id="_adr_001_microcontroller_platform_selection_for_uart2eth">ADR-001: Microcontroller Platform Selection for UART2ETH</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><strong>Status:</strong> PROPOSED<br>
+<strong>Date:</strong> 2025-07-26<br>
+<strong>Deciders:</strong> Architecture Team<br>
+<strong>Consulted:</strong> Senior Developer<br>
+<strong>Informed:</strong> Development Team</p>
+</div>
+<div class="sect2">
+<h3 id="_context">Context</h3>
+<div class="paragraph">
+<p>The UART2ETH system requires a microcontroller platform capable of:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Supporting up to 4 concurrent UART interfaces</p>
+</li>
+<li>
+<p>Processing TCP/IP networking with industrial reliability</p>
+</li>
+<li>
+<p>Implementing secure OTA firmware updates with A/B partitioning</p>
+</li>
+<li>
+<p>Operating in industrial environments (-40°C to +85°C)</p>
+</li>
+<li>
+<p>Achieving 500 kbps sustained throughput per UART port with sub-5ms latency</p>
+</li>
+<li>
+<p>Cost-effective solution for volume production</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The microcontroller selection is a foundational decision that affects all system capabilities, development complexity, and long-term maintainability.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_decision_drivers">Decision Drivers</h3>
+<div class="sect3">
+<h4 id="_primary_requirements">Primary Requirements</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Multi-UART Support</strong>: Hardware support for multiple UARTs or flexible alternatives</p>
+</li>
+<li>
+<p><strong>Network Processing</strong>: Sufficient processing power for TCP/IP stack and protocol filtering</p>
+</li>
+<li>
+<p><strong>A/B Update Capability</strong>: Sufficient flash memory and architecture for dual firmware partitions</p>
+</li>
+<li>
+<p><strong>Security Capabilities</strong>: Hardware support for cryptographic operations and secure boot</p>
+</li>
+<li>
+<p><strong>Industrial Reliability</strong>: Temperature range, electrical robustness, proven track record</p>
+</li>
+<li>
+<p><strong>Real-time Performance</strong>: Deterministic behavior for latency-critical applications</p>
+</li>
+<li>
+<p><strong>Development Ecosystem</strong>: Mature toolchain, documentation, community support</p>
+</li>
+<li>
+<p><strong>Cost Effectiveness</strong>: Component cost + external components for volume production</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_constraints">Constraints</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Must operate reliably in industrial environments</p>
+</li>
+<li>
+<p>GPL open source licensing compatibility</p>
+</li>
+<li>
+<p>Maximum system cost target: $10 for volume production</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_options_considered">Options Considered</h3>
+<div class="sect3">
+<h4 id="_option_a_raspberry_pi_rp2350">Option A: Raspberry Pi RP2350</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Architecture</strong>: Dual-core ARM Cortex-M33 @ 150MHz</p>
+</li>
+<li>
+<p><strong>Memory</strong>: 520KB SRAM, external flash required</p>
+</li>
+<li>
+<p><strong>UARTs</strong>: 2 hardware UARTs + 12 programmable I/O (PIO) state machines</p>
+</li>
+<li>
+<p><strong>Networking</strong>: Requires external Ethernet controller (ENC28J60)</p>
+</li>
+<li>
+<p><strong>Security</strong>: Hardware SHA-256, ARM TrustZone, secure boot capabilities</p>
+</li>
+<li>
+<p><strong>A/B Updates</strong>: External flash enables dual partitions + secure bootloader</p>
+</li>
+<li>
+<p><strong>Development Ecosystem</strong>: Good documentation, smaller community than Arduino</p>
+</li>
+<li>
+<p><strong>Industrial Track Record</strong>: None (released August 2024, zero field deployment)</p>
+</li>
+<li>
+<p><strong>Cost</strong>: ~$1.00 + ~$1.50 (ENC28J60) = <strong>$2.50 total</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_option_b_atmega328p_baseline">Option B: ATMega328P (Baseline)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Architecture</strong>: Single-core 8-bit AVR @ 16MHz</p>
+</li>
+<li>
+<p><strong>Memory</strong>: 2KB SRAM, 32KB Flash</p>
+</li>
+<li>
+<p><strong>UARTs</strong>: 1 hardware UART</p>
+</li>
+<li>
+<p><strong>Networking</strong>: Requires external Ethernet controller (ENC28J60)</p>
+</li>
+<li>
+<p><strong>Security</strong>: No hardware security features</p>
+</li>
+<li>
+<p><strong>A/B Updates</strong>: Insufficient flash space (32KB) for dual firmware images</p>
+</li>
+<li>
+<p><strong>Development Ecosystem</strong>: Arduino platform - most accessible ecosystem ever created, millions of tutorials</p>
+</li>
+<li>
+<p><strong>Industrial Track Record</strong>: Decades of proven deployment in industrial environments</p>
+</li>
+<li>
+<p><strong>Cost</strong>: ~$2.50 + ~$1.50 (ENC28J60) = <strong>$4.00 total</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_option_c_esp32">Option C: ESP32</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Architecture</strong>: Dual-core Xtensa LX6 @ 240MHz</p>
+</li>
+<li>
+<p><strong>Memory</strong>: 520KB SRAM, 4MB Flash</p>
+</li>
+<li>
+<p><strong>UARTs</strong>: 3 hardware UARTs</p>
+</li>
+<li>
+<p><strong>Networking</strong>: Built-in WiFi/Bluetooth, requires external Ethernet for wired</p>
+</li>
+<li>
+<p><strong>Security</strong>: Hardware crypto acceleration, secure boot</p>
+</li>
+<li>
+<p><strong>A/B Updates</strong>: 4MB flash supports dual partitions + ESP-IDF OTA framework</p>
+</li>
+<li>
+<p><strong>Development Ecosystem</strong>: Good tools (ESP-IDF, Arduino IDE), solid community, smaller than Arduino</p>
+</li>
+<li>
+<p><strong>Industrial Track Record</strong>: 8+ years deployment (2016+), moderate industrial adoption, less proven than ATMega328P</p>
+</li>
+<li>
+<p><strong>Cost</strong>: ~$2.50 + ~$1.50 (ENC28J60) = <strong>$4.00 total</strong></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h3>
+<div class="paragraph">
+<p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
+<em>Baseline: ATMega328P (all scores = 0)</em></p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 31.25%;">
+<col style="width: 12.5%;">
+<col style="width: 18.75%;">
+<col style="width: 18.75%;">
+<col style="width: 18.75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
+<th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
+<th class="tableblock halign-left valign-top"><strong>ATMega328P</strong></th>
+<th class="tableblock halign-left valign-top"><strong>RP2350</strong></th>
+<th class="tableblock halign-left valign-top"><strong>ESP32</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Support</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (PIO flexibility)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (3 HW UARTs)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Processing Power</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (dual 32-bit @150MHz)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (dual 32-bit @240MHz)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Capacity</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (260x more SRAM)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (260x more SRAM)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>A/B Update Support</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (external flash + secure boot)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (4MB flash + OTA framework)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security Features</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (HW SHA-256 + TrustZone)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (HW crypto only)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Real-time Determinism</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (PIO + dual-core)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (dual-core)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Ecosystem</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (smaller community, newer)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (good tools, smaller than Arduino)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Reliability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (new platform, zero field history)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (8+ years, less than decades)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Cost Effectiveness</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (37% cost reduction)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (same cost)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Architecture</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (same - external PHY)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (WiFi overhead)</p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect3">
+<h4 id="_weighted_scores">Weighted Scores</h4>
+<div class="paragraph">
+<p><strong>RP2350 Total Score:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>UART: 3×(+2) = +6</p>
+</li>
+<li>
+<p>Processing: 3×(+2) = +6</p>
+</li>
+<li>
+<p>Memory: 2×(+2) = +4</p>
+</li>
+<li>
+<p>A/B Updates: 3×(+2) = +6</p>
+</li>
+<li>
+<p>Security: 3×(+2) = +6</p>
+</li>
+<li>
+<p>Real-time: 2×(+2) = +4</p>
+</li>
+<li>
+<p>Ecosystem: 2×(-1) = -2</p>
+</li>
+<li>
+<p>Reliability: 2×(-1) = -2</p>
+</li>
+<li>
+<p>Cost: 1×(+2) = +2</p>
+</li>
+<li>
+<p>Network: 2×(0) = 0</p>
+</li>
+<li>
+<p><strong>Total: +30</strong></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>ESP32 Total Score:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>UART: 3×(+1) = +3</p>
+</li>
+<li>
+<p>Processing: 3×(+2) = +6</p>
+</li>
+<li>
+<p>Memory: 2×(+2) = +4</p>
+</li>
+<li>
+<p>A/B Updates: 3×(+2) = +6</p>
+</li>
+<li>
+<p>Security: 3×(+1) = +3</p>
+</li>
+<li>
+<p>Real-time: 2×(+1) = +2</p>
+</li>
+<li>
+<p>Ecosystem: 2×(0) = 0</p>
+</li>
+<li>
+<p>Reliability: 2×(0) = 0</p>
+</li>
+<li>
+<p>Cost: 1×(0) = 0</p>
+</li>
+<li>
+<p>Network: 2×(-1) = -2</p>
+</li>
+<li>
+<p><strong>Total: +22</strong></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_decision">Decision</h3>
+<div class="paragraph">
+<p><strong>Selected: Raspberry Pi RP2350</strong></p>
+</div>
+<div class="paragraph">
+<p>The RP2350 scores significantly higher (+30 vs +22) in the weighted PUGH analysis, primarily due to:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Superior UART Flexibility</strong>: PIO state machines provide unmatched capability for implementing custom UART protocols</p>
+</li>
+<li>
+<p><strong>A/B Update Architecture</strong>: External flash design enables reliable dual-partition firmware updates</p>
+</li>
+<li>
+<p><strong>Security Architecture</strong>: Hardware SHA-256 and TrustZone directly address secure OTA requirements</p>
+</li>
+<li>
+<p><strong>Cost Advantage</strong>: 37% lower total system cost while providing better capabilities</p>
+</li>
+<li>
+<p><strong>Real-time Determinism</strong>: PIO subsystem + dual-core architecture enables predictable performance</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_rationale">Rationale</h3>
+<div class="sect3">
+<h4 id="_why_rp2350_over_atmega328p">Why RP2350 Over ATMega328P</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Performance Gap</strong>: 328P cannot handle 4 concurrent UARTs + TCP processing</p>
+</li>
+<li>
+<p><strong>Memory Limitation</strong>: 2KB SRAM insufficient for networking stack and buffering</p>
+</li>
+<li>
+<p><strong>A/B Update Impossibility</strong>: 32KB flash insufficient for dual firmware images (need ~64KB minimum)</p>
+</li>
+<li>
+<p><strong>Security Gap</strong>: No hardware security features compromise OTA update integrity</p>
+</li>
+<li>
+<p><strong>Future Flexibility</strong>: PIO enables protocol adaptations without hardware changes</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_why_rp2350_over_esp32">Why RP2350 Over ESP32</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Industrial Focus</strong>: No unnecessary WiFi attack surface in industrial environments</p>
+</li>
+<li>
+<p><strong>Cost Efficiency</strong>: Lower total system cost for same networking capability</p>
+</li>
+<li>
+<p><strong>Architectural Fit</strong>: PIO subsystem specifically designed for custom I/O protocols</p>
+</li>
+<li>
+<p><strong>Security Model</strong>: TrustZone provides more comprehensive security architecture</p>
+</li>
+<li>
+<p><strong>UART Flexibility</strong>: Superior support for multiple custom UART implementations</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Industrial Reliability Trade-off</strong>: While ESP32 has solid 8+ years of industrial deployment vs RP2350&#8217;s zero field history, neither matches ATMega328P&#8217;s decades of proven reliability.</p>
+</div>
+<div class="paragraph">
+<p><strong>Development Ecosystem Trade-off</strong>: ATMega328P&#8217;s Arduino ecosystem is unmatched in accessibility, tutorials, and community support. Both RP2350 and ESP32 have smaller ecosystems despite good documentation.</p>
+</div>
+<div class="paragraph">
+<p>Despite these disadvantages, the RP2350&#8217;s technical advantages outweigh these risks for our specific application requirements.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_consequences">Consequences</h3>
+<div class="sect3">
+<h4 id="_positive">Positive</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>✅ <strong>Technical Capability</strong>: Meets all performance and functionality requirements</p>
+</li>
+<li>
+<p>✅ <strong>Cost Optimization</strong>: Lowest total system cost among capable options</p>
+</li>
+<li>
+<p>✅ <strong>Security Compliance</strong>: Hardware support for all security requirements</p>
+</li>
+<li>
+<p>✅ <strong>Development Efficiency</strong>: Excellent documentation and tooling ecosystem</p>
+</li>
+<li>
+<p>✅ <strong>Future Flexibility</strong>: PIO enables protocol extensions without redesign</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_negative">Negative</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>⚠️ <strong>External Dependency</strong>: Requires ENC28J60 Ethernet controller</p>
+</li>
+<li>
+<p>⚠️ <strong>Industrial Deployment Risk</strong>: Zero field deployment history in industrial environments (released August 2024)</p>
+</li>
+<li>
+<p>⚠️ <strong>Platform Maturity</strong>: Less proven than ATMega328P&#8217;s decades of industrial use</p>
+</li>
+<li>
+<p>⚠️ <strong>Development Ecosystem</strong>: Smaller community and fewer resources compared to Arduino&#8217;s massive ecosystem</p>
+</li>
+<li>
+<p>⚠️ <strong>Custom Development</strong>: PIO programming requires specialized knowledge</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_risks_and_mitigation">Risks and Mitigation</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Supply Chain Risk</strong>: Multiple suppliers available, stockpile strategy for critical components</p>
+</li>
+<li>
+<p><strong>ENC28J60 Dependency</strong>: Well-established component with multiple sources and alternatives</p>
+</li>
+<li>
+<p><strong>Industrial Reliability Risk</strong>: RP2350 has zero industrial field deployment history; mitigate with extensive environmental testing and validation program</p>
+</li>
+<li>
+<p><strong>Development Complexity</strong>: Comprehensive documentation and examples available</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_notes">Implementation Notes</h3>
+<div class="sect3">
+<h4 id="_required_external_components">Required External Components</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>ENC28J60 Ethernet Controller</strong>: Hardware TCP/IP stack, SPI interface</p>
+</li>
+<li>
+<p><strong>Crystal/Oscillator</strong>: For precise timing if required by application</p>
+</li>
+<li>
+<p><strong>Power Supply</strong>: 3.3V regulation and filtering</p>
+</li>
+<li>
+<p><strong>Protection</strong>: ESD protection for industrial environments</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_development_approach">Development Approach</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Phase 1</strong>: Basic RP2350 + ENC28J60 integration with single UART</p>
+</li>
+<li>
+<p><strong>Phase 2</strong>: PIO-based additional UART implementation</p>
+</li>
+<li>
+<p><strong>Phase 3</strong>: Security features and OTA update system</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_architecture_implications">Architecture Implications</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Dual-Core Utilization</strong>: Core 0 for real-time UART processing, Core 1 for networking</p>
+</li>
+<li>
+<p><strong>Memory Management</strong>: Static allocation for predictable real-time behavior</p>
+</li>
+<li>
+<p><strong>Security Integration</strong>: TrustZone secure boot with hardware-accelerated crypto</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_follow_up_actions">Follow-up Actions</h3>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Procurement</strong>: Establish supplier relationships for RP2350 and ENC28J60</p>
+</li>
+<li>
+<p><strong>Industrial Validation</strong>: Comprehensive environmental testing program to validate RP2350 reliability in industrial conditions</p>
+</li>
+<li>
+<p><strong>Prototyping</strong>: Develop basic hardware platform for validation testing</p>
+</li>
+<li>
+<p><strong>PIO Development</strong>: Create UART protocol templates using PIO state machines</p>
+</li>
+<li>
+<p><strong>Security Planning</strong>: Design secure boot and OTA update architecture</p>
+</li>
+<li>
+<p><strong>Testing Strategy</strong>: Define industrial environment validation procedures including EMI/EMC testing</p>
+</li>
+</ol>
+</div>
+<hr>
+<div class="paragraph">
+<p><strong>Review Notes:</strong></p>
+</div>
+<div class="ulist checklist">
+<ul class="checklist">
+<li>
+<p>&#10063; Confirm ENC28J60 vs W5500 preference</p>
+</li>
+<li>
+<p>&#10063; Validate cost estimates with current supplier pricing</p>
+</li>
+<li>
+<p>&#10063; Review A/B update architecture requirements vs RP2350 external flash approach</p>
+</li>
+<li>
+<p>&#10063; Confirm industrial temperature requirements vs RP2350 specs</p>
+</li>
+<li>
+<p>&#10063; Validate PUGH matrix criteria weights reflect actual project priorities</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+        </p>
+
+        <style>
+.feedback--answer {
+    display: inline-block;
+}
+
+.feedback--answer-no {
+    margin-left: 1em;
+}
+
+.feedback--response {
+    display: none;
+    margin-top: 1em;
+}
+
+.feedback--response__visible {
+    display: block;
+}
+</style>
+
+<div class="d-print-none">
+    <h2 class="feedback--title">Feedback</h2>
+    <p class="feedback--question">Was this page helpful?</p>
+    <button class="feedback--answer feedback--answer-yes">Yes</button>
+    <button class="feedback--answer feedback--answer-no">No</button>
+    <p class="feedback--response feedback--response-yes">
+        Glad to hear it! Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-001%3A+Microcontroller+Platform+Selection+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-001-microcontroller-selection.adoc">tell us
+    how we can improve</a>.
+    </p>
+    <p class="feedback--response feedback--response-no">
+        Sorry to hear that. Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-001%3A+Microcontroller+Platform+Selection+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-001-microcontroller-selection.adoc">tell
+    us how we can improve</a>.
+    </p>
+</div>
+<script>
+    const yesButton = document.querySelector('.feedback--answer-yes');
+    const noButton = document.querySelector('.feedback--answer-no');
+    const yesResponse = document.querySelector('.feedback--response-yes');
+    const noResponse = document.querySelector('.feedback--response-no');
+    const disableButtons = () => {
+        yesButton.disabled = true;
+        noButton.disabled = true;
+    };
+    const sendFeedback = (value) => {
+        if (typeof ga !== 'function') return;
+        const args = {
+            command: 'send',
+            hitType: 'event',
+            category: 'Helpful',
+            action: 'click',
+            label: window.location.pathname,
+            value: value
+        };
+        ga(args.command, args.hitType, args.category, args.action, args.label, args.value);
+    };
+    yesButton.addEventListener('click', () => {
+        yesResponse.classList.add('feedback--response__visible');
+        disableButtons();
+        sendFeedback(1);
+    });
+    noButton.addEventListener('click', () => {
+        noResponse.classList.add('feedback--response__visible');
+        disableButtons();
+        sendFeedback(0);
+    });
+</script>
+
+
+        <br>
+
+        <!--div class="text-muted mt-5 pt-3 border-top">Last modified July 3, 2019: <a
+                href="https://github.com/google/docsy-example/commit/d6aa89c8b24089d7e6741030864eff209465e896">Added
+            links to user guide repo (d6aa89c)</a>
+        </div-->
+    </div>
+
+
+			</main>
+
+		</div>
+	</div>
+
+
+	
+    <!--footer class="footer mt-auto py-3 bg-light">
+        <div class="container">
+            <span class="text-muted">&copy; 2020 | based on <a href="https://arc42.org">arc42 7.0</a> | mixed with <a href="http://getbootstrap.com/">Bootstrap v5.0.0-beta</a> | Baked with <a href="http://jbake.org">JBake v2.6.7</a></span>
+        </div>
+    </footer-->
+
+    <footer class="bg-dark py-5 row d-print-none">
+        <div class="container-fluid mx-sm-5">
+            <div class="row">
+                <div class="col-6 col-sm-4 text-xs-center order-sm-2">
+
+
+                    <ul class="list-inline mb-0">
+                        
+                        <li aria-label="User mailing list" class="list-inline-item mx-2 h3" data-original-title="User mailing list" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="mailto:##footer-email##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fa fa-envelope"></i>
+                            </a>
+                        </li>
+                        
+                        
+                        <li aria-label="Twitter" class="list-inline-item mx-2 h3" data-original-title="Twitter" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##twitter-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-twitter"></i>
+                            </a>
+                        </li>
+                        
+                        
+                        <li aria-label="Stack Overflow" class="list-inline-item mx-2 h3" data-original-title="Stack Overflow" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##Stackoverflow-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-stack-overflow"></i>
+                            </a>
+                        </li>
+                        
+                    </ul>
+
+
+                </div>
+                <div class="col-6 col-sm-4 text-right text-xs-center order-sm-3">
+
+
+                    <ul class="list-inline mb-0">
+
+                        
+                        <li aria-label="GitHub" class="list-inline-item mx-2 h3" data-original-title="GitHub" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##Github-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-github"></i>
+                            </a>
+                        </li>
+                        
+
+                        
+                        <li aria-label="Slack" class="list-inline-item mx-2 h3" data-original-title="Slack" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##Slack-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-slack"></i>
+                            </a>
+                        </li>
+                        
+
+
+                    </ul>
+
+
+                </div>
+                <div class="col-12 col-sm-4 text-center py-2 order-sm-2">
+
+                        <small class="text-white">built with <a href="https://doctoolchain.org">docToolchain</a> and <a href="https://jbake.org">jBake</a> <br /> theme: <a href="https://www.docsy.dev/">docsy</a></small>
+
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+
+
+    <script src="../js/main.min.b5fc1b29d2465835844254bd4d804738eaf24c0cec53009b4c6899989be55a47.js"></script>
+    <script src="../js/blocks.js" ></script>
+    <script src="../js/prettify.js"></script>
+    <script src="../js/copy-n-paste.js"></script>
+    <script src="../js/submenucollapse.js"></script>
+
+
+</body>
+</html>

@@ -213,7 +213,11 @@
     <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link active" href="../arc42/arc42-template.html"><span>arc42</span></a>
+                <a class="nav-link " href="../adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+            </li>
+
+            <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a class="nav-link active" href="../arc42/arc42.html"><span>arc42</span></a>
             </li>
 
         </ul>
@@ -257,11 +261,6 @@
                       <li class="collapse show" id="docs">
                           
                         <ul class="td-sidebar-nav__section ul-0">
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../arc42/arc42-template.html" title="image:arc42-logo.png[arc42] Template">image:arc42-logo.png[arc42] Template</a>
-                                
-                            </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../arc42/arc42.html" title="image:arc42-logo.png[arc42] Template">image:arc42-logo.png[arc42] Template</a>
@@ -389,7 +388,19 @@
 <li><a href="#_future_state_considerations">3.7. Future State Considerations</a></li>
 </ul>
 </li>
-<li><a href="#section-solution-strategy">4. Solution Strategy</a></li>
+<li><a href="#section-solution-strategy">4. Solution Strategy</a>
+<ul class="sectlevel2">
+<li><a href="#_quality_goals_foundation">4.1. Quality Goals Foundation</a></li>
+<li><a href="#_microcontroller_selection_analysis">4.2. Microcontroller Selection Analysis</a></li>
+<li><a href="#_technology_strategy">4.3. Technology Strategy</a></li>
+<li><a href="#_quality_achievement_strategy">4.4. Quality Achievement Strategy</a></li>
+<li><a href="#_implementation_strategy">4.5. Implementation Strategy</a></li>
+<li><a href="#_strategic_decisions_and_trade_offs">4.6. Strategic Decisions and Trade-offs</a></li>
+<li><a href="#_risk_assessment_and_mitigation">4.7. Risk Assessment and Mitigation</a></li>
+<li><a href="#_architecture_evolution_strategy">4.8. Architecture Evolution Strategy</a></li>
+<li><a href="#_conclusion">4.9. Conclusion</a></li>
+</ul>
+</li>
 <li><a href="#section-building-block-view">5. Building Block View</a>
 <ul class="sectlevel2">
 <li><a href="#_whitebox_overall_system">5.1. Whitebox Overall System</a></li>
@@ -1809,7 +1820,647 @@ Refer to details in the following sections.</p>
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_quality_goals_foundation">4.1. Quality Goals Foundation</h3>
+<div class="paragraph">
+<p>The UART2ETH solution strategy is built upon the following critical quality goals derived from our system requirements:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 15%;">
+<col style="width: 65%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Quality Goal</th>
+<th class="tableblock halign-left valign-top">Priority</th>
+<th class="tableblock halign-left valign-top">Description &amp; Success Criteria</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">500 kbps sustained throughput per UART port with sub-5ms end-to-end latency for real-time applications. Support for up to 4 simultaneous UART-to-TCP bridges operating concurrently.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reliability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial-grade operation with 99.9% uptime, fault tolerance mechanisms, and robust error handling suitable for mission-critical industrial environments.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Cryptographically secure OTA firmware updates with A/B partitioning, input validation, and protection against physical attacks in industrial settings.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Maintainability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Open source GPL licensing, modular architecture enabling customization, comprehensive documentation for future developers.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Interoperability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Support for two distinct operating modes (Gateway and Full Bridge), configurable protocol filters, and integration with diverse industrial equipment.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Cost Effectiveness</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Component cost under $10 for volume production while maintaining industrial-grade reliability and feature requirements.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_microcontroller_selection_analysis">4.2. Microcontroller Selection Analysis</h3>
+<div class="paragraph">
+<p>The foundational technology decision for UART2ETH is the choice of microcontroller platform. This decision directly impacts our ability to meet all quality goals and architectural requirements.</p>
+</div>
+<div class="sect3">
+<h4 id="_candidate_evaluation_matrix">4.2.1. Candidate Evaluation Matrix</h4>
+<div class="paragraph">
+<p>We evaluated three primary microcontroller candidates against our specific use case requirements:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 30%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top"><strong>Evaluation Criteria</strong></th>
+<th class="tableblock halign-left valign-top"><strong>RP2350</strong></th>
+<th class="tableblock halign-left valign-top"><strong>ATMega328P</strong></th>
+<th class="tableblock halign-left valign-top"><strong>ESP32</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Architecture &amp; Performance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">32-bit Dual Cortex-M33 @ 150MHz
+520KB SRAM, 32KB Flash</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8-bit AVR @ 16MHz
+2KB SRAM, 32KB Flash</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">32-bit Dual Xtensa LX6 @ 240MHz
+520KB SRAM, 4MB Flash</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Support</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2 hardware UARTs
+12 PIO state machines (programmable for additional UARTs)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1 hardware UART
+Limited software UART options</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3 hardware UARTs
+Robust concurrent operation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Networking Capability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>No built-in networking</strong>
+Requires external Ethernet PHY (W5500)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>No built-in networking</strong>
+Requires external Ethernet PHY</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Built-in WiFi &amp; Bluetooth</strong>
+No native Ethernet support</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory &amp; Processing</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sufficient for complex protocol filtering
+Dual-core enables UART/network separation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Severely limited for requirements</strong>
+Single-threaded, insufficient for complex operations</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Excellent for complex operations
+Dual-core architecture</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Power Management</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Advanced power modes
+Efficient at industrial voltages</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Very low power consumption
+Good for battery applications</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Multiple power modes
+WiFi increases power consumption</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security Features</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hardware SHA-256 accelerator</strong>
+<strong>Arm TrustZone security</strong>
+<strong>OTP storage for secure boot</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>No hardware security features</strong>
+Requires software implementation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware crypto acceleration
+Secure boot capabilities</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Suitability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>-40°C to +85°C operating range</strong>
+<strong>Industrial voltage tolerance</strong>
+<strong>EMC compliance ready</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-40°C to +85°C operating range
+Industrial proven</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>-40°C to +125°C operating range</strong>
+Industrial applications proven</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Ecosystem</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Comprehensive documentation</strong>
+<strong>Strong community support</strong>
+<strong>C/C++, MicroPython, Rust support</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Mature Arduino ecosystem
+Extensive tutorials available</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Excellent development tools</strong>
+Arduino IDE compatibility
+Multiple language support</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Cost (Volume)</strong>*</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>~$1.00 + $2.00 for W5500</strong>
+<strong>Total: ~$3.00</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>~$2.50 + $2.00 for W5500</strong>
+<strong>Total: ~$4.50</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>~$2.50</strong>
+<strong>WiFi built-in, no Ethernet</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>GPIO &amp; Peripherals</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">30 GPIO (RP2350A), 48 GPIO (RP2350B)
+<strong>Rich peripheral set</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">23 GPIO pins
+Basic peripheral set</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">34 GPIO pins
+Rich peripheral set</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Real-time Capabilities</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Deterministic PIO subsystem</strong>
+<strong>Dual-core real-time processing</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Limited real-time capabilities</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Good real-time performance
+FreeRTOS support</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_strategic_decision_rp2350_selection">4.2.2. Strategic Decision: RP2350 Selection</h4>
+<div class="paragraph">
+<p><strong>Decision</strong>: We selected the <strong>Raspberry Pi RP2350</strong> as the microcontroller platform for UART2ETH.</p>
+</div>
+<div class="paragraph">
+<p><strong>Primary Rationale:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>UART Scalability</strong>: The RP2350&#8217;s unique Programmable I/O (PIO) subsystem provides unmatched flexibility for implementing up to 4 dedicated UART interfaces with custom timing and protocol requirements. The 12 PIO state machines can be configured as additional UARTs beyond the 2 hardware UARTs.</p>
+</li>
+<li>
+<p><strong>Security Requirements</strong>: Hardware-accelerated SHA-256 and Arm TrustZone security architecture directly address our secure OTA update requirements. The ATMega328P lacks hardware security features entirely.</p>
+</li>
+<li>
+<p><strong>Performance Architecture</strong>: Dual-core Cortex-M33 @ 150MHz provides sufficient processing power for concurrent UART handling and TCP protocol processing while maintaining deterministic real-time performance.</p>
+</li>
+<li>
+<p><strong>Cost Effectiveness</strong>: At ~$3.00 total system cost (including W5500 Ethernet PHY), the RP2350 solution is the most cost-effective option for our industrial networking requirements.</p>
+</li>
+<li>
+<p><strong>Industrial Reliability</strong>: Operating temperature range (-40°C to +85°C) and robust electrical characteristics meet industrial deployment requirements.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Alternative Analysis:</strong></p>
+</div>
+<div class="paragraph">
+<p><strong>ATMega328P Rejection</strong>:
+- Insufficient processing power for 4 concurrent UARTs + TCP processing
+- Limited memory (2KB SRAM) inadequate for networking stack and packet buffering
+- Single UART hardware severely limits our core functionality
+- No hardware security features compromise OTA update integrity</p>
+</div>
+<div class="paragraph">
+<p><strong>ESP32 Rejection</strong>:
+- Built-in WiFi creates unwanted security attack surface for industrial environments
+- Lacks native Ethernet support, requiring same external PHY as RP2350
+- Higher power consumption unsuitable for some industrial deployments
+- While processing power is excellent, the integrated wireless capabilities are unnecessary overhead</p>
+</div>
+<div class="paragraph">
+<p><strong>Risk Mitigation</strong>:
+- <strong>External Ethernet Dependency</strong>: W5500 PHY chip is mature, well-documented, and widely deployed in industrial applications
+- <strong>Newer Platform Risk</strong>: RP2350 builds on proven RP2040 architecture with extensive documentation and community support</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_technology_strategy">4.3. Technology Strategy</h3>
+<div class="sect3">
+<h4 id="_core_technology_stack">4.3.1. Core Technology Stack</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Technology Area</th>
+<th class="tableblock halign-left valign-top">Strategic Decision &amp; Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Microcontroller Platform</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>RP2350 (Dual Cortex-M33 @ 150MHz)</strong> - Provides optimal balance of performance, cost, security features, and GPIO flexibility for our 4-UART requirements</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Networking Hardware</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>WIZnet W5500 Ethernet Controller</strong> - Hardware TCP/IP stack offloads networking processing from main CPU, proven industrial reliability, SPI interface</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Framework</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Pico SDK (C/C++)</strong> - Official Raspberry Pi SDK provides direct hardware access, real-time performance, comprehensive documentation and examples</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Implementation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hybrid Hardware + PIO UARTs</strong> - 2 hardware UARTs for primary connections, PIO state machines for additional UARTs with custom protocol timing</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Protocol Architecture</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Pluggable Filter Framework</strong> - Modular protocol filter system allowing custom packet processing and optimization without core system changes</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security Implementation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hardware-accelerated cryptography</strong> - RP2350 SHA-256 acceleration for firmware signature verification, TrustZone for secure boot process</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Management</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Static allocation with ringbuffers</strong> - Predictable memory usage, real-time performance, efficient buffering for UART and network data</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_architectural_patterns_and_design_principles">4.3.2. Architectural Patterns and Design Principles</h4>
+<div class="paragraph">
+<p><strong>Dual-Core Architecture Strategy:</strong></p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/dual-core-strategy.svg" alt="dual core strategy" width="3134" height="237">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Key Design Patterns:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Producer-Consumer Pattern</strong>: Core 0 produces processed UART data, Core 1 consumes for network transmission</p>
+</li>
+<li>
+<p><strong>Plugin Architecture</strong>: Protocol filters as loadable modules for different serial protocols</p>
+</li>
+<li>
+<p><strong>State Machine Pattern</strong>: Connection state management for TCP sockets and UART sessions</p>
+</li>
+<li>
+<p><strong>Observer Pattern</strong>: Event-driven configuration updates and status monitoring</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_quality_achievement_strategy">4.4. Quality Achievement Strategy</h3>
+<div class="sect3">
+<h4 id="_performance_implementation">4.4.1. Performance Implementation</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 40%;">
+<col style="width: 35%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Performance Requirement</th>
+<th class="tableblock halign-left valign-top">Architectural Mechanism</th>
+<th class="tableblock halign-left valign-top">Validation Approach</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>500 kbps UART throughput</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware UARTs + optimized PIO programs, DMA transfers, zero-copy buffer management</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automated throughput testing, oscilloscope signal validation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Sub-5ms end-to-end latency</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Dedicated real-time core, interrupt-driven processing, minimal buffering for latency-critical data</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Real-time latency measurement, timing analysis</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>4 concurrent UART bridges</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Dual-core separation, independent PIO state machines, lock-free inter-core communication</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stress testing with all 4 ports active simultaneously</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network efficiency</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware TCP/IP stack (W5500), protocol filtering to reduce packet overhead, configurable buffering</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Network traffic analysis, bandwidth utilization monitoring</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_security_implementation_strategy">4.4.2. Security Implementation Strategy</h4>
+<div class="paragraph">
+<p><strong>Secure OTA Update Architecture:</strong></p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/secure-ota-strategy.svg" alt="secure ota strategy" width="2248" height="373">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Security Mechanisms:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Hardware Cryptography</strong>: RP2350 SHA-256 accelerator for firmware signature verification</p>
+</li>
+<li>
+<p><strong>A/B Partitioning</strong>: Atomic firmware updates with automatic rollback on failure</p>
+</li>
+<li>
+<p><strong>Secure Boot</strong>: TrustZone-based boot process with firmware integrity verification</p>
+</li>
+<li>
+<p><strong>Input Validation</strong>: All network and UART inputs validated against buffer overflows</p>
+</li>
+<li>
+<p><strong>Access Control</strong>: Configuration interfaces protected with authentication</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_reliability_implementation">4.4.3. Reliability Implementation</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 70%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Reliability Mechanism</th>
+<th class="tableblock halign-left valign-top">Implementation Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Fault Detection</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watchdog timers, CRC checks on critical data structures, health monitoring of all subsystems</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Error Recovery</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automatic UART/TCP connection re-establishment, graceful degradation when individual ports fail</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Data Integrity</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">End-to-end checksums, duplicate detection, ordered delivery guarantees for critical protocols</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>System Monitoring</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Real-time status reporting, diagnostic interfaces, comprehensive logging for troubleshooting</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Graceful Degradation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Individual UART ports can fail without affecting others, network issues don&#8217;t impact local UART operation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_strategy">4.5. Implementation Strategy</h3>
+<div class="sect3">
+<h4 id="_development_approach">4.5.1. Development Approach</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Implementation Aspect</th>
+<th class="tableblock halign-left valign-top">Strategy &amp; Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Methodology</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Test-Driven Development with continuous integration</strong> - Critical for industrial reliability, extensive automated testing at component and system levels</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Modular Architecture</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Component-based design</strong> - Protocol filters, UART drivers, network stack as independent modules enabling parallel development and testing</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hardware Abstraction</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HAL-based design</strong> - Hardware abstraction layer enables unit testing and future platform migration while maintaining real-time performance</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Configuration Management</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Runtime configuration with persistence</strong> - Web-based configuration interface with EEPROM storage, enabling field deployment without recompilation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_implementation_phases">4.5.2. Implementation Phases</h4>
+<div class="imageblock">
+<div class="content">
+<img src="./images/implementation-phases.svg" alt="implementation phases" width="382" height="1098">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Phase 1 Success Criteria:</strong>
+- Single UART-to-TCP bridge operational
+- W5500 Ethernet controller fully integrated
+- Basic throughput testing (100 kbps minimum)</p>
+</div>
+<div class="paragraph">
+<p><strong>Phase 2 Success Criteria:</strong>
+- All 4 UART ports operational simultaneously
+- Protocol filter framework with 2 example filters
+- Web-based configuration functional</p>
+</div>
+<div class="paragraph">
+<p><strong>Phase 3 Success Criteria:</strong>
+- Secure OTA updates with A/B partitioning
+- Full 500 kbps throughput achieved
+- Industrial environmental testing completed</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_strategic_decisions_and_trade_offs">4.6. Strategic Decisions and Trade-offs</h3>
+<div class="sect3">
+<h4 id="_major_architectural_decisions">4.6.1. Major Architectural Decisions</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 35%;">
+<col style="width: 35%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Decision</th>
+<th class="tableblock halign-left valign-top">Rationale</th>
+<th class="tableblock halign-left valign-top">Trade-offs Accepted</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>External Ethernet PHY (W5500)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware TCP/IP stack reduces CPU load, proven industrial reliability, simplifies networking code</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Additional BOM cost (+$2), extra PCB complexity, dependency on external component</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Dual-core separation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Real-time UART processing isolated from network stack, deterministic performance, parallel processing</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Inter-core communication complexity, careful synchronization required</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>PIO for additional UARTs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RP2350 unique capability, flexible timing, cost-effective vs additional UART chips</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Custom development effort, PIO programming complexity vs standard UART libraries</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Static memory allocation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Predictable behavior, no fragmentation, real-time guarantees, industrial reliability</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Higher memory usage, compile-time memory planning, less flexible than dynamic allocation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>GPL open source licensing</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Community contributions, transparency for security auditing, competitive advantage</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Competitors can use our innovations, potential customer licensing concerns</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_risk_assessment_and_mitigation">4.7. Risk Assessment and Mitigation</h3>
+<div class="sect3">
+<h4 id="_strategic_risks">4.7.1. Strategic Risks</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 20%;">
+<col style="width: 25%;">
+<col style="width: 30%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Risk</th>
+<th class="tableblock halign-left valign-top">Probability</th>
+<th class="tableblock halign-left valign-top">Impact</th>
+<th class="tableblock halign-left valign-top">Mitigation Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>RP2350 supply chain</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Multiple supplier relationships, stockpile critical components, design for alternative MCU if needed</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>W5500 discontinuation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Alternative Ethernet PHY options exist (ENC28J60, KSZ8081), modular design enables replacement</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance requirements</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Early prototyping and testing, performance benchmarking at each development phase</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial certification</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Early engagement with certification bodies, design for compliance from start</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Real-time determinism</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Dedicated real-time core, extensive timing analysis, automated regression testing</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_architecture_evolution_strategy">4.8. Architecture Evolution Strategy</h3>
+<div class="sect3">
+<h4 id="_planned_evolution_path">4.8.1. Planned Evolution Path</h4>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Enhanced Protocol Support</strong>: Additional protocol filters for Modbus, DNP3, and other industrial protocols</p>
+</li>
+<li>
+<p><strong>Advanced Security</strong>: HSM integration, certificate-based authentication, encrypted communication channels</p>
+</li>
+<li>
+<p><strong>Performance Scaling</strong>: Optimization for higher UART speeds, additional parallel processing</p>
+</li>
+<li>
+<p><strong>Cloud Integration</strong>: Optional cloud connectivity for remote monitoring and management</p>
+</li>
+<li>
+<p><strong>Edge Computing</strong>: Local data processing and analytics capabilities</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_future_platform_considerations">4.8.2. Future Platform Considerations</h4>
+<div class="paragraph">
+<p>The modular architecture enables future migration to higher-performance platforms while preserving the core design:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>RP2354 (with integrated flash)</strong>: Direct upgrade path with 2MB on-chip flash</p>
+</li>
+<li>
+<p><strong>Cortex-M7 platforms</strong>: For applications requiring higher processing power</p>
+</li>
+<li>
+<p><strong>RISC-V alternatives</strong>: Long-term open hardware strategy</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_conclusion">4.9. Conclusion</h3>
+<div class="paragraph">
+<p>The RP2350-based solution strategy provides an optimal balance of performance, cost, security, and industrial reliability for the UART2ETH system. The key strategic decisions—RP2350 selection, external Ethernet PHY, dual-core architecture, and modular design—directly address our quality goals while maintaining cost-effectiveness and future flexibility.</p>
+</div>
+<div class="paragraph">
+<p>This strategy positions UART2ETH as a competitive, reliable, and maintainable solution for industrial UART-to-Ethernet bridging applications, with a clear evolution path for future enhancements and market requirements.</p>
+</div>
 <div style="page-break-after: always;"></div>
+</div>
 </div>
 </div>
 <div class="sect1">
