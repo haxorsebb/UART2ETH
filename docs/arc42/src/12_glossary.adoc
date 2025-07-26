@@ -36,9 +36,42 @@ endif::arc42help[]
 |===
 |Term |Definition
 
-|<Term-1>
-|<definition-1>
+|A/B Updates
+|Firmware update mechanism that maintains two separate firmware partitions, allowing safe rollback to previous version if new firmware fails
 
-|<Term-2>
-|<definition-2>
+|Client System
+|In Gateway Mode, the system connected to the network side of UART2ETH that communicates via TCP sockets
+
+|Full Bridge Mode
+|Operating mode where UART2ETH provides transparent UART-over-TCP connectivity, allowing two Host Systems with UART interfaces to communicate over network as if directly connected
+
+|Gateway Mode
+|Operating mode where UART2ETH adds networking capabilities to existing products by bridging between a Host System's UART interface and Client Systems on the network
+
+|Host System
+|System connected to the UART side of UART2ETH. In Gateway Mode, this is the legacy equipment being networked. In Full Bridge Mode, both connected systems are Host Systems
+
+|OTA (Over-The-Air)
+|Firmware update mechanism allowing remote updates without physical access to the device
+
+|PLC (Programmable Logic Controller)
+|Industrial control system used in manufacturing and automation applications
+
+|Protocol Filter
+|Pluggable software component that processes and optimizes serial data streams for efficient TCP transmission
+
+|RPI RP2350
+|Raspberry Pi microcontroller chip serving as the main processing unit for UART2ETH hardware
+
+|SCADA (Supervisory Control and Data Acquisition)
+|Industrial control system architecture for monitoring and controlling industrial processes
+
+|TCP Socket
+|Network communication endpoint using Transmission Control Protocol for reliable data transmission
+
+|UART (Universal Asynchronous Receiver-Transmitter)
+|Serial communication protocol commonly used in embedded systems and industrial equipment
+
+|UART2ETH
+|The complete hardware and firmware solution for bridging UART interfaces to TCP sockets, supporting up to 4 UART ports
 |===

@@ -3,7 +3,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-context-and-scope]]
 == Context and Scope
 
-
 ifdef::arc42help[]
 [role="arc42help"]
 ****
@@ -30,51 +29,389 @@ See https://docs.arc42.org/section-3/[Context and Scope] in the arc42 documentat
 ****
 endif::arc42help[]
 
+=== System Overview
+
+UART2ETH operates as a networking bridge that enables legacy industrial equipment with UART interfaces to communicate over TCP/IP networks. The system serves as a critical integration point in industrial automation environments, supporting two distinct operating modes:
+
+**Gateway Mode**: UART2ETH adds networking capabilities to existing Host Systems without requiring firmware modifications. The Host System maintains its original UART-based communication while Client Systems access it via TCP sockets over the network.
+
+**Full Bridge Mode**: UART2ETH provides transparent UART-over-TCP connectivity, allowing two Host Systems with UART interfaces to communicate over network infrastructure as if they were directly connected via serial cable.
+
+=== System Scope and Boundaries
+
+**Inside the System Boundary:**
+
+* RP2350 microcontroller
+* Up to 4 UART interfaces
+* Network interface controller (100Mbit Ethernet)
+* Protocol filtering and optimization engines
+* OTA update mechanism with A/B partitioning
+* Device configuration and management interfaces
+
+**Outside the System Boundary:**
+
+* Host Systems (PLCs, sensors, measurement instruments)
+* Client Systems (SCADA systems, monitoring applications)
+* Network infrastructure (switches, routers, firewalls)
+* Firmware update servers and management systems
+
 === Business Context
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Contents
-Specification of *all* communication partners (users, IT-systems, ...) with explanations of domain specific inputs and outputs or interfaces.
-Optionally you can add domain specific formats or communication protocols.
+[plantuml, system-context-business, svg]
+----
+!include <C4/C4_Context>
 
-.Motivation
-All stakeholders should understand which data are exchanged with the environment of the system.
+title Business Context - UART2ETH System
 
-.Form
-All kinds of diagrams that show the system as a black box and specify the domain interfaces to communication partners.
+' Primary Users
+Person(industrial_engineer, "Industrial Engineer", "Designs and implements automation solutions")
+Person(system_integrator, "System Integrator", "Deploys and configures networking solutions")
+Person(field_technician, "Field Technician", "Installs and maintains equipment")
 
-Alternatively (or additionally) you can use a table.
-The title of the table is the name of your system, the three columns contain the name of the communication partner, the inputs, and the outputs.
+' Core System
+System(uart2eth_system, "UART2ETH", "UART-to-TCP bridge providing networking for up to 4 serial devices")
 
-****
-endif::arc42help[]
+' Industrial Equipment - Host Systems
+System_Ext(plc_system, "PLC/Controller", "Host System: Programmable Logic Controller with UART interface")
+System_Ext(sensor_equipment, "Sensors/Instruments", "Host System: Measurement and monitoring devices")
+System_Ext(legacy_equipment, "Legacy Equipment", "Host System: Existing industrial devices with serial interfaces")
 
-**<Diagram or Table>**
+' Network Systems - Client Systems
+System_Ext(scada_system, "SCADA System", "Client System: Supervisory control and data acquisition")
+System_Ext(monitoring_system, "Monitoring Application", "Client System: Real-time monitoring and analytics")
+System_Ext(management_system, "Management System", "Client System: Device and process management")
 
-**<optionally: Explanation of external domain interfaces>**
+' Infrastructure
+System_Ext(network_infrastructure, "Network Infrastructure", "Ethernet switches, routers, and cabling")
+
+' User Interactions
+Rel(industrial_engineer, uart2eth_system, "Specifies integration requirements", "Requirements/Config")
+Rel(system_integrator, uart2eth_system, "Deploys and configures", "Web UI/Config")
+Rel(field_technician, uart2eth_system, "Installs and maintains", "Physical/Diagnostic")
+
+' Gateway Mode Connections
+Rel(uart2eth_system, plc_system, "Serial communication", "UART Protocol")
+Rel(uart2eth_system, sensor_equipment, "Data collection", "UART Protocol")
+Rel(scada_system, uart2eth_system, "Remote device access", "TCP Socket")
+Rel(monitoring_system, uart2eth_system, "Real-time data", "TCP Socket")
+
+' Full Bridge Mode (through network)
+Rel(legacy_equipment, uart2eth_system, "Serial data transmission", "UART Protocol")
+Rel(uart2eth_system, network_infrastructure, "Networked serial data", "TCP/IP")
+Rel(network_infrastructure, management_system, "Remote serial access", "TCP/IP")
+
+SHOW_LEGEND()
+----
+
+==== Primary Stakeholders
+
+[cols="25,25,50"]
+|===
+| Stakeholder | Role | Primary Business Interactions
+
+| Industrial Engineers
+| Solution designers and specifiers
+| Define networking requirements for automation projects, specify UART2ETH configurations for integrating legacy equipment into modern networks
+
+| System Integrators
+| Implementation specialists
+| Deploy UART2ETH devices in customer facilities, configure networking parameters, integrate with existing SCADA and monitoring systems
+
+| Field Technicians
+| Installation and maintenance personnel
+| Physical installation of devices, diagnostic troubleshooting, basic configuration changes, routine maintenance procedures
+
+| Equipment Manufacturers
+| Original equipment makers
+| Embed UART2ETH into products to add networking capabilities, specify custom protocol filters, integrate with product lifecycle management
+
+|===
+
+==== Business Use Cases
+
+**Legacy Equipment Integration:**
+Industrial Engineers specify UART2ETH to network aging PLCs, sensors, and measurement instruments that lack modern connectivity. System Integrators deploy these solutions to extend equipment lifecycles and enable remote monitoring without costly equipment replacement.
+
+**Infrastructure Problem Solving:**
+Field installations requiring long cable runs or operating in electrically noisy environments use UART2ETH to overcome serial communication limitations through network-based transmission.
+
+**Remote Access Enablement:**
+SCADA systems and monitoring applications access distributed serial devices through UART2ETH bridges, enabling centralized control and data collection across geographically dispersed facilities.
 
 === Technical Context
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Contents
-Technical interfaces (channels and transmission media) linking your system to its environment. In addition a mapping of domain specific input/output to the channels, i.e. an explanation which I/O uses which channel.
+[plantuml, system-context-technical, svg]
+----
+!include <C4/C4_Context>
+LAYOUT_LEFT_RIGHT()
 
-.Motivation
-Many stakeholders make architectural decision based on the technical interfaces between the system and its context. Especially infrastructure or hardware designers decide these technical interfaces.
+title Technical Context - UART2ETH System
 
-.Form
-E.g. UML deployment diagram describing channels to neighboring systems,
-together with a mapping table showing the relationships between channels and input/output.
+' Core System as Black Box
+System_Boundary(uart2eth_boundary, "UART2ETH Device") {
+    System(uart2eth_core, "UART2ETH", "4-port UART to TCP bridge with RP2350 controller")
+}
 
-****
-endif::arc42help[]
+' UART Side - Host Systems (LEFT)
+System_Ext(host_plc, "PLC/Controller", "Host System with UART/RS232/RS422 interface")
+System_Ext(host_sensor, "Sensor Array", "Host System with custom measurement protocol")
+System_Ext(host_legacy, "Legacy Device", "Host System with proprietary protocol")
+System_Ext(host_instrument, "Measurement Instrument", "Host System with standard serial interface")
 
-**<Diagram or Table>**
+' Network Side Infrastructure (RIGHT)
+System_Ext(ethernet_switch, "Ethernet Switch", "Ethernet Switch")
+System_Ext(network_firewall, "Network Firewall", "Industrial security appliance")
+System_Ext(dhcp_server, "DHCP Server", "Network configuration service")
 
-**<optionally: Explanation of technical interfaces>**
+' Network Side - Client Systems (RIGHT)
+System_Ext(client_scada, "SCADA Server", "Client System accessing Host via configurable TCP port")
+System_Ext(client_hmi, "HMI Application", "Client System accessing Host via configurable TCP port")
+System_Ext(client_historian, "Data Historian", "Client System accessing Host via configurable TCP port")
+System_Ext(client_maintenance, "Maintenance System", "Client System accessing Host via configurable TCP port")
 
-**<Mapping Input/Output to Channels>**
+' Management Systems (RIGHT)
+System_Ext(firmware_server, "Firmware Server", "OTA update distribution system")
+System_Ext(time_server, "NTP Server", "Network time synchronization")
+System_Ext(admin_workstation, "Admin Workstation", "Configuration and monitoring interface")
+
+' Layout positioning - Host Systems on LEFT
+Lay_L(host_plc, uart2eth_core)
+Lay_L(host_sensor, uart2eth_core)
+Lay_L(host_legacy, uart2eth_core)
+Lay_L(host_instrument, uart2eth_core)
+
+' Layout positioning - Network/Client Systems on RIGHT
+Lay_R(uart2eth_core, ethernet_switch)
+Lay_R(uart2eth_core, client_scada)
+Lay_R(uart2eth_core, client_hmi)
+Lay_R(uart2eth_core, client_historian)
+Lay_R(uart2eth_core, client_maintenance)
+Lay_R(uart2eth_core, network_firewall)
+Lay_R(uart2eth_core, dhcp_server)
+Lay_R(uart2eth_core, firmware_server)
+Lay_R(uart2eth_core, time_server)
+Lay_R(uart2eth_core, admin_workstation)
+
+' UART Connections (Host Systems on LEFT)
+Rel(host_plc, uart2eth_core, "Raw serial data", "UART/RS232/RS422")
+Rel(host_sensor, uart2eth_core, "Sensor readings", "UART/RS232/RS422")
+Rel(host_legacy, uart2eth_core, "Control commands", "UART/RS232/RS422")
+Rel(host_instrument, uart2eth_core, "Measurement data", "UART/RS232/RS422")
+
+' Network Infrastructure Connections (on RIGHT)
+Rel(uart2eth_core, ethernet_switch, "Ethernet frames", "100BASE-TX")
+Rel(ethernet_switch, network_firewall, "Filtered traffic", "Ethernet")
+Rel(uart2eth_core, dhcp_server, "IP configuration", "DHCP/UDP")
+
+' Client System Connections (on RIGHT)
+Rel(client_scada, uart2eth_core, "Device polling", "TCP Socket")
+Rel(client_hmi, uart2eth_core, "Real-time data", "TCP Socket")
+Rel(client_historian, uart2eth_core, "Historical data", "TCP Socket")
+Rel(client_maintenance, uart2eth_core, "Diagnostic data", "TCP Socket")
+
+' Management Connections (on RIGHT)
+Rel(firmware_server, uart2eth_core, "Firmware updates", "HTTP with signed images")
+Rel(uart2eth_core, time_server, "Time synchronization", "NTP/UDP")
+Rel(admin_workstation, uart2eth_core, "Configuration", "HTTP/Web UI")
+
+SHOW_LEGEND()
+----
+
+==== Technical Interface Specifications
+
+[cols="20,20,30,30"]
+|===
+| Interface | Type | Technical Details | Communication Pattern
+
+| UART Ports (4x)
+| Host System Interface
+| UART/RS232/RS422, 300-500k baud, configurable parameters
+| Bidirectional serial, protocol-agnostic
+
+| Ethernet Port
+| Network Interface
+| 100BASE-TX, RJ45 connector, Auto-MDIX
+| TCP/IP networking, DHCP/Static IP
+
+| TCP Sockets
+| Client Interface
+| Ports configurable, single connection per port
+| TCP client connections, application protocols
+
+| Management Interface
+| Configuration Interface
+| Web UI (HTTP), configuration interface
+| HTTP, JSON configuration
+
+| OTA Update Interface
+| Firmware Interface
+| Secure update server, A/B partition management
+| HTTP, signed firmware images
+
+|===
+
+==== Communication Protocols and Data Formats
+
+**UART Communication:**
+
+* Raw serial data transmission (protocol-agnostic)
+* Configurable baud rates: 300 bps to 500 kbps
+* Support for custom frame formats and timing requirements
+
+**Network Communication:**
+
+* TCP socket connections for data transmission
+* JSON for configuration and management data
+* Binary protocol passthrough with optional filtering
+* HTTP for management and OTA updates
+
+**Network Protocols:**
+
+* IPv4 with DHCP or static configuration
+* NTP for time synchronization
+* DNS for name resolution
+
+=== Operating Mode Contexts
+
+==== Gateway Mode Context
+
+[plantuml, gateway-mode-context, svg]
+----
+!include <C4/C4_Context>
+
+title Gateway Mode - Adding Network Capabilities
+
+Person(operator, "Equipment Operator", "Uses networked access to legacy equipment")
+
+System_Boundary(gateway_setup, "Gateway Mode Configuration") {
+    System(uart2eth_gw, "UART2ETH Gateway", "Provides network access to Host System")
+}
+
+System_Ext(host_equipment, "Host System", "Legacy equipment with UART interface (PLC, sensor, etc.)")
+System_Ext(client_app, "Client System", "Network application accessing Host System")
+System_Ext(network_infra, "Network Infrastructure", "Ethernet network")
+
+' Gateway mode connections
+Rel(host_equipment, uart2eth_gw, "Native serial protocol", "UART")
+Rel(uart2eth_gw, network_infra, "TCP/IP encapsulation", "Ethernet")
+Rel(client_app, network_infra, "Network requests", "TCP Socket")
+Rel(operator, client_app, "Remote operation", "Application UI")
+
+note right of uart2eth_gw : Host System keeps original\nfirmware and protocols.\nClient Systems access via\nTCP sockets.
+
+SHOW_LEGEND()
+----
+
+**Gateway Mode Data Flow:**
+1. Host System sends serial data using original protocol to UART2ETH
+2. UART2ETH receives serial data and applies protocol filtering/optimization
+3. Processed data is transmitted to Client Systems via TCP sockets
+4. Client Systems send responses back through TCP connections
+5. UART2ETH forwards responses to Host System via UART interface
+
+==== Full Bridge Mode Context
+
+[plantuml, bridge-mode-context, svg]
+----
+!include <C4/C4_Context>
+
+title Full Bridge Mode - Transparent UART Extension
+
+Person(technician, "Field Technician", "Manages distributed serial connections")
+
+System_Boundary(bridge_setup, "Full Bridge Mode Configuration") {
+    System(uart2eth_a, "UART2ETH A", "Local bridge device")
+    System(uart2eth_b, "UART2ETH B", "Remote bridge device")
+}
+
+System_Ext(host_system_a, "Host System A", "Local equipment with UART")
+System_Ext(host_system_b, "Host System B", "Remote equipment with UART")
+System_Ext(wan_network, "WAN Network", "Wide area network connection")
+
+' Full bridge connections
+Rel(host_system_a, uart2eth_a, "Serial communication", "UART")
+Rel(host_system_b, uart2eth_b, "Serial communication", "UART")
+Rel(uart2eth_a, wan_network, "Encapsulated serial", "TCP/IP")
+Rel(uart2eth_b, wan_network, "Encapsulated serial", "TCP/IP")
+Rel(technician, uart2eth_a, "Configuration", "Web UI")
+Rel(technician, uart2eth_b, "Configuration", "Web UI")
+
+note bottom of wan_network : Both Host Systems communicate\nas if directly connected\nvia serial cable
+
+SHOW_LEGEND()
+----
+
+**Full Bridge Mode Data Flow:**
+1. Host System A sends serial data to UART2ETH A
+2. UART2ETH A encapsulates serial data in TCP packets and transmits over network
+3. UART2ETH B receives TCP packets and extracts original serial data
+4. UART2ETH B forwards serial data to Host System B via UART
+5. Bidirectional communication maintains transparent serial connection
+
+=== Integration Architecture
+
+==== Critical Dependencies
+
+**Network Infrastructure Dependencies:**
+
+* Reliable Ethernet connectivity for TCP/IP communication
+* Network switches with appropriate bandwidth and latency characteristics
+* DHCP services for automatic IP configuration (or static IP management)
+* Network time synchronization for accurate timestamping
+
+**Power and Environmental Dependencies:**
+
+* 3.3V-24V power supply within industrial specifications
+* Operating temperature range suitable for industrial environments
+* Protection from electromagnetic interference in industrial settings
+
+**Security Dependencies:**
+
+* Network firewall configuration to allow necessary TCP ports
+* Firmware signing infrastructure for secure OTA updates
+* Network segmentation appropriate for industrial security requirements
+
+==== Security and Compliance Boundaries
+
+**Network Security:**
+
+* Cryptographic signatures for firmware validation and integrity
+* Configurable TCP port ranges to support firewall policies
+* Input validation and sanitization for all network interfaces
+
+**Industrial Compliance:**
+
+* CE certification for European industrial markets
+* Electromagnetic compatibility (EMC) for industrial environments
+* Component sourcing from Western suppliers for regulatory compliance
+* Audit trail for firmware updates and configuration changes
+
+==== Performance and Scalability Characteristics
+
+**Performance Requirements:**
+
+* 500 kbps sustained throughput per UART port
+* Sub-5ms end-to-end latency for real-time applications
+* Concurrent TCP connections (one per UART port)
+* Configurable buffering for latency vs. throughput optimization
+
+**Scalability Considerations:**
+
+* Up to 4 simultaneous UART-to-TCP bridges per device
+* Network deployment limited by IP address availability and network bandwidth
+* Protocol filtering reduces network traffic for efficient bulk transfers
+* A/B firmware updates enable fleet-wide updates without service interruption
+
+=== Future State Considerations
+
+==== Planned Integrations
+
+**Enhanced Protocol Support:**
+
+* Additional protocol filters for common industrial protocols (Modbus, DNP3, IEC 61850)
+* HTTPS/TLS on-the-wire encryption
+
+**Advanced Management Features:**
+
+* Integration with network management systems (SNMP, NETCONF)
+* Enhanced diagnostic and monitoring capabilities
