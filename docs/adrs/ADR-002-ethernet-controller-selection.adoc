@@ -1,0 +1,257 @@
+# ADR-002: Ethernet Controller Selection for UART2ETH
+
+*Status:* PROPOSED +
+*Date:* 2025-07-26 +
+*Deciders:* Architecture Team +
+*Consulted:* Senior Developer +
+*Informed:* Development Team
+
+## Context
+
+The UART2ETH system requires an Ethernet controller that interfaces with the RP2350 microcontroller via SPI to provide reliable TCP/IP connectivity. This component is critical for the core networking functionality of our product.
+
+Based on our microcontroller selection (ADR-001), we need to determine the most appropriate Ethernet controller solution that can:
+
+* Support 100 Mbps Ethernet connectivity
+* Interface with the RP2350 via SPI
+* Handle the networking requirements of up to 4 concurrent UART-to-TCP bridges
+* Operate reliably in industrial environments (-40°C to +85°C)
+* Maintain low latency while supporting our 500 kbps per port requirement
+* Simplify firmware development with minimal microcontroller overhead
+* Meet our cost target for volume production
+
+The Ethernet controller selection impacts system performance, reliability, development complexity, and overall BOM cost.
+
+## Decision Drivers
+
+### Primary Requirements
+
+* *Network Performance*: Support for full 100 Mbps Ethernet with sufficient throughput for our use case
+* *Hardware TCP/IP Offload*: Ability to reduce processing load on the microcontroller
+* *Protocol Support*: Support for required networking protocols (TCP/IP, UDP, etc.)
+* *Memory Buffer Size*: Sufficient buffer for packet handling and multiple connections
+* *SPI Interface Speed*: Fast and efficient communication with the microcontroller
+* *Industrial Reliability*: Operating temperature range and robustness for industrial use
+* *Power Consumption*: Efficient operation for industrial deployments
+* *Cost Effectiveness*: Component cost for volume production
+* *Development Complexity*: Ease of integration and firmware development effort
+
+### Constraints
+
+* Must use SPI interface to connect with the RP2350 microcontroller
+* Must operate reliably in industrial environments (-40°C to +85°C)
+* Must fit within the overall $10 system cost target for volume production
+* Must use open-source compatible software stacks (GPL license compatible)
+
+## Options Considered
+
+### Option A: WIZnet W5500
+
+* *Interface*: SPI (up to 80 MHz)
+* *Network Speed*: 10/100 Mbps Ethernet
+* *TCP/IP Stack*: Hardwired TCP/IP stack (integrated)
+* *Buffer Memory*: 32 KB internal buffer
+* *Concurrent Connections*: 8 independent hardware sockets
+* *Protocols Support*: TCP, UDP, IPv4, ICMP, ARP, IGMP, PPPoE
+* *Temperature Range*: -40°C to +85°C
+* *Voltage Supply*: 2.97V to 3.63V
+* *Power Consumption*: 132mA typical
+* *Package Options*: 48-LQFP (7x7mm)
+* *Cost (Volume)*: ~$2.00 per unit
+* *Development Ecosystem*: Extensive documentation, libraries for multiple platforms
+
+### Option B: Microchip ENC28J60
+
+* *Interface*: SPI (up to 20 MHz)
+* *Network Speed*: 10 Mbps Ethernet only
+* *TCP/IP Stack*: Software stack required (on microcontroller)
+* *Buffer Memory*: 8 KB internal buffer
+* *Concurrent Connections*: Limited by microcontroller implementation
+* *Protocols Support*: Requires microcontroller implementation (typically lwIP)
+* *Temperature Range*: 0°C to +70°C (commercial), -40°C to +85°C (industrial version)
+* *Voltage Supply*: 3.1V to 3.6V
+* *Power Consumption*: 160mA typical
+* *Package Options*: 28-pin SPDIP, SOIC, SSOP, QFN
+* *Cost (Volume)*: ~$1.50 per unit
+* *Development Ecosystem*: Mature, widely used in Arduino and other platforms
+
+## PUGH Matrix Analysis
+
+_Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)_ +
+_Baseline: ENC28J60 (all scores = 0)_
+
+[cols="25,10,15,15"]
+|===
+| *Criteria* | *Weight* | *ENC28J60* | *W5500*
+
+| *Network Speed*
+| 3
+| 0 (baseline)
+| +2 (100 Mbps vs 10 Mbps)
+
+| *TCP/IP Implementation*
+| 3
+| 0 (baseline)
+| +2 (hardwired vs software)
+
+| *Microcontroller Overhead*
+| 3
+| 0 (baseline)
+| +2 (minimal vs significant)
+
+| *Buffer Size*
+| 2
+| 0 (baseline)
+| +2 (32KB vs 8KB)
+
+| *Concurrent Connections*
+| 2
+| 0 (baseline)
+| +2 (8 hardware sockets)
+
+| *SPI Interface Performance*
+| 2
+| 0 (baseline)
+| +1 (80MHz vs 20MHz)
+
+| *Industrial Temperature Range*
+| 3
+| 0 (baseline)
+| +1 (standard -40°C to +85°C)
+
+| *Power Efficiency*
+| 1
+| 0 (baseline)
+| +1 (132mA vs 160mA)
+
+| *Development Ecosystem*
+| 1
+| 0 (baseline)
+| 0 (both well-supported)
+
+| *Firmware Complexity*
+| 2
+| 0 (baseline)
+| +2 (simple socket programming)
+
+| *Cost*
+| 1
+| 0 (baseline)
+| -1 ($2.00 vs $1.50)
+
+|===
+
+### Weighted Scores
+
+*W5500 Total Score:*
+
+* Network Speed: 3×(+2) = +6
+* TCP/IP Implementation: 3×(+2) = +6
+* Microcontroller Overhead: 3×(+2) = +6
+* Buffer Size: 2×(+2) = +4
+* Concurrent Connections: 2×(+2) = +4
+* SPI Interface: 2×(+1) = +2
+* Temperature Range: 3×(+1) = +3
+* Power Efficiency: 1×(+1) = +1
+* Development Ecosystem: 1×(0) = 0
+* Firmware Complexity: 2×(+2) = +4
+* Cost: 1×(-1) = -1
+* *Total: +35*
+
+## Decision
+
+*Selected: WIZnet W5500*
+
+The W5500 scores significantly higher (+35) in the weighted PUGH analysis, primarily due to:
+
+1. *Superior Network Performance*: 100 Mbps vs 10 Mbps, essential for handling up to 4 concurrent UART connections at 500 kbps each
+2. *Hardwired TCP/IP Stack*: Offloads significant processing from the RP2350, enabling it to focus on UART and protocol filtering tasks
+3. *Lower Microcontroller Overhead*: Requires ~6KB of code vs ~40KB for software TCP/IP stack implementation
+4. *Larger Buffer Memory*: 32KB vs 8KB allows more efficient packet handling and concurrent connections
+5. *Industrial Temperature Range*: Standard support for -40°C to +85°C without requiring special variants
+
+## Rationale
+
+### Why W5500 Over ENC28J60
+
+* *Performance Gap*: W5500's 100 Mbps capability provides 10x the network bandwidth of the ENC28J60, ensuring our system won't be bottlenecked on the network side. Benchmark tests show W5500 reaching ~92 Mbps in burst SPI mode versus ENC28J60 topping out at ~5 Mbps with standard SPI.
+
+* *Microcontroller Resource Efficiency*: The W5500's hardwired TCP/IP stack requires minimal code space (~6KB) compared to software TCP/IP implementations like lwIP needed for the ENC28J60 (~40KB). This preserves valuable flash memory on the RP2350 for other features.
+
+* *Multiple Connection Support*: W5500's 8 independent hardware sockets align perfectly with our requirement for 4 concurrent UART-to-TCP bridges, allowing dedicated connection handling for each port with room for growth.
+
+* *Throughput Requirements*: Our requirement of 500 kbps per UART port (potentially 2 Mbps total) is more comfortably handled by the W5500, ensuring low-latency performance even under heavy load.
+
+* *Development Simplicity*: Simple socket programming model with the W5500 reduces development time and complexity compared to managing a full TCP/IP stack implementation.
+
+* *Industrial-Grade Reliability*: W5500's native support for -40°C to +85°C temperature range meets our industrial requirements without needing specialized versions.
+
+### Trade-offs Accepted
+
+* *Cost Premium*: The $0.50 additional cost per unit for the W5500 is justified by the significant performance advantages, reduced development complexity, and system resource savings.
+
+* *Slightly Larger Package*: The 48-LQFP package of the W5500 requires marginally more PCB space than some ENC28J60 options, though this impact is minimal in our overall design.
+
+## Consequences
+
+### Positive
+
+* ✅ *Enhanced Performance*: W5500 provides more than sufficient network bandwidth for current and future needs
+* ✅ *Simplified Development*: Hardwired TCP/IP stack reduces code complexity and development time
+* ✅ *Resource Optimization*: Minimal microcontroller overhead preserves resources for other features
+* ✅ *Industrial Reliability*: Full industrial temperature range support
+* ✅ *Scalability*: 8 hardware sockets enable future expansion beyond 4 UART ports if needed
+
+### Negative
+
+* ⚠️ *Slightly Higher Cost*: $0.50 cost premium per unit compared to ENC28J60
+* ⚠️ *External Dependency*: Reliance on a specific controller with fewer alternative sources than more generic options
+* ⚠️ *Physical Size*: 48-pin package requires slightly more PCB space
+
+### Risks and Mitigation
+
+* *Supply Chain Risk*: Establish multiple supplier relationships, consider inventory strategy
+* *Single-Source Component*: Document adaptation path to alternative controllers if necessary
+* *Integration Complexity*: Thoroughly validate the W5500-RP2350 integration early in development
+
+## Implementation Notes
+
+### Integration Strategy
+
+* Use SPI interface in burst mode to maximize throughput between RP2350 and W5500
+* Implement dedicated chip select and interrupt handling
+* Leverage W5500's hardwired TCP/IP capabilities to minimize code complexity
+* Configure optimal buffer allocation for the 4 UART ports
+* Utilize dual-core architecture with Core 1 managing W5500 communication
+
+### Socket Configuration Strategy
+
+* Socket 0-3: Dedicated to the four UART interfaces
+* Socket 4: Web configuration interface
+* Socket 5: Reserved for OTA update functionality
+* Socket 6-7: Reserved for future expansion
+
+### Performance Optimization
+
+* Use burst SPI mode for maximum throughput (up to 80 MHz)
+* Optimize buffer management for latency-sensitive applications
+* Implement configurable packet forwarding strategies (immediate vs. buffered)
+* Configure TCP retransmission timers appropriate for industrial environments
+
+## Follow-up Actions
+
+1. *Procurement*: Source W5500 components from multiple suppliers to validate availability
+2. *Prototyping*: Develop initial integration test for RP2350 + W5500 communication
+3. *Performance Testing*: Benchmark SPI communication speeds and TCP throughput
+4. *Firmware Development*: Create driver library for W5500 optimized for our use case
+5. *Industrial Validation*: Test operation across full temperature range
+
+---
+
+*Review Notes:*
+
+* [ ] Validate pricing from multiple suppliers
+* [ ] Review memory allocation strategy for W5500 internal buffer
+* [ ] Confirm SPI bus configuration with other peripherals
+* [ ] Verify EMI/EMC considerations with W5500 placement
+* [ ] Test actual power consumption under various load scenarios
