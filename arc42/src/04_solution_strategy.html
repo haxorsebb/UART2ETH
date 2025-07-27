@@ -360,7 +360,22 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
-<li><a href="#section-solution-strategy">Solution Strategy</a></li>
+<li><a href="#section-solution-strategy">Solution Strategy</a>
+<ul class="sectlevel2">
+<li><a href="#_quality_goals_foundation">Quality Goals Foundation</a></li>
+<li><a href="#_architectural_drivers">Architectural Drivers</a></li>
+<li><a href="#_architecture_significant_requirements_asrs">Architecture Significant Requirements (ASRs)</a></li>
+<li><a href="#_solution_approach_overview">Solution Approach Overview</a></li>
+<li><a href="#_technology_strategy">Technology Strategy</a></li>
+<li><a href="#_decomposition_strategy">Decomposition Strategy</a></li>
+<li><a href="#_quality_achievement_strategy">Quality Achievement Strategy</a></li>
+<li><a href="#_strategic_decisions_and_trade_offs">Strategic Decisions and Trade-offs</a></li>
+<li><a href="#_implementation_strategy">Implementation Strategy</a></li>
+<li><a href="#_risk_assessment_and_mitigation">Risk Assessment and Mitigation</a></li>
+<li><a href="#_architecture_evolution_strategy">Architecture Evolution Strategy</a></li>
+<li><a href="#_conclusion">Conclusion</a></li>
+</ul>
+</li>
 </ul>
 </div>
 
@@ -386,7 +401,932 @@
 <div class="sect1">
 <h2 id="section-solution-strategy">Solution Strategy</h2>
 <div class="sectionbody">
+<div class="sect2">
+<h3 id="_quality_goals_foundation">Quality Goals Foundation</h3>
+<div class="sect3">
+<h4 id="_primary_quality_goals">Primary Quality Goals</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 60%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Quality Goal</th>
+<th class="tableblock halign-left valign-top">Priority</th>
+<th class="tableblock halign-left valign-top">Description &amp; Success Criteria</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reliability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>1 (Primary Driver)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical system uptime for industrial applications. Must not fail due to software issues during normal operation within environmental specifications.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Compatibility</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>2 (Secondary Driver)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Seamless integration with diverse industrial systems. Support broad range of custom baud rates and protocol parameters with reliable auto-negotiation.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>3 (Supporting Driver)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">500kBaud sustained throughput with sub-5ms end-to-end latency. Real-time data transmission capabilities for industrial process control.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_quality_scenarios_summary">Quality Scenarios Summary</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Quality Attribute</th>
+<th class="tableblock halign-left valign-top">Scenario</th>
+<th class="tableblock halign-left valign-top">Measurable Requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Reliability</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial Operation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Continuous operation for duration of connected hardware operation within environmental specifications</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Performance</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Real-time Control</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PLC sending time-critical control data must experience &lt;5ms latency to SCADA system</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Compatibility</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Protocol Flexibility</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Work reliably with broad range of custom baud rates and protocol parameters</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_architectural_drivers">Architectural Drivers</h3>
+<div class="sect3">
+<h4 id="_business_drivers_priority_order">Business Drivers (Priority Order)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Regulatory Compliance</strong> - Western-only components, anticipating new regulations for updateable/auditable firmware</p>
+</li>
+<li>
+<p><strong>Market Gap</strong> - Address discontinued commercial solutions, provide open source alternative to expensive/black-box products</p>
+</li>
+<li>
+<p><strong>Industrial Deployment</strong> - Must operate reliably in harsh industrial environments</p>
+</li>
+<li>
+<p><strong>ROI</strong> - First-year return on investment (afterthought, minimal architectural influence)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_technical_drivers_priority_order">Technical Drivers (Priority Order)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>4-UART Requirement</strong> - Multiple concurrent serial bridges, each must operate independently</p>
+</li>
+<li>
+<p><strong>Static Memory Model</strong> - No dynamic allocation, all memory allocated at compile time for predictable behavior</p>
+</li>
+<li>
+<p><strong>RP2350 Platform</strong> - Dual-core ARM, PIO capabilities, security features enable advanced functionality</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_organizational_drivers_priority_order">Organizational Drivers (Priority Order)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>TDD + C Expertise</strong> - Mandatory test-driven development, deep embedded C knowledge in team</p>
+</li>
+<li>
+<p><strong>Arc42 Documentation</strong> - Standardized architecture documentation approach</p>
+</li>
+<li>
+<p><strong>Open Source GPL</strong> - Complete transparency (minimal architectural influence)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_architecture_significant_requirements_asrs">Architecture Significant Requirements (ASRs)</h3>
+<div class="sect3">
+<h4 id="_non_negotiable_system_fails_without_these">Non-Negotiable (System Fails Without These)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Industrial Reliability</strong> - Must not fail during normal operation</p>
+</li>
+<li>
+<p><strong>Static Resource Allocation</strong> - Enables reliability through predictability</p>
+</li>
+<li>
+<p><strong>500kBaud Sustained Rate</strong> - Crucial performance baseline</p>
+</li>
+<li>
+<p><strong>Secure OTA with A/B Updates</strong> - "We can fix everything if this works"</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_negotiable_important_but_flexible">Negotiable (Important but Flexible)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>4 UARTs (important but not crucial)</p>
+</li>
+<li>
+<p>Protocol agnostic operation (debatable)</p>
+</li>
+<li>
+<p>Compliance auditability (debatable)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_solution_approach_overview">Solution Approach Overview</h3>
+<div class="paragraph">
+<p><strong>Fundamental Architecture: Dual-Core Separation + Interrupts/DMA</strong></p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/solution-strategy-overview.svg" alt="solution strategy overview" width="752" height="1420">
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_technology_strategy">Technology Strategy</h3>
+<div class="sect3">
+<h4 id="_core_technology_decisions">Core Technology Decisions</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 70%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Technology Area</th>
+<th class="tableblock halign-left valign-top">Strategic Decision &amp; Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Architecture Pattern</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Dual-core separation with interrupt/DMA - provides fault isolation while achieving hardware-driven performance</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Programming Language</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">C with Native Pico SDK - leverages team expertise, provides full platform access, enables deterministic behavior</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Management</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Static allocation only - enables industrial reliability through predictable behavior, no dynamic allocation risks</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Inter-Core Communication</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Cache-aligned ring buffers with mutexes - optimal performance with deterministic behavior</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ethernet Controller</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ENC28J60 with software TCP/IP - "dumb" controller enables full code auditability and control</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_communication_architecture">Communication Architecture</h4>
+<div class="paragraph">
+<p><strong>Ring Buffer Design:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Each entry = 1 cache line (64 bytes base + 1024 payload)
+typedef struct {
+    // Management Data (16 bytes)
+    uint8_t  uart_channel;     // 0-3
+    uint8_t  direction;        // TX/RX
+    uint8_t  status;           // FILLING/DRAINING/FULL/EMPTY
+    uint8_t  payload_length;   // Actual data length
+    uint32_t timestamp;        // Fill timestamp
+    uint32_t sequence_id;      // For ordering/debugging
+    uint32_t reserved;         // Future use/alignment
 
+    // Payload Data (1024 bytes max)
+    uint8_t  payload[1024];    // Fixed max size for worst case
+} ring_entry_t;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Memory Allocation Strategy:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Buffer Size: <code>(total_mem - static_vars) / sizeof(ring_entry_t) - 1</code> entries</p>
+</li>
+<li>
+<p>Cache Aligned: No core contention, optimal performance</p>
+</li>
+<li>
+<p>Overflow Policy: Drop oldest packets (deterministic, simple)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_decomposition_strategy">Decomposition Strategy</h3>
+<div class="sect3">
+<h4 id="_system_decomposition_approach">System Decomposition Approach</h4>
+<div class="paragraph">
+<p><strong>Dual-core functional separation</strong> - Each core specializes in distinct responsibilities with clean interfaces through shared memory ring buffers.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_major_componentsservices">Major Components/Services</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 35%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Component/Service</th>
+<th class="tableblock halign-left valign-top">Responsibilities</th>
+<th class="tableblock halign-left valign-top">Key Interfaces</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core 0 UART Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All 4 UART interfaces, interrupt/DMA handling, stream-to-packet conversion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware UARTs, Ring buffer producer</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core 1 Network Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TCP/IP stack, ENC28J60 control, packet-to-network conversion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ring buffer consumer, SPI to ENC28J60</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer System</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Inter-core communication, cache-aligned data transfer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Shared memory + mutex interfaces</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HTTP Management UI</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device configuration, diagnostics, OTA trigger</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP server on Core 1</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>OTA Update System</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Secure firmware updates, A/B partition management</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Secure boot, flash management</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_component_interaction_strategy">Component Interaction Strategy</h4>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/component-interaction.svg" alt="component interaction" width="777" height="581">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Interaction Principles:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Core 0 → Ring Buffer: UART streams converted to fixed-size packets, cache-aligned writes</p>
+</li>
+<li>
+<p>Ring Buffer → Core 1: Packet consumption for TCP transmission</p>
+</li>
+<li>
+<p>Overflow Policy: Drop oldest packets (deterministic, simple)</p>
+</li>
+<li>
+<p>Priority: UART processing takes priority over HTTP UI</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_quality_achievement_strategy">Quality Achievement Strategy</h3>
+<div class="sect3">
+<h4 id="_quality_goal_implementation">Quality Goal Implementation</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 40%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Quality Goal</th>
+<th class="tableblock halign-left valign-top">Architectural Mechanisms</th>
+<th class="tableblock halign-left valign-top">Validation Approach</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reliability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Core separation, static allocation, deterministic behavior, drop-oldest overflow</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Extended operation testing, fault injection, environmental testing</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Compatibility</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Protocol-agnostic packet handling, configurable UART parameters</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Testing with diverse industrial protocols, auto-negotiation validation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Interrupt/DMA driven I/O, cache-aligned buffers, hardware-optimized data paths</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sustained 500kBaud testing, latency measurements, stress testing</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_cross_cutting_concerns_strategy">Cross-Cutting Concerns Strategy</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 70%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Cross-Cutting Concern</th>
+<th class="tableblock halign-left valign-top">Implementation Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Error Handling</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Graceful degradation, fault isolation between cores, deterministic error responses</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Management</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Static allocation only, pre-calculated buffer sizes, cache-aligned data structures</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Secure OTA updates, A/B partitioning, auditable code paths</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Testing</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Host-based testing with abstracted semaphores, hardware-in-the-loop validation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_strategic_decisions_and_trade_offs">Strategic Decisions and Trade-offs</h3>
+<div class="sect3">
+<h4 id="_major_architectural_decisions">Major Architectural Decisions</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 35%;">
+<col style="width: 35%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Decision</th>
+<th class="tableblock halign-left valign-top">Rationale</th>
+<th class="tableblock halign-left valign-top">Trade-offs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Dual-Core Separation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Fault isolation + performance, leverages RP2350 capabilities</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Increased complexity vs single-core simplicity</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Fixed 1024-byte Packets</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deterministic behavior, handles worst-case scenarios</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">96% memory waste (avg 40 bytes vs 1024 max) accepted for simplicity</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Drop-Oldest Overflow</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deterministic, reliable behavior under overload</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data loss vs flow control complexity</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Cache-Aligned Buffers</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optimal inter-core performance</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Memory overhead vs efficiency</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_key_trade_off_fixed_packet_size_inefficiency">Key Trade-off: Fixed Packet Size Inefficiency</h4>
+<div class="paragraph">
+<p><strong>The Challenge:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Realistic scenario: Max=1024 bytes, Average=40 bytes → 96% memory waste</p>
+</li>
+<li>
+<p>Risk: Significant resource inefficiency in typical use cases</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Mitigation Rationale:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Sub-5ms latency requirement limits buffering depth anyway (~2-3 packets maximum)</p>
+</li>
+<li>
+<p>Total waste limited: 4 UARTs × 3 packets × 1024 bytes = ~12KB (acceptable in 520KB system)</p>
+</li>
+<li>
+<p>Implementation simplicity enables reliable delivery</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Future Optimization Path:</strong></p>
+</div>
+<div class="paragraph">
+<p>Protocol-aware multi-pool approach documented for later enhancement:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Small Pool: 64-byte entries (for ≤40 byte packets)</p>
+</li>
+<li>
+<p>Medium Pool: 256-byte entries (for 41-200 byte packets)</p>
+</li>
+<li>
+<p>Large Pool: 1024-byte entries (for 201-1024 byte packets)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_alternative_approaches_considered">Alternative Approaches Considered</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 50%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Alternative</th>
+<th class="tableblock halign-left valign-top">Why Not Selected</th>
+<th class="tableblock halign-left valign-top">Key Insight</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Single-Core Design</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Cannot achieve 4-UART + network performance simultaneously</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Core separation essential for real-time requirements</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Dynamic Memory Allocation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Conflicts with industrial reliability requirements</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Static allocation mandatory for predictable behavior</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>W5500 Ethernet Controller</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware TCP/IP stack not auditable, conflicts with compliance goals</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">"Dumb" controller enables full code control</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_strategy">Implementation Strategy</h3>
+<div class="sect3">
+<h4 id="_development_approach">Development Approach</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 70%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Implementation Aspect</th>
+<th class="tableblock halign-left valign-top">Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Methodology</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Test-driven development with host-based testing using abstracted semaphores</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Testing Strategy</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Host simulation with pthread/threads, then hardware validation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Single UART + single TCP proof-of-concept first</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Platform Abstraction</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Abstract semaphores/mutexes for host testing: <code>platform_mutex_t</code>, <code>platform_semaphore_t</code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_implementation_phases">Implementation Phases</h4>
+<div class="listingblock">
+<div class="content">
+<pre>Failed to generate image: PlantUML preprocessing failed: [From &lt;input&gt; (line 11) ]
+
+@startuml
+
+
+
+
+...
+... ( skipping 131 lines )
+...
+  BackgroundColor white
+  BorderColor black
+}
+skinparam StereotypeN {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam UseCaseStereoType {
+  FontColor black
+  FontName Verdana
+}
+skinparam backgroundColor transparent
+
+title Implementation Roadmap
+
+robust "Phase 1: Proof of Concept" as P1
+robust "Phase 2: Full System" as P2
+robust "Phase 3: Advanced Features" as P3
+
+P1 is "Single UART + TCP" from 0 to 3
+^^^^^
+ Syntax Error?
+
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+
+title Implementation Roadmap
+
+robust "Phase 1: Proof of Concept" as P1
+robust "Phase 2: Full System" as P2
+robust "Phase 3: Advanced Features" as P3
+
+P1 is "Single UART + TCP" from 0 to 3
+P1 is "Mock Ring Buffer" from 3 to 6
+P1 is "Host-based Testing" from 6 to 9
+
+P2 is "All 4 UARTs" from 9 to 12
+P2 is "Complete Ring Buffer" from 12 to 15
+P2 is "HTTP Management UI" from 15 to 18
+
+P3 is "Secure OTA" from 18 to 21
+P3 is "A/B Updates" from 21 to 24
+P3 is "Industrial Hardening" from 24 to 27
+
+@enduml</pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Phase 1: Proof of Concept</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Single UART + Single TCP socket</p>
+</li>
+<li>
+<p>Mock ring buffer with abstracted semaphores</p>
+</li>
+<li>
+<p>Host-based testing with thread simulation</p>
+</li>
+<li>
+<p>Validate core architecture concepts</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Phase 2: Full System Implementation</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>All 4 UARTs on Core 0</p>
+</li>
+<li>
+<p>Complete ring buffer system</p>
+</li>
+<li>
+<p>Full TCP/IP integration on Core 1</p>
+</li>
+<li>
+<p>HTTP management UI</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Phase 3: Advanced Features</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Secure OTA implementation</p>
+</li>
+<li>
+<p>A/B update mechanism</p>
+</li>
+<li>
+<p>Industrial hardening and optimization</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_validation_and_success_metrics">Validation and Success Metrics</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 35%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Milestone</th>
+<th class="tableblock halign-left valign-top">Success Criteria</th>
+<th class="tableblock halign-left valign-top">Validation Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Validation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Concurrent producer/consumer without data corruption</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Host-based stress testing</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance Achievement</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">500kBaud sustained, &lt;5ms latency</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware-in-the-loop measurement</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reliability Demonstration</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">24+ hour continuous operation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Extended testing under load</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_risk_assessment_and_mitigation">Risk Assessment and Mitigation</h3>
+<div class="sect3">
+<h4 id="_strategic_risks">Strategic Risks</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 25%;">
+<col style="width: 45%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Risk</th>
+<th class="tableblock halign-left valign-top">Probability/Impact</th>
+<th class="tableblock halign-left valign-top">Mitigation Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Fixed Packet Size Inefficiency</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High/Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Document multi-pool optimization path, validate memory usage early</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Inter-Core Communication Complexity</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium/High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Prove with host-based testing first, extensive validation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance Under Load</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium/High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Early prototyping, stress testing, hardware validation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_architecture_evolution_strategy">Architecture Evolution Strategy</h3>
+<div class="sect3">
+<h4 id="_future_optimization_path">Future Optimization Path</h4>
+<div class="paragraph">
+<p><strong>Protocol-Aware Enhancements:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Multi-pool buffer management for memory efficiency</p>
+</li>
+<li>
+<p>Protocol-specific packet sizing based on message type analysis</p>
+</li>
+<li>
+<p>Dynamic buffer allocation per UART based on usage patterns</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Security and Compliance Evolution:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Enhanced security features for evolving compliance requirements</p>
+</li>
+<li>
+<p>Extended audit trail capabilities</p>
+</li>
+<li>
+<p>Additional cryptographic features as regulations develop</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Performance Optimizations:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Fine-tuned based on real-world deployment data</p>
+</li>
+<li>
+<p>Protocol filter optimizations</p>
+</li>
+<li>
+<p>Network stack performance improvements</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_success_factors">Success Factors</h4>
+<div class="paragraph">
+<p><strong>Critical Dependencies:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Early validation of ring buffer architecture with host-based testing</p>
+</li>
+<li>
+<p>Incremental implementation starting with single UART proof-of-concept</p>
+</li>
+<li>
+<p>Comprehensive testing at each phase before proceeding</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Key Assumptions:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>RP2350 dual-core performance meets concurrent processing requirements</p>
+</li>
+<li>
+<p>Cache-aligned ring buffers provide sufficient inter-core bandwidth</p>
+</li>
+<li>
+<p>Static memory allocation provides adequate resource management</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Monitoring and Adaptation:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Continuous validation of memory efficiency in real deployments</p>
+</li>
+<li>
+<p>Performance monitoring under various industrial load scenarios</p>
+</li>
+<li>
+<p>Regular assessment of compliance requirement evolution</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_conclusion">Conclusion</h3>
+<div class="paragraph">
+<p>This solution strategy establishes UART2ETH as an <strong>"unbreakable foundation with field-updateable capability"</strong> through:</p>
+</div>
+<div class="paragraph">
+<p><strong>Core Architectural Principles:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Reliability-first dual-core separation</p>
+</li>
+<li>
+<p>Static allocation for predictable behavior</p>
+</li>
+<li>
+<p>Hardware-driven performance with software control</p>
+</li>
+<li>
+<p>Protocol-agnostic flexibility</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Strategic Advantages:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Fault isolation enables industrial reliability</p>
+</li>
+<li>
+<p>Deterministic behavior supports real-time requirements</p>
+</li>
+<li>
+<p>Full code auditability meets compliance needs</p>
+</li>
+<li>
+<p>Incremental implementation reduces development risk</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Success Enablers:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>TDD approach with host-based validation</p>
+</li>
+<li>
+<p>Clear module boundaries for team development</p>
+</li>
+<li>
+<p>Documented optimization paths for future enhancement</p>
+</li>
+<li>
+<p>Strong foundation for scaling and feature evolution</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The strategy balances immediate reliability requirements with long-term flexibility, ensuring UART2ETH can serve as a robust industrial networking solution while maintaining the ability to evolve with changing requirements and regulations.</p>
+</div>
+</div>
 </div>
 </div>
         </p>
