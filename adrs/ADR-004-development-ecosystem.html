@@ -1,0 +1,1248 @@
+<!doctype html>
+<html lang="de">
+<head>
+    
+    <!-- sourceuri: adrs/ADR-004-development-ecosystem.html -->
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+    <meta content="jbake" name="generator">
+    <meta content="INDEX, FOLLOW" name="ROBOTS">
+
+    <title>ADR-004: Development Ecosystem Selection for UART2ETH</title>
+    <meta content="docToolchain" property="og:title">
+    <meta content="build your dev docs the easy way..." property="og:description">
+    <meta content="website" property="og:type">
+    <meta content="docToolchain" property="og:site_name">
+    <meta content="docToolchain" itemprop="name">
+    <meta content="build your dev docs the easy way..." itemprop="description">
+    <meta content="summary" name="twitter:card">
+    <meta content="docToolchain" name="twitter:title">
+    <meta content="build your dev docs the easy way..." name="twitter:description">
+
+    <link as="style"
+        href="../css/main.min.881fe5f7b53609f55ebfb496c7097c3b30b2e8ceb20a54bc6a48350ded67224f.css"
+        rel="preload">
+    <link href="../css/main.min.881fe5f7b53609f55ebfb496c7097c3b30b2e8ceb20a54bc6a48350ded67224f.css"
+        integrity=""
+        rel="stylesheet">
+    <link href="../css/asciidoctor.css" rel="stylesheet">
+    <link href="../css/prettify.css" rel="stylesheet">
+
+    <!-- favicon generated with https://www.favicon-generator.org/ -->
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="apple-touch-icon" sizes="57x57" href="../apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="../apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="../apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="../apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="../apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="../apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="../apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="../apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="../android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+    <link rel="manifest" href="../manifest.json">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="../ms-icon-144x144.png">
+    <meta name="theme-color" content="#ffffff">
+
+    <script src="../js/jquery-3.5.1.min.js"></script>
+    <style>
+    div.bg-light {
+        background-color: rgba(127, 180, 224, 0.3) !important;
+    }
+
+    /* for blog posts */
+    span.blogtag {
+        border-radius: 10px;
+        background-color: #30638E;
+        color: white;
+        padding: 5px 10px;
+    }
+
+    span.blogblogtag a {
+        color: white;
+        padding: 0
+    }
+
+    span.blogtag span {
+        margin-left: 10px;
+        border-radius: 10px;
+        background-color: white;
+        color: #30638E;
+    }
+
+    div.td-toc {
+        height: calc(100vh - 5rem) !important;
+    }
+
+    div#toctitle {
+        display: none
+    }
+
+    #td-section-nav {
+        max-height: calc(100vh - 4rem);
+        font-size: smaller;
+        line-height: 1.1;
+    }
+
+    .td-page-meta {
+        font-size: smaller;
+        line-height: 1.1;
+    }
+
+    #td-section-nav ul.td-sidebar-nav__section {
+        padding-left: 0;
+    }
+
+    span.navbar-logo {
+        padding-right: 1.5em;
+    }
+
+    .match {
+        font-size: smaller;
+    }
+
+    .admonitionblock td.icon .fa:before {
+        font-size: xxx-large;
+    }
+    </style>
+
+    <style>
+    div.openblock.primary div.content, div.openblock.secondary div.content {
+        border: 1px solid #7a2518;
+        padding: 5px;
+    }
+
+    div.openblock.primary div.content div.content, div.openblock.secondary div.content div.content {
+        border: 0 solid #7a2518;
+        padding: 0;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .switch {
+        border-width: 1px 1px 0 1px;
+        border-style: solid;
+        border-color: #7a2518;
+        display: inline-block;
+    }
+
+    .switch--item {
+        padding: 2px 10px;
+        background-color: #ffffff;
+        color: #7a2518;
+        display: inline-block;
+        cursor: pointer;
+    }
+
+    .switch--item:not(:first-child) {
+        border-width: 0 0 0 1px;
+        border-style: solid;
+        border-color: #7a2518;
+    }
+
+    .switch--item.selected {
+        background-color: #7a2519;
+        color: #ffffff;
+    }
+    </style>
+
+    <!-- copy-n-paste.js -->
+    <style>
+        div.listingblock {
+            position: relative;
+        }
+        div.listingblock > span.icon {
+            position: absolute;
+            top: 2px;
+            right: 6px;
+            visibility: hidden;
+            z-index: 2;
+            cursor: pointer;
+        }
+        div.listingblock:hover > span.icon {
+            visibility: visible;
+        }
+        div.listingblock div.content pre {
+            margin: 0;
+        }
+    </style>
+    <style>
+        .td-sidebar-nav__section {
+            padding-left: 9px;
+        }
+        details {
+            margin-left: 10px;
+        }
+        summary {
+            cursor: pointer;
+            padding-left: 10px; /* Erhöhter linker Padding für den Pfeil */
+            list-style: none;
+            position: relative; /* Für absolute Positionierung des Pfeils */
+        }
+        summary::before {
+            content: '>';
+            position: absolute;
+            left: 10px; /* Position des Pfeils */
+            top: 50%;
+            transform: translateY(-50%) translateX(-120%);
+            transition: transform 0.3s;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) translateX(-120%) rotate(90deg);
+        }
+    </style>
+</head>
+
+<body onload="prettyPrint()" class="td-section">
+<header>
+	
+<nav class="js-navbar-scroll navbar navbar-expand navbar-dark flex-column flex-md-row td-navbar">
+    <a class="navbar-brand" href="../index.html">
+        <span class="navbar-logo"><img src="../images/doctoolchain-logo-blue.png" alt="docToolchain" width="32px" /></span><span
+            class="font-weight-bold">docToolchain</span>
+    </a>
+    <div class="td-navbar-nav-scroll ml-md-auto" id="main_navbar">
+        <ul class="navbar-nav mt-2 mt-lg-0">
+    <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
+
+            <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a class="nav-link active" href="../adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+            </li>
+
+            <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a class="nav-link " href="../arc42/arc42.html"><span>arc42</span></a>
+            </li>
+
+        </ul>
+    </div>
+    <div class="navbar-nav d-none d-lg-block" >
+        <form action="../search.html">
+        <input aria-label="Search this site…" autocomplete="off" class="form-control td-search-input"
+               placeholder=" Search this site…" type="search" name="q">
+        </form>
+    </div>
+</nav>
+
+</header>
+<div class="container-fluid td-outer">
+	<div class="td-main">
+		<div class="row flex-xl-nowrap">
+			<div class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">
+				<div class="td-sidebar__inner" id="td-sidebar-menu" >
+					
+
+        <form class="td-sidebar__search d-flex align-items-center d-lg-none" action="../search.html">
+
+            <input aria-label="Search this site…" name="q" autocomplete="off" class="form-control td-search-input"
+                   placeholder=" Search this site…" type="search">
+
+
+            <button aria-controls="td-docs-nav" aria-expanded="false"
+                    aria-label="Toggle section navigation" class="btn btn-link td-sidebar__toggle d-md-none p-0 ml-3 fas fa-bars" data-target="#td-section-nav"
+                    data-toggle="collapse" type="button">
+            </button>
+        </form>
+
+        <nav aria-label="Submenu" class="collapse td-sidebar-nav" id="td-section-nav" >
+
+            <ul class="td-sidebar-nav__section">
+                <li class="td-sidebar-nav__section-title">
+                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">adrs</span>
+                </li>
+                <li>
+                  <ul>
+                      <li class="collapse show" id="docs">
+                          
+                        <ul class="td-sidebar-nav__section ul-0">
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../adrs/ADR-001-microcontroller-selection.html" title="ADR-001: Microcontroller Platform Selection for UART2ETH">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../adrs/ADR-002-ethernet-controller-selection.html" title="ADR-002-ethernet-controller-selection.adoc">ADR-002-ethernet-controller-selection.adoc</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../adrs/ADR-003-programming-language-selection.html" title="ADR-003: Programming Language Selection for UART2ETH">ADR-003: Programming Language Selection for UART2ETH</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                   href="../adrs/ADR-004-development-ecosystem.html" title="ADR-004: Development Ecosystem Selection for UART2ETH">ADR-004: Development Ecosystem Selection for UART2ETH</a>
+                                
+                            </li>
+                        </ul>
+                      </li>
+                  </ul>
+                <li>
+        </nav>
+
+				</div>
+			</div>
+			<div class="d-none d-xl-block col-xl-2 td-toc d-print-none">
+				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
+					
+
+        <a href="##git-repo-url##/adrs/ADR-004-development-ecosystem.adoc"
+           target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
+
+
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-004%3A+Development+Ecosystem+Selection+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/adrs/ADR-004-development-ecosystem.adoc%0A%23branch:%20main" target="_blank"><i
+                class="fab fa-github fa-fw"></i> Create an issue</a>
+
+        
+
+        <hr />
+
+        <div id="toc" class="toc">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel1">
+<li><a href="#_adr_004_development_ecosystem_selection_for_uart2eth">ADR-004: Development Ecosystem Selection for UART2ETH</a>
+<ul class="sectlevel2">
+<li><a href="#_context">Context</a></li>
+<li><a href="#_decision_drivers">Decision Drivers</a></li>
+<li><a href="#_options_considered">Options Considered</a></li>
+<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
+<li><a href="#_decision">Decision</a></li>
+<li><a href="#_rationale">Rationale</a></li>
+<li><a href="#_consequences">Consequences</a></li>
+<li><a href="#_critical_contradiction_discovery">🚨 Critical Contradiction Discovery</a></li>
+<li><a href="#_implementation_notes">Implementation Notes</a></li>
+<li><a href="#_interdependency_with_adr_002">Interdependency with ADR-002</a></li>
+<li><a href="#_follow_up_actions">Follow-up Actions</a></li>
+</ul>
+</li>
+</ul>
+</div>
+
+
+
+
+				</div>
+			</div>
+			<main class="col-12 col-md-9 col-xl-8 pl-md-5" role="main">
+				    <nav aria-label="breadcrumb" class="d-none d-md-block d-print-none">
+        <ol class="breadcrumb spb-1">
+            <!--li aria-current="page" class="breadcrumb-item active">
+                <a href="https://example.docsy.dev/docs/">Documentation</a>
+            </li-->
+
+        </ol>
+    </nav>
+
+
+    <div class="td-content">
+        <p>
+            
+<div class="sect1">
+<h2 id="_adr_004_development_ecosystem_selection_for_uart2eth">ADR-004: Development Ecosystem Selection for UART2ETH</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><strong>Status:</strong> PROPOSED<br>
+<strong>Date:</strong> 2025-07-27<br>
+<strong>Deciders:</strong> Architecture Team<br>
+<strong>Consulted:</strong> Senior Developer<br>
+<strong>Informed:</strong> Development Team</p>
+</div>
+<div class="sect2">
+<h3 id="_context">Context</h3>
+<div class="paragraph">
+<p>The UART2ETH system requires selecting a comprehensive development ecosystem including build system, toolchain, IDE integration, and dependency management for RP2350-based firmware development. This decision directly impacts development velocity, code quality, maintainability, and the ability to leverage advanced RP2350 capabilities.</p>
+</div>
+<div class="paragraph">
+<p>Based on platform decisions:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="ADR-001-microcontroller-selection.adoc">ADR-001: RP2350 microcontroller selection</a></p>
+</li>
+<li>
+<p><a href="ADR-002-ethernet-controller-selection.adoc">ADR-002: ENC28J60 ethernet controller selection</a></p>
+</li>
+<li>
+<p><a href="ADR-003-programming-language-selection.adoc">ADR-003: C programming language selection</a></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>We need a development ecosystem that can:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Enable rapid, professional C development on RP2350 platform</p>
+</li>
+<li>
+<p>Support industrial-grade reliability and testing practices</p>
+</li>
+<li>
+<p>Provide access to advanced RP2350 features (PIO, dual-core, secure boot, A/B updates)</p>
+</li>
+<li>
+<p>Integrate with selected ethernet controller efficiently</p>
+</li>
+<li>
+<p>Support team collaboration and CI/CD practices</p>
+</li>
+<li>
+<p>Meet aggressive delivery timeline requirements</p>
+</li>
+<li>
+<p>Enable MISRA-C compliance and comprehensive testing</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_decision_drivers">Decision Drivers</h3>
+<div class="sect3">
+<h4 id="_primary_requirements">Primary Requirements</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Development Velocity</strong>: Immediate productivity with minimal learning curve</p>
+</li>
+<li>
+<p><strong>RP2350 Feature Access</strong>: Full access to PIO, dual-core, security, and OTA capabilities</p>
+</li>
+<li>
+<p><strong>Industrial Tooling</strong>: Mature debugging, static analysis, and testing infrastructure</p>
+</li>
+<li>
+<p><strong>Team Expertise Fit</strong>: Leverage existing C/embedded development skills</p>
+</li>
+<li>
+<p><strong>Ethernet Integration</strong>: Efficient integration with selected ethernet controller</p>
+</li>
+<li>
+<p><strong>Professional Workflow</strong>: Support for code reviews, CI/CD, and quality gates</p>
+</li>
+<li>
+<p><strong>Documentation</strong>: Comprehensive vendor support and community resources</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_constraints">Constraints</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Aggressive delivery timeline requiring immediate productivity</p>
+</li>
+<li>
+<p>Industrial reliability requirements (MISRA-C, comprehensive testing)</p>
+</li>
+<li>
+<p>Team expertise concentrated in C/embedded development</p>
+</li>
+<li>
+<p>Must support secure OTA updates and A/B partitioning</p>
+</li>
+<li>
+<p>GPL open source licensing compatibility</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_options_considered">Options Considered</h3>
+<div class="sect3">
+<h4 id="_option_a_arduino_ideframework">Option A: Arduino IDE/Framework</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Pros</strong>: Rapid prototyping, huge community, simple setup</p>
+</li>
+<li>
+<p><strong>Cons</strong>: Not professional-grade, poor CI/CD integration, limited industrial features, conflicts with C language choice (<a href="ADR-003-programming-language-selection.adoc">ADR-003</a>)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_option_b_platformio_arduino_framework">Option B: PlatformIO + Arduino Framework</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Pros</strong>: Professional IDE integration, good dependency management, better than Arduino IDE</p>
+</li>
+<li>
+<p><strong>Cons</strong>: Still Arduino framework limitations, emerging RP2350 support</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_option_c_platformio_native_pico_sdk">Option C: PlatformIO + Native Pico SDK</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Pros</strong>: Professional environment with native SDK access</p>
+</li>
+<li>
+<p><strong>Cons</strong>: RP2350 support still emerging, complexity with advanced features, abstraction layer overhead</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_option_d_native_pico_sdk_cmake_traditional_embedded">Option D: Native Pico SDK + CMake (Traditional Embedded)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Pros</strong>: Maximum control, full vendor support, mature tooling, industrial-grade capability</p>
+</li>
+<li>
+<p><strong>Cons</strong>: More manual setup, steeper learning curve for non-embedded developers</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h3>
+<div class="paragraph">
+<p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
+<em>Baseline: Arduino IDE (all scores = 0)</em></p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 26.3157%;">
+<col style="width: 10.5263%;">
+<col style="width: 15.7894%;">
+<col style="width: 15.7894%;">
+<col style="width: 15.7894%;">
+<col style="width: 15.7898%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
+<th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
+<th class="tableblock halign-left valign-top"><strong>Arduino IDE</strong></th>
+<th class="tableblock halign-left valign-top"><strong>PlatformIO+Arduino</strong></th>
+<th class="tableblock halign-left valign-top"><strong>PlatformIO+SDK</strong></th>
+<th class="tableblock halign-left valign-top"><strong>Native SDK+CMake</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Velocity</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (better IDE, deps mgmt)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (setup complexity)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (manual setup)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>RP2350 Feature Access</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (Arduino framework limits)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (emerging SDK access)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (full SDK access)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Tooling</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (better IDE, CI integration)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (professional environment)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (mature debugging, analysis)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Team Expertise Fit</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (similar Arduino approach)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (mixed C/Arduino)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (pure C expertise)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Professional Workflow</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (CI/CD, collaboration tools)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (professional environment)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (industry standard)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Advanced RP2350 Features</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (Arduino abstractions hide features)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (partial SDK access)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (secure boot, A/B updates, PIO)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Delivery Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (faster than manual setup)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (learning curve offsets speed)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (initial setup overhead)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Compliance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (limited MISRA-C support)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (better static analysis)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (full MISRA-C, testing support)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Debugging Maturity</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (better than Arduino IDE)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (good debugging support)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (GDB, OpenOCD, mature tools)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Long-term Maintainability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (better project structure)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (cleaner architecture)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (vendor-supported, stable)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total PUGH Score</strong></p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>0</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>+14</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>+22</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>+34</strong></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_decision">Decision</h3>
+<div class="paragraph">
+<p><strong>Selected: Native Pico SDK + CMake Development Ecosystem</strong></p>
+</div>
+<div class="paragraph">
+<p>The Native Pico SDK with CMake provides the optimal foundation for professional, industrial-grade development of the UART2ETH system, scoring significantly higher (+34 vs +22 vs +14 vs 0) in weighted analysis.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_rationale">Rationale</h3>
+<div class="sect3">
+<h4 id="_why_native_sdk_cmake_over_platformio_sdk_34_vs_22">Why Native SDK + CMake Over PlatformIO + SDK (+34 vs +22)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Superior RP2350 Feature Access</strong>: Full vendor-supported access to secure boot, A/B updates, and advanced PIO programming vs emerging support</p>
+</li>
+<li>
+<p><strong>Industrial Compliance Advantage</strong>: Native MISRA-C toolchain integration vs adaptation layers</p>
+</li>
+<li>
+<p><strong>Team Expertise Optimal Fit</strong>: Direct C expertise application vs mixed C/framework approach</p>
+</li>
+<li>
+<p><strong>Debugging Maturity</strong>: Full GDB/OpenOCD integration vs abstracted debugging</p>
+</li>
+<li>
+<p><strong>Long-term Vendor Support</strong>: Raspberry Pi official support vs third-party integration</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_why_platformio_sdk_over_platformio_arduino_22_vs_14">Why PlatformIO + SDK Over PlatformIO + Arduino (+22 vs +14)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>RP2350 Capabilities</strong>: Access to microcontroller features vs Arduino framework limitations</p>
+</li>
+<li>
+<p><strong>Industrial Requirements</strong>: Better static analysis and compliance support</p>
+</li>
+<li>
+<p><strong>Advanced Features</strong>: Required for secure OTA and A/B updates vs basic functionality</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_why_any_professional_option_over_arduino_ide_baseline">Why Any Professional Option Over Arduino IDE (Baseline)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Industrial Development</strong>: Professional tooling, CI/CD, collaboration vs hobbyist-focused</p>
+</li>
+<li>
+<p><strong>Project Complexity</strong>: Multi-UART, networking, security features exceed Arduino scope</p>
+</li>
+<li>
+<p><strong>Team Requirements</strong>: Professional development practices vs simple prototyping</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_delivery_timeline_trade_off_justification">Delivery Timeline Trade-off Justification</h4>
+<div class="paragraph">
+<p>While Native SDK has initial setup overhead (-3 points), this is offset by:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Quality Foundation</strong>: Reduces rework and debugging time later</p>
+</li>
+<li>
+<p><strong>Team Expertise</strong>: C skills minimize learning curve impact</p>
+</li>
+<li>
+<p><strong>Industrial Requirements</strong>: Mandatory for MISRA-C compliance and advanced features</p>
+</li>
+<li>
+<p><strong>Long-term Velocity</strong>: Better maintainability and debugging capabilities</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_consequences">Consequences</h3>
+<div class="sect3">
+<h4 id="_positive">Positive</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>✅ <strong>Professional Development Environment</strong>: Industry-standard toolchain with mature debugging and analysis tools</p>
+</li>
+<li>
+<p>✅ <strong>Full Platform Capability</strong>: Access to all RP2350 advanced features required for product requirements</p>
+</li>
+<li>
+<p>✅ <strong>Industrial Compliance</strong>: Native support for MISRA-C, static analysis, and testing frameworks</p>
+</li>
+<li>
+<p>✅ <strong>Team Productivity</strong>: Direct application of existing embedded C expertise</p>
+</li>
+<li>
+<p>✅ <strong>Vendor Support</strong>: Comprehensive Raspberry Pi documentation and examples</p>
+</li>
+<li>
+<p>✅ <strong>Future-Proof Architecture</strong>: Foundation for advanced features and scaling</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_negative">Negative</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>⚠️ <strong>Initial Setup Complexity</strong>: More manual configuration compared to PlatformIO</p>
+</li>
+<li>
+<p>⚠️ <strong>Learning Curve</strong>: CMake and SDK-specific concepts for team members unfamiliar with Pico development</p>
+</li>
+<li>
+<p>⚠️ <strong>Dependency Management</strong>: Manual library management vs automated PlatformIO approach</p>
+</li>
+<li>
+<p>⚠️ <strong>IDE Integration</strong>: Requires configuration vs out-of-box PlatformIO experience</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_risks_and_mitigation">Risks and Mitigation</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Development Environment Setup Risk</strong>: Mitigate with standardized Docker development containers and comprehensive setup documentation</p>
+</li>
+<li>
+<p><strong>Team Learning Curve Risk</strong>: Mitigate with focused training sessions and pair programming during initial implementation</p>
+</li>
+<li>
+<p><strong>Dependency Management Complexity</strong>: Mitigate with Git submodules and clear dependency documentation</p>
+</li>
+</ul>
+</div>
+<div class="sect4">
+<h5 id="_critical_ethernet_controller_ecosystem_dependency_risk"><strong>Critical Ethernet Controller Ecosystem Dependency Risk</strong></h5>
+<div class="paragraph">
+<p><strong>HIGH RISK</strong>: The viability of our development ecosystem choice is significantly impacted by <a href="ADR-002-ethernet-controller-selection.adoc">ADR-002 (Ethernet Controller Selection)</a>:</p>
+</div>
+<div class="paragraph">
+<p><strong>W5500 Ecosystem Support</strong>:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>✅ <strong>Official WIZnet Libraries</strong>: Native Pico SDK integration (WIZnet-PICO-C, WIZnet-PICO-LWIP-C)</p>
+</li>
+<li>
+<p>✅ <strong>Vendor Documentation</strong>: Comprehensive examples and industrial deployment guides</p>
+</li>
+<li>
+<p>✅ <strong>Community Support</strong>: Multiple professional implementations and maintained libraries</p>
+</li>
+<li>
+<p>✅ <strong>Industrial Examples</strong>: Azure IoT, AWS IoT integrations with proven reliability</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>ENC28J60 Ecosystem Support</strong>:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>⚠️ <strong>Individual Open Source Efforts</strong>: Limited to individual developers (e.g., Juddling/pi-pico-enc28j60)</p>
+</li>
+<li>
+<p>⚠️ <strong>No Official RP2350 Support</strong>: No vendor libraries for RP2350+ENC28J60 combination</p>
+</li>
+<li>
+<p>⚠️ <strong>Arduino-Focused</strong>: Most examples conflict with our C language choice (<a href="ADR-003-programming-language-selection.adoc">ADR-003</a>)</p>
+</li>
+<li>
+<p>⚠️ <strong>Custom Integration Required</strong>: Significant lwIP integration effort needed</p>
+</li>
+<li>
+<p>⚠️ <strong>Maintenance Risk</strong>: Dependency on individual maintainer vs corporate support</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Risk Assessment</strong>: ENC28J60 choice significantly increases development effort and long-term maintenance risk for our chosen development ecosystem.</p>
+</div>
+<div class="paragraph">
+<p><strong>Mitigation Options</strong>:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Accept Risk</strong>: Proceed with ENC28J60 and allocate 3-6 months for custom integration development</p>
+</li>
+<li>
+<p><strong>Reconsider ADR-002</strong>: Evaluate W5500 based on ecosystem maturity and development efficiency</p>
+</li>
+<li>
+<p><strong>Hybrid Approach</strong>: Prototype with both controllers to validate integration effort</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Recommendation</strong>: This ecosystem dependency should be factored into <a href="ADR-002-ethernet-controller-selection.adoc">ADR-002</a> reconsideration.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_critical_contradiction_discovery">🚨 Critical Contradiction Discovery</h3>
+<div class="paragraph">
+<p>During ecosystem research, significant issues were discovered with <a href="ADR-002-ethernet-controller-selection.adoc">ADR-002 (ENC28J60 selection)</a>:</p>
+</div>
+<div class="sect3">
+<h4 id="_enc28j60_rp2350_development_challenges">ENC28J60 + RP2350 Development Challenges</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Limited RP2350 Support</strong>: No official vendor libraries for RP2350+ENC28J60</p>
+</li>
+<li>
+<p><strong>Arduino-Only Examples</strong>: Most implementations require Arduino framework, conflicting with <a href="ADR-003-programming-language-selection.adoc">ADR-003 (C language choice)</a></p>
+</li>
+<li>
+<p><strong>Complex Integration</strong>: Requires custom lwIP integration with significant development effort</p>
+</li>
+<li>
+<p><strong>Performance Limitation</strong>: 10Mbps only vs 100Mbps capability needed</p>
+</li>
+<li>
+<p><strong>Industrial Reliability Risk</strong>: Less mature integration, more complex software stack</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_alternative_w5500_rp2350_ecosystem_maturity">Alternative: W5500 + RP2350 Ecosystem Maturity</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Official RP2350 Support</strong>: WIZnet W5500-EVB-Pico2 with comprehensive SDK integration</p>
+</li>
+<li>
+<p><strong>Native Pico SDK Libraries</strong>: WIZnet-PICO-C, WIZnet-PICO-LWIP-C, industrial examples</p>
+</li>
+<li>
+<p><strong>Hardware TCP/IP Stack</strong>: Reduces microcontroller overhead, improves determinism</p>
+</li>
+<li>
+<p><strong>100Mbps Performance</strong>: Meets bandwidth requirements</p>
+</li>
+<li>
+<p><strong>Industrial Deployments</strong>: Proven in Azure IoT, AWS IoT applications</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Recommendation</strong>: <a href="ADR-002-ethernet-controller-selection.adoc">ADR-002</a> should be reconsidered in light of development ecosystem requirements.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_notes">Implementation Notes</h3>
+<div class="sect3">
+<h4 id="_development_environment_components">Development Environment Components</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Toolchain</strong>: ARM GCC toolchain provided with Pico SDK</p>
+</li>
+<li>
+<p><strong>Build System</strong>: CMake with Pico SDK build extensions</p>
+</li>
+<li>
+<p><strong>IDE Integration</strong>: VS Code with C/C++ and CMake extensions</p>
+</li>
+<li>
+<p><strong>Debugging</strong>: OpenOCD + GDB with Picoprobe or compatible debugger</p>
+</li>
+<li>
+<p><strong>Static Analysis</strong>: PC-lint Plus or Cppcheck integration</p>
+</li>
+<li>
+<p><strong>Testing Framework</strong>: Unity or CppUTest for unit testing</p>
+</li>
+<li>
+<p><strong>CI/CD</strong>: GitHub Actions with standardized build and test pipelines</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_required_dependencies">Required Dependencies</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Pico SDK v2.1+</strong>: Full RP2350 support with security features</p>
+</li>
+<li>
+<p><strong>W5500 Libraries</strong>: WIZnet-PICO-C for ethernet integration (if <a href="ADR-002-ethernet-controller-selection.adoc">ADR-002</a> reconsidered)</p>
+</li>
+<li>
+<p><strong>lwIP Stack</strong>: For TCP/IP implementation (ENC28J60) or hardware stack interface (W5500)</p>
+</li>
+<li>
+<p><strong>Testing Framework</strong>: Unity for embedded unit testing</p>
+</li>
+<li>
+<p><strong>Static Analysis Tools</strong>: MISRA-C compliance checking</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_development_standards">Development Standards</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>MISRA-C Compliance</strong>: Enforce via static analysis in CI pipeline</p>
+</li>
+<li>
+<p><strong>Code Coverage</strong>: 100% requirement with automated reporting</p>
+</li>
+<li>
+<p><strong>Documentation</strong>: Doxygen-style comments for all public interfaces</p>
+</li>
+<li>
+<p><strong>Version Control</strong>: Git with semantic versioning and conventional commits</p>
+</li>
+<li>
+<p><strong>Code Reviews</strong>: Mandatory reviews for all production code changes</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_interdependency_with_adr_002">Interdependency with ADR-002</h3>
+<div class="paragraph">
+<p><strong>This ADR reveals critical issues with <a href="ADR-002-ethernet-controller-selection.adoc">ADR-002 (ENC28J60 selection)</a>:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Development Ecosystem Mismatch</strong>: ENC28J60 lacks mature RP2350 SDK integration</p>
+</li>
+<li>
+<p><strong>Performance vs Requirements</strong>: 10Mbps limitation vs 100Mbps capability needed</p>
+</li>
+<li>
+<p><strong>Industrial Reliability Concerns</strong>: Complex software stack vs proven hardware solutions</p>
+</li>
+<li>
+<p><strong>Team Productivity Impact</strong>: Months of custom development vs immediate integration</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Recommendation</strong>: <a href="ADR-002-ethernet-controller-selection.adoc">ADR-002</a> should be reopened with updated technical analysis considering:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Ecosystem maturity and vendor support</p>
+</li>
+<li>
+<p>Development velocity and team productivity impact</p>
+</li>
+<li>
+<p>Industrial deployment requirements and reliability</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_follow_up_actions">Follow-up Actions</h3>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Evaluate ADR-002 Impact</strong>: Technical reassessment of ethernet controller choice with ecosystem considerations</p>
+</li>
+<li>
+<p><strong>Development Environment Setup</strong>: Create standardized Docker containers and setup documentation</p>
+</li>
+<li>
+<p><strong>Toolchain Integration</strong>: Configure CMake, static analysis, and testing framework integration</p>
+</li>
+<li>
+<p><strong>Team Training Plan</strong>: Develop Pico SDK and CMake training materials</p>
+</li>
+<li>
+<p><strong>Prototype Development</strong>: Create proof-of-concept demonstrating ecosystem capabilities</p>
+</li>
+<li>
+<p><strong>CI/CD Pipeline</strong>: Implement automated build, test, and quality gates</p>
+</li>
+</ol>
+</div>
+<hr>
+<div class="paragraph">
+<p><strong>Review Notes:</strong></p>
+</div>
+<div class="ulist checklist">
+<ul class="checklist">
+<li>
+<p>&#10063; <strong>CRITICAL</strong>: This ADR recommends reconsidering <a href="ADR-002-ethernet-controller-selection.adoc">ADR-002</a> based on technical evidence</p>
+</li>
+<li>
+<p>&#10063; Confirm W5500 ecosystem advantages align with project requirements</p>
+</li>
+<li>
+<p>&#10063; Validate team acceptance of Native SDK approach vs PlatformIO preference</p>
+</li>
+<li>
+<p>&#10063; Review industrial compliance requirements vs ecosystem capabilities</p>
+</li>
+<li>
+<p>&#10063; Assess impact of ADR-002 change on project timeline and budget</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+        </p>
+
+        <style>
+.feedback--answer {
+    display: inline-block;
+}
+
+.feedback--answer-no {
+    margin-left: 1em;
+}
+
+.feedback--response {
+    display: none;
+    margin-top: 1em;
+}
+
+.feedback--response__visible {
+    display: block;
+}
+</style>
+
+<div class="d-print-none">
+    <h2 class="feedback--title">Feedback</h2>
+    <p class="feedback--question">Was this page helpful?</p>
+    <button class="feedback--answer feedback--answer-yes">Yes</button>
+    <button class="feedback--answer feedback--answer-no">No</button>
+    <p class="feedback--response feedback--response-yes">
+        Glad to hear it! Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-004%3A+Development+Ecosystem+Selection+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-004-development-ecosystem.adoc">tell us
+    how we can improve</a>.
+    </p>
+    <p class="feedback--response feedback--response-no">
+        Sorry to hear that. Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-004%3A+Development+Ecosystem+Selection+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-004-development-ecosystem.adoc">tell
+    us how we can improve</a>.
+    </p>
+</div>
+<script>
+    const yesButton = document.querySelector('.feedback--answer-yes');
+    const noButton = document.querySelector('.feedback--answer-no');
+    const yesResponse = document.querySelector('.feedback--response-yes');
+    const noResponse = document.querySelector('.feedback--response-no');
+    const disableButtons = () => {
+        yesButton.disabled = true;
+        noButton.disabled = true;
+    };
+    const sendFeedback = (value) => {
+        if (typeof ga !== 'function') return;
+        const args = {
+            command: 'send',
+            hitType: 'event',
+            category: 'Helpful',
+            action: 'click',
+            label: window.location.pathname,
+            value: value
+        };
+        ga(args.command, args.hitType, args.category, args.action, args.label, args.value);
+    };
+    yesButton.addEventListener('click', () => {
+        yesResponse.classList.add('feedback--response__visible');
+        disableButtons();
+        sendFeedback(1);
+    });
+    noButton.addEventListener('click', () => {
+        noResponse.classList.add('feedback--response__visible');
+        disableButtons();
+        sendFeedback(0);
+    });
+</script>
+
+
+        <br>
+
+        <!--div class="text-muted mt-5 pt-3 border-top">Last modified July 3, 2019: <a
+                href="https://github.com/google/docsy-example/commit/d6aa89c8b24089d7e6741030864eff209465e896">Added
+            links to user guide repo (d6aa89c)</a>
+        </div-->
+    </div>
+
+
+			</main>
+
+		</div>
+	</div>
+
+
+	
+    <!--footer class="footer mt-auto py-3 bg-light">
+        <div class="container">
+            <span class="text-muted">&copy; 2020 | based on <a href="https://arc42.org">arc42 7.0</a> | mixed with <a href="http://getbootstrap.com/">Bootstrap v5.0.0-beta</a> | Baked with <a href="http://jbake.org">JBake v2.6.7</a></span>
+        </div>
+    </footer-->
+
+    <footer class="bg-dark py-5 row d-print-none">
+        <div class="container-fluid mx-sm-5">
+            <div class="row">
+                <div class="col-6 col-sm-4 text-xs-center order-sm-2">
+
+
+                    <ul class="list-inline mb-0">
+                        
+                        <li aria-label="User mailing list" class="list-inline-item mx-2 h3" data-original-title="User mailing list" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="mailto:##footer-email##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fa fa-envelope"></i>
+                            </a>
+                        </li>
+                        
+                        
+                        <li aria-label="Twitter" class="list-inline-item mx-2 h3" data-original-title="Twitter" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##twitter-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-twitter"></i>
+                            </a>
+                        </li>
+                        
+                        
+                        <li aria-label="Stack Overflow" class="list-inline-item mx-2 h3" data-original-title="Stack Overflow" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##Stackoverflow-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-stack-overflow"></i>
+                            </a>
+                        </li>
+                        
+                    </ul>
+
+
+                </div>
+                <div class="col-6 col-sm-4 text-right text-xs-center order-sm-3">
+
+
+                    <ul class="list-inline mb-0">
+
+                        
+                        <li aria-label="GitHub" class="list-inline-item mx-2 h3" data-original-title="GitHub" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##Github-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-github"></i>
+                            </a>
+                        </li>
+                        
+
+                        
+                        <li aria-label="Slack" class="list-inline-item mx-2 h3" data-original-title="Slack" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##Slack-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-slack"></i>
+                            </a>
+                        </li>
+                        
+
+
+                    </ul>
+
+
+                </div>
+                <div class="col-12 col-sm-4 text-center py-2 order-sm-2">
+
+                        <small class="text-white">built with <a href="https://doctoolchain.org">docToolchain</a> and <a href="https://jbake.org">jBake</a> <br /> theme: <a href="https://www.docsy.dev/">docsy</a></small>
+
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+
+
+    <script src="../js/main.min.b5fc1b29d2465835844254bd4d804738eaf24c0cec53009b4c6899989be55a47.js"></script>
+    <script src="../js/blocks.js" ></script>
+    <script src="../js/prettify.js"></script>
+    <script src="../js/copy-n-paste.js"></script>
+    <script src="../js/submenucollapse.js"></script>
+
+
+</body>
+</html>
