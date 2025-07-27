@@ -39,8 +39,20 @@ endif::arc42help[]
 |A/B Updates
 |Firmware update mechanism that maintains two separate firmware partitions, allowing safe rollback to previous version if new firmware fails
 
+|Arduino
+|Open-source electronics platform based on easy-to-use hardware and software, providing development framework and IDE for microcontroller programming
+
+|CI/CD
+|Continuous Integration/Continuous Deployment - automated software development practices for building, testing, and deploying code changes
+
 |Client System
 |In Gateway Mode, the system connected to the network side of UART2ETH that communicates via TCP sockets
+
+|CMake
+|Cross-platform build system generator that manages the build process in an operating system and compiler independent manner
+
+|ENC28J60
+|Microchip Ethernet controller chip with SPI interface, providing 10Base-T Ethernet connectivity for microcontrollers
 
 |Full Bridge Mode
 |Operating mode where UART2ETH provides transparent UART-over-TCP connectivity, allowing two Host Systems with UART interfaces to communicate over network as if directly connected
@@ -51,11 +63,23 @@ endif::arc42help[]
 |Host System
 |System connected to the UART side of UART2ETH. In Gateway Mode, this is the legacy equipment being networked. In Full Bridge Mode, both connected systems are Host Systems
 
+|HW UART
+|Hardware Universal Asynchronous Receiver-Transmitter - dedicated silicon implementation of UART communication interface in microcontrollers
+
+|Misra-c
+|Motor Industry Software Reliability Association C - coding standard defining guidelines for using C programming language in safety-critical systems
+
 |OTA (Over-The-Air)
 |Firmware update mechanism allowing remote updates without physical access to the device
 
+|PIO
+|Platform IO - cross-platform IDE and ecosystem for embedded development supporting multiple microcontroller platforms and frameworks
+
 |PLC (Programmable Logic Controller)
 |Industrial control system used in manufacturing and automation applications
+
+|platformio
+|Open-source ecosystem for IoT development with cross-platform IDE, unified debugger, and remote unit testing
 
 |Protocol Filter
 |Pluggable software component that processes and optimizes serial data streams for efficient TCP transmission
@@ -66,6 +90,12 @@ endif::arc42help[]
 |SCADA (Supervisory Control and Data Acquisition)
 |Industrial control system architecture for monitoring and controlling industrial processes
 
+|SPI Ethernet Controller
+|Serial Peripheral Interface based Ethernet controller that provides network connectivity through SPI communication protocol
+
+|SPI TCP/IP Controller
+|Integrated circuit that handles TCP/IP protocol stack via SPI interface, offloading network processing from main microcontroller
+
 |TCP Socket
 |Network communication endpoint using Transmission Control Protocol for reliable data transmission
 
@@ -74,4 +104,7 @@ endif::arc42help[]
 
 |UART2ETH
 |The complete hardware and firmware solution for bridging UART interfaces to TCP sockets, supporting up to 4 UART ports
+
+|W5500
+|WIZnet Ethernet controller chip with integrated TCP/IP stack and SPI interface, providing full-duplex 10/100 Ethernet connectivity
 |===
