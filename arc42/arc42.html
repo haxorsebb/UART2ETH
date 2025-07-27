@@ -3394,99 +3394,99 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>A/B Updates</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Firmware update mechanism that maintains two separate firmware partitions, allowing safe rollback to previous version if new firmware fails</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Dual partition firmware update strategy that maintains two separate flash memory partitions (A and B) containing different firmware versions. During updates, the new firmware is written to the inactive partition while the system continues running from the active partition. If the new firmware fails or becomes corrupted, the system can automatically rollback to the previous working version, ensuring system reliability and preventing brick situations in remote deployments.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>Arduino</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Open-source electronics platform based on easy-to-use hardware and software, providing development framework and IDE for microcontroller programming</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Open-source electronics platform consisting of both hardware boards (microcontroller development boards) and software (integrated development environment). Arduino provides a simplified programming framework with pre-built libraries and functions that abstract complex microcontroller operations, making embedded programming accessible to beginners while remaining powerful enough for professional applications. The Arduino ecosystem includes thousands of community-contributed libraries and shields (expansion boards).</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>CI/CD</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Continuous Integration/Continuous Deployment - automated software development practices for building, testing, and deploying code changes</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Continuous Integration/Continuous Deployment - modern software development methodology that automates the building, testing, and deployment pipeline. CI automatically builds and tests code changes when developers commit to version control, catching integration issues early. CD extends this by automatically deploying tested code to production environments, reducing manual errors and enabling rapid, reliable software releases.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>Client System</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>In Gateway Mode, the system connected to the network side of UART2ETH that communicates via TCP sockets</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>In Gateway Mode, the networked device or application that connects to UART2ETH via TCP sockets to communicate with legacy serial equipment. Client systems can be computers, servers, mobile devices, or other networked equipment that need to access serial devices remotely over Ethernet networks. Examples include monitoring software, configuration tools, or remote control applications.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>CMake</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Cross-platform build system generator that manages the build process in an operating system and compiler independent manner</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Cross-platform, open-source build system generator that creates native build files (Makefiles, Visual Studio projects, Xcode projects) from platform-independent configuration files. CMake manages complex build dependencies, compiler flags, and linking requirements across different operating systems and compilers, simplifying the build process for C/C++ projects and enabling consistent builds across development teams.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>ENC28J60</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Microchip Ethernet controller chip with SPI interface, providing 10Base-T Ethernet connectivity for microcontrollers</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Low-cost Ethernet controller chip from Microchip Technology that provides 10Base-T Ethernet connectivity via SPI interface. This single-chip solution includes MAC (Media Access Control) and PHY (Physical Layer) functions, making it popular for adding basic Ethernet capabilities to microcontroller projects. It requires external TCP/IP stack implementation and offers a cost-effective alternative to more integrated solutions.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>Full Bridge Mode</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Operating mode where UART2ETH provides transparent UART-over-TCP connectivity, allowing two Host Systems with UART interfaces to communicate over network as if directly connected</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>UART2ETH operating mode that creates a transparent network bridge between two serial devices located at different physical locations. Both devices communicate through their UART interfaces as if they were directly connected with a serial cable, but the connection is actually routed through TCP/IP networks. This mode enables legacy serial equipment to communicate across long distances, through existing network infrastructure, without requiring protocol modifications.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>Gateway Mode</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Operating mode where UART2ETH adds networking capabilities to existing products by bridging between a Host System&#8217;s UART interface and Client Systems on the network</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>UART2ETH operating mode that adds network connectivity to existing serial-only equipment without modifying the original device. The UART2ETH device acts as a protocol gateway, translating between the legacy device&#8217;s serial communication and modern TCP/IP networking. This allows multiple network clients to simultaneously access serial equipment, enabling remote monitoring, configuration, and control of industrial equipment, embedded systems, or test instruments.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>Host System</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>System connected to the UART side of UART2ETH. In Gateway Mode, this is the legacy equipment being networked. In Full Bridge Mode, both connected systems are Host Systems</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The serial equipment or device connected to UART2ETH&#8217;s physical UART interface. In Gateway Mode, this is typically legacy industrial equipment, embedded systems, or test instruments that only support serial communication. In Full Bridge Mode, both endpoints are considered Host Systems. Host Systems are unaware of the network translation and continue using their native serial protocols.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>HW UART</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Hardware Universal Asynchronous Receiver-Transmitter - dedicated silicon implementation of UART communication interface in microcontrollers</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Hardware Universal Asynchronous Receiver-Transmitter - dedicated silicon circuitry within microcontrollers that handles serial communication at the hardware level. HW UARTs provide precise timing, automatic start/stop bit handling, parity checking, and interrupt generation without CPU intervention. This contrasts with software-based UART implementations that consume CPU cycles and may have timing limitations, especially at higher baud rates.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>Misra-c</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Motor Industry Software Reliability Association C - coding standard defining guidelines for using C programming language in safety-critical systems</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Motor Industry Software Reliability Association C - comprehensive coding standard that defines strict guidelines for writing safety-critical C code. MISRA-C rules cover language subset restrictions, coding practices, and documentation requirements designed to eliminate common programming errors, undefined behaviors, and implementation-defined constructs. Originally developed for automotive software, it&#8217;s now widely used in aerospace, medical devices, and industrial control systems.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>OTA (Over-The-Air)</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Firmware update mechanism allowing remote updates without physical access to the device</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Remote firmware update mechanism that allows devices to receive and install new firmware through their existing communication channels (WiFi, Ethernet, cellular) without requiring physical access. OTA updates enable field devices to receive bug fixes, security patches, and feature updates remotely, reducing maintenance costs and enabling rapid deployment of improvements across device fleets. Critical for IoT devices in remote or inaccessible locations.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>PIO</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Platform IO - cross-platform IDE and ecosystem for embedded development supporting multiple microcontroller platforms and frameworks</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Programmable Input/Output - specialized hardware feature of the Raspberry Pi RP2350 microcontroller that provides highly flexible, real-time I/O processing independent of the main CPU cores. PIO consists of state machines that can execute custom assembly-like programs to handle precise timing requirements for protocols like WS2812 LEDs, custom serial formats, or parallel interfaces. Each PIO block can run multiple state machines simultaneously, enabling complex I/O operations without CPU intervention.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>PLC (Programmable Logic Controller)</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Industrial control system used in manufacturing and automation applications</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Industrial computer designed for automation of manufacturing processes, machinery control, and industrial monitoring systems. PLCs are ruggedized for harsh industrial environments and provide real-time control with deterministic response times. They typically use ladder logic programming and offer extensive I/O capabilities for sensors, actuators, and communication networks. Common in factory automation, process control, and building management systems.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>platformio</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Open-source ecosystem for IoT development with cross-platform IDE, unified debugger, and remote unit testing</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Modern, open-source ecosystem for embedded and IoT development that provides unified tooling across multiple microcontroller platforms, frameworks, and boards. PlatformIO includes cross-platform IDE, library manager, unit testing framework, remote debugging capabilities, and continuous integration support. It abstracts away toolchain complexity while supporting hundreds of development boards and frameworks including Arduino, ESP-IDF, STM32, and many others.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>Protocol Filter</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Pluggable software component that processes and optimizes serial data streams for efficient TCP transmission</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Pluggable software component within UART2ETH that intelligently processes and optimizes serial data streams before TCP transmission. Protocol filters can implement packet framing, data compression, error correction, or protocol-specific optimizations to reduce network bandwidth, improve latency, or enhance reliability. Examples include buffering strategies for bulk data transfers, real-time filtering for control systems, or custom packet structures for specific industrial protocols.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>RPI RP2350</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Raspberry Pi microcontroller chip serving as the main processing unit for UART2ETH hardware</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Second-generation microcontroller chip from Raspberry Pi Foundation featuring dual ARM Cortex-M33 cores running up to 150MHz, 520KB SRAM, advanced security features, and flexible I/O capabilities including PIO state machines. The RP2350 provides enhanced performance and security compared to the original RP2040, making it suitable for industrial applications requiring real-time processing, secure communications, and complex I/O handling.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>SCADA (Supervisory Control and Data Acquisition)</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Industrial control system architecture for monitoring and controlling industrial processes</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Industrial control system architecture used for monitoring and controlling large-scale processes across multiple locations. SCADA systems collect data from remote sensors and equipment, provide centralized monitoring through human-machine interfaces (HMIs), and enable operators to control distributed processes. Common in utilities (power grids, water treatment), manufacturing, and transportation systems where real-time monitoring and control of geographically dispersed equipment is essential.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>SPI Ethernet Controller</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Serial Peripheral Interface based Ethernet controller that provides network connectivity through SPI communication protocol</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Ethernet controller chip that communicates with microcontrollers through the Serial Peripheral Interface (SPI) protocol rather than parallel buses. These controllers handle the complex Ethernet physical layer operations (signal encoding, collision detection, carrier sensing) while presenting a simple SPI interface to the host microcontroller. This approach reduces pin count requirements and simplifies PCB design while providing reliable network connectivity for embedded systems.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>SPI TCP/IP Controller</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Integrated circuit that handles TCP/IP protocol stack via SPI interface, offloading network processing from main microcontroller</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Integrated circuit that implements the complete TCP/IP protocol stack in hardware and communicates with host microcontrollers via SPI interface. These chips handle all network protocol processing (IP, TCP, UDP, ARP, DHCP) independently, presenting socket-based APIs through SPI commands. This offloads complex network processing from the main microcontroller, simplifying firmware development and improving real-time performance for applications requiring both networking and real-time control.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>TCP Socket</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Network communication endpoint using Transmission Control Protocol for reliable data transmission</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Network communication endpoint that provides reliable, ordered, and error-checked delivery of data streams between applications over IP networks. TCP sockets establish connections, handle flow control, retransmission of lost packets, and ensure data integrity through checksums and acknowledgments. Unlike UDP, TCP guarantees that data arrives in the correct order and without errors, making it essential for applications requiring reliable data transmission such as file transfers, web browsing, and industrial control protocols.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>UART (Universal Asynchronous Receiver-Transmitter)</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Serial communication protocol commonly used in embedded systems and industrial equipment</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Serial communication protocol and hardware interface that transmits data character by character without requiring a shared clock signal between communicating devices. UART uses start and stop bits to frame each character, with configurable data bits (5-9), parity (none, even, odd), and stop bits (1, 1.5, 2). This asynchronous approach makes UART simple to implement and widely compatible, leading to its extensive use in embedded systems, industrial equipment, and debugging interfaces.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>UART2ETH</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The complete hardware and firmware solution for bridging UART interfaces to TCP sockets, supporting up to 4 UART ports</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Complete hardware and firmware solution that bridges between UART serial interfaces and TCP/IP Ethernet networks, supporting up to 4 simultaneous UART connections. The system provides bidirectional data translation, protocol filtering, secure OTA updates, and flexible operating modes (Gateway and Full Bridge) to enable legacy serial equipment integration with modern networks. Built on the RPI RP2350 platform with support for various Ethernet controller options.</em></p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>W5500</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>WIZnet Ethernet controller chip with integrated TCP/IP stack and SPI interface, providing full-duplex 10/100 Ethernet connectivity</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Fully integrated Ethernet controller from WIZnet that combines 10/100 Ethernet MAC, PHY, and a complete TCP/IP protocol stack in a single chip. The W5500 communicates with host microcontrollers via SPI and provides hardware-accelerated socket operations, automatic packet processing, and wake-on-LAN capabilities. Its integrated approach simplifies network integration for embedded systems by handling all low-level networking operations transparently, allowing developers to focus on application logic rather than network protocols.</em></p></td>
 </tr>
 </tbody>
 </table>
