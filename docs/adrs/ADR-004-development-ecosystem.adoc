@@ -240,7 +240,7 @@ While Native SDK has initial setup overhead (-3 points), this is offset by:
 
 *Mitigation Options*:
 
-1. *Accept Risk*: Proceed with ENC28J60 and allocate 3-6 months for custom integration development
+1. *Accept Risk*: Proceed with ENC28J60 and allocate 1-2 weeks for custom integration development
 2. *Reconsider ADR-002*: Evaluate W5500 based on ecosystem maturity and development efficiency
 3. *Hybrid Approach*: Prototype with both controllers to validate integration effort
 
