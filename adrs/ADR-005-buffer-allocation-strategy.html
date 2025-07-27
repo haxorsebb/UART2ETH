@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: adrs/ADR-002-ethernet-controller-selection.html -->
+    <!-- sourceuri: adrs/ADR-005-buffer-allocation-strategy.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-002-ethernet-controller-selection.adoc</title>
+    <title>ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -267,7 +267,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../adrs/ADR-002-ethernet-controller-selection.html" title="ADR-002-ethernet-controller-selection.adoc">ADR-002-ethernet-controller-selection.adoc</a>
                                 
                             </li>
@@ -282,7 +282,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../adrs/ADR-005-buffer-allocation-strategy.html" title="ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</a>
                                 
                             </li>
@@ -298,11 +298,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/adrs/ADR-002-ethernet-controller-selection.adoc"
+        <a href="##git-repo-url##/adrs/ADR-005-buffer-allocation-strategy.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-002-ethernet-controller-selection.adoc%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/adrs/ADR-002-ethernet-controller-selection.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-005%3A+Ring+Buffer+Memory+Allocation+Strategy+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/adrs/ADR-005-buffer-allocation-strategy.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -311,42 +311,19 @@
 
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
-<ul class="sectlevel0">
-<li><a href="#_adr_002_ethernet_controller_selection_for_uart2eth">ADR-002: Ethernet Controller Selection for UART2ETH</a>
 <ul class="sectlevel1">
+<li><a href="#_adr_005_ring_buffer_memory_allocation_strategy_for_uart2eth">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</a>
+<ul class="sectlevel2">
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision_drivers">Decision Drivers</a>
-<ul class="sectlevel2">
-<li><a href="#_primary_requirements">Primary Requirements</a></li>
-<li><a href="#_constraints">Constraints</a></li>
-</ul>
-</li>
-<li><a href="#_options_considered">Options Considered</a>
-<ul class="sectlevel2">
-<li><a href="#_option_a_wiznet_w5500">Option A: WIZnet W5500</a></li>
-<li><a href="#_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</a></li>
-</ul>
-</li>
+<li><a href="#_decision_drivers">Decision Drivers</a></li>
+<li><a href="#_options_considered">Options Considered</a></li>
 <li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
 <li><a href="#_decision">Decision</a></li>
-<li><a href="#_rationale">Rationale</a>
-<ul class="sectlevel2">
-<li><a href="#_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</a></li>
-<li><a href="#_trade_offs_accepted">Trade-offs Accepted</a></li>
-</ul>
-</li>
-<li><a href="#_consequences">Consequences</a>
-<ul class="sectlevel2">
-<li><a href="#_positive">Positive</a></li>
-<li><a href="#_negative">Negative</a></li>
-<li><a href="#_risks_and_mitigation">Risks and Mitigation</a></li>
-</ul>
-</li>
-<li><a href="#_implementation_notes">Implementation Notes</a>
-<ul class="sectlevel2">
-<li><a href="#_performance_optimization">Performance Optimization</a></li>
-</ul>
-</li>
+<li><a href="#_rationale">Rationale</a></li>
+<li><a href="#_consequences">Consequences</a></li>
+<li><a href="#_implementation_notes">Implementation Notes</a></li>
+<li><a href="#_future_optimization_path">Future Optimization Path</a></li>
+<li><a href="#_alternative_approaches_considered">Alternative Approaches Considered</a></li>
 <li><a href="#_follow_up_actions">Follow-up Actions</a></li>
 </ul>
 </li>
@@ -372,439 +349,691 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_002_ethernet_controller_selection_for_uart2eth" class="sect0">ADR-002: Ethernet Controller Selection for UART2ETH</h1>
+<div class="sect1">
+<h2 id="_adr_005_ring_buffer_memory_allocation_strategy_for_uart2eth">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p><strong>Status:</strong> PROPOSED<br>
-<strong>Date:</strong> 2025-07-26<br>
+<strong>Date:</strong> 2025-07-27<br>
 <strong>Deciders:</strong> Architecture Team<br>
 <strong>Consulted:</strong> Senior Developer<br>
 <strong>Informed:</strong> Development Team</p>
 </div>
-<div class="sect1">
-<h2 id="_context">Context</h2>
-<div class="sectionbody">
+<div class="sect2">
+<h3 id="_context">Context</h3>
 <div class="paragraph">
-<p>The UART2ETH system requires an Ethernet controller that interfaces with the RP2350 microcontroller via SPI to provide reliable TCP/IP connectivity. This component is critical for the core networking functionality of our product.</p>
+<p>The UART2ETH system requires a ring buffer allocation strategy for inter-core communication between Core 0 (UART processing) and Core 1 (network processing). Based on our solution strategy (Chapter 4), we use cache-aligned ring buffers with fixed-size entries to enable deterministic, high-performance data transfer.</p>
 </div>
 <div class="paragraph">
-<p>Based on our microcontroller selection (ADR-001), we need to determine the most appropriate Ethernet controller solution that can:</p>
+<p>This ADR documents the critical decision between different buffer allocation approaches given our realistic packet size analysis:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>Support 100 Mbps Ethernet connectivity</p>
+<p><strong>Maximum payload size</strong>: 1024 bytes (worst-case industrial protocol)</p>
 </li>
 <li>
-<p>Interface with the RP2350 via SPI</p>
+<p><strong>Minimum payload size</strong>: 10 bytes (small sensor readings)</p>
 </li>
 <li>
-<p>Handle the networking requirements of up to 4 concurrent UART-to-TCP bridges</p>
-</li>
-<li>
-<p>Operate reliably in industrial environments (-40°C to +85°C)</p>
-</li>
-<li>
-<p>Maintain low latency while supporting our 500 kbps per port requirement</p>
-</li>
-<li>
-<p>Simplify firmware development with minimal microcontroller overhead</p>
-</li>
-<li>
-<p>Meet our cost target for volume production</p>
-</li>
-<li>
-<p>Does not contain firmware on its own</p>
-</li>
-<li>
-<p>Comes from a 'western' supplier</p>
+<p><strong>Average payload size</strong>: 40 bytes (typical industrial data)</p>
 </li>
 </ul>
 </div>
 <div class="paragraph">
-<p>The Ethernet controller selection impacts system performance, reliability, development complexity, and overall BOM cost.</p>
+<p>The buffer allocation strategy directly impacts:</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_decision_drivers">Decision Drivers</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_primary_requirements">Primary Requirements</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Network Performance</strong>: Support for full 100 Mbps Ethernet with sufficient throughput for our use case</p>
+<p>Memory efficiency and utilization</p>
 </li>
 <li>
-<p><strong>Memory Buffer Size</strong>: Sufficient buffer for packet handling and multiple connections</p>
+<p>System determinism and real-time behavior</p>
 </li>
 <li>
-<p><strong>SPI Interface Speed</strong>: Fast and efficient communication with the microcontroller</p>
+<p>Implementation complexity and maintainability</p>
 </li>
 <li>
-<p><strong>Industrial Reliability</strong>: Operating temperature range and robustness for industrial use</p>
+<p>Development timeline and risk</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>This decision is architecturally significant because it affects the fundamental memory model of our dual-core architecture and determines whether we can achieve our non-negotiable requirements within the 520KB SRAM constraints of the RP2350.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_decision_drivers">Decision Drivers</h3>
+<div class="sect3">
+<h4 id="_primary_requirements">Primary Requirements</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Industrial Reliability</strong>: Must enable deterministic, predictable behavior for industrial applications</p>
 </li>
 <li>
-<p><strong>Cost Effectiveness</strong>: Component cost for volume production</p>
+<p><strong>Static Memory Allocation</strong>: All memory must be allocated at compile time (no dynamic allocation)</p>
 </li>
 <li>
-<p><strong>Development Complexity</strong>: Readily available OpenSource library for integration</p>
+<p><strong>Sub-5ms Latency</strong>: Latency requirement limits buffering depth, reducing total memory impact</p>
+</li>
+<li>
+<p><strong>Cache-Aligned Performance</strong>: Inter-core communication must be optimized for dual-core RP2350</p>
+</li>
+<li>
+<p><strong>TDD Implementation</strong>: Must be testable and maintainable using test-driven development</p>
 </li>
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_constraints">Constraints</h3>
+<div class="sect3">
+<h4 id="_constraints">Constraints</h4>
 <div class="ulist">
 <ul>
 <li>
-<p>Must use SPI interface to connect with the RP2350 microcontroller</p>
+<p>Limited to 520KB SRAM total on RP2350 platform</p>
 </li>
 <li>
-<p>Must operate reliably in industrial environments (-40°C to +85°C)</p>
+<p>Static allocation only (no malloc/free)</p>
 </li>
 <li>
-<p>Must fit within the overall $10 system cost target for volume production</p>
+<p>Cache-line alignment required (64-byte boundaries)</p>
 </li>
 <li>
-<p>Must use open-source compatible software stacks (GPL license compatible)</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_options_considered">Options Considered</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_option_a_wiznet_w5500">Option A: WIZnet W5500</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Interface</strong>: SPI (up to 80 MHz)</p>
+<p>Maximum 2-3 packets buffered per UART due to latency constraints</p>
 </li>
 <li>
-<p><strong>Network Speed</strong>: 10/100 Mbps Ethernet</p>
-</li>
-<li>
-<p><strong>TCP/IP Stack</strong>: Hardwired TCP/IP stack (integrated)</p>
-</li>
-<li>
-<p><strong>Buffer Memory</strong>: 32 KB internal buffer</p>
-</li>
-<li>
-<p><strong>Concurrent Connections</strong>: 8 independent hardware sockets</p>
-</li>
-<li>
-<p><strong>Protocols Support</strong>: TCP, UDP, IPv4, ICMP, ARP, IGMP, PPPoE</p>
-</li>
-<li>
-<p><strong>Temperature Range</strong>: -40°C to +85°C</p>
-</li>
-<li>
-<p><strong>Voltage Supply</strong>: 2.97V to 3.63V</p>
-</li>
-<li>
-<p><strong>Power Consumption</strong>: 132mA typical</p>
-</li>
-<li>
-<p><strong>Package Options</strong>: 48-LQFP (7x7mm)</p>
-</li>
-<li>
-<p><strong>Cost (Volume)</strong>: ~$2.00 per unit</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Extensive documentation, libraries for multiple platforms</p>
-</li>
-<li>
-<p><strong>Manufacturer</strong>: WIZnet.io (South Korea)</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Interface</strong>: SPI (up to 20 MHz)</p>
-</li>
-<li>
-<p><strong>Network Speed</strong>: 10 Mbps Ethernet only</p>
-</li>
-<li>
-<p><strong>TCP/IP Stack</strong>: Software stack required (on microcontroller)</p>
-</li>
-<li>
-<p><strong>Buffer Memory</strong>: 8 KB internal buffer</p>
-</li>
-<li>
-<p><strong>Concurrent Connections</strong>: Limited by microcontroller implementation</p>
-</li>
-<li>
-<p><strong>Protocols Support</strong>: Requires microcontroller implementation (typically lwIP)</p>
-</li>
-<li>
-<p><strong>Temperature Range</strong>: 0°C to +70°C (commercial), -40°C to +85°C (industrial version)</p>
-</li>
-<li>
-<p><strong>Voltage Supply</strong>: 3.1V to 3.6V</p>
-</li>
-<li>
-<p><strong>Power Consumption</strong>: 160mA typical</p>
-</li>
-<li>
-<p><strong>Package Options</strong>: 28-pin SPDIP, SOIC, SSOP, QFN</p>
-</li>
-<li>
-<p><strong>Cost (Volume)</strong>: ~$2.50 per unit</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Mature, widely used in Arduino and other platforms</p>
-</li>
-<li>
-<p><strong>Manufacturer</strong>: Microchip Technology (USA)</p>
+<p>Must support worst-case 1024-byte payload scenarios</p>
 </li>
 </ul>
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_options_considered">Options Considered</h3>
+<div class="sect3">
+<h4 id="_option_a_static_worst_case_allocation_baseline">Option A: Static Worst-Case Allocation (Baseline)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Approach</strong>: Fixed ring buffer entries sized for maximum payload (1024 bytes + 16 bytes management = 1040 bytes per entry)</p>
+</li>
+<li>
+<p><strong>Memory Usage</strong>: Each entry wastes 984 bytes when storing 40-byte average payloads (96% waste)</p>
+</li>
+<li>
+<p><strong>Determinism</strong>: Completely predictable, compile-time allocation</p>
+</li>
+<li>
+<p><strong>Implementation Complexity</strong>: Minimal - simple fixed-size array</p>
+</li>
+<li>
+<p><strong>Cache Alignment</strong>: Straightforward alignment to cache boundaries</p>
+</li>
+<li>
+<p><strong>Testing</strong>: Simple to test, no dynamic allocation edge cases</p>
+</li>
+</ul>
 </div>
-<div class="sect1">
-<h2 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h2>
-<div class="sectionbody">
+</div>
+<div class="sect3">
+<h4 id="_option_b_protocol_aware_multi_pool">Option B: Protocol-Aware Multi-Pool</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Approach</strong>: Three separate buffer pools sized for different payload ranges</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Small Pool: 64-byte entries (for ≤40 byte packets)</p>
+</li>
+<li>
+<p>Medium Pool: 256-byte entries (for 41-200 byte packets)</p>
+</li>
+<li>
+<p>Large Pool: 1024-byte entries (for 201-1024 byte packets)</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>Memory Usage</strong>: Significantly more efficient (~20-30% waste vs 96%)</p>
+</li>
+<li>
+<p><strong>Determinism</strong>: Still predictable, but requires pool management logic</p>
+</li>
+<li>
+<p><strong>Implementation Complexity</strong>: Requires pool allocation logic, protocol size prediction</p>
+</li>
+<li>
+<p><strong>Cache Alignment</strong>: More complex alignment across multiple pools</p>
+</li>
+<li>
+<p><strong>Testing</strong>: Complex testing scenarios for pool exhaustion, allocation failures</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_option_c_variable_length_with_fragmentation">Option C: Variable-Length with Fragmentation</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Approach</strong>: Variable-length entries with fragmentation and reassembly</p>
+</li>
+<li>
+<p><strong>Memory Usage</strong>: Most efficient possible memory utilization</p>
+</li>
+<li>
+<p><strong>Determinism</strong>: Unpredictable due to fragmentation and reassembly timing</p>
+</li>
+<li>
+<p><strong>Implementation Complexity</strong>: High - fragmentation logic, reassembly buffers</p>
+</li>
+<li>
+<p><strong>Cache Alignment</strong>: Complex alignment with variable sizes</p>
+</li>
+<li>
+<p><strong>Testing</strong>: Very complex testing for fragmentation edge cases</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h3>
 <div class="paragraph">
 <p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
-<em>Baseline: ENC28J60 (all scores = 0)</em></p>
+<em>Baseline: Static Worst-Case Allocation (all scores = 0)</em></p>
 </div>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
-<col style="width: 38.4615%;">
-<col style="width: 15.3846%;">
-<col style="width: 23.0769%;">
-<col style="width: 23.077%;">
+<col style="width: 31.25%;">
+<col style="width: 12.5%;">
+<col style="width: 18.75%;">
+<col style="width: 18.75%;">
+<col style="width: 18.75%;">
 </colgroup>
 <thead>
 <tr>
 <th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
 <th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
-<th class="tableblock halign-left valign-top"><strong>ENC28J60</strong></th>
-<th class="tableblock halign-left valign-top"><strong>W5500</strong></th>
+<th class="tableblock halign-left valign-top"><strong>Static Worst-Case</strong></th>
+<th class="tableblock halign-left valign-top"><strong>Multi-Pool</strong></th>
+<th class="tableblock halign-left valign-top"><strong>Variable-Length</strong></th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Speed</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (100 Mbps vs 10 Mbps)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>TCP/IP Implementation</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (hardwired vs software)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Microcontroller Overhead</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (minimal vs significant)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Buffer Size</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (32KB vs 8KB)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>SPI Interface Performance</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (80MHz vs 20MHz)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Temperature Range</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (standard -40°C to +85°C)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Ecosystem</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (both well-supported)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Firmware Complexity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (simple socket programming)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Open Internal Firmware</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Reliability</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (Complex, Closed Source)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (pool management risk)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (fragmentation unpredictability)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Western Manufacturer</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Efficiency</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (20-30% waste vs 96%)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (optimal utilization)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Implementation Simplicity</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (South Korea)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (pool allocation logic)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (fragmentation complexity)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Auditable Sourcecode</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Deterministic Behavior</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (Closed Source)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (pool allocation timing)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (fragmentation timing)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total PUGH Score</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Testing Complexity</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (pool edge cases)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (fragmentation edge cases)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (additional development)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (significant additional work)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Cache Optimization</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (multi-pool alignment)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (variable alignment complexity)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Future Maintainability</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-6</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (documented optimization path)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (complex maintenance)</p></td>
 </tr>
 </tbody>
 </table>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_decision">Decision</h2>
-<div class="sectionbody">
+<div class="sect3">
+<h4 id="_weighted_scores">Weighted Scores</h4>
 <div class="paragraph">
-<p><strong>Selected: ENC28J60</strong></p>
+<p><strong>Multi-Pool Total Score:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Reliability: 3×(-1) = -3</p>
+</li>
+<li>
+<p>Memory: 2×(+2) = +4</p>
+</li>
+<li>
+<p>Simplicity: 3×(-1) = -3</p>
+</li>
+<li>
+<p>Determinism: 3×(-1) = -3</p>
+</li>
+<li>
+<p>Testing: 2×(-1) = -2</p>
+</li>
+<li>
+<p>Timeline: 2×(-1) = -2</p>
+</li>
+<li>
+<p>Cache: 2×(-1) = -2</p>
+</li>
+<li>
+<p>Maintainability: 1×(+1) = +1</p>
+</li>
+<li>
+<p><strong>Total: -10</strong></p>
+</li>
+</ul>
 </div>
 <div class="paragraph">
-<p>While the W5500 is technically superior in every aspect and more easy to integrate, the ENC28J60 is a <strong>dumb</strong> device, which is, given to goal of maximum control, auditable software and upgradeable software, exactly what we want. And additionally it is from a 'western' manufacturer.</p>
+<p><strong>Variable-Length Total Score:</strong></p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_rationale">Rationale</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Dumb</strong>: The ENC28J60 has no complex firmware.</p>
+<p>Reliability: 3×(-2) = -6</p>
 </li>
 <li>
-<p><strong>Auditable Sourcecode</strong>: The main network code is in the microcontrollers firmware, which we have total control over. This allows us to show <strong>all</strong> relevant code for audits.</p>
+<p>Memory: 2×(+2) = +4</p>
 </li>
 <li>
-<p><strong>Western Manufacturer</strong>: Because of supply chain considerations we want this project to contain only 'western' manufacturers. While technically South Korea is a western ally, it is still in the east.</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_trade_offs_accepted">Trade-offs Accepted</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Cost Premium</strong>: The $0.50 additional cost per unit for the W5500 is justified by the significant performance advantages, reduced development complexity, and system resource savings.</p>
+<p>Simplicity: 3×(-2) = -6</p>
 </li>
 <li>
-<p><strong>Lower Performance</strong>: The W5500 is superior in all aspects of performance. But the ENC28J60 is <strong>good enough</strong> to match the performance criteria.</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_consequences">Consequences</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_positive">Positive</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>✅ <strong>Minimal Performance</strong>: ENC28J60 provides enough network bandwidth for current needs</p>
+<p>Determinism: 3×(-2) = -6</p>
 </li>
 <li>
-<p>✅ <strong>Physical Size</strong>: 28SSOP package requires slightly less PCB space</p>
+<p>Testing: 2×(-2) = -4</p>
 </li>
 <li>
-<p>✅ <strong>Industrial Reliability</strong>: Full industrial temperature range support</p>
+<p>Timeline: 2×(-2) = -4</p>
 </li>
 <li>
-<p>✅ <strong>External Dependency</strong>: Reliance on a more generic controller with more alternatives</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_negative">Negative</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>⚠️ <strong>Resource Spending</strong>: More microcontroller overhead diminishes resources for other features</p>
+<p>Cache: 2×(-2) = -4</p>
 </li>
 <li>
-<p>⚠️ <strong>Slightly Higher Cost</strong>: $0.50 cost premium per unit compared to W5500</p>
+<p>Maintainability: 1×(-1) = -1</p>
 </li>
 <li>
-<p>⚠️ <strong>More Complex Development</strong>: Software TCP/IP stack incraeses code complexity and development time</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_risks_and_mitigation">Risks and Mitigation</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Supply Chain Risk</strong>: Establish multiple supplier relationships, consider inventory strategy</p>
-</li>
-<li>
-<p><strong>Single-Source Component</strong>: Document adaptation path to alternative controllers if necessary</p>
-</li>
-<li>
-<p><strong>Integration Complexity</strong>: Thoroughly validate the ENC28J60-RP2350 integration early in development</p>
+<p><strong>Total: -23</strong></p>
 </li>
 </ul>
 </div>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_implementation_notes">Implementation Notes</h2>
-<div class="sectionbody">
 <div class="sect2">
-<h3 id="_performance_optimization">Performance Optimization</h3>
+<h3 id="_decision">Decision</h3>
+<div class="paragraph">
+<p><strong>Selected: Static Worst-Case Allocation</strong></p>
+</div>
+<div class="paragraph">
+<p>Despite the significant memory inefficiency (96% waste in typical scenarios), static worst-case allocation scores highest in our weighted analysis due to our <strong>reliability-first</strong> architecture principles and aggressive <strong>sub-5ms latency requirements</strong>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_rationale">Rationale</h3>
+<div class="sect3">
+<h4 id="_why_static_allocation_over_multi_pool_10_score">Why Static Allocation Over Multi-Pool (-10 score)</h4>
+<div class="paragraph">
+<p><strong>Reliability Trumps Efficiency:</strong></p>
+</div>
 <div class="ulist">
 <ul>
 <li>
-<p>Use burst SPI mode for maximum throughput (up to 25 MHz)</p>
+<p>Industrial reliability is our non-negotiable #1 priority</p>
 </li>
 <li>
-<p>Optimize buffer management for latency-sensitive applications)</p>
+<p>Static allocation provides <strong>completely predictable behavior</strong></p>
+</li>
+<li>
+<p>No pool exhaustion scenarios or allocation failures</p>
+</li>
+<li>
+<p>Simpler testing with fewer edge cases</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Latency Constraint Mitigation:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Sub-5ms requirement limits buffer depth to ~2-3 packets maximum</p>
+</li>
+<li>
+<p>Total memory waste: 4 UARTs × 3 packets × 1024 bytes = ~12KB</p>
+</li>
+<li>
+<p>12KB waste is <strong>acceptable within 520KB total SRAM</strong></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Implementation Risk Reduction:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>TDD requirement</strong> favors simpler, more testable implementation</p>
+</li>
+<li>
+<p>Aggressive delivery timeline cannot accommodate complex allocation logic</p>
+</li>
+<li>
+<p>Static allocation enables immediate development progress</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_why_static_allocation_over_variable_length_23_score">Why Static Allocation Over Variable-Length (-23 score)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Variable-length fails completely on <strong>reliability and determinism</strong></p>
+</li>
+<li>
+<p>Fragmentation creates <strong>unpredictable latency</strong> - incompatible with sub-5ms requirement</p>
+</li>
+<li>
+<p>Testing complexity would significantly impact <strong>TDD implementation</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_memory_efficiency_analysis">Memory Efficiency Analysis</h4>
+<div class="paragraph">
+<p><strong>Realistic Memory Impact:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code>Worst-case buffer usage:
+4 UARTs × 3 packets/UART × 1024 bytes/packet = 12KB total
+Percentage of available SRAM: 12KB / 520KB = 2.3%
+
+Total system memory budget impact: Acceptable</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Latency-Limited Buffering:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Sub-5ms latency inherently limits packet accumulation</p>
+</li>
+<li>
+<p>Small buffer depths make absolute memory waste manageable</p>
+</li>
+<li>
+<p><strong>Quality goal (latency) constraints enable architectural simplification</strong></p>
 </li>
 </ul>
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_consequences">Consequences</h3>
+<div class="sect3">
+<h4 id="_positive">Positive</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>✅ <strong>Industrial Reliability</strong>: Completely predictable memory behavior</p>
+</li>
+<li>
+<p>✅ <strong>Development Velocity</strong>: Immediate implementation, no complex allocation logic</p>
+</li>
+<li>
+<p>✅ <strong>Testing Simplicity</strong>: Straightforward test scenarios, high confidence</p>
+</li>
+<li>
+<p>✅ <strong>Cache Optimization</strong>: Simple 64-byte alignment for optimal inter-core performance</p>
+</li>
+<li>
+<p>✅ <strong>Future Flexibility</strong>: Clear optimization path documented for later enhancement</p>
+</li>
+</ul>
 </div>
-<div class="sect1">
-<h2 id="_follow_up_actions">Follow-up Actions</h2>
-<div class="sectionbody">
+</div>
+<div class="sect3">
+<h4 id="_negative">Negative</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>❌ <strong>Memory Inefficiency</strong>: 96% waste in typical scenarios (1024B allocated, 40B used)</p>
+</li>
+<li>
+<p>❌ <strong>Resource Utilization</strong>: Suboptimal use of precious SRAM resource</p>
+</li>
+<li>
+<p>❌ <strong>Scalability Limitation</strong>: Inefficiency grows with larger maximum packet sizes</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_risks_and_mitigation">Risks and Mitigation</h4>
+<div class="paragraph">
+<p><strong>Primary Risk: Memory Inefficiency</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Probability</strong>: High (96% waste is certain)</p>
+</li>
+<li>
+<p><strong>Impact</strong>: Medium (limited by latency constraints to ~12KB total)</p>
+</li>
+<li>
+<p><strong>Mitigation</strong>: Document multi-pool optimization path, monitor actual memory usage</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Secondary Risk: Future Scalability</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Probability</strong>: Low (latency requirements unlikely to change)</p>
+</li>
+<li>
+<p><strong>Impact</strong>: Medium (could require architectural changes)</p>
+</li>
+<li>
+<p><strong>Mitigation</strong>: Protocol-aware multi-pool approach documented as known optimization</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_notes">Implementation Notes</h3>
+<div class="sect3">
+<h4 id="_ring_buffer_entry_structure">Ring Buffer Entry Structure</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Each entry = 1024 bytes payload + 16 bytes management + padding to cache line
+typedef struct {
+    // Management Data (16 bytes)
+    uint8_t  uart_channel;     // 0-3
+    uint8_t  direction;        // TX/RX
+    uint8_t  status;           // FILLING/DRAINING/FULL/EMPTY
+    uint8_t  payload_length;   // Actual data length (≤1024)
+    uint32_t timestamp;        // Fill timestamp
+    uint32_t sequence_id;      // For ordering/debugging
+    uint32_t reserved;         // Future use/alignment
+
+    // Payload Data (1024 bytes fixed)
+    uint8_t  payload[1024];    // Fixed maximum size
+} __attribute__((aligned(64))) ring_entry_t;  // Cache-aligned</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_memory_allocation_strategy">Memory Allocation Strategy</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Total Buffer Size</strong>: <code>(available_memory - static_variables) / sizeof(ring_entry_t) - 1</code> entries</p>
+</li>
+<li>
+<p><strong>Per-UART Allocation</strong>: Dynamic allocation from shared pool based on actual usage</p>
+</li>
+<li>
+<p><strong>Overflow Policy</strong>: Drop oldest packets (deterministic behavior)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_future_optimization_path">Future Optimization Path</h3>
+<div class="paragraph">
+<p>When memory efficiency becomes critical (e.g., adding features that require more SRAM), implement <strong>Protocol-Aware Multi-Pool</strong> allocation:</p>
+</div>
+<div class="sect3">
+<h4 id="_multi_pool_implementation_strategy">Multi-Pool Implementation Strategy</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Future optimization - three separate pools
+typedef struct {
+    ring_entry_t small_pool[SMALL_POOL_SIZE];   // 64-byte entries
+    ring_entry_t medium_pool[MEDIUM_POOL_SIZE]; // 256-byte entries
+    ring_entry_t large_pool[LARGE_POOL_SIZE];   // 1024-byte entries
+
+    // Pool allocation logic
+    pool_allocator_t allocator;
+} multi_pool_ring_buffer_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_protocol_size_prediction">Protocol Size Prediction</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Runtime Analysis</strong>: Monitor actual packet sizes during operation</p>
+</li>
+<li>
+<p><strong>Protocol Configuration</strong>: Per-UART protocol profiles specifying expected size ranges</p>
+</li>
+<li>
+<p><strong>Adaptive Allocation</strong>: Adjust pool usage based on observed patterns</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_migration_path">Migration Path</h4>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><strong>Procurement</strong>: Source ENC28J60 components from multiple suppliers to validate availability</p>
+<p><strong>Phase 1</strong>: Implement size monitoring in current static allocation</p>
 </li>
 <li>
-<p><strong>Prototyping</strong>: Develop initial integration test for RP2350 + ENC28J60 communication</p>
+<p><strong>Phase 2</strong>: Develop pool allocation logic with same interfaces</p>
 </li>
 <li>
-<p><strong>Performance Testing</strong>: Benchmark SPI communication speeds and TCP throughput</p>
+<p><strong>Phase 3</strong>: A/B test multi-pool vs static allocation</p>
 </li>
 <li>
-<p><strong>Industrial Validation</strong>: Test operation across full temperature range</p>
+<p><strong>Phase 4</strong>: Switch to multi-pool if memory pressure requires it</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_alternative_approaches_considered">Alternative Approaches Considered</h3>
+<div class="sect3">
+<h4 id="_per_uart_configurable_sizing">Per-UART Configurable Sizing</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Concept</strong>: Compile-time configuration of maximum packet size per UART</p>
+</li>
+<li>
+<p><strong>Rejection Reason</strong>: Adds complexity without addressing core efficiency problem</p>
+</li>
+<li>
+<p><strong>Example</strong>: UART0=64B, UART1=128B, UART2=1024B, UART3=256B</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_hybrid_static_overflow">Hybrid Static + Overflow</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Concept</strong>: Small static buffers + large overflow buffer for rare large packets</p>
+</li>
+<li>
+<p><strong>Rejection Reason</strong>: Violates deterministic behavior requirement</p>
+</li>
+<li>
+<p><strong>Risk</strong>: Overflow scenarios create unpredictable timing</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_follow_up_actions">Follow-up Actions</h3>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Memory Monitoring</strong>: Implement runtime memory usage tracking in debug builds</p>
+</li>
+<li>
+<p><strong>Size Analysis</strong>: Log actual packet sizes during development and testing</p>
+</li>
+<li>
+<p><strong>Pool Design</strong>: Document detailed multi-pool implementation specifications</p>
+</li>
+<li>
+<p><strong>Performance Validation</strong>: Benchmark static allocation performance characteristics</p>
+</li>
+<li>
+<p><strong>Future Review</strong>: Schedule memory efficiency review after core implementation</p>
 </li>
 </ol>
 </div>
@@ -815,18 +1044,22 @@
 <div class="ulist checklist">
 <ul class="checklist">
 <li>
-<p>&#10063; Validate pricing from multiple suppliers</p>
+<p>&#10063; Validate 12KB memory impact against other system memory requirements</p>
 </li>
 <li>
-<p>&#10063; Confirm SPI bus configuration with other peripherals</p>
+<p>&#10063; Confirm cache-line alignment performance benefits on RP2350</p>
 </li>
 <li>
-<p>&#10063; Verify EMI/EMC considerations with ENC28J60 placement</p>
+<p>&#10063; Review multi-pool optimization trigger conditions</p>
 </li>
 <li>
-<p>&#10063; Test actual power consumption under various load scenarios</p>
+<p>&#10063; Document protocol size prediction strategies</p>
+</li>
+<li>
+<p>&#10063; Establish memory usage monitoring in CI/CD pipeline</p>
 </li>
 </ul>
+</div>
 </div>
 </div>
 </div>
@@ -857,11 +1090,11 @@
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-002-ethernet-controller-selection.adoc%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-002-ethernet-controller-selection.adoc">tell us
+        Glad to hear it! Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-005%3A+Ring+Buffer+Memory+Allocation+Strategy+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-005-buffer-allocation-strategy.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-002-ethernet-controller-selection.adoc%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-002-ethernet-controller-selection.adoc">tell
+        Sorry to hear that. Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-005%3A+Ring+Buffer+Memory+Allocation+Strategy+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:adrs/ADR-005-buffer-allocation-strategy.adoc">tell
     us how we can improve</a>.
     </p>
 </div>

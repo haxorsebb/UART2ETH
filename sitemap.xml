@@ -22,6 +22,11 @@
     </url>
 
     <url>
+    	<loc>http://jbake.org/adrs/ADR-005-buffer-allocation-strategy.html</loc>
+    	<lastmod>2025-07-27</lastmod>
+    </url>
+
+    <url>
     	<loc>http://jbake.org/arc42/arc42.html</loc>
     	<lastmod>2025-07-27</lastmod>
     </url>
