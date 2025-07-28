@@ -397,21 +397,36 @@ skinparam backgroundColor transparent
 
 title Implementation Roadmap
 
-robust "Phase 1: Proof of Concept" as P1
-robust "Phase 2: Full System" as P2  
-robust "Phase 3: Advanced Features" as P3
+package "Phase 1: Proof of Concept" as P1 {
+    component [Single UART + TCP] as P1_1
+    component [Mock Ring Buffer] as P1_2
+    component [Host-based Testing] as P1_3
+}
 
-P1 is "Single UART + TCP" from 0 to 3
-P1 is "Mock Ring Buffer" from 3 to 6
-P1 is "Host-based Testing" from 6 to 9
+package "Phase 2: Full System" as P2 {
+    component [All 4 UARTs] as P2_1
+    component [Complete Ring Buffer] as P2_2
+    component [HTTP Management UI] as P2_3
+}
 
-P2 is "All 4 UARTs" from 9 to 12
-P2 is "Complete Ring Buffer" from 12 to 15
-P2 is "HTTP Management UI" from 15 to 18
+package "Phase 3: Advanced Features" as P3 {
+    component [Secure OTA] as P3_1
+    component [A/B Updates] as P3_2
+    component [Industrial Hardening] as P3_3
+}
 
-P3 is "Secure OTA" from 18 to 21
-P3 is "A/B Updates" from 21 to 24
-P3 is "Industrial Hardening" from 24 to 27
+P1_1 --> P1_2 : Sequential
+P1_2 --> P1_3 : Sequential
+P1 --> P2 : Foundation Ready
+P2_1 --> P2_2 : Sequential
+P2_2 --> P2_3 : Sequential
+P2 --> P3 : Core System Complete
+P3_1 --> P3_2 : Sequential
+P3_2 --> P3_3 : Sequential
+
+note top of P1 : 3 months each task
+note top of P2 : 3 months each task  
+note top of P3 : 3 months each task
 
 @enduml
 ----
