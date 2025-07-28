@@ -2396,64 +2396,9 @@ typedef struct {
 </div>
 <div class="sect3">
 <h4 id="_implementation_phases">4.9.2. Implementation Phases</h4>
-<div class="listingblock">
+<div class="imageblock">
 <div class="content">
-<pre>Failed to generate image: PlantUML preprocessing failed: [From &lt;input&gt; (line 11) ]
-
-@startuml
-
-
-
-
-...
-... ( skipping 131 lines )
-...
-  BackgroundColor white
-  BorderColor black
-}
-skinparam StereotypeN {
-  BackgroundColor white
-  BorderColor black
-}
-skinparam UseCaseStereoType {
-  FontColor black
-  FontName Verdana
-}
-skinparam backgroundColor transparent
-
-title Implementation Roadmap
-
-robust "Phase 1: Proof of Concept" as P1
-robust "Phase 2: Full System" as P2
-robust "Phase 3: Advanced Features" as P3
-
-P1 is "Single UART + TCP" from 0 to 3
-^^^^^
- Syntax Error?
-
-@startuml
-!theme plain
-skinparam backgroundColor transparent
-
-title Implementation Roadmap
-
-robust "Phase 1: Proof of Concept" as P1
-robust "Phase 2: Full System" as P2
-robust "Phase 3: Advanced Features" as P3
-
-P1 is "Single UART + TCP" from 0 to 3
-P1 is "Mock Ring Buffer" from 3 to 6
-P1 is "Host-based Testing" from 6 to 9
-
-P2 is "All 4 UARTs" from 9 to 12
-P2 is "Complete Ring Buffer" from 12 to 15
-P2 is "HTTP Management UI" from 15 to 18
-
-P3 is "Secure OTA" from 18 to 21
-P3 is "A/B Updates" from 21 to 24
-P3 is "Industrial Hardening" from 24 to 27
-
-@enduml</pre>
+<img src="./images/implementation-phases.svg" alt="implementation phases" width="407" height="320">
 </div>
 </div>
 <div class="paragraph">
