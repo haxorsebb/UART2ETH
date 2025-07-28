@@ -1,48 +1,42 @@
 ifndef::imagesdir[:imagesdir: ../images]
 
 [[section-deployment-view]]
-
 == Deployment View
 
 === System Context
-
-The UART2ETH system is an embedded firmware solution deployed on RP2350 microcontroller hardware. The deployment view focuses on the firmware development, testing, and deployment pipeline that enables secure over-the-air (OTA) updates to devices deployed in customer environments.
-
-The deployment architecture supports our core business requirements:
-
-* **Secure OTA firmware updates**: Cryptographically signed firmware delivery
-* **A/B update strategy**: Dual-partition system enabling safe updates with automatic rollback
-* **Zero-downtime updates**: Seamless firmware transitions without service interruption
-* **Configuration management**: Support for device-specific and customer-specific firmware variants
+The UART2ETH system is an embedded hardware solution based on the RPI RP2350 microcontroller that bridges UART interfaces to TCP sockets. The deployment view focuses on the firmware deployment pipeline, from development through QA validation to field deployment via Over-The-Air (OTA) updates.
 
 === Operational Requirements Summary
-
 [cols="25,25,50"]
 |===
 | Requirement Type | Target | Description
 
-| Update Availability
-| 99.9% success rate
-| OTA updates must reliably reach and install on field devices
+| Availability
+| Zero-downtime updates
+| A/B partition switching maintains device operation until manual reboot
 
-| Update Security
-| Cryptographic signing
-| All firmware updates must be cryptographically verified before installation
+| Security
+| Signed firmware delivery
+| Cryptographic signing, secure boot, initial key embedding at factory
 
-| Rollback Capability
-| < 30 seconds
-| Automatic rollback to previous firmware version on update failure
+| Reliability
+| Automatic rollback
+| Watchdog-based rollback mechanism for failed firmware updates
 
-| Update Delivery
-| < 10 minutes
-| Firmware updates should propagate to devices within 10 minutes of release
+| Auditability
+| Version tracking
+| Git tags and commit checksums embedded in firmware builds
+
+| Control
+| Manual operations
+| No remote device reboots, QA gatekeeping for all releases
 |===
 
-=== Firmware Deployment Pipeline
+== Deployment Environments
 
-==== Pipeline Overview
+=== Environment Overview
 
-[plantuml, firmware-deployment-pipeline, svg]
+[plantuml, deployment-environments, svg]
 ----
 @startuml
 !theme plain
@@ -50,278 +44,163 @@ skinparam backgroundColor transparent
 
 title Firmware Deployment Pipeline
 
-package "Development Environment" {
-  [Developer Workstation] as dev
-  [Local Build Tools] as localtools
-  [Unit Tests] as unittest
+package "Development" {
+  [Local Hardware] as dev_hw
+  [CMake Build] as build
+  [Local Testing] as dev_test
 }
 
-package "CI/CD Infrastructure" {
-  [Git Repository] as git
-  [Build Server] as buildserver
-  [Automated Tests] as autotests
-  [Firmware Signing] as signing
-  [Artifact Storage] as artifacts
+package "QA Environment" {
+  [Testbench Hardware] as qa_hw
+  [Automated Tests] as qa_test
+  [Release Approval] as qa_approve
 }
 
-package "Testing Environments" {
-  [Hardware-in-Loop Testing] as hil
-  [Integration Test Lab] as testlab
-  [Beta Device Fleet] as beta
+package "Production" {
+  [Cloud OTA Server] as ota_server
+  [Field Devices] as field_devices
 }
 
-package "Production Infrastructure" {
-  [OTA Update Server] as otaserver
-  [Device Management] as devicemgmt
-  [Monitoring & Analytics] as monitoring
-}
+build --> qa_test : "Release Candidate"
+qa_test --> qa_hw : "Hardware Validation"
+qa_hw --> qa_approve : "Test Results"
+qa_approve --> ota_server : "Approved Firmware"
+ota_server --> field_devices : "HTTP Download"
 
-package "Field Deployment" {
-  [Production Device Fleet] as prodfleet
-  [Customer Networks] as customer
-}
-
-dev --> git : "Code Commit"
-git --> buildserver : "Trigger Build"
-buildserver --> autotests : "Run Tests"
-autotests --> signing : "Sign Firmware"
-signing --> artifacts : "Store Signed Binary"
-
-artifacts --> hil : "Deploy to HIL"
-artifacts --> testlab : "Manual Testing"
-artifacts --> beta : "Beta Deployment"
-
-beta --> otaserver : "Promote to Production"
-otaserver --> devicemgmt : "Coordinate Updates"
-devicemgmt --> prodfleet : "OTA Updates"
-prodfleet --> customer : "Service Delivery"
-
-monitoring --> prodfleet : "Monitor Health"
-monitoring --> otaserver : "Update Analytics"
+note right of qa_approve : QA is sole gatekeeper\nfor production releases
+note right of field_devices : Manual reboot required\nfor partition switch
 
 @enduml
 ----
 
-==== Environment Specifications
+=== Environment Specifications
 
-[cols="20,25,25,30"]
+[cols="20,30,25,25"]
 |===
-| Environment | Purpose | Infrastructure | Security Level
+| Environment | Purpose | Hardware | Deployment Method
 
 | Development
-| Feature development and unit testing
-| Developer workstations, local RP2350 hardware
-| Internal network, code review required
+| Feature development and local testing
+| Individual RP2350 devices per developer
+| Direct flash programming
 
-| CI/CD
-| Automated build, test, and signing
-| Build servers, test automation, HSM for signing
-| Secured build environment, signed artifacts
-
-| Testing
-| Hardware validation and integration testing
-| Physical test lab, HIL test systems, beta devices
-| Controlled test network, pre-production firmware
+| QA Testing
+| Release validation with real hardware
+| Single testbench with RP2350 hardware
+| Automated test deployment
 
 | Production
-| Live firmware deployment to field devices
-| OTA infrastructure, device management platform
-| Internet-facing, TLS secured, authenticated updates
+| Live firmware distribution
+| Customer-deployed field devices
+| OTA HTTP downloads
+
+| Factory
+| Initial device provisioning
+| Manufacturing test fixtures
+| Flash programming + key embedding
 |===
 
-==== Network Requirements
+== Firmware Deployment Architecture
 
-[cols="30,30,40"]
-|===
-| Connection Path | Protocol/Ports | Bandwidth/Latency Requirements
+=== High-Level Architecture
 
-| Device → OTA Server
-| HTTPS (443/TCP)
-| Min 50Kbps, <500ms latency
+[plantuml, firmware-architecture, svg]
+----
+!include <C4/C4_Deployment>
 
-| OTA Server → Firmware Repository
-| Internal HTTPS (443/TCP)
-| Min 1Gbps, <10ms latency
+title Firmware Deployment Architecture
 
-| Build Server → Firmware Repository
-| SFTP (22/TCP)
-| Min 1Gbps, <50ms latency
+Deployment_Node(dev, "Development Environment", "Developer Workstation") {
+  Container(cmake, "CMake Build System", "Compiles and signs firmware")
+  Container(local_hw, "RP2350 Device", "Local testing hardware")
+}
 
-| Device Management API
-| HTTPS (443/TCP)
-| Min 10Kbps, <1000ms latency
+Deployment_Node(qa, "QA Environment", "Testing Infrastructure") {
+  Container(testbench, "Hardware Testbench", "Automated validation on real hardware")
+  Container(qa_gate, "QA Approval Process", "Manual release gatekeeper")
+}
 
-| Monitoring Endpoints
-| HTTPS (443/TCP)
-| Min 1Kbps, <2000ms latency
+Deployment_Node(cloud, "Cloud Infrastructure", "Production OTA Server") {
+  Container(ota_server, "OTA Server", "HTTP firmware distribution")
+  Container(key_mgmt, "Key Management", "Firmware signing keys")
+}
 
-| HSM Communication
-| PKCS#11 over TLS (varies)
-| Min 100Kbps, <100ms latency
-|===
+Deployment_Node(field, "Field Deployment", "Customer Environment") {
+  Container(device, "UART2ETH Device", "RP2350 with A/B partitions")
+  Container(mgmt_ui, "Management Interface", "OTA server configuration")
+}
 
-=== Production Deployment Architecture
+Rel(cmake, testbench, "Release candidate")
+Rel(testbench, qa_gate, "Test results")
+Rel(qa_gate, ota_server, "Approved firmware")
+Rel(ota_server, device, "HTTP download")
+Rel(mgmt_ui, device, "Configure OTA server URL")
+----
 
-==== Firmware Update Infrastructure
+=== A/B Partition Strategy
 
-[plantuml, ota-infrastructure, svg]
+[plantuml, ab-partitions, svg]
 ----
 @startuml
 !theme plain
 skinparam backgroundColor transparent
 
-title OTA Update Infrastructure
+title A/B Partition Boot Process
 
-cloud "Internet" {
-  [Customer Networks] as customers
-}
+start
 
-package "OTA Infrastructure" {
-  [Load Balancer] as lb
-  [OTA Update Servers] as ota
-  [Firmware Repository] as repo
-  [Device Registry] as registry
-  [Update Scheduler] as scheduler
-}
+:Device powers on;
+:RP2350 ROM bootloader reads partition table;
 
-package "Management Platform" {
-  [Device Management API] as mgmtapi
-  [Update Orchestrator] as orchestrator
-  [Health Monitor] as health
-  [Analytics Engine] as analytics
-}
-
-package "Security Services" {
-  [Certificate Authority] as ca
-  [Firmware Signing Service] as signing
-  [Device Authentication] as deviceauth
-}
-
-package "Field Devices" {
-  [UART2ETH Device A] as devicea
-  [UART2ETH Device B] as deviceb
-  [UART2ETH Device N] as devicen
-}
-
-customers --> lb : "HTTPS/TLS"
-lb --> ota : "Route Requests"
-ota --> repo : "Fetch Firmware"
-ota --> registry : "Validate Device"
-ota --> deviceauth : "Authenticate"
-
-orchestrator --> scheduler : "Plan Updates"
-scheduler --> ota : "Trigger Deployment"
-health --> analytics : "Collect Metrics"
-
-signing --> repo : "Signed Firmware"
-ca --> deviceauth : "Device Certificates"
-
-devicea --> lb : "Check for Updates"
-deviceb --> lb : "Download Firmware"
-devicen --> lb : "Report Status"
+if (Active partition valid?) then (yes)
+  :Boot from active partition;
+  :Start watchdog timer;
+  
+  if (Firmware disables watchdog?) then (yes)
+    :Mark partition as confirmed;
+    :Normal operation;
+    stop
+  else (timeout)
+    :Watchdog triggers rollback;
+    :Switch to backup partition;
+    :Boot from backup partition;
+    stop
+  endif
+else (no)
+  :Boot from backup partition;
+  stop
+endif
 
 @enduml
 ----
 
-==== Device A/B Partition Architecture
+== Infrastructure Components
 
-[plantuml, ab-partition-system, svg]
-----
-@startuml
-!theme plain
-skinparam backgroundColor transparent
+=== Build and Release Infrastructure
 
-title A/B Partition System on RP2350 Device
-
-package "RP2350 Flash Memory Layout" {
-  rectangle "Bootloader\n(16KB)" as bootloader
-  rectangle "Partition A\n(Active)\n(512KB)" as partA
-  rectangle "Partition B\n(Standby)\n(512KB)" as partB
-  rectangle "Configuration\n(32KB)" as config
-  rectangle "User Data\n(Remaining)" as userdata
-}
-
-package "Update Process" {
-  [OTA Client] as otaclient
-  [Integrity Checker] as integrity
-  [Partition Manager] as partmgr
-}
-
-package "Rollback System" {
-  [Watchdog Timer] as watchdog
-  [Health Monitor] as devhealth
-  [Rollback Logic] as rollback
-}
-
-bootloader --> partA : "Boot Active"
-bootloader --> partB : "Boot Standby"
-
-otaclient --> partB : "Download to Standby"
-integrity --> partB : "Verify Signature"
-partmgr --> config : "Switch Active Flag"
-
-watchdog --> devhealth : "Monitor Health"
-devhealth --> rollback : "Trigger on Failure"
-rollback --> config : "Revert Active Flag"
-rollback --> bootloader : "Boot Previous"
-
-note right of partA : Contains currently running firmware
-note right of partB : Receives new firmware updates
-note bottom of config : Stores active partition flag\nand rollback counters
-
-@enduml
-----
-
-=== Infrastructure Components
-
-==== Development and Build Infrastructure
-
-[cols="25,25,25,25"]
+[cols="25,35,40"]
 |===
-| Component | Technology | Specifications | Scaling Strategy
+| Component | Technology & Configuration | Purpose & Responsibilities
 
-| Build Servers
-| CI/CD pipeline (GitHub Actions)
-| ARM cross-compilation toolchain
-| Horizontal scaling with build agents
+| CMake Build System
+| Pico SDK integration, firmware signing
+| Compile source code, embed version info, sign binaries
 
-| Firmware Signing
-| Hardware Security Module (HSM)
-| RSA-4096 or ECDSA P-384 keys
-| Redundant HSM for high availability
+| Developer Hardware
+| Individual RP2350 devices
+| Local development and unit testing
 
-| Artifact Storage
-| Secure binary repository
-| Versioned firmware storage with checksums
-| Geographical replication for reliability
+| QA Testbench
+| Single automated test fixture with RP2350
+| Hardware-in-the-loop validation of release candidates
 
-| Test Infrastructure
-| Hardware-in-Loop test systems
-| Physical RP2350 test devices
-| Automated test execution framework
-|===
+| Cloud OTA Server
+| HTTP-based firmware distribution
+| Serve approved firmware to field devices
 
-=== Production OTA Infrastructure
-
-[cols="30,35,35"]
-|===
-| Component | Technology & Configuration | Operational Characteristics
-
-| OTA Update Servers
-| Load-balanced HTTPS endpoints with TLS 1.3
-| 99.9% uptime, rate limiting, DDoS protection
-
-| Device Registry
-| Database tracking device states and versions
-| Real-time device status, update history
-
-| Update Orchestrator
-| Manages phased rollouts and canary deployments
-| Configurable rollout schedules, rollback triggers
-
-| Monitoring System
-| Collects device health and update metrics
-| Real-time alerting, update success analytics
+| Key Management
+| Secure cryptographic key storage
+| Firmware signing keys, device authentication
 |===
 
 === Security Architecture
@@ -330,257 +209,152 @@ note bottom of config : Stores active partition flag\nand rollback counters
 |===
 | Security Layer | Implementation
 
-| Firmware Integrity
-| Cryptographic signatures using RSA-4096 or ECDSA, verified in bootloader
+| Factory Key Embedding
+| Cryptographic keys installed during initial manufacturing flash
 
-| Transport Security
-| TLS 1.3 for all OTA communications, certificate pinning on devices
-
-| Device Authentication
-| Unique device certificates, mutual TLS authentication
-
-| Update Authorization
-| Signed update manifests, version rollback protection
+| Firmware Signing
+| All firmware builds cryptographically signed before distribution
 
 | Secure Boot
-| Verified boot chain from bootloader through application firmware
+| RP2350 ROM bootloader verifies firmware signatures before execution
+
+| OTA Authentication
+| Device authenticates with OTA server before firmware download
+
+| Partition Verification
+| Each partition validated before boot attempt
 |===
 
-=== Deployment Strategies
+== Deployment Strategies
 
-==== Update Deployment Patterns
+=== Firmware Update Process
 
 [cols="25,35,40"]
 |===
-| Pattern | Use Case | Implementation
+| Stage | Process | Validation & Control
 
-| Phased Rollout
-| Gradual deployment to minimize risk
-| Deploy to 1%, 10%, 50%, then 100% of fleet
+| Development Build
+| CMake compilation with embedded version tags
+| Local developer testing on real hardware
 
-| Canary Deployment
-| Test updates on subset before full deployment
-| Deploy to designated test devices first
+| QA Validation
+| Automated testbench execution
+| Hardware-in-the-loop testing, manual approval gate
 
-| Scheduled Updates
-| Coordinated updates during maintenance windows
-| Time-based deployment with customer preferences
+| Production Release
+| QA promotes approved firmware to OTA server
+| Single gatekeeper model, full traceability
 
-| Emergency Updates
-| Critical security patches requiring immediate deployment
-| Override normal rollout patterns for urgent fixes
+| Field Deployment
+| Device pulls firmware via HTTP when configured
+| Manual reboot required, automatic rollback protection
 |===
 
-=== A/B Update Process Flow
+=== A/B Partition Management
 
-[plantuml, ab-update-flow, svg]
+[plantuml, partition-management, svg]
 ----
 @startuml
 !theme plain
 skinparam backgroundColor transparent
 
-title A/B Firmware Update Process
+title OTA Update Process
 
-start
+participant "Field Device" as device
+participant "OTA Server" as ota
+participant "ROM Bootloader" as rom
+participant "Watchdog" as wd
 
-:Device checks for updates;
-:OTA server responds with new firmware;
+device -> ota: Check for updates (HTTP)
+ota -> device: New firmware available
+device -> ota: Download firmware to inactive partition
+device -> device: Verify firmware signature
+device -> device: Mark new partition as active
+device -> device: Manual reboot initiated
+rom -> rom: Boot from newly active partition
+rom -> wd: Start watchdog timer
+device -> wd: Disable watchdog (success)
+device -> device: Confirm partition as stable
 
-if (New firmware available?) then (yes)
-  :Download firmware to standby partition;
-  :Verify cryptographic signature;
-  
-  if (Signature valid?) then (yes)
-    :Set standby partition as active;
-    :Reboot to new firmware;
-    :Start watchdog timer;
-    :Run health checks;
-    
-    if (Health checks pass?) then (yes)
-      :Confirm update success;
-      :Report success to OTA server;
-      stop
-    else (no)
-      :Watchdog triggers rollback;
-      :Set previous partition as active;
-      :Reboot to previous firmware;
-      :Report rollback to OTA server;
-      stop
-    endif
-  else (no)
-    :Reject invalid firmware;
-    :Report verification failure;
-    stop
-  endif
-else (no)
-  :No update needed;
-  stop
-endif
+note right of device : If watchdog times out,\nROM automatically boots\nfrom backup partition
 
 @enduml
 ----
 
-=== Operational Procedures
+== Operational Procedures
 
-==== Update Monitoring and Observability
+=== Version Management and Auditability
 
-[cols="25,35,40"]
+[cols="30,35,35"]
 |===
-| Monitoring Type | Metrics & Tools | Alerting Strategy
+| Aspect | Implementation | Benefits
 
-| Update Success Rate
-| Deployment success/failure rates per firmware version
-| Alert if success rate drops below 95%
+| Version Identification
+| Git tags and commit checksums embedded in firmware
+| Precise traceability of deployed firmware versions
 
-| Device Health
-| Post-update device functionality and connectivity
-| Alert on increased failure rates or device offline status
+| Build Reproducibility
+| Deterministic build process with version tagging
+| Ability to rebuild exact firmware for debugging
 
-| Rollback Frequency
-| Automatic rollback events and root causes
-| Investigate if rollback rate exceeds 5%
+| Release Documentation
+| QA approval records linked to firmware versions
+| Clear audit trail for all production releases
 
-| Network Performance
-| OTA download speeds and connection success rates
-| Monitor for network issues affecting updates
+| Field Identification
+| Device reports firmware version via management interface
+| Support teams can identify deployed firmware versions
 |===
 
 === Rollback and Recovery Procedures
 
-[cols="30,35,35"]
+[cols="25,35,40"]
 |===
-| Recovery Scenario | Automatic Response | Manual Intervention
-
-| Firmware Corruption
-| Automatic rollback via watchdog timeout
-| Re-deploy known good firmware version
+| Scenario | Recovery Method | Implementation
 
 | Boot Failure
-| Bootloader falls back to previous partition
-| Investigate boot failure root cause
+| Automatic rollback via watchdog timeout
+| RP2350 ROM bootloader switches to backup partition
 
-| Network Connectivity Loss
-| Device continues with current firmware
-| Restore network connectivity, retry update
+| Corrupted Download
+| Signature verification failure
+| Device rejects invalid firmware, retains current version
 
-| Mass Deployment Failure
-| Halt deployment, investigate failures
-| Root cause analysis, fix and re-deploy
+| Network Issues
+| Download retry mechanism
+| Device continues with current firmware, retries later
+
+| Total Firmware Corruption
+| Device replacement
+| No field recovery possible when both partitions corrupted
 |===
 
-=== Infrastructure Disaster Recovery
+=== Monitoring and Maintenance
 
 [cols="30,70"]
 |===
-| Failure Scenario | Recovery Procedure
+| Monitoring Aspect | Implementation
 
-| OTA Server Failure
-| 1. Automatic failover to standby instances +
-2. DNS updates to redirect traffic +
-3. Recovery time objective: <15 minutes
+| Firmware Version Tracking
+| Git checksums embedded in firmware, reported via management UI
 
-| Firmware Repository Corruption
-| 1. Restore from daily backups +
-2. Verify firmware integrity with checksums +
-3. Recovery time objective: <60 minutes
+| Update Success Rate
+| Device reports successful updates to management interface
 
-| HSM Failure
-| 1. Switch to secondary HSM +
-2. Verify key availability +
-3. Recovery time objective: <30 minutes
+| Rollback Events
+| Watchdog rollback events logged in device memory
 
-| Database Failure
-| 1. Failover to read replica +
-2. Promote replica to primary +
-3. Recovery time objective: <10 minutes
-
-| Network Infrastructure Failure
-| 1. Route traffic through backup CDN +
-2. Activate backup data centers +
-3. Recovery time objective: <5 minutes
-
-| Certificate Authority Compromise
-| 1. Revoke compromised certificates +
-2. Issue new device certificates +
-3. Deploy emergency firmware with new CA
+| OTA Server Health
+| HTTP availability monitoring for firmware distribution
 |===
 
-=== Configuration Management
+== Configuration Management
 
-[cols="25,35,40"]
-|===
-| Configuration Type | Management Approach | Deployment Method
+=== OTA Server Configuration
 
-| Base Firmware
-| Version-controlled source code builds
-| Standard OTA update process
+The UART2ETH device supports flexible OTA server configuration:
 
-| Device-Specific Config
-| Template-based configuration generation
-| Configuration files via OTA or factory provisioning
-
-| Customer Customizations
-| Feature flags and configurable parameters
-| Runtime configuration updates via management API
-
-| Security Credentials
-| Secure provisioning during manufacturing
-| Certificate rotation via secure update channel
-|===
-
-=== Risk Mitigation
-
-==== Deployment Risk Assessment
-
-[cols="30,25,45"]
-|===
-| Risk Category | Probability/Impact | Mitigation Strategy
-
-| Failed Firmware Update
-| Medium/High
-| A/B partitioning with automatic rollback, extensive testing
-
-| Network Infrastructure Failure
-| Low/High
-| Redundant OTA servers, CDN distribution, offline operation capability
-
-| Cryptographic Key Compromise
-| Low/Critical
-| Hardware security modules, key rotation procedures, revocation lists
-
-| Mass Device Failure
-| Low/Critical
-| Phased rollouts, canary deployments, emergency rollback procedures
-|===
-
-=== Conclusion
-
-==== Deployment Architecture Summary
-
-The UART2ETH firmware deployment architecture provides a robust, secure, and reliable system for managing firmware updates across distributed device fleets. Key architectural decisions include:
-
-* **A/B partitioning** enables zero-downtime updates with automatic rollback capability
-* **Cryptographic verification** ensures firmware integrity and authenticity
-* **Phased deployment strategies** minimize risk through gradual rollout processes
-* **Comprehensive monitoring** provides visibility into update success and device health
-
-=== Implementation Priorities
-
-1. **Core A/B partition system** - Foundation for safe updates
-2. **Secure OTA infrastructure** - Scalable update delivery system  
-3. **Device management platform** - Fleet visibility and control
-4. **Monitoring and analytics** - Operational insight and alerting
-
-=== Success Metrics
-
-* **99.9% update success rate** across device fleet
-* **< 30 second rollback time** for failed updates
-* **< 5% automatic rollback rate** indicating stable firmware quality
-* **Zero security incidents** related to firmware integrity or delivery
-
-=== Dependencies and Assumptions
-
-* Reliable internet connectivity for OTA updates (with offline operation capability)
-* Hardware security module availability for firmware signing
-* Development team adherence to secure coding and testing practices
-* Customer acceptance of automated firmware update processes
+* **Default Server**: Company-hosted cloud OTA server for standard deployments
+* **Customer Servers**: Configurable OTA server URL via management interface
+* **HTTP Protocol**: Simple HTTP-based firmware downloads (no HTTPS requirement)
+* **Pull-based Updates**: Devices initiate update checks, no push capability
