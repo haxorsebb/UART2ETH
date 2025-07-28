@@ -2,99 +2,517 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 [[section-deployment-view]]
 
-
 == Deployment View
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Content
-The deployment view describes:
+=== System Context
 
- 1. technical infrastructure used to execute your system, with infrastructure elements like geographical locations, environments, computers, processors, channels and net topologies as well as other infrastructure elements and
+The UART2ETH system is an embedded firmware solution deployed on RP2350 microcontroller hardware. The deployment view focuses on the firmware development, testing, and deployment pipeline that enables secure over-the-air (OTA) updates to devices deployed in customer environments.
 
-2. mapping of (software) building blocks to that infrastructure elements.
+The deployment architecture supports our core business requirements:
 
-Often systems are executed in different environments, e.g. development environment, test environment, production environment. In such cases you should document all relevant environments.
+* **Secure OTA firmware updates**: Cryptographically signed firmware delivery
+* **A/B update strategy**: Dual-partition system enabling safe updates with automatic rollback
+* **Zero-downtime updates**: Seamless firmware transitions without service interruption
+* **Configuration management**: Support for device-specific and customer-specific firmware variants
 
-Especially document a deployment view if your software is executed as distributed system with more than one computer, processor, server or container or when you design and construct your own hardware processors and chips.
+=== Operational Requirements Summary
 
-From a software perspective it is sufficient to capture only those elements of an infrastructure that are needed to show a deployment of your building blocks. Hardware architects can go beyond that and describe an infrastructure to any level of detail they need to capture.
+[cols="25,25,50"]
+|===
+| Requirement Type | Target | Description
 
-.Motivation
-Software does not run without hardware.
-This underlying infrastructure can and will influence a system and/or some
-cross-cutting concepts. Therefore, there is a need to know the infrastructure.
+| Update Availability
+| 99.9% success rate
+| OTA updates must reliably reach and install on field devices
 
-.Form
+| Update Security
+| Cryptographic signing
+| All firmware updates must be cryptographically verified before installation
 
-Maybe a highest level deployment diagram is already contained in section 3.2. as
-technical context with your own infrastructure as ONE black box. In this section one can
-zoom into this black box using additional deployment diagrams:
+| Rollback Capability
+| < 30 seconds
+| Automatic rollback to previous firmware version on update failure
 
-* UML offers deployment diagrams to express that view. Use it, probably with nested diagrams,
-when your infrastructure is more complex.
-* When your (hardware) stakeholders prefer other kinds of diagrams rather than a deployment diagram, let them use any kind that is able to show nodes and channels of the infrastructure.
+| Update Delivery
+| < 10 minutes
+| Firmware updates should propagate to devices within 10 minutes of release
+|===
 
+== Firmware Deployment Pipeline
 
-.Further Information
+=== Pipeline Overview
 
-See https://docs.arc42.org/section-7/[Deployment View] in the arc42 documentation.
+[plantuml, firmware-deployment-pipeline, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
 
-****
-endif::arc42help[]
+title Firmware Deployment Pipeline
 
-=== Infrastructure Level 1
+package "Development Environment" {
+  [Developer Workstation] as dev
+  [Local Build Tools] as localtools
+  [Unit Tests] as unittest
+}
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Describe (usually in a combination of diagrams, tables, and text):
+package "CI/CD Infrastructure" {
+  [Git Repository] as git
+  [Build Server] as buildserver
+  [Automated Tests] as autotests
+  [Firmware Signing] as signing
+  [Artifact Storage] as artifacts
+}
 
-* distribution of a system to multiple locations, environments, computers, processors, .., as well as physical connections between them
-* important justifications or motivations for this deployment structure
-* quality and/or performance features of this infrastructure
-* mapping of software artifacts to elements of this infrastructure
+package "Testing Environments" {
+  [Hardware-in-Loop Testing] as hil
+  [Integration Test Lab] as testlab
+  [Beta Device Fleet] as beta
+}
 
-For multiple environments or alternative deployments please copy and adapt this section of arc42 for all relevant environments.
-****
-endif::arc42help[]
+package "Production Infrastructure" {
+  [OTA Update Server] as otaserver
+  [Device Management] as devicemgmt
+  [Monitoring & Analytics] as monitoring
+}
 
-_**<Overview Diagram>**_
+package "Field Deployment" {
+  [Production Device Fleet] as prodfleet
+  [Customer Networks] as customer
+}
 
-Motivation::
+dev --> git : "Code Commit"
+git --> buildserver : "Trigger Build"
+buildserver --> autotests : "Run Tests"
+autotests --> signing : "Sign Firmware"
+signing --> artifacts : "Store Signed Binary"
 
-_<explanation in text form>_
+artifacts --> hil : "Deploy to HIL"
+artifacts --> testlab : "Manual Testing"
+artifacts --> beta : "Beta Deployment"
 
-Quality and/or Performance Features::
+beta --> otaserver : "Promote to Production"
+otaserver --> devicemgmt : "Coordinate Updates"
+devicemgmt --> prodfleet : "OTA Updates"
+prodfleet --> customer : "Service Delivery"
 
-_<explanation in text form>_
+monitoring --> prodfleet : "Monitor Health"
+monitoring --> otaserver : "Update Analytics"
 
-Mapping of Building Blocks to Infrastructure::
-_<description of the mapping>_
+@enduml
+----
 
+=== Environment Specifications
 
-=== Infrastructure Level 2
+[cols="20,25,25,30"]
+|===
+| Environment | Purpose | Infrastructure | Security Level
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Here you can include the internal structure of (some) infrastructure elements from level 1.
+| Development
+| Feature development and unit testing
+| Developer workstations, local RP2350 hardware
+| Internal network, code review required
 
-Please copy the structure from level 1 for each selected element.
-****
-endif::arc42help[]
+| CI/CD
+| Automated build, test, and signing
+| Build servers, test automation, HSM for signing
+| Secured build environment, signed artifacts
 
-==== _<Infrastructure Element 1>_
+| Testing
+| Hardware validation and integration testing
+| Physical test lab, HIL test systems, beta devices
+| Controlled test network, pre-production firmware
 
-_<diagram + explanation>_
+| Production
+| Live firmware deployment to field devices
+| OTA infrastructure, device management platform
+| Internet-facing, TLS secured, authenticated updates
+|===
 
-==== _<Infrastructure Element 2>_
+== Production Deployment Architecture
 
-_<diagram + explanation>_
+=== Firmware Update Infrastructure
 
-...
+[plantuml, ota-infrastructure, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
 
-==== _<Infrastructure Element n>_
+title OTA Update Infrastructure
 
-_<diagram + explanation>_
+cloud "Internet" {
+  [Customer Networks] as customers
+}
+
+package "OTA Infrastructure" {
+  [Load Balancer] as lb
+  [OTA Update Servers] as ota
+  [Firmware Repository] as repo
+  [Device Registry] as registry
+  [Update Scheduler] as scheduler
+}
+
+package "Management Platform" {
+  [Device Management API] as mgmtapi
+  [Update Orchestrator] as orchestrator
+  [Health Monitor] as health
+  [Analytics Engine] as analytics
+}
+
+package "Security Services" {
+  [Certificate Authority] as ca
+  [Firmware Signing Service] as signing
+  [Device Authentication] as deviceauth
+}
+
+package "Field Devices" {
+  [UART2ETH Device A] as devicea
+  [UART2ETH Device B] as deviceb
+  [UART2ETH Device N] as devicen
+}
+
+customers --> lb : "HTTPS/TLS"
+lb --> ota : "Route Requests"
+ota --> repo : "Fetch Firmware"
+ota --> registry : "Validate Device"
+ota --> deviceauth : "Authenticate"
+
+orchestrator --> scheduler : "Plan Updates"
+scheduler --> ota : "Trigger Deployment"
+health --> analytics : "Collect Metrics"
+
+signing --> repo : "Signed Firmware"
+ca --> deviceauth : "Device Certificates"
+
+devicea --> lb : "Check for Updates"
+deviceb --> lb : "Download Firmware"
+devicen --> lb : "Report Status"
+
+@enduml
+----
+
+=== Device A/B Partition Architecture
+
+[plantuml, ab-partition-system, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+
+title A/B Partition System on RP2350 Device
+
+package "RP2350 Flash Memory Layout" {
+  rectangle "Bootloader\n(16KB)" as bootloader
+  rectangle "Partition A\n(Active)\n(512KB)" as partA
+  rectangle "Partition B\n(Standby)\n(512KB)" as partB
+  rectangle "Configuration\n(32KB)" as config
+  rectangle "User Data\n(Remaining)" as userdata
+}
+
+package "Update Process" {
+  [OTA Client] as otaclient
+  [Integrity Checker] as integrity
+  [Partition Manager] as partmgr
+}
+
+package "Rollback System" {
+  [Watchdog Timer] as watchdog
+  [Health Monitor] as devhealth
+  [Rollback Logic] as rollback
+}
+
+bootloader --> partA : "Boot Active"
+bootloader --> partB : "Boot Standby"
+
+otaclient --> partB : "Download to Standby"
+integrity --> partB : "Verify Signature"
+partmgr --> config : "Switch Active Flag"
+
+watchdog --> devhealth : "Monitor Health"
+devhealth --> rollback : "Trigger on Failure"
+rollback --> config : "Revert Active Flag"
+rollback --> bootloader : "Boot Previous"
+
+note right of partA : Contains currently running firmware
+note right of partB : Receives new firmware updates
+note bottom of config : Stores active partition flag\nand rollback counters
+
+@enduml
+----
+
+== Infrastructure Components
+
+=== Development and Build Infrastructure
+
+[cols="25,25,25,25"]
+|===
+| Component | Technology | Specifications | Scaling Strategy
+
+| Build Servers
+| CI/CD pipeline (GitHub Actions)
+| ARM cross-compilation toolchain
+| Horizontal scaling with build agents
+
+| Firmware Signing
+| Hardware Security Module (HSM)
+| RSA-4096 or ECDSA P-384 keys
+| Redundant HSM for high availability
+
+| Artifact Storage
+| Secure binary repository
+| Versioned firmware storage with checksums
+| Geographical replication for reliability
+
+| Test Infrastructure
+| Hardware-in-Loop test systems
+| Physical RP2350 test devices
+| Automated test execution framework
+|===
+
+=== Production OTA Infrastructure
+
+[cols="30,35,35"]
+|===
+| Component | Technology & Configuration | Operational Characteristics
+
+| OTA Update Servers
+| Load-balanced HTTPS endpoints with TLS 1.3
+| 99.9% uptime, rate limiting, DDoS protection
+
+| Device Registry
+| Database tracking device states and versions
+| Real-time device status, update history
+
+| Update Orchestrator
+| Manages phased rollouts and canary deployments
+| Configurable rollout schedules, rollback triggers
+
+| Monitoring System
+| Collects device health and update metrics
+| Real-time alerting, update success analytics
+|===
+
+=== Security Architecture
+
+[cols="30,70"]
+|===
+| Security Layer | Implementation
+
+| Firmware Integrity
+| Cryptographic signatures using RSA-4096 or ECDSA, verified in bootloader
+
+| Transport Security
+| TLS 1.3 for all OTA communications, certificate pinning on devices
+
+| Device Authentication
+| Unique device certificates, mutual TLS authentication
+
+| Update Authorization
+| Signed update manifests, version rollback protection
+
+| Secure Boot
+| Verified boot chain from bootloader through application firmware
+|===
+
+== Deployment Strategies
+
+=== Update Deployment Patterns
+
+[cols="25,35,40"]
+|===
+| Pattern | Use Case | Implementation
+
+| Phased Rollout
+| Gradual deployment to minimize risk
+| Deploy to 1%, 10%, 50%, then 100% of fleet
+
+| Canary Deployment
+| Test updates on subset before full deployment
+| Deploy to designated test devices first
+
+| Scheduled Updates
+| Coordinated updates during maintenance windows
+| Time-based deployment with customer preferences
+
+| Emergency Updates
+| Critical security patches requiring immediate deployment
+| Override normal rollout patterns for urgent fixes
+|===
+
+=== A/B Update Process Flow
+
+[plantuml, ab-update-flow, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+
+title A/B Firmware Update Process
+
+start
+
+:Device checks for updates;
+:OTA server responds with new firmware;
+
+if (New firmware available?) then (yes)
+  :Download firmware to standby partition;
+  :Verify cryptographic signature;
+  
+  if (Signature valid?) then (yes)
+    :Set standby partition as active;
+    :Reboot to new firmware;
+    :Start watchdog timer;
+    :Run health checks;
+    
+    if (Health checks pass?) then (yes)
+      :Confirm update success;
+      :Report success to OTA server;
+      stop
+    else (no)
+      :Watchdog triggers rollback;
+      :Set previous partition as active;
+      :Reboot to previous firmware;
+      :Report rollback to OTA server;
+      stop
+    endif
+  else (no)
+    :Reject invalid firmware;
+    :Report verification failure;
+    stop
+  endif
+else (no)
+  :No update needed;
+  stop
+endif
+
+@enduml
+----
+
+== Operational Procedures
+
+=== Update Monitoring and Observability
+
+[cols="25,35,40"]
+|===
+| Monitoring Type | Metrics & Tools | Alerting Strategy
+
+| Update Success Rate
+| Deployment success/failure rates per firmware version
+| Alert if success rate drops below 95%
+
+| Device Health
+| Post-update device functionality and connectivity
+| Alert on increased failure rates or device offline status
+
+| Rollback Frequency
+| Automatic rollback events and root causes
+| Investigate if rollback rate exceeds 5%
+
+| Network Performance
+| OTA download speeds and connection success rates
+| Monitor for network issues affecting updates
+|===
+
+=== Rollback and Recovery Procedures
+
+[cols="30,35,35"]
+|===
+| Recovery Scenario | Automatic Response | Manual Intervention
+
+| Firmware Corruption
+| Automatic rollback via watchdog timeout
+| Re-deploy known good firmware version
+
+| Boot Failure
+| Bootloader falls back to previous partition
+| Investigate boot failure root cause
+
+| Network Connectivity Loss
+| Device continues with current firmware
+| Restore network connectivity, retry update
+
+| Mass Deployment Failure
+| Halt deployment, investigate failures
+| Root cause analysis, fix and re-deploy
+|===
+
+=== Configuration Management
+
+[cols="25,35,40"]
+|===
+| Configuration Type | Management Approach | Deployment Method
+
+| Base Firmware
+| Version-controlled source code builds
+| Standard OTA update process
+
+| Device-Specific Config
+| Template-based configuration generation
+| Configuration files via OTA or factory provisioning
+
+| Customer Customizations
+| Feature flags and configurable parameters
+| Runtime configuration updates via management API
+
+| Security Credentials
+| Secure provisioning during manufacturing
+| Certificate rotation via secure update channel
+|===
+
+== Risk Mitigation
+
+=== Deployment Risk Assessment
+
+[cols="30,25,45"]
+|===
+| Risk Category | Probability/Impact | Mitigation Strategy
+
+| Failed Firmware Update
+| Medium/High
+| A/B partitioning with automatic rollback, extensive testing
+
+| Network Infrastructure Failure
+| Low/High
+| Redundant OTA servers, CDN distribution, offline operation capability
+
+| Cryptographic Key Compromise
+| Low/Critical
+| Hardware security modules, key rotation procedures, revocation lists
+
+| Mass Device Failure
+| Low/Critical
+| Phased rollouts, canary deployments, emergency rollback procedures
+|===
+
+== Conclusion
+
+=== Deployment Architecture Summary
+
+The UART2ETH firmware deployment architecture provides a robust, secure, and reliable system for managing firmware updates across distributed device fleets. Key architectural decisions include:
+
+* **A/B partitioning** enables zero-downtime updates with automatic rollback capability
+* **Cryptographic verification** ensures firmware integrity and authenticity
+* **Phased deployment strategies** minimize risk through gradual rollout processes
+* **Comprehensive monitoring** provides visibility into update success and device health
+
+=== Implementation Priorities
+
+1. **Core A/B partition system** - Foundation for safe updates
+2. **Secure OTA infrastructure** - Scalable update delivery system  
+3. **Device management platform** - Fleet visibility and control
+4. **Monitoring and analytics** - Operational insight and alerting
+
+=== Success Metrics
+
+* **99.9% update success rate** across device fleet
+* **< 30 second rollback time** for failed updates
+* **< 5% automatic rollback rate** indicating stable firmware quality
+* **Zero security incidents** related to firmware integrity or delivery
+
+=== Dependencies and Assumptions
+
+* Reliable internet connectivity for OTA updates (with offline operation capability)
+* Hardware security module availability for firmware signing
+* Development team adherence to secure coding and testing practices
+* Customer acceptance of automated firmware update processes
