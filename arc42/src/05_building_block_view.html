@@ -395,110 +395,765 @@
 <div class="sect2">
 <h3 id="_whitebox_overall_system">Whitebox Overall System</h3>
 <div class="paragraph">
-<p><em><strong>&lt;Overview Diagram&gt;</strong></em></p>
+<p>The UART2ETH system follows a dual-core separation strategy that provides fault isolation while achieving hardware-driven performance. The system is decomposed into five major building blocks that each handle distinct responsibilities in the UART-to-TCP bridge functionality.</p>
 </div>
-<div class="dlist">
-<dl>
-<dt class="hdlist1">Motivation</dt>
-<dd>
-<p><em>&lt;text explanation&gt;</em></p>
-</dd>
-<dt class="hdlist1">Contained Building Blocks</dt>
-<dd>
-<p><em>&lt;Description of contained building block (black boxes)&gt;</em></p>
-</dd>
-<dt class="hdlist1">Important Interfaces</dt>
-<dd>
-<p><em>&lt;Description of important interfaces&gt;</em></p>
-</dd>
-</dl>
-</div>
-<div class="sect3">
-<h4 id="_name_black_box_1">&lt;Name black box 1&gt;</h4>
-<div class="paragraph">
-<p><em>&lt;Purpose/Responsibility&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;Interface(s)&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;(Optional) Quality/Performance Characteristics&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;(Optional) Directory/File Location&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;(Optional) Fulfilled Requirements&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;(optional) Open Issues/Problems/Risks&gt;</em></p>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level1-building-blocks-simple.svg" alt="level1 building blocks simple" width="917" height="709">
 </div>
 </div>
 <div class="sect3">
-<h4 id="_name_black_box_2">&lt;Name black box 2&gt;</h4>
+<h4 id="_motivation">Motivation</h4>
 <div class="paragraph">
-<p><em>&lt;black box template&gt;</em></p>
+<p>The dual-core separation strategy from our solution approach drives this decomposition to achieve:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Fault isolation</strong>: Each core has distinct responsibilities to prevent cascading failures</p>
+</li>
+<li>
+<p><strong>Performance optimization</strong>: Hardware-driven I/O with software control for real-time requirements</p>
+</li>
+<li>
+<p><strong>Industrial reliability</strong>: Predictable behavior through static allocation and deterministic interfaces</p>
+</li>
+<li>
+<p><strong>Bidirectional communication</strong>: Both UART and TCP interfaces require full-duplex operation</p>
+</li>
+</ul>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_name_black_box_n">&lt;Name black box n&gt;</h4>
-<div class="paragraph">
-<p><em>&lt;black box template&gt;</em></p>
-</div>
+<h4 id="_contained_building_blocks">Contained Building Blocks</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core 0 UART Subsystem</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages all 4 UART interfaces with interrupt/DMA handling. Performs bidirectional stream-to-packet conversion for communication with the ring buffer system.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core 1 Network Subsystem</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implements TCP/IP stack and Ethernet controller interface with interrupt/DMA handling. Copies packets from and to the network stack and manages TCP socket connections.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Communication</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides bidirectional inter-core data transfer using a shared memory pool with cache-aligned, mutex-protected buffers. Handles dynamic burst allocation by being channel and driection agnostic.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Management Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Offers web-based configuration, monitoring, and administration through HTTP server with authentication, statistics collection, and configuration UIs.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>OTA Update System</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages secure firmware updates with A/B partition management, signature validation, and automatic rollback capabilities.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="sect3">
-<h4 id="_name_interface_1">&lt;Name interface 1&gt;</h4>
-<div class="paragraph">
-<p>&#8230;&#8203;</p>
+<h4 id="_important_interfaces">Important Interfaces</h4>
+<div class="sect4">
+<h5 id="_ring_buffer_interface">Ring Buffer Interface</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Shared Pool Design</strong>: Single buffer pool serves both directions dynamically</p>
+</li>
+<li>
+<p><strong>Core 0</strong>: Producer (UART RX) + Consumer (UART TX) using shared pool</p>
+</li>
+<li>
+<p><strong>Core 1</strong>: Producer (TCP RX) + Consumer (TCP TX) using shared pool</p>
+</li>
+<li>
+<p><strong>Entry Format</strong>: Fixed 1088-byte entries (64-byte header + 1024-byte payload)</p>
+</li>
+<li>
+<p><strong>Synchronization</strong>: Mutex-protected operations for shared pool access</p>
+</li>
+<li>
+<p><strong>Overflow Policy</strong>: Drop-oldest across entire pool (direction-agnostic)</p>
+</li>
+</ul>
 </div>
 </div>
-<div class="sect3">
-<h4 id="_name_interface_m">&lt;Name interface m&gt;</h4>
-
+<div class="sect4">
+<h5 id="_network_interface">Network Interface</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>External</strong>: 10BASE-T Ethernet, RJ45 connector (ENC28J60 limitation)</p>
+</li>
+<li>
+<p><strong>Internal</strong>: SPI to ENC28J60 controller, software TCP/IP stack (lwIP)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_uart_interface">UART Interface</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Hardware</strong>: 4 independent UART channels with configurable parameters</p>
+</li>
+<li>
+<p><strong>Protocols</strong>: UART/RS232/RS422 support with 300-500kBaud range</p>
+</li>
+<li>
+<p><strong>Configuration</strong>: Per-channel baud rate, data bits, stop bits, parity settings</p>
+</li>
+</ul>
+</div>
+</div>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_level_2">Level 2</h3>
 <div class="sect3">
-<h4 id="_white_box_building_block_1">White Box <em>&lt;building block 1&gt;</em></h4>
+<h4 id="_whitebox_core_0_uart_subsystem">Whitebox Core 0 UART Subsystem</h4>
 <div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
+<p>The Core 0 UART Subsystem specializes in handling all UART communication with dedicated hardware management, interrupt processing, and bidirectional data conversion between stream and packet formats.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level2-core0-uart-simple.svg" alt="level2 core0 uart simple" width="1509" height="681">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_2">Motivation</h5>
+<div class="paragraph">
+<p>Core 0 specialization enables real-time UART processing without interference from network operations. The bidirectional packet conversion allows seamless translation between continuous UART streams and discrete network packets.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_2">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Hardware Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Direct control of 4 UART channels with configurable parameters (baud rate, data bits, parity). Manages hardware registers and status monitoring.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Interrupt Handler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Processes time-critical UART events (RX data available, TX buffer empty) with minimal latency for real-time performance.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>DMA Controller</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optimizes bulk data transfers in both directions to reduce CPU load and improve throughput for high-baud applications.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Assembler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Converts incoming UART streams into fixed-size packets for ring buffer storage. Handles framing and timestamp metadata.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Disassembler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Extracts UART data from ring buffer packets and converts back to continuous streams for transmission.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides producer operations (UART RX data) and consumer operations (UART TX data) with proper synchronization.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_white_box_building_block_2">White Box <em>&lt;building block 2&gt;</em></h4>
+<h4 id="_whitebox_core_1_network_subsystem">Whitebox Core 1 Network Subsystem</h4>
 <div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
+<p>The Core 1 Network Subsystem manages all network communication including TCP/IP protocol processing, Ethernet controller interface, and bidirectional packet routing between ring buffer and network clients.</p>
 </div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level2-core1-network-simple.svg" alt="level2 core1 network simple" width="1517" height="1280">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_3">Motivation</h5>
 <div class="paragraph">
-<p>&#8230;&#8203;</p>
+<p>Core 1 specialization allows network processing to operate independently from time-critical UART operations. The modular design enables efficient TCP/IP processing while maintaining clear separation between hardware drivers and application logic.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_3">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>lwIP TCP/IP Stack</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Complete software-based TCP/IP implementation providing standard network protocols and socket interfaces.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>ENC28J60 Driver</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low-level SPI driver for the 10BASE-T Ethernet controller, handling frame transmission and reception.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Socket Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages TCP socket connections with one dedicated socket per UART channel. Handles connection lifecycle and error recovery.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Router</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maps UART channel numbers to TCP port numbers and routes data bidirectionally between network and ring buffer interfaces.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Assembler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Converts incoming TCP data streams into ring buffer packets for transmission to Core 0.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Disassembler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Extracts data from ring buffer packets and formats for TCP transmission to network clients.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides producer operations (TCP RX data) and consumer operations (TCP TX data) with shared pool access.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_white_box_building_block_m">White Box <em>&lt;building block m&gt;</em></h4>
+<h4 id="_whitebox_ring_buffer_communication_system">Whitebox Ring Buffer Communication System</h4>
 <div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
+<p>The Ring Buffer Communication System provides the critical inter-core communication mechanism using a shared memory pool that dynamically handles bursts from either direction while maintaining deterministic behavior.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level2-ring-buffer-simple.svg" alt="level2 ring buffer simple" width="741" height="1004">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_4">Motivation</h5>
+<div class="paragraph">
+<p>The shared buffer pool design provides elegant burst handling by allowing dynamic allocation to whichever direction needs capacity. This approach is more efficient than fixed per-direction pools and gracefully handles real-world traffic patterns.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_4">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Shared Buffer Pool</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Single memory pool that dynamically serves both UART→TCP and TCP→UART directions with fixed-size entries.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Mutex Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides thread-safe access to the shared pool using FreeRTOS mutexes and semaphores for inter-core synchronization.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles allocation and deallocation of fixed-size buffer entries with cache-aligned addressing for optimal performance.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Overflow Handler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implements drop-oldest policy when buffer reaches capacity, ensuring deterministic behavior under overload conditions.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Statistics Collector</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Tracks buffer utilization, message counts, throughput metrics, and error conditions for monitoring and diagnostics.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_whitebox_management_interface">Whitebox Management Interface</h4>
+<div class="paragraph">
+<p>The Management Interface provides comprehensive web-based administration through modular components handling authentication, configuration, and monitoring functions.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level2-management-simple.svg" alt="level2 management simple" width="1451" height="840">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_5">Motivation</h5>
+<div class="paragraph">
+<p>The modular management interface design separates concerns between web serving, authentication, data collection, and configuration UIs. This enables independent development and testing of each component while providing a comprehensive administration solution.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_5">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HTTP Web Server</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Processes HTTP/1.1 requests, serves static content (HTML/CSS/JS), provides REST API endpoints, and manages user sessions.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Authentication System</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles user login validation, JWT session token management, role-based access control, and security header implementation.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Statistical Data Module</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Collects real-time metrics from system components, maintains historical data, tracks performance counters, and monitors system health.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Configuration UI</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides web interface for configuring UART channel settings, hardware control options, protocol filters, and parameter validation.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>TCP/IP Configuration UI</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Offers web interface for network settings, TCP port mapping, connection limits, and security configurations.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_level_3">Level 3</h3>
 <div class="sect3">
-<h4 id="_white_box_building_block_x_1">White Box &lt;_building block x.1_&gt;</h4>
+<h4 id="_whitebox_core_0_uart_handler_subsystem">Whitebox Core 0 UART Handler Subsystem</h4>
 <div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
+<p>The Core 0 UART Subsystem specializes in handling all UART communication with dedicated hardware management, interrupt processing, and bidirectional data conversion between stream and packet formats.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level3-core0-uart-internal.svg" alt="level3 core0 uart internal" width="938" height="1564">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_6">Motivation</h5>
+<div class="paragraph">
+<p>UART processing utilizing UART specific ISR and DMA transfers for maximum troughput.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_6">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Hardware Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Direct control of 4 UART channels with configurable parameters (baud rate, data bits, parity). Manages hardware registers and status monitoring.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Interrupt Handler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Processes time-critical UART events (RX data available, TX buffer empty) with minimal latency for real-time performance.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>DMA Controller</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Controls bulk data transfers in both directions</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>DMA Channel</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optimizes bulk data transfers in both directions to reduce CPU load and improve throughput for high-baud applications.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Assembler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Converts incoming UART streams into fixed-size packets for ring buffer storage. Handles framing and timestamp metadata.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Disassembler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Extracts UART data from ring buffer packets and converts back to continuous streams for transmission.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides producer operations (UART RX data) and consumer operations (UART TX data) with proper synchronization.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_white_box_building_block_x_2">White Box &lt;_building block x.2_&gt;</h4>
+<h4 id="_whitebox_ring_buffer_system_internal_structure">Whitebox Ring Buffer System Internal Structure</h4>
 <div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
+<p>The Ring Buffer System provides the foundational inter-core communication with detailed memory management, helper functions, and synchronization primitives.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level3-ring-buffer-internals-simple.svg" alt="level3 ring buffer internals simple" width="964" height="951">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_purpose">Purpose</h5>
+<div class="paragraph">
+<p>Provides efficient, thread-safe, bidirectional communication between cores with deterministic behavior and comprehensive monitoring capabilities.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_internal_structure">Internal Structure</h5>
+<div class="sect5">
+<h6 id="_memory_layout_manager">Memory Layout Manager</h6>
+<div class="paragraph">
+<p>Manages the physical organization of the ring buffer in memory with cache-aligned addressing and efficient index calculations.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Ring Buffer Array</strong>: Contiguous memory block with cache-aligned entries</p>
+</li>
+<li>
+<p><strong>Index Management</strong>: Head/tail pointers with wrap-around logic</p>
+</li>
+<li>
+<p><strong>Memory Addressing</strong>: Base address + (index × entry_size) calculations</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_buffer_management_functions">Buffer Management Functions</h6>
+<div class="paragraph">
+<p>Core API providing the helper functions for ring buffer operations and monitoring.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Core buffer operations
+ring_entry_t* find_next_free_block(void);
+ring_entry_t* find_next_ready_block(uint8_t uart_channel, uint8_t direction);
+bool is_buffer_full(void);
+bool is_buffer_empty(void);
+
+// Statistics and monitoring
+uint32_t get_cached_message_count(void);
+uint32_t get_cached_message_count_by_channel(uint8_t uart_channel);
+uint32_t get_cached_message_count_by_direction(uint8_t direction);
+uint32_t get_free_block_count(void);
+uint32_t get_overflow_count(void);          // Dropped messages
+uint32_t get_total_throughput_bytes(void);
+
+// Advanced operations
+ring_entry_t* peek_next_block(uint8_t uart_channel, uint8_t direction);
+void mark_block_ready(ring_entry_t* entry);
+void mark_block_consumed(ring_entry_t* entry);
+void reset_buffer_statistics(void);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_memory_layout_structure">Memory Layout Structure</h6>
+<div class="paragraph">
+<p>Complete ring buffer system data structure with metadata, statistics, and synchronization primitives.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    // Ring buffer metadata (cache-aligned)
+    volatile uint32_t head_index;      // Producer index
+    volatile uint32_t tail_index;      // Consumer index
+    volatile uint32_t entry_count;     // Current entries
+    uint32_t max_entries;              // Buffer capacity
+
+    // Statistics (cache-aligned)
+    uint32_t total_produced;
+    uint32_t total_consumed;
+    uint32_t overflow_count;
+    uint32_t underflow_count;
+
+    // Synchronization
+    mutex_t buffer_mutex;
+    semaphore_t free_space_sem;
+    semaphore_t data_ready_sem;
+
+    // Entry array (cache-aligned)
+    ring_entry_t entries[];
+} ring_buffer_system_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_data_entry_format">Data Entry Format</h6>
+<div class="paragraph">
+<p>Individual ring buffer entry structure used for both communication directions.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    // Management Data (16 bytes)
+    uint8_t  uart_channel;     // 0-3
+    uint8_t  direction;        // RX_UART_TO_TCP / RX_TCP_TO_UART
+    uint8_t  status;           // FILLING/DRAINING/FULL/EMPTY
+    uint8_t  payload_length;   // Actual data length
+    uint32_t timestamp;        // Fill timestamp
+    uint32_t sequence_id;      // For ordering/debugging
+    uint32_t next_in_use;      // Packets in use (within ring buffer) are a single linked list
+    uint32_t reserved;         // Future use/alignment
+
+    // Payload Data (1024 bytes max)
+    uint8_t  payload[1024];    // Fixed max size for worst case
+} ring_entry_t;</code></pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_white_box_building_block_y_1">White Box &lt;_building block y.1_&gt;</h4>
+<h4 id="_whitebox_uart_hardware_manager_internal_structure">Whitebox UART Hardware Manager Internal Structure</h4>
 <div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
+<p>The UART Hardware Manager provides unified control over all 4 UART channels with individual controllers, parameter management, and comprehensive status monitoring.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level3-uart-hardware-simple.svg" alt="level3 uart hardware simple" width="3921" height="581">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_purpose_2">Purpose</h5>
+<div class="paragraph">
+<p>Provides unified interface to all 4 UART channels with configurable parameters, comprehensive status monitoring, and efficient interrupt handling.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_internal_structure_2">Internal Structure</h5>
+<div class="sect5">
+<h6 id="_uart_configuration_interface">UART Configuration Interface</h6>
+<div class="paragraph">
+<p>Complete configuration structure for UART channel parameters.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    uint32_t baud_rate;        // 300-500000 bps
+    uint8_t  data_bits;        // 5-8 bits
+    uint8_t  stop_bits;        // 1-2 bits
+    uint8_t  parity;           // NONE/ODD/EVEN
+    bool     flow_control;     // Hardware flow control
+    bool     rs485_mode;       // RS485 half-duplex mode
+} uart_config_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_uart_operations_api">UART Operations API</h6>
+<div class="paragraph">
+<p>Core function interface for UART channel operations.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Channel operations
+int uart_channel_configure(uint8_t channel, uart_config_t* config);
+int uart_channel_read(uint8_t channel, uint8_t* buffer, size_t length);
+int uart_channel_write(uint8_t channel, const uint8_t* data, size_t length);
+bool uart_channel_is_ready(uint8_t channel);
+uint32_t uart_channel_get_status(uint8_t channel);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_status_monitoring_structure">Status Monitoring Structure</h6>
+<div class="paragraph">
+<p>Comprehensive status tracking for each UART channel.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    bool carrier_detect;
+    bool clear_to_send;
+    bool data_set_ready;
+    uint32_t rx_errors;
+    uint32_t tx_errors;
+    uint32_t frames_received;
+    uint32_t frames_transmitted;
+} uart_channel_status_t;</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_whitebox_management_interface_internal_structure">Whitebox Management Interface Internal Structure</h4>
+<div class="paragraph">
+<p>The Management Interface provides comprehensive web-based administration through specialized components for HTTP serving, authentication, statistics, and configuration management.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level3-management-internals-simple.svg" alt="level3 management internals simple" width="1752" height="959">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_purpose_3">Purpose</h5>
+<div class="paragraph">
+<p>Provides comprehensive web-based configuration, monitoring, and administration interface with modular components for different management aspects.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_internal_structure_3">Internal Structure</h5>
+<div class="sect5">
+<h6 id="_http_web_server_components">HTTP Web Server Components</h6>
+<div class="paragraph">
+<p><strong>Request Handler</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    uint16_t port;                     // Default: 80
+    uint32_t max_connections;          // Concurrent sessions
+    char document_root[256];           // Static content path
+} webserver_config_t;
+
+int webserver_start(webserver_config_t* config);
+int webserver_register_endpoint(const char* path, http_handler_t handler);
+int webserver_send_response(int client_fd, http_response_t* response);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_authentication_system_components">Authentication System Components</h6>
+<div class="paragraph">
+<p><strong>User Management</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
+    AUTH_ROLE_ADMIN,       // Full configuration access
+    AUTH_ROLE_OPERATOR,    // Monitor + basic config
+    AUTH_ROLE_READONLY     // Monitor only
+} auth_role_t;
+
+typedef struct {
+    char username[32];
+    char password_hash[64];    // SHA-256 hash
+    auth_role_t role;
+    bool enabled;
+} user_account_t;
+
+bool authenticate_user(const char* username, const char* password);
+const char* create_session_token(const char* username);
+bool validate_session_token(const char* token);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_statistical_data_components">Statistical Data Components</h6>
+<div class="paragraph">
+<p><strong>System Statistics Structure</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    // Per-channel statistics
+    struct {
+        uint64_t bytes_transmitted;
+        uint64_t bytes_received;
+        uint32_t messages_transmitted;
+        uint32_t messages_received;
+        uint32_t error_count;
+        uint32_t overflow_count;
+        float average_latency_ms;
+        uint32_t current_baud_rate;
+    } uart_stats[4];
+
+    // Network statistics
+    uint64_t tcp_bytes_sent;
+    uint64_t tcp_bytes_received;
+    uint32_t tcp_connections_active;
+    uint32_t tcp_connections_total;
+
+    // System statistics
+    uint32_t uptime_seconds;
+    uint32_t cpu_usage_percent;
+    uint32_t memory_used_bytes;
+    uint32_t ring_buffer_utilization_percent;
+} system_statistics_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_configuration_interface_components">Configuration Interface Components</h6>
+<div class="paragraph">
+<p><strong>UART Configuration Structure</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    bool enabled;
+    uart_config_t config;              // From UART Hardware Manager
+    char description[64];              // User-friendly name
+    bool protocol_filter_enabled;
+    char protocol_filter_type[32];     // "SharkNet", "custom", etc.
+} uart_channel_settings_t;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Network Configuration Structure</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    // Network configuration
+    bool use_dhcp;
+    char ip_address[16];               // "192.168.1.100"
+    char subnet_mask[16];              // "255.255.255.0"
+    char gateway[16];                  // "192.168.1.1"
+    char dns_primary[16];
+    char dns_secondary[16];
+
+    // Port mapping
+    struct {
+        uint16_t tcp_port;             // 4001-4004 default
+        bool enabled;
+        uint32_t connection_timeout_ms;
+        char allowed_clients[256];     // IP ranges: "192.168.1.0/24"
+    } port_config[4];
+
+    // Security
+    bool enable_firewall;
+    char hostname[64];
+    uint16_t management_port;          // Web UI port (default 80)
+} network_config_t;</code></pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 </div>
