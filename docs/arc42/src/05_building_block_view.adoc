@@ -1,8 +1,6 @@
 ifndef::imagesdir[:imagesdir: ../images]
 
 [[section-building-block-view]]
-
-
 == Building Block View
 
 ifdef::arc42help[]
@@ -34,7 +32,6 @@ Thus it contains the white box description of selected building blocks of level 
 
 *Level 3* zooms into selected building blocks of level 2, and so on.
 
-
 .Further Information
 
 See https://docs.arc42.org/section-5/[Building Block View] in the arc42 documentation.
@@ -44,182 +41,1052 @@ endif::arc42help[]
 
 === Whitebox Overall System
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Here you describe the decomposition of the overall system using the following white box template. It contains
+The UART2ETH system follows a dual-core separation strategy that provides fault isolation while achieving hardware-driven performance. The system is decomposed into five major building blocks that each handle distinct responsibilities in the UART-to-TCP bridge functionality.
 
- * an overview diagram
- * a motivation for the decomposition
- * black box descriptions of the contained building blocks. For these we offer you alternatives:
+[plantuml, level1-building-blocks-simple, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+skinparam defaultFontName "Arial"
 
-   ** use _one_ table for a short and pragmatic overview of all contained building blocks and their interfaces
-   ** use a list of black box descriptions of the building blocks according to the black box template (see below).
-   Depending on your choice of tool this list could be sub-chapters (in text files), sub-pages (in a Wiki) or nested elements (in a modeling tool).
+title Level 1 - UART2ETH Building Block View
+
+actor "Field Technician" as FT
+cloud "UART Devices\n(PLCs, Sensors)" as UD
+cloud "TCP Clients\n(SCADA, HMI)" as TC
+cloud "Network Infrastructure" as NI
+cloud "Firmware Server" as FS
+
+package "UART2ETH Device" {
+    component "Core 0 UART Subsystem\nRP2350 Core 0\n4 UART interfaces\nStream ↔ Packet conversion" as C0 #lightgreen
+    
+    component "Ring Buffer Communication\nShared Memory Pool\nCache-aligned buffers\nBidirectional flow" as RB #lightyellow
+    
+    component "Core 1 Network Subsystem\nRP2350 Core 1\nTCP/IP + ENC28J60\nPacket ↔ Network conversion" as C1 #lightblue
+    
+    component "Management Interface\nHTTP Web Server\nConfig + Monitoring\nAuthentication" as MI #lightcyan
+    
+    component "OTA Update System\nSecure Updates\nA/B Partitions\nRollback capability" as OTA #lightpink
+}
 
 
- * (optional:) important interfaces, that are not explained in the black box templates of a building block, but are very important for understanding the white box.
-Since there are so many ways to specify interfaces why do not provide a specific template for them.
- In the worst case you have to specify and describe syntax, semantics, protocols, error handling,
- restrictions, versions, qualities, necessary compatibilities and many things more.
-In the best case you will get away with examples or simple signatures.
+' Internal connections
+C0 <--> RB : Produces/Consumes\nShared Memory
+C1 <--> RB : Consumes/Produces\nShared Memory
+MI --> C0 : UART Config
+MI --> C1 : Network Config
+MI --> RB : Statistics Query
+OTA --> C1 : Update Triggers
 
-****
-endif::arc42help[]
+' External connections
+UD --> C0 : Serial Data\nUART/RS232/RS422
+C1 --> NI : Ethernet Frames\n10BASE-T
+TC --> NI : TCP Connections
+FT --> MI : Configuration\nHTTP/Web UI
+FS --> OTA : Firmware Updates\nHTTPS
 
-_**<Overview Diagram>**_
+@enduml
+----
 
-Motivation::
+==== Motivation
 
-_<text explanation>_
+The dual-core separation strategy from our solution approach drives this decomposition to achieve:
 
+* **Fault isolation**: Each core has distinct responsibilities to prevent cascading failures
+* **Performance optimization**: Hardware-driven I/O with software control for real-time requirements
+* **Industrial reliability**: Predictable behavior through static allocation and deterministic interfaces
+* **Bidirectional communication**: Both UART and TCP interfaces require full-duplex operation
 
-Contained Building Blocks::
-_<Description of contained building block (black boxes)>_
+==== Contained Building Blocks
 
-Important Interfaces::
-_<Description of important interfaces>_
-
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Insert your explanations of black boxes from level 1:
-
-If you use tabular form you will only describe your black boxes with name and
-responsibility according to the following schema:
-
-[cols="1,2" options="header"]
+[options="header",cols="1,3"]
 |===
-| **Name** | **Responsibility**
-| _<black box 1>_ | _<Text>_
-| _<black box 2>_ | _<Text>_
+|Name|Responsibility
+
+|*Core 0 UART Subsystem*
+|Manages all 4 UART interfaces with interrupt/DMA handling. Performs bidirectional stream-to-packet conversion for communication with the ring buffer system.
+
+|*Core 1 Network Subsystem*  
+|Implements TCP/IP stack and Ethernet controller interface with interrupt/DMA handling. Copies packets from and to the network stack and manages TCP socket connections.
+
+|*Ring Buffer Communication*
+|Provides bidirectional inter-core data transfer using a shared memory pool with cache-aligned, mutex-protected buffers. Handles dynamic burst allocation by being channel and driection agnostic.
+
+|*Management Interface*
+|Offers web-based configuration, monitoring, and administration through HTTP server with authentication, statistics collection, and configuration UIs.
+
+|*OTA Update System*
+|Manages secure firmware updates with A/B partition management, signature validation, and automatic rollback capabilities.
 |===
 
+==== Important Interfaces
 
+===== Ring Buffer Interface
+* **Shared Pool Design**: Single buffer pool serves both directions dynamically
+* **Core 0**: Producer (UART RX) + Consumer (UART TX) using shared pool
+* **Core 1**: Producer (TCP RX) + Consumer (TCP TX) using shared pool
+* **Entry Format**: Fixed 1088-byte entries (64-byte header + 1024-byte payload)
+* **Synchronization**: Mutex-protected operations for shared pool access
+* **Overflow Policy**: Drop-oldest across entire pool (direction-agnostic)
 
-If you use a list of black box descriptions then you fill in a separate black box template for every important building block .
-Its headline is the name of the black box.
-****
-endif::arc42help[]
+===== Network Interface
+* **External**: 10BASE-T Ethernet, RJ45 connector (ENC28J60 limitation)
+* **Internal**: SPI to ENC28J60 controller, software TCP/IP stack (lwIP)
 
-==== <Name black box 1>
-
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Here you describe <black box 1>
-according the the following black box template:
-
-* Purpose/Responsibility
-* Interface(s), when they are not extracted as separate paragraphs. This interfaces may include qualities and performance characteristics.
-* (Optional) Quality-/Performance characteristics of the black box, e.g.availability, run time behavior, ....
-* (Optional) directory/file location
-* (Optional) Fulfilled requirements (if you need traceability to requirements).
-* (Optional) Open issues/problems/risks
-
-****
-endif::arc42help[]
-
-_<Purpose/Responsibility>_
-
-_<Interface(s)>_
-
-_<(Optional) Quality/Performance Characteristics>_
-
-_<(Optional) Directory/File Location>_
-
-_<(Optional) Fulfilled Requirements>_
-
-_<(optional) Open Issues/Problems/Risks>_
-
-
-
-
-==== <Name black box 2>
-
-_<black box template>_
-
-==== <Name black box n>
-
-_<black box template>_
-
-
-==== <Name interface 1>
-
-...
-
-==== <Name interface m>
-
-
+===== UART Interface
+* **Hardware**: 4 independent UART channels with configurable parameters
+* **Protocols**: UART/RS232/RS422 support with 300-500kBaud range
+* **Configuration**: Per-channel baud rate, data bits, stop bits, parity settings
 
 === Level 2
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Here you can specify the inner structure of (some) building blocks from level 1 as white boxes.
+==== Whitebox Core 0 UART Subsystem
 
-You have to decide which building blocks of your system are important enough to justify such a detailed description.
-Please prefer relevance over completeness. Specify important, surprising, risky, complex or volatile building blocks.
-Leave out normal, simple, boring or standardized parts of your system
-****
-endif::arc42help[]
+The Core 0 UART Subsystem specializes in handling all UART communication with dedicated hardware management, interrupt processing, and bidirectional data conversion between stream and packet formats.
 
-==== White Box _<building block 1>_
+[plantuml, level2-core0-uart-simple, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-...describes the internal structure of _building block 1_.
-****
-endif::arc42help[]
+title Level 2 - Core 0 UART Subsystem (Whitebox)
 
-_<white box template>_
+cloud "UART0 Hardware" as UART_HW_0
+cloud "UART1 Hardware" as UART_HW_1
+cloud "UART2 Hardware" as UART_HW_2
+cloud "UART3 Hardware" as UART_HW_3
 
-==== White Box _<building block 2>_
+cloud "Ring Buffer System\nShared Memory" as RBS
+
+package "Core 0 UART Subsystem" {
+    component "UART Hardware Manager\nHardware HAL\n4 channels." as UHM #lightsalmon
+    component "UART configuration" as UART_config #lightsalmon
+    component "UART performance statistcs" as UART_statistics #lightsalmon
+    
+    component "UART Handler UART0" as UART_Handler_0 #lightgreen
+    component "UART Handler UART1" as UART_Handler_1 #lightgreen
+    component "UART Handler UART2" as UART_Handler_2 #lightgreen
+    component "UART Handler UART3" as UART_Handler_3 #lightgreen
+        
+    
+}
+
+' External connections
+UART_HW_0 <--> UART_Handler_0 : Data/Control
+UART_HW_1 <--> UART_Handler_1 : Data/Control
+UART_HW_2 <--> UART_Handler_2 : Data/Control
+UART_HW_3 <--> UART_Handler_3 : Data/Control
+
+UD <--> UHM : Serial Data\nUART/RS232/RS422
+UART_Handler_0 <--> RBS : Bidirectional Packets\nShared Memory
+UART_Handler_1 <--> RBS : Bidirectional Packets\nShared Memory
+UART_Handler_2 <--> RBS : Bidirectional Packets\nShared Memory
+UART_Handler_3 <--> RBS : Bidirectional Packets\nShared Memory
+
+' Internal connections
+UHM <--> UART_Handler_0 : Data/Control
+UHM <--> UART_Handler_1 : Data/Control
+UHM <--> UART_Handler_2 : Data/Control
+UHM <--> UART_Handler_3 : Data/Control
+
+UART_Handler_0 --> UART_statistics : Update
+UART_Handler_1 --> UART_statistics : Update
+UART_Handler_2 --> UART_statistics : Update
+UART_Handler_3 --> UART_statistics : Update
+
+UHM --> UART_config : Manage
+UART_config --> UART_Handler_0 : Setup
+UART_config --> UART_Handler_1 : Setup
+UART_config --> UART_Handler_2 : Setup
+UART_config --> UART_Handler_3 : Setup
+
+@enduml
+----
+
+===== Motivation
+
+Core 0 specialization enables real-time UART processing without interference from network operations. The bidirectional packet conversion allows seamless translation between continuous UART streams and discrete network packets.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*UART Hardware Manager*
+|Direct control of 4 UART channels with configurable parameters (baud rate, data bits, parity). Manages hardware registers and status monitoring.
+
+|*Interrupt Handler*
+|Processes time-critical UART events (RX data available, TX buffer empty) with minimal latency for real-time performance.
+
+|*DMA Controller*
+|Optimizes bulk data transfers in both directions to reduce CPU load and improve throughput for high-baud applications.
+
+|*Packet Assembler*
+|Converts incoming UART streams into fixed-size packets for ring buffer storage. Handles framing and timestamp metadata.
+
+|*Packet Disassembler*
+|Extracts UART data from ring buffer packets and converts back to continuous streams for transmission.
+
+|*Ring Buffer Interface*
+|Provides producer operations (UART RX data) and consumer operations (UART TX data) with proper synchronization.
+|===
+
+==== Whitebox Core 1 Network Subsystem
+
+The Core 1 Network Subsystem manages all network communication including TCP/IP protocol processing, Ethernet controller interface, and bidirectional packet routing between ring buffer and network clients.
+
+[plantuml, level2-core1-network-simple, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Core 1 Network Subsystem (Whitebox)
+
+cloud "Network Infrastructure\nEthernet Switch/Router" as NI
+cloud "Ring Buffer System\nShared Memory" as RBS
+cloud "Management Interface" as management_interface
+
+package "Core 1 Network Subsystem" {
+
+    component "Network Manager" as network_manager #lightsalmon
+    
+    component "lwIP TCP/IP Stack\nSoftware Protocol\nNetwork processing" as LWIP #lightsalmon
+    
+    component "ENC28J60 Driver\nSPI Interface\n10BASE-T controller\nFrame handling" as ENC #lightsalmon
+    
+    component "Socket Manager\nTCP Connections\n1 per UART channel\nBidirectional sockets" as socket_manager #lightsalmon
+    
+    component "Network Configuration\nPort Assignment" as network_configuration #lightsalmon
+    
+    component "Packet Assembler\nTCP → Packet\nNetwork RX data\nRing buffer format" as PA #lightblue
+    
+    component "Packet Disassembler\nPacket → TCP\nRing buffer data\nNetwork TX output" as PD #lightgreen
+    
+    component "Ring Buffer Interface\nProducer/Consumer\nTCP RX producer\nTCP TX consumer" as RBI #lightyellow
+
+    component "RX Interrupt Handler\nISR\nTime-critical events\nRX handling" as RXISR #LightBlue
+    component "TX Interrupt Handler\nISR\nTime-critical events\nTX handling" as TXISR #lightgreen
+    
+    component "DMA Controller\nBulk Transfer\nCPU optimization" as DMA #LightSalmon
+
+    component "TX DMA Channel\nBulk Transfers" as TXDMA #lightgreen
+    component "RX DMA Channel\nBulk Transfers" as RXDMA #LightBlue
+
+    component "DMA Controller\nBulk Transfer\nCPU optimization" as DMA #LightSalmon
+}
+
+' External connections
+ENC <--> NI : Ethernet Frames\n10BASE-T
+RBI <--> RBS : Bidirectional Packets\nShared Memory
+socket_manager <--> management_interface : Webserver connections
+
+' Internal connections
+
+network_manager --> TXISR : Setup/Control\nHardware IRQ
+network_manager --> RXISR : Setup/Control\nHardware IRQ
+network_manager --> DMA : Setup/Control\nHardware DMA
+network_manager --> network_configuration : manage
+DMA --> TXDMA : Setup/Control\nHardware DMA
+DMA --> RXDMA : Setup/Control\nHardware DMA
+
+LWIP <--> socket_manager : TCP Events\nSocket Callbacks
 
 
-_<white box template>_
+network_configuration --> LWIP : setup
+network_configuration --> socket_manager : setup
 
-...
+ENC --> TXISR : HW sets interrupt
+ENC --> RXISR : HW sets interrupt
+TXISR --> TXDMA : Sets up DMA transfers
+RXISR --> RXDMA : Sets up DMA transfers
+TXDMA --> DMA : HW sets interrupt
+RXDMA --> DMA : HW sets interrupt
 
-==== White Box _<building block m>_
+' outgoing data to network
+RBI --> PD : Packets from Core0\nDequeue
+PD --> socket_manager : Outbound packets TX DMA Transfers 
+socket_manager --> LWIP : Outbound packets TX DMA Transfers
+LWIP --> ENC : TX DMA Transfers
 
+' incoming data from network
+ENC --> LWIP : RX DMA Transfers
+LWIP --> socket_manager : Inbound packets TX DMA Transfers 
+socket_manager --> PA : Inbound packets TX DMA Transfers 
+PA --> RBI : Packets to Core0\nEnqueue
 
-_<white box template>_
+@enduml
+----
 
+===== Motivation
 
+Core 1 specialization allows network processing to operate independently from time-critical UART operations. The modular design enables efficient TCP/IP processing while maintaining clear separation between hardware drivers and application logic.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*lwIP TCP/IP Stack*
+|Complete software-based TCP/IP implementation providing standard network protocols and socket interfaces.
+
+|*ENC28J60 Driver*
+|Low-level SPI driver for the 10BASE-T Ethernet controller, handling frame transmission and reception.
+
+|*Socket Manager*
+|Manages TCP socket connections with one dedicated socket per UART channel. Handles connection lifecycle and error recovery.
+
+|*Packet Router*
+|Maps UART channel numbers to TCP port numbers and routes data bidirectionally between network and ring buffer interfaces.
+
+|*Packet Assembler*
+|Converts incoming TCP data streams into ring buffer packets for transmission to Core 0.
+
+|*Packet Disassembler*
+|Extracts data from ring buffer packets and formats for TCP transmission to network clients.
+
+|*Ring Buffer Interface*
+|Provides producer operations (TCP RX data) and consumer operations (TCP TX data) with shared pool access.
+|===
+
+==== Whitebox Ring Buffer Communication System
+
+The Ring Buffer Communication System provides the critical inter-core communication mechanism using a shared memory pool that dynamically handles bursts from either direction while maintaining deterministic behavior.
+
+[plantuml, level2-ring-buffer-simple, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Ring Buffer Communication System (Whitebox)
+
+cloud "Core 0 UART Subsystem\nProducer/Consumer" as C0
+cloud "Core 1 Network Subsystem\nConsumer/Producer" as C1
+cloud "Management Interface\nStatistics Consumer" as MI
+
+package "Ring Buffer Communication System" {
+    component "Shared Buffer Pool\nStatic Memory\nSingle pool, both directions" as SBP #lightyellow
+    
+    component "Mutex Manager\nInter-core coordination\nThread-safe access" as MM #lightcyan
+    
+    component "Memory Manager\nFixed Allocation\nCache-aligned entries\nEntry lifecycle" as MEM #lightyellow
+    
+    component "Overflow Handler\nDrop-Oldest Policy\nDeterministic behavior\nBoth directions" as OH #lightcyan
+    
+    component "Statistics Collector\nMetrics Engine\nBuffer utilization\nPerformance tracking" as SC #lightpink
+}
+
+' External connections
+C0 <--> SBP : Produce/Consume\nUART Packets
+C1 <--> SBP : Consume/Produce\nTCP Packets
+SC --> MI : Buffer Metrics\nFunction Calls
+
+' Internal connections
+SBP <--> MM : Sync Requests\nMutex Operations
+SBP <--> MEM : Allocation Requests\nEntry Management
+MEM --> OH : Buffer Full\nOverflow Event
+SBP --> SC : Buffer Events\nMetrics Update
+OH --> SC : Drop Events\nError Counting
+
+@enduml
+----
+
+===== Motivation
+
+The shared buffer pool design provides elegant burst handling by allowing dynamic allocation to whichever direction needs capacity. This approach is more efficient than fixed per-direction pools and gracefully handles real-world traffic patterns.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*Shared Buffer Pool*
+|Single memory pool that dynamically serves both UART→TCP and TCP→UART directions with fixed-size entries.
+
+|*Mutex Manager*
+|Provides thread-safe access to the shared pool using FreeRTOS mutexes and semaphores for inter-core synchronization.
+
+|*Memory Manager*
+|Handles allocation and deallocation of fixed-size buffer entries with cache-aligned addressing for optimal performance.
+
+|*Overflow Handler*
+|Implements drop-oldest policy when buffer reaches capacity, ensuring deterministic behavior under overload conditions.
+
+|*Statistics Collector*
+|Tracks buffer utilization, message counts, throughput metrics, and error conditions for monitoring and diagnostics.
+|===
+
+==== Whitebox Management Interface
+
+The Management Interface provides comprehensive web-based administration through modular components handling authentication, configuration, and monitoring functions.
+
+[plantuml, level2-management-simple, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Management Interface (Whitebox)
+
+actor "Field Technician\nDevice Administrator" as FT
+cloud "Core 0 UART Subsystem\nConfig Target" as C0
+cloud "Core 1 Network Subsystem\nConfig Target" as C1
+cloud "Ring Buffer System\nStatistics Source" as RBS
+cloud "Flash Storage\nPersistence Layer" as FS
+
+package "Management Interface" {
+    component "HTTP Web Server\nRequest Handler" as HTTP #lightcyan
+    
+    component "Authentication System\nLoginRole-based access" as AUTH #lightpink
+    
+    component "Statistical Data Module\nMetrics Collection\nReal-time + historical\nSystem health monitoring" as STATS #lightgreen
+    
+    component "UART Configuration UI\nChannel Settings\nHardware control\nProtocol filters" as UART_UI #lightyellow
+    
+    component "TCP/IP Configuration UI\nNetwork Settings\nPort mapping\nSecurity controls" as TCP_UI #lightblue
+}
+
+' External connections
+FT <--> HTTP : Web Requests\nHTTP Browser
+UART_UI --> C0 : UART Config\nFunction Calls
+TCP_UI --> C1 : Network Config\nFunction Calls
+STATS <--> RBS : Metrics Query\nStatistics API
+HTTP <--> FS : Config Persistence\nRead/Write
+
+' Internal connections
+HTTP <--> AUTH : Authentication
+HTTP <--> STATS : Statistics
+HTTP --> UART_UI : Static Content\nUI Serving
+HTTP --> TCP_UI : Static Content\nUI Serving
+UART_UI <--> STATS : UART Metrics
+TCP_UI <--> STATS : Network Metrics
+AUTH <--> FS : User Accounts\nPassword Storage
+
+@enduml
+----
+
+===== Motivation
+
+The modular management interface design separates concerns between web serving, authentication, data collection, and configuration UIs. This enables independent development and testing of each component while providing a comprehensive administration solution.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*HTTP Web Server*
+|Processes HTTP/1.1 requests, serves static content (HTML/CSS/JS), provides REST API endpoints, and manages user sessions.
+
+|*Authentication System*
+|Handles user login validation, JWT session token management, role-based access control, and security header implementation.
+
+|*Statistical Data Module*
+|Collects real-time metrics from system components, maintains historical data, tracks performance counters, and monitors system health.
+
+|*UART Configuration UI*
+|Provides web interface for configuring UART channel settings, hardware control options, protocol filters, and parameter validation.
+
+|*TCP/IP Configuration UI*
+|Offers web interface for network settings, TCP port mapping, connection limits, and security configurations.
+|===
 
 === Level 3
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Here you can specify the inner structure of (some) building blocks from level 2 as white boxes.
+==== Whitebox Core 0 UART Handler Subsystem
 
-When you need more detailed levels of your architecture please copy this
-part of arc42 for additional levels.
-****
-endif::arc42help[]
+The Core 0 UART Subsystem specializes in handling all UART communication with dedicated hardware management, interrupt processing, and bidirectional data conversion between stream and packet formats.
 
-==== White Box <_building block x.1_>
+[plantuml, level3-core0-uart-internal, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Specifies the internal structure of _building block x.1_.
-****
-endif::arc42help[]
+title Level 3 - Core 0 UART Handler Subsystem (Whitebox)
 
-_<white box template>_
+cloud "UART Hardware Manager" as UHM
+cloud "Ring Buffer System\nShared Memory" as RBS
+cloud "UART Hardware or PIO UART" as HW
 
+package "Core 0 UART Handler" {
+    component "UART Hardware Manager Interface\nHardware HAL\nRegister control" as UHMI #LightSalmon
+    
+    component "RX Interrupt Handler\nISR\nTime-critical events\nRX handling" as RXISR #LightBlue
+    component "TX Interrupt Handler\nISR\nTime-critical events\nTX handling" as TXISR #lightgreen
+    
+    component "DMA Controller\nBulk Transfer\nCPU optimization" as DMA #LightSalmon
 
-==== White Box <_building block x.2_>
+    component "TX DMA Channel\nBulk Transfers" as TXDMA #lightgreen
+    component "RX DMA Channel\nBulk Transfers" as RXDMA #LightBlue
+    
+    component "Packet Assembler\nStream → Packet\nTimestamp + metadata" as PA #LightBlue
+    component "Packet Disassembler\nPacket → Stream\nRing buffer data\n" as PD #lightgreen
+    
+    component "Ring Buffer Interface\nProducer/Consumer\nUART RX producer\nUART TX consumer" as RBI #lightyellow
 
-_<white box template>_
+    component "UART TX output registers" as OR #lightgreen
+    component "UART RX input registers" as IR #LightBlue
+    
+}
 
+' External connections
+UHMI <--> UHM : Configuration/Setup
+RBI <--> RBS : Bidirectional Packets\nShared Memory
 
+' Internal connections
+UHMI --> TXISR : Setup/Control\nHardware IRQ
+UHMI --> RXISR : Setup/Control\nHardware IRQ
+UHMI --> DMA : Setup/Control\nHardware DMA
+DMA --> TXDMA : Setup/Control\nHardware DMA
+DMA --> RXDMA : Setup/Control\nHardware DMA
 
-==== White Box <_building block y.1_>
+UHMI --> IR : RX Data Control
+UHMI --> OR : TX Data Control
+PA --> RBI : Packets Ready\nEnqueue Operation
+RBI --> PD : Packets Received\nDequeue Operation
+PD --> TXDMA : TX Data\nStream Output
+TXDMA --> OR : TX Output to wire\nBulk Transfers\nDMA Requests
+IR --> RXDMA : RX Data from wire\nDMA Bulk Transfers
+RXDMA --> PA : RX Data stream input\nDMA Bulk Transfers
 
-_<white box template>_
+HW --> IR : RX
+OR --> HW : TX
+
+OR --> TXISR : HW sets interrupt
+IR --> RXISR : HW sets interrupt
+
+TXISR --> TXDMA : Sets up DMA transfers
+RXISR --> RXDMA : Sets up DMA transfers
+
+TXDMA --> DMA : HW sets interrupt
+RXDMA --> DMA : HW sets interrupt
+
+@enduml
+----
+
+===== Motivation
+
+UART processing utilizing UART specific ISR and DMA transfers for maximum troughput. 
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*UART Hardware Manager*
+|Direct control of 4 UART channels with configurable parameters (baud rate, data bits, parity). Manages hardware registers and status monitoring.
+
+|*Interrupt Handler*
+|Processes time-critical UART events (RX data available, TX buffer empty) with minimal latency for real-time performance.
+
+|*DMA Controller*
+|Controls bulk data transfers in both directions
+
+|*DMA Channel*
+|Optimizes bulk data transfers in both directions to reduce CPU load and improve throughput for high-baud applications.
+
+|*Packet Assembler*
+|Converts incoming UART streams into fixed-size packets for ring buffer storage. Handles framing and timestamp metadata.
+
+|*Packet Disassembler*
+|Extracts UART data from ring buffer packets and converts back to continuous streams for transmission.
+
+|*Ring Buffer Interface*
+|Provides producer operations (UART RX data) and consumer operations (UART TX data) with proper synchronization.
+|===
+
+==== Whitebox Ring Buffer System Internal Structure
+
+The Ring Buffer System provides the foundational inter-core communication with detailed memory management, helper functions, and synchronization primitives.
+
+[plantuml, level3-ring-buffer-internals-simple, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 3 - Ring Buffer System Internal Structure (Whitebox)
+
+cloud "Core 0\nProducer/Consumer" as C0
+cloud "Core 1\nConsumer/Producer" as C1
+cloud "Management UI\nStatistics Consumer" as UI
+
+package "Buffer Management Functions" {
+    component "Core API Functions\n• find_next_free_block()\n• find_next_ready_block()\n• get_cached_message_count()\n• mark_block_ready()\n• mark_block_consumed()" as API #lightgreen
+    
+    component "Statistics Functions\n• get_free_block_count()\n• get_overflow_count()\n• get_throughput_bytes()\n• reset_buffer_statistics()" as STATS_API #lightgreen
+}
+
+package "Memory Structure" {
+    component "Memory Layout Manager\nAddress Calculation\nIndex management\nCache-aligned access" as LAYOUT #lightyellow
+    
+    component "Buffer Metadata\nVolatile State\nhead_index, tail_index\nentry_count, max_entries" as META #lightyellow
+    
+    component "Entry Array\nRing Buffer Data\nring_entry_t entries[]\nFixed 1088-byte entries" as ENTRIES #lightyellow
+}
+
+package "Synchronization" {
+    component "Sync Manager\nThread Safety\nMutex protection\nCache coherency" as MGR #lightcyan
+    
+    component "Sync Primitives\nFreeRTOS\nbuffer_mutex\nsemaphores" as PRIM #lightcyan
+}
+
+package "Statistics Engine" {
+    component "Performance Counters\nMetrics Tracking\nThroughput calculation\nError monitoring" as PERF #lightpink
+    
+    component "System Health\nState Monitoring\nBuffer utilization\nOverflow detection" as HEALTH #lightpink
+}
+
+' External connections
+C0 <--> API : Producer/Consumer Ops\nenqueue(), dequeue()
+C1 <--> API : Consumer/Producer Ops\ndequeue(), enqueue()
+UI <--> STATS_API : Statistics Queries\nMetrics API
+
+' Internal connections
+API <--> LAYOUT : Memory Access\nBuffer Operations
+API <--> MGR : Thread Safety\nSync Operations
+API --> PERF : Event Tracking\nCounter Updates
+
+LAYOUT <--> META : Index Operations\nPointer Management
+LAYOUT <--> ENTRIES : Entry Access\nDirect Memory I/O
+MGR <--> PRIM : Synchronization\nMutex/Semaphore
+
+PERF <--> HEALTH : State Monitoring\nUtilization Tracking
+HEALTH <--> META : Buffer Analysis\nMetrics Collection
+STATS_API <--> PERF : Data Aggregation\nReport Generation
+
+@enduml
+----
+
+===== Purpose
+
+Provides efficient, thread-safe, bidirectional communication between cores with deterministic behavior and comprehensive monitoring capabilities.
+
+===== Internal Structure
+
+====== Memory Layout Manager
+Manages the physical organization of the ring buffer in memory with cache-aligned addressing and efficient index calculations.
+
+* **Ring Buffer Array**: Contiguous memory block with cache-aligned entries
+* **Index Management**: Head/tail pointers with wrap-around logic  
+* **Memory Addressing**: Base address + (index × entry_size) calculations
+
+====== Buffer Management Functions
+Core API providing the helper functions for ring buffer operations and monitoring.
+
+[source,c]
+----
+// Core buffer operations
+ring_entry_t* find_next_free_block(void);
+ring_entry_t* find_next_ready_block(uint8_t uart_channel, uint8_t direction);
+bool is_buffer_full(void);
+bool is_buffer_empty(void);
+
+// Statistics and monitoring
+uint32_t get_cached_message_count(void);
+uint32_t get_cached_message_count_by_channel(uint8_t uart_channel);
+uint32_t get_cached_message_count_by_direction(uint8_t direction);
+uint32_t get_free_block_count(void);
+uint32_t get_overflow_count(void);          // Dropped messages
+uint32_t get_total_throughput_bytes(void);
+
+// Advanced operations
+ring_entry_t* peek_next_block(uint8_t uart_channel, uint8_t direction);
+void mark_block_ready(ring_entry_t* entry);
+void mark_block_consumed(ring_entry_t* entry);
+void reset_buffer_statistics(void);
+----
+
+====== Memory Layout Structure
+Complete ring buffer system data structure with metadata, statistics, and synchronization primitives.
+
+[source,c]
+----
+typedef struct {
+    // Ring buffer metadata (cache-aligned)
+    volatile uint32_t head_index;      // Producer index
+    volatile uint32_t tail_index;      // Consumer index  
+    volatile uint32_t entry_count;     // Current entries
+    uint32_t max_entries;              // Buffer capacity
+    
+    // Statistics (cache-aligned)
+    uint32_t total_produced;
+    uint32_t total_consumed;
+    uint32_t overflow_count;
+    uint32_t underflow_count;
+    
+    // Synchronization
+    mutex_t buffer_mutex;
+    semaphore_t free_space_sem;
+    semaphore_t data_ready_sem;
+    
+    // Entry array (cache-aligned)
+    ring_entry_t entries[];
+} ring_buffer_system_t;
+----
+
+====== Data Entry Format
+Individual ring buffer entry structure used for both communication directions.
+
+[source,c]
+----
+typedef struct {
+    // Management Data (16 bytes)
+    uint8_t  uart_channel;     // 0-3
+    uint8_t  direction;        // RX_UART_TO_TCP / RX_TCP_TO_UART
+    uint8_t  status;           // FILLING/DRAINING/FULL/EMPTY
+    uint8_t  payload_length;   // Actual data length
+    uint32_t timestamp;        // Fill timestamp
+    uint32_t sequence_id;      // For ordering/debugging
+    uint32_t next_in_use;      // Packets in use (within ring buffer) are a single linked list
+    uint32_t reserved;         // Future use/alignment
+    
+    // Payload Data (1024 bytes max)
+    uint8_t  payload[1024];    // Fixed max size for worst case
+} ring_entry_t;
+----
+
+==== Whitebox UART Hardware Manager Internal Structure
+
+The UART Hardware Manager provides unified control over all 4 UART channels with individual controllers, parameter management, and comprehensive status monitoring.
+
+[plantuml, level3-uart-hardware-simple, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 3 - UART Hardware Manager Internal Structure (Whitebox)
+
+cloud "UART Devices\n4x Serial Devices" as DEV
+cloud "Interrupt Handler\nISR Processing" as INT
+cloud "DMA Controller\nBulk Transfers" as DMA
+cloud "Management Interface\nConfiguration Source" as MGMT
+
+package "Channel Controllers" {
+    component "Channel Controller 0\nUART0 HAL\nConfig + Status\nRegister control" as CH0 #lightgreen
+    component "Channel Controller 1\nUART1 HAL\nConfig + Status\nRegister control" as CH1 #lightgreen
+    component "Channel Controller 2\nUART2 HAL\nConfig + Status\nRegister control" as CH2 #lightgreen
+    component "Channel Controller 3\nUART3 HAL\nConfig + Status\nRegister control" as CH3 #lightgreen
+}
+
+package "Management Components" {
+    component "Parameter Manager\nConfiguration\nBaud rate, frame format\nValidation + apply" as PARAM #lightyellow
+    component "Status Monitor\nChannel Tracking\nError detection\nReal-time status" as STATUS #lightyellow
+    component "Interrupt Router\nEvent Distribution\nChannel-specific ISR\nHardware IRQ routing" as ROUTER #lightyellow
+}
+
+package "Hardware Abstraction" {
+    component "UART0 Hardware\nRP2350 Peripheral\nPhysical interface" as U0 #lightcyan
+    component "UART1 Hardware\nRP2350 Peripheral\nPhysical interface" as U1 #lightcyan
+    component "UART2 Hardware\nRP2350 Peripheral\nPhysical interface" as U2 #lightcyan
+    component "UART3 Hardware\nRP2350 Peripheral\nPhysical interface" as U3 #lightcyan
+    component "Pin Multiplexer\nGPIO Config\nRS232/RS422 selection\nPin routing" as PIN #lightcyan
+}
+
+' External connections
+DEV <--> U0 : Serial Channel 0\nUART/RS232/RS422
+DEV <--> U1 : Serial Channel 1\nUART/RS232/RS422
+DEV <--> U2 : Serial Channel 2\nUART/RS232/RS422
+DEV <--> U3 : Serial Channel 3\nUART/RS232/RS422
+
+MGMT <--> PARAM : Configuration\nuart_config_t
+STATUS --> MGMT : Status Data\nuart_channel_status_t
+
+' Hardware connections
+CH0 <--> U0 : Register Access\nMemory-mapped I/O
+CH1 <--> U1 : Register Access\nMemory-mapped I/O
+CH2 <--> U2 : Register Access\nMemory-mapped I/O
+CH3 <--> U3 : Register Access\nMemory-mapped I/O
+
+' Management connections
+PARAM --> CH0 : Ch0 Config\nApply Settings
+PARAM --> CH1 : Ch1 Config\nApply Settings
+PARAM --> CH2 : Ch2 Config\nApply Settings
+PARAM --> CH3 : Ch3 Config\nApply Settings
+
+' Status connections
+CH0 --> STATUS : Ch0 Status\nState Updates
+CH1 --> STATUS : Ch1 Status\nState Updates
+CH2 --> STATUS : Ch2 Status\nState Updates
+CH3 --> STATUS : Ch3 Status\nState Updates
+
+' Interrupt connections
+U0 --> ROUTER : UART0 IRQ\nHardware Interrupt
+U1 --> ROUTER : UART1 IRQ\nHardware Interrupt
+U2 --> ROUTER : UART2 IRQ\nHardware Interrupt
+U3 --> ROUTER : UART3 IRQ\nHardware Interrupt
+ROUTER --> INT : Routed Events\nChannel-specific
+
+' DMA connections
+CH0 <--> DMA : DMA Requests\nBulk Transfer
+CH1 <--> DMA : DMA Requests\nBulk Transfer
+CH2 <--> DMA : DMA Requests\nBulk Transfer
+CH3 <--> DMA : DMA Requests\nBulk Transfer
+
+' Pin configuration
+PARAM --> PIN : Pin Config\nRS232/RS422 Mode
+
+@enduml
+----
+
+===== Purpose
+
+Provides unified interface to all 4 UART channels with configurable parameters, comprehensive status monitoring, and efficient interrupt handling.
+
+===== Internal Structure
+
+====== UART Configuration Interface
+Complete configuration structure for UART channel parameters.
+
+[source,c]
+----
+typedef struct {
+    uint32_t baud_rate;        // 300-500000 bps
+    uint8_t  data_bits;        // 5-8 bits
+    uint8_t  stop_bits;        // 1-2 bits  
+    uint8_t  parity;           // NONE/ODD/EVEN
+    bool     flow_control;     // Hardware flow control
+    bool     rs485_mode;       // RS485 half-duplex mode
+} uart_config_t;
+----
+
+====== UART Operations API
+Core function interface for UART channel operations.
+
+[source,c]
+----
+// Channel operations
+int uart_channel_configure(uint8_t channel, uart_config_t* config);
+int uart_channel_read(uint8_t channel, uint8_t* buffer, size_t length);
+int uart_channel_write(uint8_t channel, const uint8_t* data, size_t length);
+bool uart_channel_is_ready(uint8_t channel);
+uint32_t uart_channel_get_status(uint8_t channel);
+----
+
+====== Status Monitoring Structure
+Comprehensive status tracking for each UART channel.
+
+[source,c]
+----
+typedef struct {
+    bool carrier_detect;
+    bool clear_to_send;
+    bool data_set_ready;
+    uint32_t rx_errors;
+    uint32_t tx_errors;
+    uint32_t frames_received;
+    uint32_t frames_transmitted;
+} uart_channel_status_t;
+----
+
+==== Whitebox Management Interface Internal Structure  
+
+The Management Interface provides comprehensive web-based administration through specialized components for HTTP serving, authentication, statistics, and configuration management.
+
+[plantuml, level3-management-internals-simple, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 3 - Management Interface Internal Structure (Whitebox)
+
+actor "Field Technician\nWeb Browser User" as USER
+cloud "External Systems\nUART/Network/Ring Buffer" as EXT_SYS
+cloud "Flash Storage\nPersistence Layer" as STORAGE
+
+package "HTTP Web Server" {
+    component "Request Handler\nHTTP/1.1 Processing\nRoute management\nProtocol handling" as REQ #lightgreen
+    component "Static Content Server\nFile Serving\nHTML, CSS, JS\nAsset management" as STATIC #lightgreen
+    component "REST API\nConfiguration API\nStatus endpoints" as API #lightgreen
+    component "Session Manager\nState Tracking\nConnection persistence\nSession lifecycle" as SESS #lightgreen
+}
+
+package "Authentication System" {
+    component "Login Manager\nCredential Validation\nUsername/password\nLogin attempts" as LOGIN #lightpink
+    component "Session Tokens\nJWT Management\nToken generation\nToken validation" as TOKEN #lightpink
+    component "Access Control\nRole-based Permissions\nAdmin/Operator/ReadOnly\nPermission checking" as ACCESS #lightpink
+}
+
+package "Configuration Interfaces" {
+    component "UART Configuration\nChannel Settings\nBaud, parity, flow control\nProtocol filters" as UART_CFG #lightyellow
+    component "Network Configuration\nTCP/IP Settings\nIP, ports, security\nConnection limits" as NET_CFG #lightyellow
+    component "Validation Engine\nParameter Checking\nRange validation\nConflict detection" as VALID #lightyellow
+}
+
+package "Statistical Data Module" {
+    component "Real-time Metrics\nLive Data Collection\nThroughput, latency\nPer-channel statistics" as REALTIME #lightblue
+    component "Historical Data\nTime-series Storage\nTrend analysis\nData archival" as HISTORY #lightblue
+    component "System Health\nStatus Monitoring\nTemperature, memory\nUptime tracking" as HEALTH #lightblue
+}
+ 
+' External connections
+USER <--> REQ : HTTP Requests\nWeb Browser
+UART_CFG --> EXT_SYS : UART Config\nAPI Calls
+NET_CFG --> EXT_SYS : Network Config\nAPI Calls
+REALTIME <--> EXT_SYS : Live Metrics\nFunction Calls
+LOGIN <--> STORAGE : User Accounts\nRead/Write
+
+' HTTP Server internal
+REQ <--> STATIC : File Requests\nStatic Assets
+REQ <--> API : API Requests\nJSON Processing
+REQ <--> SESS : Session Handling\nState Management
+
+' Authentication flow
+SESS <--> LOGIN : Login Requests\nCredential Check
+TOKEN <--> ACCESS : Role Checking
+API <--> ACCESS : Authorization\nPermission Check
+
+' Statistics flow
+REALTIME --> HISTORY : Data Archival\nEvent Time-series Storage
+REALTIME <--> HEALTH : System Metrics\nHealth Data
+API <--> REALTIME : Metrics API
+
+' Configuration flow
+UART_CFG <--> VALID : Parameter Validation\nRange Checking
+NET_CFG <--> VALID : Parameter Validation\nConflict Detection
+VALID <--> API : Valid Configuration\nAPI Submission
+
+' UI data flow
+UART_CFG <--> REALTIME : UART Metrics
+NET_CFG <--> REALTIME : Network Metrics
+
+@enduml
+----
+
+===== Purpose
+
+Provides comprehensive web-based configuration, monitoring, and administration interface with modular components for different management aspects.
+
+===== Internal Structure
+
+====== HTTP Web Server Components
+
+**Request Handler**
+[source,c]
+----
+typedef struct {
+    uint16_t port;                     // Default: 80
+    uint32_t max_connections;          // Concurrent sessions
+    char document_root[256];           // Static content path
+} webserver_config_t;
+
+int webserver_start(webserver_config_t* config);
+int webserver_register_endpoint(const char* path, http_handler_t handler);
+int webserver_send_response(int client_fd, http_response_t* response);
+----
+
+====== Authentication System Components
+
+**User Management**
+[source,c]
+----
+typedef enum {
+    AUTH_ROLE_ADMIN,       // Full configuration access
+    AUTH_ROLE_OPERATOR,    // Monitor + basic config
+    AUTH_ROLE_READONLY     // Monitor only
+} auth_role_t;
+
+typedef struct {
+    char username[32];
+    char password_hash[64];    // SHA-256 hash
+    auth_role_t role;
+    bool enabled;
+} user_account_t;
+
+bool authenticate_user(const char* username, const char* password);
+const char* create_session_token(const char* username);
+bool validate_session_token(const char* token);
+----
+
+====== Statistical Data Components
+
+**System Statistics Structure**
+[source,c]
+----
+typedef struct {
+    // Per-channel statistics
+    struct {
+        uint64_t bytes_transmitted;
+        uint64_t bytes_received;
+        uint32_t messages_transmitted;
+        uint32_t messages_received;
+        uint32_t error_count;
+        uint32_t overflow_count;
+        float average_latency_ms;
+        uint32_t current_baud_rate;
+    } uart_stats[4];
+    
+    // Network statistics
+    uint64_t tcp_bytes_sent;
+    uint64_t tcp_bytes_received;
+    uint32_t tcp_connections_active;
+    uint32_t tcp_connections_total;
+    
+    // System statistics
+    uint32_t uptime_seconds;
+    uint32_t cpu_usage_percent;
+    uint32_t memory_used_bytes;
+    uint32_t ring_buffer_utilization_percent;
+} system_statistics_t;
+----
+
+====== Configuration Interface Components
+
+**UART Configuration Structure**
+[source,c]
+----
+typedef struct {
+    bool enabled;
+    uart_config_t config;              // From UART Hardware Manager
+    char description[64];              // User-friendly name
+    bool protocol_filter_enabled;
+    char protocol_filter_type[32];     // "SharkNet", "custom", etc.
+} uart_channel_settings_t;
+----
+
+**Network Configuration Structure**
+[source,c]
+----
+typedef struct {
+    // Network configuration
+    bool use_dhcp;
+    char ip_address[16];               // "192.168.1.100"
+    char subnet_mask[16];              // "255.255.255.0"  
+    char gateway[16];                  // "192.168.1.1"
+    char dns_primary[16];
+    char dns_secondary[16];
+    
+    // Port mapping
+    struct {
+        uint16_t tcp_port;             // 4001-4004 default
+        bool enabled;
+        uint32_t connection_timeout_ms;
+        char allowed_clients[256];     // IP ranges: "192.168.1.0/24"
+    } port_config[4];
+    
+    // Security
+    bool enable_firewall;
+    char hostname[64];
+    uint16_t management_port;          // Web UI port (default 80)
+} network_config_t;
+----
+
