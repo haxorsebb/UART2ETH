@@ -421,8 +421,14 @@
 </li>
 <li><a href="#section-deployment-view">7. Deployment View</a>
 <ul class="sectlevel2">
-<li><a href="#_infrastructure_level_1">7.1. Infrastructure Level 1</a></li>
-<li><a href="#_infrastructure_level_2">7.2. Infrastructure Level 2</a></li>
+<li><a href="#_system_context">7.1. System Context</a></li>
+<li><a href="#_operational_requirements_summary">7.2. Operational Requirements Summary</a></li>
+<li><a href="#_deployment_environments">7.3. Deployment Environments</a></li>
+<li><a href="#_firmware_deployment_architecture">7.4. Firmware Deployment Architecture</a></li>
+<li><a href="#_infrastructure_components">7.5. Infrastructure Components</a></li>
+<li><a href="#_deployment_strategies">7.6. Deployment Strategies</a></li>
+<li><a href="#_operational_procedures">7.7. Operational Procedures</a></li>
+<li><a href="#_configuration_management">7.8. Configuration Management</a></li>
 </ul>
 </li>
 <li><a href="#section-concepts">8. Cross-cutting Concepts</a>
@@ -3614,139 +3620,401 @@ building block instances depicted in this diagram.&gt;</em></p>
 <div class="sect1">
 <h2 id="section-deployment-view">7. Deployment View</h2>
 <div class="sectionbody">
-<div class="sidebarblock arc42help">
+<div class="sect2">
+<h3 id="_system_context">7.1. System Context</h3>
+<div class="paragraph">
+<p>The UART2ETH system is an embedded hardware solution based on the RPI RP2350 microcontroller that bridges UART interfaces to TCP sockets. The deployment view focuses on the firmware deployment pipeline, from development through QA validation to field deployment via Over-The-Air (OTA) updates.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_operational_requirements_summary">7.2. Operational Requirements Summary</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Requirement Type</th>
+<th class="tableblock halign-left valign-top">Target</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Availability</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Zero-downtime updates</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A/B partition switching maintains device operation until manual reboot</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Signed firmware delivery</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Cryptographic signing, secure boot, initial key embedding at factory</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Reliability</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automatic rollback</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watchdog-based rollback mechanism for failed firmware updates</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Auditability</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Version tracking</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Git tags and commit checksums embedded in firmware builds</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Control</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manual operations</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No remote device reboots, QA gatekeeping for all releases</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_deployment_environments">7.3. Deployment Environments</h3>
+<div class="sect3">
+<h4 id="_environment_overview">7.3.1. Environment Overview</h4>
+<div class="imageblock">
 <div class="content">
-<div class="paragraph">
-<div class="title">Content</div>
-<p>The deployment view describes:</p>
+<img src="./images/deployment-environments.svg" alt="deployment environments" width="567" height="824">
 </div>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>technical infrastructure used to execute your system, with infrastructure elements like geographical locations, environments, computers, processors, channels and net topologies as well as other infrastructure elements and</p>
-</li>
-<li>
-<p>mapping of (software) building blocks to that infrastructure elements.</p>
-</li>
-</ol>
 </div>
-<div class="paragraph">
-<p>Often systems are executed in different environments, e.g. development environment, test environment, production environment. In such cases you should document all relevant environments.</p>
 </div>
-<div class="paragraph">
-<p>Especially document a deployment view if your software is executed as distributed system with more than one computer, processor, server or container or when you design and construct your own hardware processors and chips.</p>
+<div class="sect3">
+<h4 id="_environment_specifications">7.3.2. Environment Specifications</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 30%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Environment</th>
+<th class="tableblock halign-left valign-top">Purpose</th>
+<th class="tableblock halign-left valign-top">Hardware</th>
+<th class="tableblock halign-left valign-top">Deployment Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Development</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Feature development and local testing</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Individual RP2350 devices per developer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Direct flash programming</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QA Testing</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Release validation with real hardware</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Single testbench with RP2350 hardware</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automated test deployment</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Production</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Live firmware distribution</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Customer-deployed field devices</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OTA HTTP downloads</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Factory</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Initial device provisioning</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manufacturing test fixtures</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Flash programming + key embedding</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-<div class="paragraph">
-<p>From a software perspective it is sufficient to capture only those elements of an infrastructure that are needed to show a deployment of your building blocks. Hardware architects can go beyond that and describe an infrastructure to any level of detail they need to capture.</p>
 </div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>Software does not run without hardware.
-This underlying infrastructure can and will influence a system and/or some
-cross-cutting concepts. Therefore, there is a need to know the infrastructure.</p>
+<div class="sect2">
+<h3 id="_firmware_deployment_architecture">7.4. Firmware Deployment Architecture</h3>
+<div class="sect3">
+<h4 id="_high_level_architecture">7.4.1. High-Level Architecture</h4>
+<div class="imageblock">
+<div class="content">
+<img src="./images/firmware-architecture.svg" alt="firmware architecture" width="724" height="916">
 </div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>Maybe a highest level deployment diagram is already contained in section 3.2. as
-technical context with your own infrastructure as ONE black box. In this section one can
-zoom into this black box using additional deployment diagrams:</p>
 </div>
-<div class="ulist">
-<ul>
-<li>
-<p>UML offers deployment diagrams to express that view. Use it, probably with nested diagrams,
-when your infrastructure is more complex.</p>
-</li>
-<li>
-<p>When your (hardware) stakeholders prefer other kinds of diagrams rather than a deployment diagram, let them use any kind that is able to show nodes and channels of the infrastructure.</p>
-</li>
-</ul>
 </div>
-<div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-7/">Deployment View</a> in the arc42 documentation.</p>
+<div class="sect3">
+<h4 id="_ab_partition_strategy">7.4.2. A/B Partition Strategy</h4>
+<div class="imageblock">
+<div class="content">
+<img src="./images/ab-partitions.svg" alt="ab partitions" width="633" height="565">
+</div>
 </div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_infrastructure_level_1">7.1. Infrastructure Level 1</h3>
-<div class="sidebarblock arc42help">
+<h3 id="_infrastructure_components">7.5. Infrastructure Components</h3>
+<div class="sect3">
+<h4 id="_build_and_release_infrastructure">7.5.1. Build and Release Infrastructure</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 35%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Component</th>
+<th class="tableblock halign-left valign-top">Technology &amp; Configuration</th>
+<th class="tableblock halign-left valign-top">Purpose &amp; Responsibilities</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CMake Build System</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Pico SDK integration, firmware signing</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Compile source code, embed version info, sign binaries</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Developer Hardware</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Individual RP2350 devices</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Local development and unit testing</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QA Testbench</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Single automated test fixture with RP2350</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware-in-the-loop validation of release candidates</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Cloud OTA Server</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP-based firmware distribution</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Serve approved firmware to field devices</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Key Management</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Secure cryptographic key storage</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Firmware signing keys, device authentication</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_security_architecture">7.5.2. Security Architecture</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 70%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Security Layer</th>
+<th class="tableblock halign-left valign-top">Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Factory Key Embedding</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Cryptographic keys installed during initial manufacturing flash</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Firmware Signing</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All firmware builds cryptographically signed before distribution</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Secure Boot</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RP2350 ROM bootloader verifies firmware signatures before execution</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OTA Authentication</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device authenticates with OTA server before firmware download</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Partition Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Each partition validated before boot attempt</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_deployment_strategies">7.6. Deployment Strategies</h3>
+<div class="sect3">
+<h4 id="_firmware_update_process">7.6.1. Firmware Update Process</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 35%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Stage</th>
+<th class="tableblock halign-left valign-top">Process</th>
+<th class="tableblock halign-left valign-top">Validation &amp; Control</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Development Build</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CMake compilation with embedded version tags</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Local developer testing on real hardware</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QA Validation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automated testbench execution</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware-in-the-loop testing, manual approval gate</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Production Release</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QA promotes approved firmware to OTA server</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Single gatekeeper model, full traceability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Field Deployment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device pulls firmware via HTTP when configured</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manual reboot required, automatic rollback protection</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_ab_partition_management">7.6.2. A/B Partition Management</h4>
+<div class="imageblock">
 <div class="content">
+<img src="./images/partition-management.svg" alt="partition management" width="743" height="559">
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_operational_procedures">7.7. Operational Procedures</h3>
+<div class="sect3">
+<h4 id="_version_management_and_auditability">7.7.1. Version Management and Auditability</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 35%;">
+<col style="width: 35%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Aspect</th>
+<th class="tableblock halign-left valign-top">Implementation</th>
+<th class="tableblock halign-left valign-top">Benefits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Version Identification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Git tags and commit checksums embedded in firmware</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Precise traceability of deployed firmware versions</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build Reproducibility</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deterministic build process with version tagging</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ability to rebuild exact firmware for debugging</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Release Documentation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QA approval records linked to firmware versions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Clear audit trail for all production releases</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Field Identification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device reports firmware version via management interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Support teams can identify deployed firmware versions</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_rollback_and_recovery_procedures">7.7.2. Rollback and Recovery Procedures</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 35%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Scenario</th>
+<th class="tableblock halign-left valign-top">Recovery Method</th>
+<th class="tableblock halign-left valign-top">Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Boot Failure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automatic rollback via watchdog timeout</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RP2350 ROM bootloader switches to backup partition</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Corrupted Download</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Signature verification failure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device rejects invalid firmware, retains current version</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Network Issues</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Download retry mechanism</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device continues with current firmware, retries later</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Total Firmware Corruption</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device replacement</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No field recovery possible when both partitions corrupted</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_monitoring_and_maintenance">7.7.3. Monitoring and Maintenance</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 70%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Monitoring Aspect</th>
+<th class="tableblock halign-left valign-top">Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Firmware Version Tracking</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Git checksums embedded in firmware, reported via management UI</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Update Success Rate</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device reports successful updates to management interface</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rollback Events</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watchdog rollback events logged in device memory</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OTA Server Health</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP availability monitoring for firmware distribution</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_configuration_management">7.8. Configuration Management</h3>
+<div class="sect3">
+<h4 id="_ota_server_configuration">7.8.1. OTA Server Configuration</h4>
 <div class="paragraph">
-<p>Describe (usually in a combination of diagrams, tables, and text):</p>
+<p>The UART2ETH device supports flexible OTA server configuration:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>distribution of a system to multiple locations, environments, computers, processors, .., as well as physical connections between them</p>
+<p><strong>Default Server</strong>: Company-hosted cloud OTA server for standard deployments</p>
 </li>
 <li>
-<p>important justifications or motivations for this deployment structure</p>
+<p><strong>Customer Servers</strong>: Configurable OTA server URL via management interface</p>
 </li>
 <li>
-<p>quality and/or performance features of this infrastructure</p>
+<p><strong>HTTP Protocol</strong>: Simple HTTP-based firmware downloads (no HTTPS requirement)</p>
 </li>
 <li>
-<p>mapping of software artifacts to elements of this infrastructure</p>
+<p><strong>Pull-based Updates</strong>: Devices initiate update checks, no push capability</p>
 </li>
 </ul>
-</div>
-<div class="paragraph">
-<p>For multiple environments or alternative deployments please copy and adapt this section of arc42 for all relevant environments.</p>
-</div>
-</div>
-</div>
-<div class="paragraph">
-<p><em><strong>&lt;Overview Diagram&gt;</strong></em></p>
-</div>
-<div class="dlist">
-<dl>
-<dt class="hdlist1">Motivation</dt>
-<dd>
-<p><em>&lt;explanation in text form&gt;</em></p>
-</dd>
-<dt class="hdlist1">Quality and/or Performance Features</dt>
-<dd>
-<p><em>&lt;explanation in text form&gt;</em></p>
-</dd>
-<dt class="hdlist1">Mapping of Building Blocks to Infrastructure</dt>
-<dd>
-<p><em>&lt;description of the mapping&gt;</em></p>
-</dd>
-</dl>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_infrastructure_level_2">7.2. Infrastructure Level 2</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<p>Here you can include the internal structure of (some) infrastructure elements from level 1.</p>
-</div>
-<div class="paragraph">
-<p>Please copy the structure from level 1 for each selected element.</p>
-</div>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_infrastructure_element_1">7.2.1. <em>&lt;Infrastructure Element 1&gt;</em></h4>
-<div class="paragraph">
-<p><em>&lt;diagram + explanation&gt;</em></p>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_infrastructure_element_2">7.2.2. <em>&lt;Infrastructure Element 2&gt;</em></h4>
-<div class="paragraph">
-<p><em>&lt;diagram + explanation&gt;</em></p>
-</div>
-<div class="paragraph">
-<p>&#8230;&#8203;</p>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_infrastructure_element_n">7.2.3. <em>&lt;Infrastructure Element n&gt;</em></h4>
-<div class="paragraph">
-<p><em>&lt;diagram + explanation&gt;</em></p>
 </div>
 <div style="page-break-after: always;"></div>
 </div>
