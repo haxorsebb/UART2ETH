@@ -38,9 +38,9 @@ The deployment architecture supports our core business requirements:
 | Firmware updates should propagate to devices within 10 minutes of release
 |===
 
-== Firmware Deployment Pipeline
+=== Firmware Deployment Pipeline
 
-=== Pipeline Overview
+==== Pipeline Overview
 
 [plantuml, firmware-deployment-pipeline, svg]
 ----
@@ -102,7 +102,7 @@ monitoring --> otaserver : "Update Analytics"
 @enduml
 ----
 
-=== Environment Specifications
+==== Environment Specifications
 
 [cols="20,25,25,30"]
 |===
@@ -129,9 +129,40 @@ monitoring --> otaserver : "Update Analytics"
 | Internet-facing, TLS secured, authenticated updates
 |===
 
-== Production Deployment Architecture
+==== Network Requirements
 
-=== Firmware Update Infrastructure
+[cols="30,30,40"]
+|===
+| Connection Path | Protocol/Ports | Bandwidth/Latency Requirements
+
+| Device → OTA Server
+| HTTPS (443/TCP)
+| Min 50Kbps, <500ms latency
+
+| OTA Server → Firmware Repository
+| Internal HTTPS (443/TCP)
+| Min 1Gbps, <10ms latency
+
+| Build Server → Firmware Repository
+| SFTP (22/TCP)
+| Min 1Gbps, <50ms latency
+
+| Device Management API
+| HTTPS (443/TCP)
+| Min 10Kbps, <1000ms latency
+
+| Monitoring Endpoints
+| HTTPS (443/TCP)
+| Min 1Kbps, <2000ms latency
+
+| HSM Communication
+| PKCS#11 over TLS (varies)
+| Min 100Kbps, <100ms latency
+|===
+
+=== Production Deployment Architecture
+
+==== Firmware Update Infrastructure
 
 [plantuml, ota-infrastructure, svg]
 ----
@@ -192,7 +223,7 @@ devicen --> lb : "Report Status"
 @enduml
 ----
 
-=== Device A/B Partition Architecture
+==== Device A/B Partition Architecture
 
 [plantuml, ab-partition-system, svg]
 ----
@@ -241,9 +272,9 @@ note bottom of config : Stores active partition flag\nand rollback counters
 @enduml
 ----
 
-== Infrastructure Components
+=== Infrastructure Components
 
-=== Development and Build Infrastructure
+==== Development and Build Infrastructure
 
 [cols="25,25,25,25"]
 |===
@@ -315,9 +346,9 @@ note bottom of config : Stores active partition flag\nand rollback counters
 | Verified boot chain from bootloader through application firmware
 |===
 
-== Deployment Strategies
+=== Deployment Strategies
 
-=== Update Deployment Patterns
+==== Update Deployment Patterns
 
 [cols="25,35,40"]
 |===
@@ -389,9 +420,9 @@ endif
 @enduml
 ----
 
-== Operational Procedures
+=== Operational Procedures
 
-=== Update Monitoring and Observability
+==== Update Monitoring and Observability
 
 [cols="25,35,40"]
 |===
@@ -437,6 +468,43 @@ endif
 | Root cause analysis, fix and re-deploy
 |===
 
+=== Infrastructure Disaster Recovery
+
+[cols="30,70"]
+|===
+| Failure Scenario | Recovery Procedure
+
+| OTA Server Failure
+| 1. Automatic failover to standby instances +
+2. DNS updates to redirect traffic +
+3. Recovery time objective: <15 minutes
+
+| Firmware Repository Corruption
+| 1. Restore from daily backups +
+2. Verify firmware integrity with checksums +
+3. Recovery time objective: <60 minutes
+
+| HSM Failure
+| 1. Switch to secondary HSM +
+2. Verify key availability +
+3. Recovery time objective: <30 minutes
+
+| Database Failure
+| 1. Failover to read replica +
+2. Promote replica to primary +
+3. Recovery time objective: <10 minutes
+
+| Network Infrastructure Failure
+| 1. Route traffic through backup CDN +
+2. Activate backup data centers +
+3. Recovery time objective: <5 minutes
+
+| Certificate Authority Compromise
+| 1. Revoke compromised certificates +
+2. Issue new device certificates +
+3. Deploy emergency firmware with new CA
+|===
+
 === Configuration Management
 
 [cols="25,35,40"]
@@ -460,9 +528,9 @@ endif
 | Certificate rotation via secure update channel
 |===
 
-== Risk Mitigation
+=== Risk Mitigation
 
-=== Deployment Risk Assessment
+==== Deployment Risk Assessment
 
 [cols="30,25,45"]
 |===
@@ -485,9 +553,9 @@ endif
 | Phased rollouts, canary deployments, emergency rollback procedures
 |===
 
-== Conclusion
+=== Conclusion
 
-=== Deployment Architecture Summary
+==== Deployment Architecture Summary
 
 The UART2ETH firmware deployment architecture provides a robust, secure, and reliable system for managing firmware updates across distributed device fleets. Key architectural decisions include:
 
