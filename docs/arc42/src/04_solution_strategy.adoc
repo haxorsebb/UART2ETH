@@ -391,44 +391,25 @@ Protocol-aware multi-pool approach documented for later enhancement:
 
 [plantuml, implementation-phases, svg]
 ----
-@startuml
-!theme plain
-skinparam backgroundColor transparent
-
+@startgantt
 title Implementation Roadmap
 
-package "Phase 1: Proof of Concept" as P1 {
-    component [Single UART + TCP] as P1_1
-    component [Mock Ring Buffer] as P1_2
-    component [Host-based Testing] as P1_3
-}
+-- Phase 1: Proof of Concept --
+[Single UART + TCP] requires 3 days
+then [Mock Ring Buffer] requires 1 day  
+then [Host-based Testing] requires 1 day
 
-package "Phase 2: Full System" as P2 {
-    component [All 4 UARTs] as P2_1
-    component [Complete Ring Buffer] as P2_2
-    component [HTTP Management UI] as P2_3
-}
+-- Phase 2: Full System --
+then [All 4 UARTs] requires 2 days
+then [Complete Ring Buffer] requires 2 days
+then [HTTP Management UI] requires 3 days
 
-package "Phase 3: Advanced Features" as P3 {
-    component [Secure OTA] as P3_1
-    component [A/B Updates] as P3_2
-    component [Industrial Hardening] as P3_3
-}
+-- Phase 3: Advanced Features --
+then [Secure OTA] requires 2 days
+then [A/B Updates] requires 2 days
+then [Industrial Hardening] requires 2 days
 
-P1_1 --> P1_2 : Sequential
-P1_2 --> P1_3 : Sequential
-P1 --> P2 : Foundation Ready
-P2_1 --> P2_2 : Sequential
-P2_2 --> P2_3 : Sequential
-P2 --> P3 : Core System Complete
-P3_1 --> P3_2 : Sequential
-P3_2 --> P3_3 : Sequential
-
-note top of P1 : 3 months each task
-note top of P2 : 3 months each task  
-note top of P3 : 3 months each task
-
-@enduml
+@endgantt
 ----
 
 *Phase 1: Proof of Concept*
