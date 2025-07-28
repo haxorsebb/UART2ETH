@@ -32,9 +32,9 @@ The UART2ETH system is an embedded hardware solution based on the RPI RP2350 mic
 | No remote device reboots, QA gatekeeping for all releases
 |===
 
-== Deployment Environments
+=== Deployment Environments
 
-=== Environment Overview
+==== Environment Overview
 
 [plantuml, deployment-environments, svg]
 ----
@@ -73,7 +73,7 @@ note right of field_devices : Manual reboot required\nfor partition switch
 @enduml
 ----
 
-=== Environment Specifications
+==== Environment Specifications
 
 [cols="20,30,25,25"]
 |===
@@ -100,9 +100,9 @@ note right of field_devices : Manual reboot required\nfor partition switch
 | Flash programming + key embedding
 |===
 
-== Firmware Deployment Architecture
+=== Firmware Deployment Architecture
 
-=== High-Level Architecture
+==== High-Level Architecture
 
 [plantuml, firmware-architecture, svg]
 ----
@@ -137,7 +137,7 @@ Rel(ota_server, device, "HTTP download")
 Rel(mgmt_ui, device, "Configure OTA server URL")
 ----
 
-=== A/B Partition Strategy
+==== A/B Partition Strategy
 
 [plantuml, ab-partitions, svg]
 ----
@@ -174,9 +174,9 @@ endif
 @enduml
 ----
 
-== Infrastructure Components
+=== Infrastructure Components
 
-=== Build and Release Infrastructure
+==== Build and Release Infrastructure
 
 [cols="25,35,40"]
 |===
@@ -203,7 +203,7 @@ endif
 | Firmware signing keys, device authentication
 |===
 
-=== Security Architecture
+==== Security Architecture
 
 [cols="30,70"]
 |===
@@ -225,9 +225,9 @@ endif
 | Each partition validated before boot attempt
 |===
 
-== Deployment Strategies
+=== Deployment Strategies
 
-=== Firmware Update Process
+==== Firmware Update Process
 
 [cols="25,35,40"]
 |===
@@ -250,7 +250,7 @@ endif
 | Manual reboot required, automatic rollback protection
 |===
 
-=== A/B Partition Management
+==== A/B Partition Management
 
 [plantuml, partition-management, svg]
 ----
@@ -281,9 +281,9 @@ note right of device : If watchdog times out,\nROM automatically boots\nfrom bac
 @enduml
 ----
 
-== Operational Procedures
+=== Operational Procedures
 
-=== Version Management and Auditability
+==== Version Management and Auditability
 
 [cols="30,35,35"]
 |===
@@ -306,7 +306,7 @@ note right of device : If watchdog times out,\nROM automatically boots\nfrom bac
 | Support teams can identify deployed firmware versions
 |===
 
-=== Rollback and Recovery Procedures
+==== Rollback and Recovery Procedures
 
 [cols="25,35,40"]
 |===
@@ -329,7 +329,7 @@ note right of device : If watchdog times out,\nROM automatically boots\nfrom bac
 | No field recovery possible when both partitions corrupted
 |===
 
-=== Monitoring and Maintenance
+==== Monitoring and Maintenance
 
 [cols="30,70"]
 |===
@@ -348,9 +348,9 @@ note right of device : If watchdog times out,\nROM automatically boots\nfrom bac
 | HTTP availability monitoring for firmware distribution
 |===
 
-== Configuration Management
+=== Configuration Management
 
-=== OTA Server Configuration
+==== OTA Server Configuration
 
 The UART2ETH device supports flexible OTA server configuration:
 
