@@ -200,11 +200,11 @@ right side
 | Quality Attribute | Security
 | Context | UART2ETH deployed in production network with potential access from unauthorized devices
 | Stimulus | Unauthorized device attempts TCP connection to UART bridge ports (4001-4004)
-| Response | System validates connection source against configured allow-list, rejects unauthorized connections, logs security events with timestamp and source details
-| Response Measure | 100% of unauthorized connection attempts blocked within 10ms, security events logged to persistent storage, no impact on authorized connections during attack
+| Response | System validates connection using IP whitelist and optional TLS client certificate authentication, rejects unauthorized connections with RST packet, logs security events with ISO 8601 timestamp and source details to encrypted flash storage
+| Response Measure | 100% of unauthorized connection attempts blocked within 10ms, zero false positives for whitelisted IPs, security events logged with integrity protection, system remains operational during connection flood attacks (up to 1000 attempts/second)
 | Priority | High
 | Rationale | Industrial networks require protection against unauthorized access to prevent data interception and system manipulation
-| Verification | Penetration testing with unauthorized IP addresses, port scanning detection, connection rate limiting validation
+| Verification | OWASP-based penetration testing with unauthorized IP addresses, automated port scanning from external networks, TLS certificate validation testing, connection flood testing with 1000+ concurrent attempts
 |===
 
 ===== Scenario S2: Firmware Integrity Validation
@@ -212,13 +212,13 @@ right side
 [cols="1,3"]
 |===
 | Quality Attribute | Security
-| Context | OTA firmware update process or system boot sequence
+| Context | OTA firmware update process or system boot sequence with secure boot enabled
 | Stimulus | System receives firmware image or boots from flash memory
-| Response | System validates cryptographic signature using embedded public key, verifies image checksum, rejects invalid firmware
-| Response Measure | 100% signature validation before execution, invalid firmware rejected within 500ms, automatic rollback to previous version if validation fails post-update
+| Response | System validates Ed25519 cryptographic signature using embedded public key, verifies SHA-256 image hash, implements secure boot chain from RP2350 ROM, validates firmware version to prevent rollback attacks, rejects invalid firmware
+| Response Measure | 100% signature validation before execution using Ed25519 (suitable for RP2350 performance constraints), invalid firmware rejected within 500ms, automatic rollback to previous version if post-update health check fails within 60 seconds, firmware version monotonically increasing
 | Priority | High  
 | Rationale | Firmware integrity ensures system operates only trusted code, preventing malicious modifications in industrial environments
-| Verification | Test with tampered firmware images, signature validation timing measurements, rollback procedure validation
+| Verification | Test with tampered firmware images using invalid signatures, downgrade attack testing with older firmware versions, signature validation timing measurements on RP2350 hardware, secure boot chain validation, rollback procedure validation
 |===
 
 ===== Scenario S3: Configuration Data Protection
@@ -228,11 +228,39 @@ right side
 | Quality Attribute | Security
 | Context | Device configuration contains network credentials and operational parameters
 | Stimulus | Power cycle, configuration backup, or unauthorized physical access attempt
-| Response | System encrypts sensitive configuration data in flash storage, requires authentication for configuration access, maintains configuration integrity
-| Response Measure | Configuration data encrypted with AES-256, authentication required for web interface access, configuration tampering detected with CRC validation
+| Response | System encrypts sensitive configuration data using ChaCha20-Poly1305 with device-unique key derived from RP2350 hardware features, implements PBKDF2 for password storage, requires session-based authentication for web interface access, maintains configuration integrity with HMAC-SHA256
+| Response Measure | Configuration data encrypted with ChaCha20-Poly1305 (optimized for RP2350), passwords stored using PBKDF2 with 10,000 iterations, session tokens expire after 30 minutes of inactivity, configuration tampering detected with HMAC-SHA256 validation triggering factory reset
 | Priority | High
 | Rationale | Configuration data contains sensitive network information that must be protected from unauthorized disclosure or modification
-| Verification | Flash memory analysis, authentication bypass testing, configuration integrity validation after power cycles
+| Verification | Flash memory hexdump analysis to verify encryption, password brute-force testing, session management testing, configuration integrity validation after power cycles, PBKDF2 timing validation on RP2350
+|===
+
+===== Scenario S4: Communication Security
+
+[cols="1,3"]
+|===
+| Quality Attribute | Security
+| Context | UART data transmitted over TCP connections in potentially untrusted network environments
+| Stimulus | Sensitive industrial data (PLC commands, sensor readings) transmitted between UART devices and network clients
+| Response | System provides optional TLS 1.3 encryption for TCP connections with industrial-grade cipher suites, maintains data integrity during transmission, implements connection authentication
+| Response Measure | TLS 1.3 with ChaCha20-Poly1305 cipher suite available for all TCP connections, <10ms additional latency for TLS handshake, 100% data integrity verification using TLS record layer, certificate-based client authentication supported
+| Priority | High
+| Rationale | Industrial data may contain sensitive process information requiring protection during network transmission
+| Verification | Network packet capture analysis to verify TLS encryption, latency measurement with TLS enabled/disabled, certificate validation testing, man-in-the-middle attack testing
+|===
+
+===== Scenario S5: Security Event Logging and Monitoring
+
+[cols="1,3"]
+|===
+| Quality Attribute | Security
+| Context | Industrial environment requiring audit trails and security incident detection
+| Stimulus | Security events including authentication failures, unauthorized access attempts, configuration changes, firmware updates
+| Response | System logs all security events to encrypted flash storage with tamper-evident integrity protection, provides secure export capability, maintains event timestamps with NTP synchronization
+| Response Measure | 100% of security events logged with ISO 8601 timestamps, log integrity protected with HMAC-SHA256, encrypted log storage using device-unique keys, log retention for minimum 30 days (10,000 events), secure log export via authenticated HTTPS
+| Priority | High
+| Rationale | Industrial systems require comprehensive audit trails for compliance and security incident investigation
+| Verification | Security event generation testing, log integrity validation, encrypted storage verification, timestamp accuracy testing, log export functionality testing
 |===
 
 ==== Compatibility Requirements (Priority 4 - Important)
@@ -422,9 +450,9 @@ The following table summarizes all quality scenarios by priority level:
 | 99.9% uptime, <100ms failure detection
 
 | **High** 
-| P1, P2, P3, P4, S1, S2, S3
+| P1, P2, P3, P4, S1, S2, S3, S4, S5
 | Performance & Security scenarios
-| <5ms latency, 500kBaud throughput, 100% security validation
+| <5ms latency, 500kBaud throughput, 100% security validation, TLS 1.3 encryption
 
 | **Important**
 | C1, C2, C3  
@@ -446,11 +474,34 @@ The following table summarizes all quality scenarios by priority level:
 
 The quality scenarios establish measurable success criteria that guide both architectural decisions and validation approaches. Critical scenarios represent non-negotiable requirements where system failure would render the product unsuitable for industrial deployment. High priority scenarios significantly impact user satisfaction and market adoption. Lower priority scenarios enhance user experience and reduce operational costs.
 
+=== Security-Industrial Operation Balance
+
+Industrial systems require a careful balance between security measures and operational requirements:
+
+**Security vs. Availability Trade-offs:**
+- Security features (authentication, encryption) must not compromise the 99.9% uptime requirement
+- TLS encryption adds <10ms latency, acceptable for industrial control loops
+- Security event logging uses <1% of flash storage, preserving system resources
+- Cryptographic algorithms selected for RP2350 performance constraints (Ed25519, ChaCha20-Poly1305)
+
+**Platform-Specific Security Considerations:**
+- RP2350 hardware security features (secure boot, unique device ID) integrated into security architecture
+- Lightweight cryptographic algorithms chosen to minimize CPU overhead (<5% utilization)
+- Static memory allocation prevents security-related memory leaks
+- Hardware random number generator used for cryptographic operations
+
+**Fail-Safe Security Principles:**
+- Security failures default to secure state (deny access, maintain logging)
+- Industrial operation continues during security incidents where possible
+- Critical security events trigger controlled degradation, not system shutdown
+- Recovery procedures restore both security and operational functionality
+
 These scenarios serve as the foundation for:
 - Architecture decision evaluation criteria
 - Test case development and acceptance criteria
 - Performance benchmarking and validation
 - Stakeholder communication about quality expectations
 - Risk assessment and mitigation planning
+- Security-operational trade-off analysis
 
 The concrete, measurable nature of these scenarios enables objective validation and provides clear guidance for architectural trade-offs throughout the development process.
