@@ -457,7 +457,42 @@
 </ul>
 </li>
 <li><a href="#section-technical-risks">11. Risks and Technical Debts</a></li>
-<li><a href="#section-glossary">12. Glossary</a></li>
+<li><a href="#_risk_overview">12. Risk Overview</a></li>
+<li><a href="#_detailed_risk_analysis">13. Detailed Risk Analysis</a>
+<ul class="sectlevel2">
+<li><a href="#_r_001_enc28j60_ecosystem_maturity_risk">13.1. R-001: ENC28J60 Ecosystem Maturity Risk</a></li>
+<li><a href="#_r_002_uart_hardware_resource_conflicts">13.2. R-002: UART Hardware Resource Conflicts</a></li>
+<li><a href="#_r_003_no_tlshttps_security_implementation">13.3. R-003: No TLS/HTTPS Security Implementation</a></li>
+<li><a href="#_r_004_no_uart_flow_control_implementation">13.4. R-004: No UART Flow Control Implementation</a></li>
+<li><a href="#_r_005_single_developer_knowledge_dependencies">13.5. R-005: Single Developer Knowledge Dependencies</a></li>
+<li><a href="#_r_006_rp2350_platform_learning_curve">13.6. R-006: RP2350 Platform Learning Curve</a></li>
+<li><a href="#_r_007_component_supply_chain_availability">13.7. R-007: Component Supply Chain Availability</a></li>
+<li><a href="#_r_008_industrial_performance_requirements">13.8. R-008: Industrial Performance Requirements</a></li>
+</ul>
+</li>
+<li><a href="#_technical_debt_register">14. Technical Debt Register</a>
+<ul class="sectlevel2">
+<li><a href="#_td_001_uart_flow_control">14.1. TD-001: UART Flow Control</a></li>
+<li><a href="#_td_002_tlshttps_security">14.2. TD-002: TLS/HTTPS Security</a></li>
+<li><a href="#_td_003_uart_resource_limitations">14.3. TD-003: UART Resource Limitations</a></li>
+</ul>
+</li>
+<li><a href="#_risk_mitigation_plan">15. Risk Mitigation Plan</a>
+<ul class="sectlevel2">
+<li><a href="#_immediate_actions_next_30_days">15.1. Immediate Actions (Next 30 Days)</a></li>
+<li><a href="#_short_term_actions_next_90_days">15.2. Short-term Actions (Next 90 Days)</a></li>
+<li><a href="#_long_term_actions_next_6_months">15.3. Long-term Actions (Next 6 Months)</a></li>
+</ul>
+</li>
+<li><a href="#_risk_monitoring">16. Risk Monitoring</a>
+<ul class="sectlevel2">
+<li><a href="#_weekly_reviews">16.1. Weekly Reviews</a></li>
+<li><a href="#_monthly_reviews">16.2. Monthly Reviews</a></li>
+<li><a href="#_quarterly_reviews">16.3. Quarterly Reviews</a></li>
+</ul>
+</li>
+<li><a href="#_risk_escalation_triggers">17. Risk Escalation Triggers</a></li>
+<li><a href="#section-glossary">18. Glossary</a></li>
 </ul>
 </div>
 
@@ -5447,7 +5482,7 @@ concrete and measurable.</p>
 </div>
 <div class="paragraph">
 <div class="title">Motivation</div>
-<p>“Risk management is project management for grown-ups” (Tim Lister, Atlantic Systems Guild.)</p>
+<p>"Risk management is project management for grown-ups" (Tim Lister, Atlantic Systems Guild.)</p>
 </div>
 <div class="paragraph">
 <p>This should be your motto for systematic detection and evaluation of risks and technical debts in the architecture, which will be needed by management stakeholders (e.g. project managers, product owners) as part of the overall risk analysis and measurement planning.</p>
@@ -5462,11 +5497,768 @@ concrete and measurable.</p>
 </div>
 </div>
 </div>
+<div class="paragraph">
+<p>This document identifies and assesses risks for the UART2ETH project, providing mitigation strategies and ownership assignments. Risk assessment follows systematic evaluation across technical, organizational, external, and business categories.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_risk_overview">12. Risk Overview</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 12.5%;">
+<col style="width: 37.5%;">
+<col style="width: 12.5%;">
+<col style="width: 12.5%;">
+<col style="width: 12.5%;">
+<col style="width: 12.5%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Risk ID</th>
+<th class="tableblock halign-left valign-top">Risk Title</th>
+<th class="tableblock halign-left valign-top">Category</th>
+<th class="tableblock halign-left valign-top">Probability</th>
+<th class="tableblock halign-left valign-top">Impact</th>
+<th class="tableblock halign-left valign-top">Risk Level</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-001</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ENC28J60 Ecosystem Maturity</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>CRITICAL</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-002</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART Hardware Resource Conflicts</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-003</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No TLS/HTTPS Security Implementation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-004</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No UART Flow Control Implementation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-005</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Single Developer Knowledge Dependencies</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Organizational</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-006</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RP2350 Platform Learning Curve</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Organizational</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>MEDIUM</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-007</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Component Supply Chain Availability</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">External</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>MEDIUM</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-008</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial Performance Requirements</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Business</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_detailed_risk_analysis">13. Detailed Risk Analysis</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_r_001_enc28j60_ecosystem_maturity_risk">13.1. R-001: ENC28J60 Ecosystem Maturity Risk</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Category</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Description</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ENC28J60 ethernet controller lacks mature RP2350 SDK integration, requiring significant custom development effort and potentially impacting industrial reliability goals</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High - No official RP2350 support exists, only individual open-source efforts</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High - Could require months of custom lwIP integration development and create maintenance risks</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Level</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>CRITICAL</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Current Controls</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Decision made to accept risk and proceed with ENC28J60
+- Basic research completed on integration approaches
+- Alternative W5500 option identified</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Additional Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Allocate 2-4 weeks for custom integration development
+- Create fallback plan for W5500 migration if integration proves too complex
+- Establish contact with existing ENC28J60+RP2350 community projects</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Owner</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Senior Developer</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Early implementation phase (next 3 months)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Early Warning Signs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Integration taking longer than 4 weeks
+- Stability issues with ethernet stack
+- Performance not meeting requirements</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Review Date</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Monthly during development</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_r_002_uart_hardware_resource_conflicts">13.2. R-002: UART Hardware Resource Conflicts</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Category</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Description</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RP2350 has limited UART resources: only 3 PIO UARTs available, 1 hardware UART conflicts with debug UART, other hardware UART used for SPI</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High - Hardware limitations are fixed constraints</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium - Limits system to 3 UARTs instead of advertised 4, affects product specification</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Level</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Current Controls</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Issue documented in technical debt register
+- PIO UART implementation planned</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Additional Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Redesign system for 3 UARTs maximum
+- Investigate debug UART alternatives (SWD-only debugging)
+- Consider external UART expansion via I2C</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Owner</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware Lead</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware design phase</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Early Warning Signs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Debug UART conflicts discovered during testing
+- PIO UART performance insufficient</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Review Date</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">During hardware design finalization</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_r_003_no_tlshttps_security_implementation">13.3. R-003: No TLS/HTTPS Security Implementation</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Category</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Description</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Current architecture does not include TLS/HTTPS support, creating security vulnerability for industrial applications</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium - Not all deployments require TLS, but many industrial environments do</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High - Could prevent deployment in security-conscious environments, data interception risk</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Level</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Current Controls</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Issue documented in technical debt register
+- TLS requirement identified for future implementation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Additional Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Research mbedTLS integration with RP2350
+- Plan TLS implementation for firmware v2.0
+- Document security limitations clearly for v1.0
+- Consider VPN-based security as interim solution</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Owner</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security Lead</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Post-v1.0 release</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Early Warning Signs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Customer inquiries about TLS support
+- Security audit requirements emerge</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Review Date</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quarterly</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_r_004_no_uart_flow_control_implementation">13.4. R-004: No UART Flow Control Implementation</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Category</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Description</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART implementation lacks hardware flow control (RTS/CTS), risking data loss under high throughput conditions</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High - High-speed UART communication commonly requires flow control</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium - Data loss possible, but software buffering may mitigate for many use cases</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Level</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Current Controls</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Issue documented in technical debt register
+- Software buffering strategy implemented</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Additional Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Implement XON/XOFF software flow control
+- Add hardware flow control pins to hardware design
+- Document flow control limitations clearly
+- Test thoroughly with high-speed protocols</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Owner</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Firmware Lead</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">During UART implementation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Early Warning Signs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Data loss observed during testing
+- Customer requirements include flow control</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Review Date</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">During UART testing phase</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_r_005_single_developer_knowledge_dependencies">13.5. R-005: Single Developer Knowledge Dependencies</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Category</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Organizational</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Description</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical project knowledge concentrated in individual team members, creating project continuity risk</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium - Team changes can occur during project lifecycle</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High - Could halt development if key person unavailable</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Level</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Current Controls</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Comprehensive arc42 documentation being created
+- ADR records document technical decisions</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Additional Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Implement pair programming for critical components
+- Create detailed technical documentation for all modules
+- Cross-train team members on RP2350 platform
+- Record design decision rationale thoroughly</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Owner</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Project Manager</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Throughout project</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Early Warning Signs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Key team member availability concerns
+- Knowledge gaps identified during reviews</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Review Date</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Monthly</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_r_006_rp2350_platform_learning_curve">13.6. R-006: RP2350 Platform Learning Curve</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Category</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Organizational</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Description</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Team unfamiliarity with RP2350-specific features (PIO, dual-core, security) may slow development</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium - Team has embedded experience but not RP2350-specific</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium - Could extend development timeline, suboptimal implementations</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Level</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>MEDIUM</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Current Controls</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- ADR-004 selected Native Pico SDK for best platform access
+- Team has strong C and embedded background</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Additional Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Allocate time for RP2350 training sessions
+- Create proof-of-concept implementations for key features
+- Engage with Raspberry Pi developer community
+- Study official examples and documentation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Owner</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical Lead</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Early development phase</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Early Warning Signs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Development taking longer than estimated
+- Suboptimal use of platform features</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Review Date</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Bi-weekly during development</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_r_007_component_supply_chain_availability">13.7. R-007: Component Supply Chain Availability</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Category</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">External</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Description</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RP2350 and ENC28J60 component availability could be affected by supply chain disruptions</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low - Both components currently available from multiple suppliers</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High - Could halt production if components unavailable</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Level</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>MEDIUM</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Current Controls</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Multiple supplier sources identified
+- Components currently in stock at major distributors</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Additional Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Monitor component availability regularly
+- Establish relationships with multiple suppliers
+- Consider alternative component specifications (W5500 backup)
+- Plan component inventory for production runs</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Owner</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Supply Chain Manager</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Pre-production and production phases</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Early Warning Signs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Lead times extending beyond normal
+- Price increases indicating supply constraints</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Review Date</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quarterly</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_r_008_industrial_performance_requirements">13.8. R-008: Industrial Performance Requirements</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Category</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Business</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Description</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System may not meet industrial performance requirements (latency, throughput, reliability) under real-world conditions</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium - Performance requirements are aggressive for embedded system</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High - Could prevent adoption in target industrial applications</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Level</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Current Controls</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Quality requirements documented in Chapter 10
+- Performance testing planned
+- Static allocation strategy chosen for predictability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Additional Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Implement comprehensive performance testing framework
+- Test with realistic industrial data patterns
+- Monitor performance metrics continuously
+- Plan performance optimization iterations</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Owner</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Performance Engineer</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Testing and validation phases</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Early Warning Signs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Performance tests failing targets
+- Latency spikes under load</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Review Date</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Weekly during testing</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_technical_debt_register">14. Technical Debt Register</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The following technical debts have been identified and require future resolution:</p>
+</div>
+<div class="sect2">
+<h3 id="_td_001_uart_flow_control">14.1. TD-001: UART Flow Control</h3>
+<div class="paragraph">
+<p><strong>Description:</strong> No hardware flow control implementation for UART interfaces<br>
+<strong>Impact:</strong> Potential data loss under high throughput conditions<br>
+<strong>Priority:</strong> High<br>
+<strong>Effort:</strong> Medium (2-3 weeks)<br>
+<strong>Resolution Plan:</strong> Implement XON/XOFF software flow control and add hardware pins in next revision</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_td_002_tlshttps_security">14.2. TD-002: TLS/HTTPS Security</h3>
+<div class="paragraph">
+<p><strong>Description:</strong> No TLS/HTTPS security implementation for network communications<br>
+<strong>Impact:</strong> Security vulnerability in industrial environments<br>
+<strong>Priority:</strong> High<br>
+<strong>Effort:</strong> High (4-6 weeks)<br>
+<strong>Resolution Plan:</strong> Integrate mbedTLS library in firmware v2.0</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_td_003_uart_resource_limitations">14.3. TD-003: UART Resource Limitations</h3>
+<div class="paragraph">
+<p><strong>Description:</strong> Only 3 UARTs available due to debug and SPI conflicts, not 4 as originally planned<br>
+<strong>Impact:</strong> Product specification limitation<br>
+<strong>Priority:</strong> Medium<br>
+<strong>Effort:</strong> High (hardware redesign)<br>
+<strong>Resolution Plan:</strong> Document limitation clearly, investigate external UART expansion options</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_risk_mitigation_plan">15. Risk Mitigation Plan</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_immediate_actions_next_30_days">15.1. Immediate Actions (Next 30 Days)</h3>
+<div class="ulist checklist">
+<ul class="checklist">
+<li>
+<p>&#10063; Allocate ENC28J60 integration development time (R-001)</p>
+</li>
+<li>
+<p>&#10063; Finalize UART hardware configuration to avoid conflicts (R-002)</p>
+</li>
+<li>
+<p>&#10063; Begin RP2350 platform training sessions (R-006)</p>
+</li>
+<li>
+<p>&#10063; Create detailed technical documentation templates (R-005)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_short_term_actions_next_90_days">15.2. Short-term Actions (Next 90 Days)</h3>
+<div class="ulist checklist">
+<ul class="checklist">
+<li>
+<p>&#10063; Complete ENC28J60 integration prototype (R-001)</p>
+</li>
+<li>
+<p>&#10063; Implement comprehensive performance testing (R-008)</p>
+</li>
+<li>
+<p>&#10063; Document security limitations and alternatives (R-003)</p>
+</li>
+<li>
+<p>&#10063; Establish component supplier relationships (R-007)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_long_term_actions_next_6_months">15.3. Long-term Actions (Next 6 Months)</h3>
+<div class="ulist checklist">
+<ul class="checklist">
+<li>
+<p>&#10063; Plan TLS implementation for v2.0 (R-003)</p>
+</li>
+<li>
+<p>&#10063; Evaluate hardware flow control addition (R-004)</p>
+</li>
+<li>
+<p>&#10063; Quarterly risk assessment reviews</p>
+</li>
+<li>
+<p>&#10063; Post-implementation risk validation</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_risk_monitoring">16. Risk Monitoring</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_weekly_reviews">16.1. Weekly Reviews</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Monitor ENC28J60 integration progress</p>
+</li>
+<li>
+<p>Review performance testing results</p>
+</li>
+<li>
+<p>Track component availability</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_monthly_reviews">16.2. Monthly Reviews</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Assess risk mitigation progress</p>
+</li>
+<li>
+<p>Identify new risks from development discoveries</p>
+</li>
+<li>
+<p>Update risk levels based on current status</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_quarterly_reviews">16.3. Quarterly Reviews</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Complete comprehensive risk register review</p>
+</li>
+<li>
+<p>Validate mitigation effectiveness</p>
+</li>
+<li>
+<p>Update risk management process</p>
+</li>
+<li>
+<p>Review technical debt resolution progress</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_risk_escalation_triggers">17. Risk Escalation Triggers</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Critical</strong>: ENC28J60 integration proves unfeasible</p>
+</li>
+<li>
+<p><strong>High</strong>: Performance targets consistently missed</p>
+</li>
+<li>
+<p><strong>Medium</strong>: Key team member unavailability</p>
+</li>
+<li>
+<p><strong>Any</strong>: New risks emerge that threaten project success</p>
+</li>
+</ul>
+</div>
 <div style="page-break-after: always;"></div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="section-glossary">12. Glossary</h2>
+<h2 id="section-glossary">18. Glossary</h2>
 <div class="sectionbody">
 <div class="sidebarblock arc42help">
 <div class="content">
