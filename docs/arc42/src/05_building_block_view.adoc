@@ -41,7 +41,7 @@ endif::arc42help[]
 
 === Whitebox Overall System
 
-The UART2ETH system follows a dual-core separation strategy that provides fault isolation while achieving hardware-driven performance. The system is decomposed into five major building blocks that each handle distinct responsibilities in the UART-to-TCP bridge functionality.
+The UART2ETH system follows a dual-core separation strategy that provides fault isolation while achieving hardware-driven performance. The system is decomposed into ten major building blocks that each handle distinct responsibilities in the UART-to-TCP bridge functionality.
 
 [plantuml, level1-building-blocks-simple, svg]
 ----
@@ -69,23 +69,46 @@ package "UART2ETH Device" {
     component "Management Interface\nHTTP Web Server\nConfig + Monitoring\nAuthentication" as MI #lightcyan
     
     component "OTA Update System\nSecure Updates\nA/B Partitions\nRollback capability" as OTA #lightpink
+    
+    component "Global State Machine\nSystem State Coordination\nBoot/Run/Update/Error states" as GSM #lightgray
+    
+    component "Log Manager\nSystem-wide Event Logging\nPerformance data collection\nDiagnostic data storage" as LOG #lightsalmon
+    
+    component "Configuration Manager\nPersistent Settings Storage\nFactory defaults\nParameter validation" as CFG #lightsteelblue
+    
+    component "Periodic Background Process\n100ms Timer\nHousekeeping tasks\nSystem maintenance" as PBP #wheat
+    
+    component "Watchdog System\nHealth Monitoring\nFailure Detection\nAutomatic Recovery" as WD #mistyrose
 }
 
-
-' Internal connections
+' Internal connections - Core System
 C0 <--> RB : Produces/Consumes\nShared Memory
 C1 <--> RB : Consumes/Produces\nShared Memory
-MI --> C0 : UART Config
-MI --> C1 : Network Config
 MI --> RB : Statistics Query
-OTA --> C1 : Update Triggers
+
+' Internal connections - State Machine
+GSM --> C0 : State Control\nEnable/Disable
+GSM --> C1 : State Control\nEnable/Disable
+GSM --> OTA : State Control
+GSM <--> PBP : State Control\nEnable/Disable
+GSM -> WD : Heartbeat
+
+' Internal connections - Configuration Manager
+CFG <--> C0 : UART Settings\nPersistent Storage
+CFG <--> C1 : Network Settings\nPersistent Storage
+
+' Management Interface connections
+MI <--> LOG : Log Query\nDiagnostics View
+MI <--> GSM : State Query\nSystem Status
+MI <--> CFG : Config Management\nSettings
+MI --> OTA : Update Authorization
 
 ' External connections
 UD --> C0 : Serial Data\nUART/RS232/RS422
 C1 --> NI : Ethernet Frames\n10BASE-T
 TC --> NI : TCP Connections
 FT --> MI : Configuration\nHTTP/Web UI
-FS --> OTA : Firmware Updates\nHTTPS
+FS --> OTA : Firmware Updates\nHTTP
 
 @enduml
 ----
@@ -98,6 +121,11 @@ The dual-core separation strategy from our solution approach drives this decompo
 * **Performance optimization**: Hardware-driven I/O with software control for real-time requirements
 * **Industrial reliability**: Predictable behavior through static allocation and deterministic interfaces
 * **Bidirectional communication**: Both UART and TCP interfaces require full-duplex operation
+* **System coordination**: Global state machine ensures consistent system behavior across cores
+* **Comprehensive monitoring**: Log Manager with performance data collection provides visibility and diagnostics
+* **Configuration persistence**: Configuration Manager ensures settings survive power cycles and support factory operations
+* **Predictable maintenance**: Periodic background processing ensures system housekeeping at regular intervals
+* **Automatic recovery**: Watchdog system provides fault detection and recovery capabilities
 
 ==== Contained Building Blocks
 
@@ -119,6 +147,21 @@ The dual-core separation strategy from our solution approach drives this decompo
 
 |*OTA Update System*
 |Manages secure firmware updates with A/B partition management, signature validation, and automatic rollback capabilities.
+
+|*Global State Machine*
+|Coordinates overall system state across both cores including boot sequence, operational modes, error handling, and update states. Provides centralized state synchronization and transition control.
+
+|*Log Manager*
+|Collects, formats, and stores system-wide events, errors, performance data, and diagnostic information from all components. Provides log rotation, filtering, and integration with management interface for diagnostics.
+
+|*Configuration Manager*
+|Manages persistent storage of all system settings including UART parameters, network configuration, user preferences, and system options. Provides factory defaults, parameter validation, configuration versioning, and backup/restore functionality.
+
+|*Periodic Background Process*
+|Executes system maintenance tasks every 100ms including statistics collection, connection cleanup, buffer maintenance, session management, configuration backup, and system health checks.
+
+|*Watchdog System*
+|Monitors system health through heartbeat signals from all major components. Detects failures, logs recovery events, and triggers automatic system recovery or reset when necessary.
 |===
 
 ==== Important Interfaces
@@ -139,6 +182,38 @@ The dual-core separation strategy from our solution approach drives this decompo
 * **Hardware**: 4 independent UART channels with configurable parameters
 * **Protocols**: UART/RS232/RS422 support with 300-500kBaud range
 * **Configuration**: Per-channel baud rate, data bits, stop bits, parity settings
+
+===== Global State Machine Interface
+* **States**: BOOT, INITIALIZING, OPERATIONAL, ERROR, UPDATE_MODE, RECOVERY
+* **Inter-core**: Shared state variables with atomic updates and cache coherency
+* **Transitions**: Event-driven state changes with validation and rollback capability
+* **Synchronization**: Cross-core state synchronization using FreeRTOS primitives
+
+===== Logging Interface
+* **Log Levels**: DEBUG, INFO, WARN, ERROR, CRITICAL with configurable filtering
+* **Storage**: Circular buffer in RAM with optional flash persistence
+* **Format**: Structured logging with timestamps, component ID, and severity
+* **Performance Data**: Throughput metrics, latency measurements, resource utilization
+* **Access**: Real-time log streaming via management interface
+
+===== Configuration Manager Interface
+* **Storage**: Persistent flash storage with wear leveling and redundancy
+* **Settings Categories**: UART parameters, network config, user accounts, system options
+* **Validation**: Parameter range checking, conflict detection, dependency validation
+* **Factory Reset**: Restore to known-good defaults with version migration
+* **Backup/Restore**: Configuration export/import for deployment and recovery
+
+===== Periodic Process Interface
+* **Timer**: Hardware timer interrupt every 100ms (10Hz frequency)
+* **Task Queue**: Priority-based maintenance task scheduling
+* **Execution**: Non-blocking operations with bounded execution time
+* **Health Reports**: Regular status updates to watchdog system
+
+===== Watchdog Interface
+* **Heartbeat**: Component-specific periodic health signals
+* **Thresholds**: Configurable timeout values per monitored component
+* **Recovery Actions**: Graduated response from warnings to system reset
+* **Hardware Integration**: RP2350 hardware watchdog timer as final safety net
 
 === Level 2
 
@@ -172,7 +247,7 @@ package "Core 0 UART Subsystem" {
     component "UART Handler UART2" as UART_Handler_2 #lightgreen
     component "UART Handler UART3" as UART_Handler_3 #lightgreen
         
-    
+
 }
 
 ' External connections
@@ -425,6 +500,124 @@ The shared buffer pool design provides elegant burst handling by allowing dynami
 |*Statistics Collector*
 |Tracks buffer utilization, message counts, throughput metrics, and error conditions for monitoring and diagnostics.
 |===
+
+==== Whitebox Log Manager
+
+The Log Manager provides system-wide event logging and performance data collection through lock-free interfaces that ensure real-time operations on both cores are never blocked by logging activities.
+
+[plantuml, level2-log-manager-simple, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Log Manager (Whitebox)
+
+cloud "Core 0 UART Subsystem\nUART Events + Performance" as C0
+cloud "Core 1 Network Subsystem\nNetwork Events + Performance" as C1
+cloud "Other System Components\nGSM, CFG, OTA, PBP, WD" as OTHER
+cloud "Management Interface\nLog Query + Display" as MI
+cloud "Flash Storage\nPersistent Logs" as FLASH
+
+package "Log Manager" {
+    component "Lock-Free Interface Core 0\nAtomic Write Operations\nNo blocking calls\nHigh-priority logging" as LF0 #lightgreen
+    
+    component "Lock-Free Interface Core 1\nAtomic Write Operations\nNo blocking calls\nNetwork event logging" as LF1 #lightblue
+    
+    component "Event Log Ring Buffer\nCircular Buffer\nFixed-size entries\nOverwrite oldest policy" as RING #lightyellow
+    
+    component "Log Entry Formatter\nStructured Logging\nTimestamp + Component ID\nSeverity + Message" as FORMAT #lightsalmon
+    
+    component "Log Level Filter\nConfigurable Filtering\nRuntime level control\nPer-component masks" as FILTER #lightcyan
+    
+    component "Performance Data Collector\nMetrics Aggregation\nThroughput calculation\nLatency measurement" as PERF #lightpink
+    
+    component "Log Query Interface\nSearch + Retrieval\nReal-time streaming\nHistorical access" as QUERY #lightsteelblue
+    
+    component "Log Persistence Manager\nFlash Storage\nLog rotation\nCompress + archive" as PERSIST #wheat
+}
+
+' External connections
+C0 --> LF0 : Log Events\nPerformance Data
+C1 --> LF1 : Log Events\nPerformance Data
+OTHER --> LF0 : System Events\nLower Priority
+MI <--> QUERY : Log Requests\nSearch Results
+PERSIST <--> FLASH : Read/Write\nLog Files
+
+' Internal connections - Core Data Flow
+LF0 --> FORMAT : Raw Log Data\nAtomic Writes
+LF1 --> FORMAT : Raw Log Data\nAtomic Writes
+FORMAT --> FILTER : Formatted Entries\nStructured Data
+FILTER --> RING : Filtered Entries\nLevel-appropriate
+
+' Internal connections - Performance Data
+LF0 --> PERF : Performance Metrics\nUART Statistics
+LF1 --> PERF : Performance Metrics\nNetwork Statistics
+PERF --> RING : Aggregated Metrics\nPerformance Reports
+
+' Internal connections - Output
+RING --> QUERY : Current Logs\nLive Data
+RING --> PERSIST : Log Entries\nPersistence Queue
+QUERY <--> RING : Search Operations\nData Retrieval
+
+@enduml
+----
+
+===== Motivation
+
+Lock-free logging interfaces prevent real-time operations from being blocked by logging activities. The dual-interface design allows each core to log independently without synchronization overhead, while the ring buffer provides bounded memory usage and predictable performance.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*Lock-Free Interface Core 0*
+|Provides atomic write operations for Core 0 components. Uses lock-free algorithms to ensure UART processing is never blocked by logging operations.
+
+|*Lock-Free Interface Core 1*
+|Provides atomic write operations for Core 1 components. Ensures network processing continues uninterrupted during logging activities.
+
+|*Event Log Ring Buffer*
+|Circular buffer storing formatted log entries with fixed-size allocation. Implements overwrite-oldest policy to handle log bursts without memory allocation.
+
+|*Log Entry Formatter*
+|Converts raw log data into structured entries with timestamps, component IDs, severity levels, and formatted messages for consistent log format.
+
+|*Log Level Filter*
+|Runtime-configurable filtering based on severity levels and component masks. Reduces storage overhead by filtering out debug messages in production.
+
+|*Performance Data Collector*
+|Aggregates performance metrics from both cores including throughput calculations, latency measurements, and resource utilization statistics.
+
+|*Log Query Interface*
+|Provides search and retrieval capabilities for both real-time log streaming and historical log access via the management interface.
+
+|*Log Persistence Manager*
+|Handles optional flash storage with log rotation, compression, and archival. Manages persistent log files for post-mortem analysis.
+|===
+
+===== Important Interfaces
+
+====== Lock-Free Logging Interface
+* **Atomic Operations**: Single-writer, multiple-reader lock-free ring buffer
+* **Non-blocking**: Log calls never block or yield the calling thread
+* **Bounded Time**: Worst-case execution time guarantees for real-time systems
+* **Overflow Handling**: Graceful degradation when log buffer fills
+
+====== Event Log Ring Buffer Structure
+* **Entry Size**: Fixed 128-byte entries for predictable memory usage
+* **Buffer Size**: Configurable (default 1024 entries = 128KB)
+* **Overflow Policy**: Drop oldest entries when buffer is full
+* **Memory Layout**: Cache-aligned for optimal performance
+
+====== Performance Data Interface
+* **Metrics Collection**: Throughput, latency, error counts, resource usage
+* **Aggregation**: Time-based windowing for trend analysis
+* **Real-time Access**: Current performance data always available
+* **Historical Data**: Configurable retention period for trend analysis
 
 ==== Whitebox Management Interface
 
@@ -1089,4 +1282,3 @@ typedef struct {
     uint16_t management_port;          // Web UI port (default 80)
 } network_config_t;
 ----
-
