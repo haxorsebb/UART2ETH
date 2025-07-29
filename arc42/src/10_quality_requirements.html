@@ -364,6 +364,10 @@
 <ul class="sectlevel2">
 <li><a href="#_quality_tree">Quality Tree</a></li>
 <li><a href="#_quality_scenarios">Quality Scenarios</a></li>
+<li><a href="#_quality_scenarios_integration">Quality Scenarios Integration</a></li>
+<li><a href="#_quality_scenario_priority_matrix">Quality Scenario Priority Matrix</a></li>
+<li><a href="#_quality_requirements_summary">Quality Requirements Summary</a></li>
+<li><a href="#_security_industrial_operation_balance">Security-Industrial Operation Balance</a></li>
 </ul>
 </li>
 </ul>
@@ -393,11 +397,1147 @@
 <div class="sectionbody">
 <div class="sect2">
 <h3 id="_quality_tree">Quality Tree</h3>
-
+<div class="paragraph">
+<p>The quality tree organizes our quality requirements hierarchically, derived from stakeholder expectations and our industrial embedded systems context. Priority levels reflect architectural significance and business impact.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/quality-tree-overview.svg" alt="quality tree overview" width="857" height="565">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Priority Levels:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Critical (1)</strong>: System failure without this quality - business showstopper</p>
+</li>
+<li>
+<p><strong>High (2)</strong>: Essential for reliable operation and long-term maintenance</p>
+</li>
+<li>
+<p><strong>High (3)</strong>: Significant impact on user satisfaction and adoption</p>
+</li>
+<li>
+<p><strong>Important (4)</strong>: Affects usability, deployment efficiency, and operational monitoring</p>
+</li>
+<li>
+<p><strong>Medium (5)</strong>: Enhances user experience and compatibility but system functional without them</p>
+</li>
+<li>
+<p><strong>Desired (6)</strong>: Nice-to-have features for future releases and enhanced security</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Resource and Performance Context:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Platform</strong>: RP2350 dual-core ARM Cortex-M33 at 150MHz, 520KB SRAM, 4MB Flash</p>
+</li>
+<li>
+<p><strong>Network</strong>: ENC28J60 10BASE-T Ethernet controller via SPI</p>
+</li>
+<li>
+<p><strong>Expected Load</strong>: Up to 4 concurrent UART channels at combined 500kBaud maximum throughput</p>
+</li>
+</ul>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_quality_scenarios">Quality Scenarios</h3>
-
+<div class="sect3">
+<h4 id="_reliability_requirements_priority_1_critical">Reliability Requirements (Priority 1 - Critical)</h4>
+<div class="sect4">
+<h5 id="_scenario_r1_industrial_continuous_operation">Scenario R1: Industrial Continuous Operation</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Reliability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manufacturing environment with 24/7 operation during normal environmental conditions (temperature, humidity, power within specifications)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART2ETH device deployed in production line handling PLC communication</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System maintains continuous operation without software-induced failure</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">99.99% uptime during scheduled production hours (876 hours/year), maximum 0.876 hours downtime annually due to software issues</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical (1)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manufacturing downtime costs thousands per minute; industrial systems require exceptional reliability for business viability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Extended operation testing for 100+ continuous hours with simulated industrial traffic patterns, watchdog timer validation, memory leak detection tools</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_r2_hardware_component_failure_recovery">Scenario R2: Hardware Component Failure Recovery</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Reliability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Production deployment with active UART and network connections</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Single hardware component failure (e.g., ENC28J60 controller malfunction)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System logs error with timestamp and component identifier, maintains UART data buffering, activates error LED with specific blink pattern, continues UART processing while disabling affected network functions</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Failure detection within 100ms, no data corruption in ring buffer, error LED pattern visible, automatic recovery within 2 seconds when component functionality restored</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical (1)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware failures are inevitable; system must handle them gracefully to maintain industrial reliability standards</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Fault injection testing using SPI line manipulation and network disconnection. Verified with oscilloscope timing measurements and data integrity checksums</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_r3_power_cycle_recovery">Scenario R3: Power Cycle Recovery</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Reliability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial environment with occasional power fluctuations or maintenance shutdowns</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Unexpected power loss followed by power restoration</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System restarts cleanly, restores previous configuration, resumes operation without manual intervention</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Full operational restart within 10 seconds, 100% configuration preservation, automatic reconnection from previous TCP clients within 15 seconds</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical (1)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Power interruptions are common in industrial settings; system must resume operation automatically to avoid service calls</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_r4_memory_exhaustion_protection">Scenario R4: Memory Exhaustion Protection</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Reliability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High-throughput operation with all 4 UARTs active at maximum baud rates</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ring buffer approaches capacity due to traffic burst or consumer processing delays</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System applies drop-oldest policy deterministically, continues operation without crash or memory leak</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No system crash under any traffic conditions, maximum 5% packet loss during extreme bursts (&gt;150% of sustained capacity), recovery to normal operation within 1 second after burst ends</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical (1)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Static memory architecture must handle overload gracefully; crashes are unacceptable in industrial applications</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Traffic generation testing at 200% rated capacity for 30 minutes, memory usage monitoring, packet loss measurement with statistical analysis</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_performance_requirements_mixed_priority_highimportant">Performance Requirements (Mixed Priority: High/Important)</h4>
+<div class="sect4">
+<h5 id="_scenario_p1_real_time_industrial_control_latency">Scenario P1: Real-time Industrial Control Latency</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Performance</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PLC communicating time-critical control data to SCADA system via UART2ETH bridge</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PLC sends control command that must reach SCADA system with minimal delay</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data transmitted through UART→Ring Buffer→TCP path with optimized processing</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">End-to-end latency &lt;5ms for 95% of packets under normal load (up to 300kBaud sustained across all channels)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High (3)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial control loops require predictable, low latency to maintain process stability and safety</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Measured using hardware timestamp injection at UART TX and TCP packet capture analysis. Test with 10,000 message sequences under sustained 300kBaud load</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_p2_sustained_high_throughput">Scenario P2: Sustained High Throughput</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Performance</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data-intensive application requiring bulk data transfer (e.g., measurement data logging)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Continuous data stream at maximum specified throughput across multiple UART channels</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System maintains data flow without drops or significant queuing delays</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sustain 500kBaud combined throughput across all active channels for 8+ hour periods with &lt;0.1% packet loss</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High (2)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High-volume applications require consistent throughput to avoid data loss and maintain system efficiency</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automated throughput testing with UART traffic generators, network packet capture analysis, 24-hour continuous operation validation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_p3_resource_utilization_under_load">Scenario P3: Resource Utilization Under Load</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Performance</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System operating at 80% of maximum specified capacity across CPU, memory, and network resources</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Normal industrial traffic patterns with occasional bursts</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System maintains responsive operation with efficient resource usage</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CPU utilization &lt;70%, memory usage &lt;80% of available RAM, network buffer utilization &lt;60% during normal operation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Important (4)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Efficient resource usage ensures headroom for traffic spikes and maintains system responsiveness</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_p4_network_congestion_handling">Scenario P4: Network Congestion Handling</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Performance</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Network infrastructure experiencing intermittent congestion or high latency</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TCP connection experiences delays or temporary packet loss</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System adapts transmission patterns while maintaining UART data flow integrity</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automatic TCP retry within 50ms, UART data buffering up to 2 seconds during network issues, no UART data loss during network recovery</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High (2)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Network infrastructure issues are common; system must adapt while protecting serial data integrity</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_security_requirements_mixed_priority_criticalimportantdesired">Security Requirements (Mixed Priority: Critical/Important/Desired)</h4>
+<div class="sect4">
+<h5 id="_scenario_s1_unauthorized_network_access_prevention">Scenario S1: Unauthorized Network Access Prevention</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART2ETH deployed in production network with potential access from unauthorized devices</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Unauthorized device attempts TCP connection to UART bridge ports (4001-4004)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System validates connection using IP whitelist and optional TLS client certificate authentication, rejects unauthorized connections with RST packet, logs security events with ISO 8601 timestamp and source details to encrypted flash storage</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">100% of unauthorized connection attempts blocked within 10ms, zero false positives for whitelisted IPs, security events logged with integrity protection, system remains operational during connection flood attacks (up to 1000 attempts/second)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Desired (6)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial networks require protection against unauthorized access to prevent data interception and system manipulation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OWASP-based penetration testing with unauthorized IP addresses, automated port scanning from external networks, TLS certificate validation testing, connection flood testing with 1000+ concurrent attempts</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_s2_firmware_integrity_validation">Scenario S2: Firmware Integrity Validation</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OTA firmware update process or system boot sequence with secure boot enabled</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System receives firmware image or boots from flash memory</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System validates cryptographic signature using embedded public key, verifies SHA-256 image hash, implements secure boot chain from RP2350 ROM, validates firmware version to prevent rollback attacks, rejects invalid firmware</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">100% signature validation before execution using, invalid firmware rejected within 500ms, automatic rollback to previous version if post-update health check fails within 15 seconds, firmware version monotonically increasing</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical (1)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Firmware integrity ensures system operates only trusted code, preventing malicious modifications in industrial environments</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Test with tampered firmware images using invalid signatures, downgrade attack testing with older firmware versions, signature validation timing measurements on RP2350 hardware, secure boot chain validation, rollback procedure validation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_s3_configuration_data_protection">Scenario S3: Configuration Data Protection</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device configuration contains network credentials and operational parameters</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Power cycle, configuration backup</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System validates configuration integrity with HMAC-SHA256, keeps 2 copies configuration, uses monotonic revision counter to keep track of latest vaild revision</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration tampering or corruption detected with HMAC-SHA256 validation triggering rollback to latest valid version</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical (1)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration data must not be corrupted</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Flash memory hexdump analysis to verify HMAC-SHA256 and revision counter, configuration integrity validation after power cycles, forced corruption to verify configuration rollback</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_s4_communication_security">Scenario S4: Communication Security</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART data transmitted over TCP connections in potentially untrusted network environments</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sensitive industrial data (PLC commands, sensor readings) transmitted between UART devices and network clients</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System provides optional TLS 1.3 encryption for TCP connections with industrial-grade cipher suites, maintains data integrity during transmission, implements connection authentication</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TLS 1.3 available for all TCP connections, &lt;10ms additional latency for TLS handshake, 100% data integrity verification using TLS record layer, certificate-based client authentication supported</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Desired (6)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial data may contain sensitive process information requiring protection during network transmission</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Network packet capture analysis to verify TLS encryption, latency measurement with TLS enabled/disabled, certificate validation testing, man-in-the-middle attack testing</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_s5_security_event_logging_and_monitoring">Scenario S5: Security Event Logging and Monitoring</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial environment requiring audit trails and security incident detection</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security events including authentication failures, unauthorized access attempts, configuration changes, firmware updates</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System logs all security events to encrypted flash storage with tamper-evident integrity protection, provides secure export capability, maintains event timestamps with NTP synchronization</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">100% of events logged with ISO 8601 timestamps, log integrity protected with HMAC-SHA256, encrypted log storage using device-unique keys, log retention for 1000 events, log export via HTTP Web UI</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Important (4)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial systems require comprehensive audit trails for compliance and security incident investigation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security event generation testing, log integrity validation, encrypted storage verification, timestamp accuracy testing, log export functionality testing</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_compatibility_requirements_mixed_priority_criticalmedium">Compatibility Requirements (Mixed Priority: Critical/Medium)</h4>
+<div class="sect4">
+<h5 id="_scenario_c1_diverse_industrial_protocol_support">Scenario C1: Diverse Industrial Protocol Support</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Compatibility</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System integrator deploying UART2ETH with various industrial equipment (PLCs, sensors, measurement devices)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration requests for non-standard baud rates, unusual frame formats, or custom protocol timing</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System accepts and maintains stable communication with diverse protocol requirements</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Support for baud rates 300-500000, all standard frame formats (5-8 data bits, 1-2 stop bits, none/odd/even parity), stable operation with 99.9% of industrial serial devices</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium (5)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial environments contain diverse legacy equipment; broad compatibility enables market adoption and reduces integration effort</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Protocol compliance testing with representative industrial devices (PLCs from 3+ vendors, measurement instruments), baud rate accuracy measurement with oscilloscope</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_c2_network_infrastructure_integration">Scenario C2: Network Infrastructure Integration</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Compatibility</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deployment in existing network infrastructure with various switches, routers, and network management systems</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Connection to different network environments (managed switches, VLANs, different subnet configurations)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System auto-negotiates network parameters and maintains stable operation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Successful auto-negotiation with 95% of standard Ethernet infrastructure, stable operation across different network topologies, DHCP and static IP support</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical (1)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Network environments vary significantly between sites; automatic adaptation reduces deployment complexity and support costs</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_c3_scada_system_integration">Scenario C3: SCADA System Integration</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Compatibility</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Integration with existing SCADA/HMI systems from various vendors</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SCADA system establishes TCP connection with specific protocol expectations or timing requirements</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System provides transparent TCP socket interface compatible with SCADA expectations</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Successful integration with 90% of common SCADA systems, transparent protocol forwarding without modification, support for multiple simultaneous connections per UART</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium (5)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SCADA integration is primary use case; broad compatibility ensures market viability and reduces customer integration effort</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_usability_requirements_mixed_priority_importantmedium">Usability Requirements (Mixed Priority: Important/Medium)</h4>
+<div class="sect4">
+<h5 id="_scenario_u1_field_technician_deployment">Scenario U1: Field Technician Deployment</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Usability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Field technician with basic networking knowledge deploying device in industrial facility</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technician needs to configure device for first-time operation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System provides intuitive configuration interface with clear guidance and validation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Complete basic configuration (IP settings, UART parameters, port mapping) within 15 minutes by technician with minimal training, configuration errors caught with helpful error messages</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Important (4)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Simple deployment reduces installation time, training costs, and field support requirements</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_u2_troubleshooting_and_diagnostics">Scenario U2: Troubleshooting and Diagnostics</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Usability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System experiencing communication issues in production environment</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Field technician or system integrator needs to diagnose and resolve connectivity problems</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System provides clear diagnostic information and status indicators</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Problem identification within 5 minutes using web interface diagnostics, LED status indicators visible from 2 meters, error messages identify specific issue and suggest resolution steps</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium (5)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Clear diagnostics reduce troubleshooting time, minimize production downtime, and reduce support costs</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_u3_configuration_management">Scenario U3: Configuration Management</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Usability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System integrator managing multiple UART2ETH devices across different sites</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Need to backup, restore, or replicate device configurations</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System provides configuration export/import functionality with validation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Complete configuration backup/restore within 2 minutes, configuration file validation with clear error reporting, bulk configuration deployment to multiple devices</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium (5)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration management reduces deployment time for multiple devices and simplifies maintenance procedures</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_maintainability_requirements_mixed_priority_criticalhighdesired">Maintainability Requirements (Mixed Priority: Critical/High/Desired)</h4>
+<div class="sect4">
+<h5 id="_scenario_m1_secure_over_the_air_updates">Scenario M1: Secure Over-the-Air Updates</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maintainability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deployed devices requiring firmware update for bug fixes or feature enhancements</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Administrator initiates OTA update from management server</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System securely downloads, validates, and applies firmware update with automatic rollback on failure</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Update completion within 10 minutes, 100% signature validation, automatic rollback within 2 minutes if update fails, zero configuration loss during successful updates</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High (2)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Field updates are essential for long-term maintenance; secure OTA capability reduces service costs and improves security posture</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Verification</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OTA update testing with valid/invalid signatures, network interruption during update, rollback timing measurement, configuration persistence validation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_m2_ab_partition_rollback">Scenario M2: A/B Partition Rollback</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maintainability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Recently updated device experiencing issues with new firmware version</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automatic rollback trigger due to system health check failure or manual rollback command</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System switches to previous firmware version and restores operation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rollback completion within 30 seconds, 100% restoration of previous functionality, all user configurations preserved during rollback process</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical (1)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rollback capability ensures update safety and reduces risk of system unavailability due to problematic firmware</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_scenario_m3_development_and_testing_support">Scenario M3: Development and Testing Support</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quality Attribute</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maintainability</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Context</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Development team implementing new features or debugging reported issues</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stimulus</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Developer needs to analyze system behavior or verify fix implementation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System provides comprehensive debugging interfaces and test capabilities</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Response Measure</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Debug interface access within 30 seconds, comprehensive logging of system events, test mode operation without affecting production traffic</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Desired (6)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rationale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Development efficiency directly impacts time-to-market and bug resolution speed, affecting overall product quality</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_quality_scenarios_integration">Quality Scenarios Integration</h3>
+<div class="sect3">
+<h4 id="_architectural_decision_impact">Architectural Decision Impact</h4>
+<div class="paragraph">
+<p>These quality scenarios directly influence key architectural decisions documented in our ADRs:</p>
+</div>
+<div class="paragraph">
+<p><strong>Hardware Platform Decisions:</strong>
+- <strong>Reliability Scenarios R1-R4</strong> → <a href="../../adrs/ADR-001-microcontroller-selection.adoc">ADR-001: RP2350 Selection</a> provides dual-core architecture for fault isolation
+- <strong>Performance Scenarios P1-P2</strong> → Static memory allocation strategy eliminates runtime allocation failures</p>
+</div>
+<div class="paragraph">
+<p><strong>Software Architecture Decisions:</strong>
+- <strong>Performance Scenarios P1-P4</strong> → <a href="../../adrs/ADR-003-programming-language-selection.adoc">ADR-003: C Language Selection</a> enables deterministic, real-time behavior
+- <strong>Reliability Scenarios R2-R4</strong> → Ring buffer design with drop-oldest policy provides predictable overload behavior</p>
+</div>
+<div class="paragraph">
+<p><strong>Network Architecture Decisions:</strong>
+- <strong>Compatibility Scenarios C1-C3</strong> → ENC28J60 selection with software TCP/IP stack enables full protocol control and auditability</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_testing_and_validation_framework">Testing and Validation Framework</h4>
+<div class="paragraph">
+<p>Each quality scenario translates directly into test cases:</p>
+</div>
+<div class="paragraph">
+<p><strong>Reliability Testing:</strong>
+- Extended operation testing (1000+ hours) to validate R1
+- Fault injection testing for hardware failure scenarios (R2)
+- Power cycle testing with configuration persistence validation (R3)
+- Memory stress testing with overload conditions (R4)</p>
+</div>
+<div class="paragraph">
+<p><strong>Performance Testing:</strong>
+- Real-time latency measurement under various loads (P1)
+- Sustained throughput testing for extended periods (P2)
+- Resource monitoring during peak operations (P3)
+- Network resilience testing with simulated congestion (P4)</p>
+</div>
+<div class="paragraph">
+<p><strong>Compatibility Testing:</strong>
+- Protocol compliance testing with diverse industrial equipment (C1)
+- Network infrastructure compatibility testing (C2)
+- SCADA system integration testing (C3)</p>
+</div>
+<div class="paragraph">
+<p><strong>Usability Testing:</strong>
+- Field deployment simulation with time measurements (U1)
+- Diagnostic effectiveness testing with problem scenarios (U2)
+- Configuration management workflow testing (U3)</p>
+</div>
+<div class="paragraph">
+<p><strong>Maintainability Testing:</strong>
+- OTA update testing with various failure scenarios (M1)
+- A/B rollback testing with timing and data integrity validation (M2)
+- Development workflow testing and debugging interface validation (M3)</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_quality_scenario_priority_matrix">Quality Scenario Priority Matrix</h3>
+<div class="paragraph">
+<p>The following table summarizes all quality scenarios by priority level:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 15%;">
+<col style="width: 25%;">
+<col style="width: 35%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Priority</th>
+<th class="tableblock halign-left valign-top">Scenario ID</th>
+<th class="tableblock halign-left valign-top">Scenario Name</th>
+<th class="tableblock halign-left valign-top">Key Metric</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Critical (1)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R1, R2, R3, R4, S2, S3, C2, M2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Industrial Operation, Hardware Failure, Power Recovery, Memory Protection, Firmware Integrity, Configuration Protection, Network Integration, A/B Rollback</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">99.99% uptime, &lt;100ms failure detection, 100% signature validation, automatic network compatibility</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>High (2)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">P2, P4, M1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High Throughput, Network Congestion Handling, OTA Updates</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">500kBaud sustained throughput, &lt;10min OTA updates, network resilience</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>High (3)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">P1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Real-time Industrial Control Latency</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt;5ms latency for 95% of packets</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Important (4)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">P3, S5, U1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Resource Utilization, Security Logging, Field Deployment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt;70% CPU utilization, comprehensive audit trails, &lt;15min deployment</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Medium (5)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">C1, C3, U2, U3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Protocol Support, SCADA Integration, Diagnostics, Configuration Management</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">99.9% device compatibility, &lt;5min troubleshooting, configuration backup/restore</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Desired (6)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">S1, S4, M3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Network Access Control, Communication Security, Development Support</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TLS 1.3 encryption, unauthorized access blocking, debug interface access</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_quality_requirements_summary">Quality Requirements Summary</h3>
+<div class="paragraph">
+<p>The quality scenarios establish measurable success criteria that guide both architectural decisions and validation approaches. Critical scenarios represent non-negotiable requirements where system failure would render the product unsuitable for industrial deployment. High priority scenarios significantly impact user satisfaction and market adoption. Lower priority scenarios enhance user experience and reduce operational costs.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_security_industrial_operation_balance">Security-Industrial Operation Balance</h3>
+<div class="paragraph">
+<p>Industrial systems require a careful balance between security measures and operational requirements:</p>
+</div>
+<div class="paragraph">
+<p><strong>Security vs. Availability Trade-offs:</strong>
+- Security features (authentication, encryption) must not compromise the 99.99% uptime requirement
+- TLS encryption adds &lt;10ms latency, acceptable for industrial control loops
+- Security event logging uses &lt;1% of flash storage, preserving system resources</p>
+</div>
+<div class="paragraph">
+<p><strong>Platform-Specific Security Considerations:</strong>
+- RP2350 hardware security features (secure boot, unique device ID) integrated into security architecture
+- Lightweight cryptographic algorithms chosen to minimize CPU overhead (&lt;5% utilization)
+- Static memory allocation prevents security-related memory leaks
+- Hardware random number generator used for cryptographic operations</p>
+</div>
+<div class="paragraph">
+<p><strong>Fail-Safe Security Principles:</strong>
+- Security failures default to secure state (deny access, maintain logging)
+- Industrial operation continues during security incidents where possible
+- Critical security events trigger controlled degradation, not system shutdown
+- Recovery procedures restore both security and operational functionality</p>
+</div>
+<div class="paragraph">
+<p>These scenarios serve as the foundation for:
+- Architecture decision evaluation criteria
+- Test case development and acceptance criteria
+- Performance benchmarking and validation
+- Stakeholder communication about quality expectations
+- Risk assessment and mitigation planning
+- Security-operational trade-off analysis</p>
+</div>
+<div class="paragraph">
+<p>The concrete, measurable nature of these scenarios enables objective validation and provides clear guidance for architectural trade-offs throughout the development process.</p>
+</div>
 </div>
 </div>
 </div>
