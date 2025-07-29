@@ -64,9 +64,17 @@ right side
 
 **Priority Levels:**
 
-* **Critical (Priority 1)**: System failure without this quality - business showstopper
-* **Important (Priority 2-3)**: Significant impact on user satisfaction and adoption
-* **Desired (Priority 4-5)**: Valuable for user experience but system functional without them
+* **Critical (Priority 1)**: System failure without this quality - business showstopper  
+* **High (Priority 2-3)**: Significant impact on user satisfaction and adoption
+* **Important (Priority 4)**: Affects usability and market competitiveness
+* **Medium (Priority 5)**: Enhances user experience but system functional without them
+* **Desired (Priority 6)**: Nice-to-have features for future releases
+
+**Resource and Performance Context:**
+
+* **Platform**: RP2350 dual-core ARM Cortex-M33 at 150MHz, 520KB SRAM, 4MB Flash
+* **Network**: ENC28J60 10BASE-T Ethernet controller via SPI
+* **Expected Load**: Up to 4 concurrent UART channels at combined 500kBaud maximum throughput
 
 === Quality Scenarios
 
@@ -83,6 +91,7 @@ right side
 | Response Measure | 99.9% uptime during scheduled production hours (8760 hours/year), maximum 8.76 hours downtime annually due to software issues
 | Priority | Critical
 | Rationale | Manufacturing downtime costs thousands per minute; industrial systems require exceptional reliability for business viability
+| Verification | Extended operation testing for 1000+ continuous hours with simulated industrial traffic patterns, watchdog timer validation, memory leak detection tools
 |===
 
 ===== Scenario R2: Hardware Component Failure Recovery
@@ -92,10 +101,11 @@ right side
 | Quality Attribute | Reliability  
 | Context | Production deployment with active UART and network connections
 | Stimulus | Single hardware component failure (e.g., ENC28J60 controller malfunction)
-| Response | System detects failure, maintains data integrity, provides clear error indication without corrupting ongoing operations
-| Response Measure | Failure detection within 100ms, no data corruption, graceful degradation with error LED indication, system recovery without restart when component restored
+| Response | System logs error with timestamp and component identifier, maintains UART data buffering, activates error LED with specific blink pattern, continues UART processing while disabling affected network functions
+| Response Measure | Failure detection within 100ms, no data corruption in ring buffer, error LED pattern visible from 3 meters, automatic recovery within 2 seconds when component functionality restored
 | Priority | Critical
 | Rationale | Hardware failures are inevitable; system must handle them gracefully to maintain industrial reliability standards
+| Verification | Fault injection testing using SPI line manipulation and network disconnection. Verified with oscilloscope timing measurements and data integrity checksums
 |===
 
 ===== Scenario R3: Power Cycle Recovery
@@ -122,6 +132,7 @@ right side
 | Response Measure | No system crash under any traffic conditions, maximum 5% packet loss during extreme bursts (>150% of sustained capacity), recovery to normal operation within 1 second after burst ends
 | Priority | Critical
 | Rationale | Static memory architecture must handle overload gracefully; crashes are unacceptable in industrial applications
+| Verification | Traffic generation testing at 200% rated capacity for 30 minutes, memory usage monitoring, packet loss measurement with statistical analysis
 |===
 
 ==== Performance Requirements (Priority 2 - Important)
@@ -137,6 +148,7 @@ right side
 | Response Measure | End-to-end latency <5ms for 95% of packets under normal load (up to 300kBaud sustained across all channels)
 | Priority | High
 | Rationale | Industrial control loops require predictable, low latency to maintain process stability and safety
+| Verification | Measured using hardware timestamp injection at UART TX and TCP packet capture analysis. Test with 10,000 message sequences under sustained 300kBaud load
 |===
 
 ===== Scenario P2: Sustained High Throughput
@@ -150,6 +162,7 @@ right side
 | Response Measure | Sustain 500kBaud combined throughput across all active channels for 8+ hour periods with <0.1% packet loss
 | Priority | High
 | Rationale | High-volume applications require consistent throughput to avoid data loss and maintain system efficiency
+| Verification | Automated throughput testing with UART traffic generators, network packet capture analysis, 24-hour continuous operation validation
 |===
 
 ===== Scenario P3: Resource Utilization Under Load
@@ -178,7 +191,51 @@ right side
 | Rationale | Network infrastructure issues are common; system must adapt while protecting serial data integrity
 |===
 
-==== Compatibility Requirements (Priority 3 - Important)
+==== Security Requirements (Priority 3 - Important)
+
+===== Scenario S1: Unauthorized Network Access Prevention
+
+[cols="1,3"]
+|===
+| Quality Attribute | Security
+| Context | UART2ETH deployed in production network with potential access from unauthorized devices
+| Stimulus | Unauthorized device attempts TCP connection to UART bridge ports (4001-4004)
+| Response | System validates connection source against configured allow-list, rejects unauthorized connections, logs security events with timestamp and source details
+| Response Measure | 100% of unauthorized connection attempts blocked within 10ms, security events logged to persistent storage, no impact on authorized connections during attack
+| Priority | High
+| Rationale | Industrial networks require protection against unauthorized access to prevent data interception and system manipulation
+| Verification | Penetration testing with unauthorized IP addresses, port scanning detection, connection rate limiting validation
+|===
+
+===== Scenario S2: Firmware Integrity Validation
+
+[cols="1,3"]
+|===
+| Quality Attribute | Security
+| Context | OTA firmware update process or system boot sequence
+| Stimulus | System receives firmware image or boots from flash memory
+| Response | System validates cryptographic signature using embedded public key, verifies image checksum, rejects invalid firmware
+| Response Measure | 100% signature validation before execution, invalid firmware rejected within 500ms, automatic rollback to previous version if validation fails post-update
+| Priority | High  
+| Rationale | Firmware integrity ensures system operates only trusted code, preventing malicious modifications in industrial environments
+| Verification | Test with tampered firmware images, signature validation timing measurements, rollback procedure validation
+|===
+
+===== Scenario S3: Configuration Data Protection
+
+[cols="1,3"]
+|===
+| Quality Attribute | Security
+| Context | Device configuration contains network credentials and operational parameters
+| Stimulus | Power cycle, configuration backup, or unauthorized physical access attempt
+| Response | System encrypts sensitive configuration data in flash storage, requires authentication for configuration access, maintains configuration integrity
+| Response Measure | Configuration data encrypted with AES-256, authentication required for web interface access, configuration tampering detected with CRC validation
+| Priority | High
+| Rationale | Configuration data contains sensitive network information that must be protected from unauthorized disclosure or modification
+| Verification | Flash memory analysis, authentication bypass testing, configuration integrity validation after power cycles
+|===
+
+==== Compatibility Requirements (Priority 4 - Important)
 
 ===== Scenario C1: Diverse Industrial Protocol Support
 
@@ -191,6 +248,7 @@ right side
 | Response Measure | Support for baud rates 300-500000, all standard frame formats (5-8 data bits, 1-2 stop bits, none/odd/even parity), stable operation with 99.9% of industrial serial devices
 | Priority | Important
 | Rationale | Industrial environments contain diverse legacy equipment; broad compatibility enables market adoption and reduces integration effort
+| Verification | Protocol compliance testing with representative industrial devices (PLCs from 3+ vendors, measurement instruments), baud rate accuracy measurement with oscilloscope
 |===
 
 ===== Scenario C2: Network Infrastructure Integration
@@ -219,7 +277,7 @@ right side
 | Rationale | SCADA integration is primary use case; broad compatibility ensures market viability and reduces customer integration effort
 |===
 
-==== Usability Requirements (Priority 4 - Desired)
+==== Usability Requirements (Priority 5 - Desired)
 
 ===== Scenario U1: Field Technician Deployment
 
@@ -260,7 +318,7 @@ right side
 | Rationale | Configuration management reduces deployment time for multiple devices and simplifies maintenance procedures
 |===
 
-==== Maintainability Requirements (Priority 5 - Desired)
+==== Maintainability Requirements (Priority 6 - Desired)
 
 ===== Scenario M1: Secure Over-the-Air Updates
 
@@ -273,6 +331,7 @@ right side
 | Response Measure | Update completion within 10 minutes, 100% signature validation, automatic rollback within 2 minutes if update fails, zero configuration loss during successful updates
 | Priority | Medium
 | Rationale | Field updates are essential for long-term maintenance; secure OTA capability reduces service costs and improves security posture
+| Verification | OTA update testing with valid/invalid signatures, network interruption during update, rollback timing measurement, configuration persistence validation
 |===
 
 ===== Scenario M2: A/B Partition Rollback
@@ -349,9 +408,43 @@ Each quality scenario translates directly into test cases:
 - A/B rollback testing with timing and data integrity validation (M2)
 - Development workflow testing and debugging interface validation (M3)
 
+=== Quality Scenario Priority Matrix
+
+The following table summarizes all quality scenarios by priority level:
+
+[cols="15,25,35,25"]
+|===
+| Priority | Scenario ID | Scenario Name | Key Metric
+
+| **Critical**
+| R1, R2, R3, R4
+| Industrial Operation, Hardware Failure, Power Recovery, Memory Protection
+| 99.9% uptime, <100ms failure detection
+
+| **High** 
+| P1, P2, P3, P4, S1, S2, S3
+| Performance & Security scenarios
+| <5ms latency, 500kBaud throughput, 100% security validation
+
+| **Important**
+| C1, C2, C3  
+| Compatibility scenarios
+| 99.9% device compatibility, automatic network negotiation
+
+| **Medium**
+| U1, U2, U3
+| Usability scenarios  
+| <15min deployment, <5min troubleshooting
+
+| **Desired**
+| M1, M2, M3
+| Maintainability scenarios
+| <10min OTA updates, <30sec rollback
+|===
+
 === Quality Requirements Summary
 
-The quality scenarios establish measurable success criteria that guide both architectural decisions and validation approaches. Priority 1 (Critical) scenarios represent non-negotiable requirements where system failure would render the product unsuitable for industrial deployment. Priority 2-3 (Important) scenarios significantly impact user satisfaction and market adoption. Priority 4-5 (Desired) scenarios enhance user experience and reduce operational costs.
+The quality scenarios establish measurable success criteria that guide both architectural decisions and validation approaches. Critical scenarios represent non-negotiable requirements where system failure would render the product unsuitable for industrial deployment. High priority scenarios significantly impact user satisfaction and market adoption. Lower priority scenarios enhance user experience and reduce operational costs.
 
 These scenarios serve as the foundation for:
 - Architecture decision evaluation criteria
