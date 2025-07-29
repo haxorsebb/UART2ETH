@@ -2800,11 +2800,11 @@ Thus it contains the white box description of selected building blocks of level 
 <div class="sect2">
 <h3 id="_whitebox_overall_system">5.1. Whitebox Overall System</h3>
 <div class="paragraph">
-<p>The UART2ETH system follows a dual-core separation strategy that provides fault isolation while achieving hardware-driven performance. The system is decomposed into five major building blocks that each handle distinct responsibilities in the UART-to-TCP bridge functionality.</p>
+<p>The UART2ETH system follows a dual-core separation strategy that provides fault isolation while achieving hardware-driven performance. The system is decomposed into ten major building blocks that each handle distinct responsibilities in the UART-to-TCP bridge functionality.</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="./images/level1-building-blocks-simple.svg" alt="level1 building blocks simple" width="917" height="709">
+<img src="./images/level1-building-blocks-simple.svg" alt="level1 building blocks simple" width="1645" height="886">
 </div>
 </div>
 <div class="sect3">
@@ -2825,6 +2825,21 @@ Thus it contains the white box description of selected building blocks of level 
 </li>
 <li>
 <p><strong>Bidirectional communication</strong>: Both UART and TCP interfaces require full-duplex operation</p>
+</li>
+<li>
+<p><strong>System coordination</strong>: Global state machine ensures consistent system behavior across cores</p>
+</li>
+<li>
+<p><strong>Comprehensive monitoring</strong>: Log Manager with performance data collection provides visibility and diagnostics</p>
+</li>
+<li>
+<p><strong>Configuration persistence</strong>: Configuration Manager ensures settings survive power cycles and support factory operations</p>
+</li>
+<li>
+<p><strong>Predictable maintenance</strong>: Periodic background processing ensures system housekeeping at regular intervals</p>
+</li>
+<li>
+<p><strong>Automatic recovery</strong>: Watchdog system provides fault detection and recovery capabilities</p>
 </li>
 </ul>
 </div>
@@ -2862,6 +2877,26 @@ Thus it contains the white box description of selected building blocks of level 
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>OTA Update System</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Manages secure firmware updates with A/B partition management, signature validation, and automatic rollback capabilities.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Global State Machine</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Coordinates overall system state across both cores including boot sequence, operational modes, error handling, and update states. Provides centralized state synchronization and transition control.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Collects, formats, and stores system-wide events, errors, performance data, and diagnostic information from all components. Provides log rotation, filtering, and integration with management interface for diagnostics.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Configuration Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages persistent storage of all system settings including UART parameters, network configuration, user preferences, and system options. Provides factory defaults, parameter validation, configuration versioning, and backup/restore functionality.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Periodic Background Process</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Executes system maintenance tasks every 100ms including statistics collection, connection cleanup, buffer maintenance, session management, configuration backup, and system health checks.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Watchdog System</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Monitors system health through heartbeat signals from all major components. Detects failures, logs recovery events, and triggers automatic system recovery or reset when necessary.</p></td>
 </tr>
 </tbody>
 </table>
@@ -2918,6 +2953,107 @@ Thus it contains the white box description of selected building blocks of level 
 </li>
 <li>
 <p><strong>Configuration</strong>: Per-channel baud rate, data bits, stop bits, parity settings</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_global_state_machine_interface">Global State Machine Interface</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>States</strong>: BOOT, INITIALIZING, OPERATIONAL, ERROR, UPDATE_MODE, RECOVERY</p>
+</li>
+<li>
+<p><strong>Inter-core</strong>: Shared state variables with atomic updates and cache coherency</p>
+</li>
+<li>
+<p><strong>Transitions</strong>: Event-driven state changes with validation and rollback capability</p>
+</li>
+<li>
+<p><strong>Synchronization</strong>: Cross-core state synchronization using FreeRTOS primitives</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_logging_interface">Logging Interface</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Log Levels</strong>: DEBUG, INFO, WARN, ERROR, CRITICAL with configurable filtering</p>
+</li>
+<li>
+<p><strong>Storage</strong>: Circular buffer in RAM with optional flash persistence</p>
+</li>
+<li>
+<p><strong>Format</strong>: Structured logging with timestamps, component ID, and severity</p>
+</li>
+<li>
+<p><strong>Performance Data</strong>: Throughput metrics, latency measurements, resource utilization</p>
+</li>
+<li>
+<p><strong>Access</strong>: Real-time log streaming via management interface</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_configuration_manager_interface">Configuration Manager Interface</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Storage</strong>: Persistent flash storage with wear leveling and redundancy</p>
+</li>
+<li>
+<p><strong>Settings Categories</strong>: UART parameters, network config, user accounts, system options</p>
+</li>
+<li>
+<p><strong>Validation</strong>: Parameter range checking, conflict detection, dependency validation</p>
+</li>
+<li>
+<p><strong>Factory Reset</strong>: Restore to known-good defaults with version migration</p>
+</li>
+<li>
+<p><strong>Backup/Restore</strong>: Configuration export/import for deployment and recovery</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_periodic_process_interface">Periodic Process Interface</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Timer</strong>: Hardware timer interrupt every 100ms (10Hz frequency)</p>
+</li>
+<li>
+<p><strong>Task Queue</strong>: Priority-based maintenance task scheduling</p>
+</li>
+<li>
+<p><strong>Execution</strong>: Non-blocking operations with bounded execution time</p>
+</li>
+<li>
+<p><strong>Health Reports</strong>: Regular status updates to watchdog system</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_watchdog_interface">Watchdog Interface</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Heartbeat</strong>: Component-specific periodic health signals</p>
+</li>
+<li>
+<p><strong>Thresholds</strong>: Configurable timeout values per monitored component</p>
+</li>
+<li>
+<p><strong>Recovery Actions</strong>: Graduated response from warnings to system reset</p>
+</li>
+<li>
+<p><strong>Hardware Integration</strong>: RP2350 hardware watchdog timer as final safety net</p>
 </li>
 </ul>
 </div>
@@ -3101,7 +3237,133 @@ Thus it contains the white box description of selected building blocks of level 
 </div>
 </div>
 <div class="sect3">
-<h4 id="_whitebox_management_interface">5.2.4. Whitebox Management Interface</h4>
+<h4 id="_whitebox_log_manager">5.2.4. Whitebox Log Manager</h4>
+<div class="paragraph">
+<p>The Log Manager provides system-wide event logging and performance data collection through lock-free interfaces that ensure real-time operations on both cores are never blocked by logging activities.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/level2-log-manager-simple.svg" alt="level2 log manager simple" width="854" height="1196">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_5">Motivation</h5>
+<div class="paragraph">
+<p>Lock-free logging interfaces prevent real-time operations from being blocked by logging activities. The dual-interface design allows each core to log independently without synchronization overhead, while the ring buffer provides bounded memory usage and predictable performance.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_5">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Lock-Free Interface Core 0</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides atomic write operations for Core 0 components. Uses lock-free algorithms to ensure UART processing is never blocked by logging operations.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Lock-Free Interface Core 1</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides atomic write operations for Core 1 components. Ensures network processing continues uninterrupted during logging activities.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Event Log Ring Buffer</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Circular buffer storing formatted log entries with fixed-size allocation. Implements overwrite-oldest policy to handle log bursts without memory allocation.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Entry Formatter</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Converts raw log data into structured entries with timestamps, component IDs, severity levels, and formatted messages for consistent log format.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Level Filter</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Runtime-configurable filtering based on severity levels and component masks. Reduces storage overhead by filtering out debug messages in production.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance Data Collector</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Aggregates performance metrics from both cores including throughput calculations, latency measurements, and resource utilization statistics.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Query Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides search and retrieval capabilities for both real-time log streaming and historical log access via the management interface.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Persistence Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles optional flash storage with log rotation, compression, and archival. Manages persistent log files for post-mortem analysis.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_important_interfaces_2">Important Interfaces</h5>
+<div class="sect5">
+<h6 id="_lock_free_logging_interface">Lock-Free Logging Interface</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Atomic Operations</strong>: Single-writer, multiple-reader lock-free ring buffer</p>
+</li>
+<li>
+<p><strong>Non-blocking</strong>: Log calls never block or yield the calling thread</p>
+</li>
+<li>
+<p><strong>Bounded Time</strong>: Worst-case execution time guarantees for real-time systems</p>
+</li>
+<li>
+<p><strong>Overflow Handling</strong>: Graceful degradation when log buffer fills</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_event_log_ring_buffer_structure">Event Log Ring Buffer Structure</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Entry Size</strong>: Fixed 128-byte entries for predictable memory usage</p>
+</li>
+<li>
+<p><strong>Buffer Size</strong>: Configurable (default 1024 entries = 128KB)</p>
+</li>
+<li>
+<p><strong>Overflow Policy</strong>: Drop oldest entries when buffer is full</p>
+</li>
+<li>
+<p><strong>Memory Layout</strong>: Cache-aligned for optimal performance</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_performance_data_interface">Performance Data Interface</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Metrics Collection</strong>: Throughput, latency, error counts, resource usage</p>
+</li>
+<li>
+<p><strong>Aggregation</strong>: Time-based windowing for trend analysis</p>
+</li>
+<li>
+<p><strong>Real-time Access</strong>: Current performance data always available</p>
+</li>
+<li>
+<p><strong>Historical Data</strong>: Configurable retention period for trend analysis</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_whitebox_management_interface">5.2.5. Whitebox Management Interface</h4>
 <div class="paragraph">
 <p>The Management Interface provides comprehensive web-based administration through modular components handling authentication, configuration, and monitoring functions.</p>
 </div>
@@ -3111,13 +3373,13 @@ Thus it contains the white box description of selected building blocks of level 
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_5">Motivation</h5>
+<h5 id="_motivation_6">Motivation</h5>
 <div class="paragraph">
 <p>The modular management interface design separates concerns between web serving, authentication, data collection, and configuration UIs. This enables independent development and testing of each component while providing a comprehensive administration solution.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_5">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_6">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -3168,13 +3430,13 @@ Thus it contains the white box description of selected building blocks of level 
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_6">Motivation</h5>
+<h5 id="_motivation_7">Motivation</h5>
 <div class="paragraph">
 <p>UART processing utilizing UART specific ISR and DMA transfers for maximum troughput.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_6">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_7">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
