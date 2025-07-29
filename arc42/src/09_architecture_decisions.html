@@ -364,6 +364,8 @@
 <ul class="sectlevel2">
 <li><a href="#_hardware_platform_decisions">Hardware Platform Decisions</a></li>
 <li><a href="#_software_platform_decisions">Software Platform Decisions</a></li>
+<li><a href="#_implementation_strategy_decisions">Implementation Strategy Decisions</a></li>
+<li><a href="#_decision_interdependencies">Decision Interdependencies</a></li>
 </ul>
 </li>
 </ul>
@@ -392,7 +394,7 @@
 <h2 id="section-design-decisions">Architecture Decisions</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>This section references the Architecture Decision Records (ADRs) that document key technical decisions for the UART2ETH project.</p>
+<p>This section references the Architecture Decision Records (ADRs) that document key technical decisions for the UART2ETH project. These decisions form the foundation of the system architecture and significantly influence capabilities, performance characteristics, and development approach.</p>
 </div>
 <div class="sect2">
 <h3 id="_hardware_platform_decisions">Hardware Platform Decisions</h3>
@@ -414,10 +416,42 @@
 <li>
 <p><a href="../../adrs/ADR-003-programming-language-selection.adoc">ADR-003: Programming Language Selection</a> - Documents the decision to use C programming language for firmware development, considering team expertise, delivery timeline, and memory model constraints.</p>
 </li>
+<li>
+<p><a href="../../adrs/ADR-004-development-ecosystem.adoc">ADR-004: Development Ecosystem Selection</a> - Documents the decision to use Native Pico SDK + CMake development ecosystem for professional, industrial-grade development.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_strategy_decisions">Implementation Strategy Decisions</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="../../adrs/ADR-005-buffer-allocation-strategy.adoc">ADR-005: Ring Buffer Memory Allocation Strategy</a> - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_decision_interdependencies">Decision Interdependencies</h3>
+<div class="paragraph">
+<p>The ADRs reveal important interdependencies that influence architectural coherence:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>ADR-004 (Development Ecosystem) challenges ADR-002 (Ethernet Controller)</strong>: The ecosystem analysis revealed that ENC28J60 lacks mature RP2350 SDK integration, potentially requiring significant custom development effort and impacting industrial reliability goals.</p>
+</li>
+<li>
+<p><strong>ADR-003 (C Language) reinforces ADR-004 (Native SDK)</strong>: The choice of C programming language aligns optimally with the Native Pico SDK approach, enabling direct application of team expertise.</p>
+</li>
+<li>
+<p><strong>ADR-005 (Buffer Strategy) supports ADR-003 (C Language)</strong>: Static allocation strategy leverages C&#8217;s deterministic memory model and supports industrial reliability requirements.</p>
+</li>
 </ul>
 </div>
 <div class="paragraph">
-<p>These decisions form the foundation of the hardware and software architecture and significantly influence the system&#8217;s capabilities, performance characteristics, and development approach.</p>
+<p>These interdependencies demonstrate the systemic nature of architectural decisions and highlight areas requiring ongoing technical evaluation.</p>
 </div>
 </div>
 </div>
