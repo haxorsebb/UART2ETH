@@ -36,7 +36,7 @@ There you will find links and examples about ADR.
 ****
 endif::arc42help[]
 
-This section references the Architecture Decision Records (ADRs) that document key technical decisions for the UART2ETH project.
+This section references the Architecture Decision Records (ADRs) that document key technical decisions for the UART2ETH project. These decisions form the foundation of the system architecture and significantly influence capabilities, performance characteristics, and development approach.
 
 === Hardware Platform Decisions
 
@@ -46,5 +46,20 @@ This section references the Architecture Decision Records (ADRs) that document k
 === Software Platform Decisions
 
 * link:../../adrs/ADR-003-programming-language-selection.adoc[ADR-003: Programming Language Selection] - Documents the decision to use C programming language for firmware development, considering team expertise, delivery timeline, and memory model constraints.
+* link:../../adrs/ADR-004-development-ecosystem.adoc[ADR-004: Development Ecosystem Selection] - Documents the decision to use Native Pico SDK + CMake development ecosystem for professional, industrial-grade development.
 
-These decisions form the foundation of the hardware and software architecture and significantly influence the system's capabilities, performance characteristics, and development approach.
+=== Implementation Strategy Decisions
+
+* link:../../adrs/ADR-005-buffer-allocation-strategy.adoc[ADR-005: Ring Buffer Memory Allocation Strategy] - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.
+
+=== Decision Interdependencies
+
+The ADRs reveal important interdependencies that influence architectural coherence:
+
+* *ADR-004 (Development Ecosystem) challenges ADR-002 (Ethernet Controller)*: The ecosystem analysis revealed that ENC28J60 lacks mature RP2350 SDK integration, potentially requiring significant custom development effort and impacting industrial reliability goals.
+
+* *ADR-003 (C Language) reinforces ADR-004 (Native SDK)*: The choice of C programming language aligns optimally with the Native Pico SDK approach, enabling direct application of team expertise.
+
+* *ADR-005 (Buffer Strategy) supports ADR-003 (C Language)*: Static allocation strategy leverages C's deterministic memory model and supports industrial reliability requirements.
+
+These interdependencies demonstrate the systemic nature of architectural decisions and highlight areas requiring ongoing technical evaluation.
