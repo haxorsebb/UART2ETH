@@ -360,42 +360,16 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
-<li><a href="#section-technical-risks">Risks and Technical Debts</a></li>
+<li><a href="#section-technical-risks">Risks and Technical Debts</a>
+<ul class="sectlevel2">
 <li><a href="#_risk_overview">Risk Overview</a></li>
-<li><a href="#_detailed_risk_analysis">Detailed Risk Analysis</a>
-<ul class="sectlevel2">
-<li><a href="#_r_001_enc28j60_ecosystem_maturity_risk">R-001: ENC28J60 Ecosystem Maturity Risk</a></li>
-<li><a href="#_r_002_uart_hardware_resource_conflicts">R-002: UART Hardware Resource Conflicts</a></li>
-<li><a href="#_r_003_no_tlshttps_security_implementation">R-003: No TLS/HTTPS Security Implementation</a></li>
-<li><a href="#_r_004_no_uart_flow_control_implementation">R-004: No UART Flow Control Implementation</a></li>
-<li><a href="#_r_005_single_developer_knowledge_dependencies">R-005: Single Developer Knowledge Dependencies</a></li>
-<li><a href="#_r_006_rp2350_platform_learning_curve">R-006: RP2350 Platform Learning Curve</a></li>
-<li><a href="#_r_007_component_supply_chain_availability">R-007: Component Supply Chain Availability</a></li>
-<li><a href="#_r_008_industrial_performance_requirements">R-008: Industrial Performance Requirements</a></li>
-</ul>
-</li>
-<li><a href="#_technical_debt_register">Technical Debt Register</a>
-<ul class="sectlevel2">
-<li><a href="#_td_001_uart_flow_control">TD-001: UART Flow Control</a></li>
-<li><a href="#_td_002_tlshttps_security">TD-002: TLS/HTTPS Security</a></li>
-<li><a href="#_td_003_uart_resource_limitations">TD-003: UART Resource Limitations</a></li>
-</ul>
-</li>
-<li><a href="#_risk_mitigation_plan">Risk Mitigation Plan</a>
-<ul class="sectlevel2">
-<li><a href="#_immediate_actions_next_30_days">Immediate Actions (Next 30 Days)</a></li>
-<li><a href="#_short_term_actions_next_90_days">Short-term Actions (Next 90 Days)</a></li>
-<li><a href="#_long_term_actions_next_6_months">Long-term Actions (Next 6 Months)</a></li>
-</ul>
-</li>
-<li><a href="#_risk_monitoring">Risk Monitoring</a>
-<ul class="sectlevel2">
-<li><a href="#_weekly_reviews">Weekly Reviews</a></li>
-<li><a href="#_monthly_reviews">Monthly Reviews</a></li>
-<li><a href="#_quarterly_reviews">Quarterly Reviews</a></li>
-</ul>
-</li>
+<li><a href="#_detailed_risk_analysis">Detailed Risk Analysis</a></li>
+<li><a href="#_technical_debt_register">Technical Debt Register</a></li>
+<li><a href="#_risk_mitigation_plan">Risk Mitigation Plan</a></li>
+<li><a href="#_risk_monitoring">Risk Monitoring</a></li>
 <li><a href="#_risk_escalation_triggers">Risk Escalation Triggers</a></li>
+</ul>
+</li>
 </ul>
 </div>
 
@@ -424,11 +398,8 @@
 <div class="paragraph">
 <p>This document identifies and assesses risks for the UART2ETH project, providing mitigation strategies and ownership assignments. Risk assessment follows systematic evaluation across technical, organizational, external, and business categories.</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_risk_overview">Risk Overview</h2>
-<div class="sectionbody">
+<div class="sect2">
+<h3 id="_risk_overview">Risk Overview</h3>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 12.5%;">
@@ -516,12 +487,10 @@
 </tbody>
 </table>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_detailed_risk_analysis">Detailed Risk Analysis</h2>
-<div class="sectionbody">
 <div class="sect2">
-<h3 id="_r_001_enc28j60_ecosystem_maturity_risk">R-001: ENC28J60 Ecosystem Maturity Risk</h3>
+<h3 id="_detailed_risk_analysis">Detailed Risk Analysis</h3>
+<div class="sect3">
+<h4 id="_r_001_enc28j60_ecosystem_maturity_risk">R-001: ENC28J60 Ecosystem Maturity Risk</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -581,8 +550,8 @@
 </tbody>
 </table>
 </div>
-<div class="sect2">
-<h3 id="_r_002_uart_hardware_resource_conflicts">R-002: UART Hardware Resource Conflicts</h3>
+<div class="sect3">
+<h4 id="_r_002_uart_hardware_resource_conflicts">R-002: UART Hardware Resource Conflicts</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -640,8 +609,8 @@
 </tbody>
 </table>
 </div>
-<div class="sect2">
-<h3 id="_r_003_no_tlshttps_security_implementation">R-003: No TLS/HTTPS Security Implementation</h3>
+<div class="sect3">
+<h4 id="_r_003_no_tlshttps_security_implementation">R-003: No TLS/HTTPS Security Implementation</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -700,8 +669,8 @@
 </tbody>
 </table>
 </div>
-<div class="sect2">
-<h3 id="_r_004_no_uart_flow_control_implementation">R-004: No UART Flow Control Implementation</h3>
+<div class="sect3">
+<h4 id="_r_004_no_uart_flow_control_implementation">R-004: No UART Flow Control Implementation</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -760,8 +729,8 @@
 </tbody>
 </table>
 </div>
-<div class="sect2">
-<h3 id="_r_005_single_developer_knowledge_dependencies">R-005: Single Developer Knowledge Dependencies</h3>
+<div class="sect3">
+<h4 id="_r_005_single_developer_knowledge_dependencies">R-005: Single Developer Knowledge Dependencies</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -820,8 +789,8 @@
 </tbody>
 </table>
 </div>
-<div class="sect2">
-<h3 id="_r_006_rp2350_platform_learning_curve">R-006: RP2350 Platform Learning Curve</h3>
+<div class="sect3">
+<h4 id="_r_006_rp2350_platform_learning_curve">R-006: RP2350 Platform Learning Curve</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -880,8 +849,8 @@
 </tbody>
 </table>
 </div>
-<div class="sect2">
-<h3 id="_r_007_component_supply_chain_availability">R-007: Component Supply Chain Availability</h3>
+<div class="sect3">
+<h4 id="_r_007_component_supply_chain_availability">R-007: Component Supply Chain Availability</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -940,8 +909,8 @@
 </tbody>
 </table>
 </div>
-<div class="sect2">
-<h3 id="_r_008_industrial_performance_requirements">R-008: Industrial Performance Requirements</h3>
+<div class="sect3">
+<h4 id="_r_008_industrial_performance_requirements">R-008: Industrial Performance Requirements</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -1002,15 +971,13 @@
 </table>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_technical_debt_register">Technical Debt Register</h2>
-<div class="sectionbody">
+<div class="sect2">
+<h3 id="_technical_debt_register">Technical Debt Register</h3>
 <div class="paragraph">
 <p>The following technical debts have been identified and require future resolution:</p>
 </div>
-<div class="sect2">
-<h3 id="_td_001_uart_flow_control">TD-001: UART Flow Control</h3>
+<div class="sect3">
+<h4 id="_td_001_uart_flow_control">TD-001: UART Flow Control</h4>
 <div class="paragraph">
 <p><strong>Description:</strong> No hardware flow control implementation for UART interfaces<br>
 <strong>Impact:</strong> Potential data loss under high throughput conditions<br>
@@ -1019,8 +986,8 @@
 <strong>Resolution Plan:</strong> Implement XON/XOFF software flow control and add hardware pins in next revision</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_td_002_tlshttps_security">TD-002: TLS/HTTPS Security</h3>
+<div class="sect3">
+<h4 id="_td_002_tlshttps_security">TD-002: TLS/HTTPS Security</h4>
 <div class="paragraph">
 <p><strong>Description:</strong> No TLS/HTTPS security implementation for network communications<br>
 <strong>Impact:</strong> Security vulnerability in industrial environments<br>
@@ -1029,8 +996,8 @@
 <strong>Resolution Plan:</strong> Integrate mbedTLS library in firmware v2.0</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_td_003_uart_resource_limitations">TD-003: UART Resource Limitations</h3>
+<div class="sect3">
+<h4 id="_td_003_uart_resource_limitations">TD-003: UART Resource Limitations</h4>
 <div class="paragraph">
 <p><strong>Description:</strong> Only 3 UARTs available due to debug and SPI conflicts, not 4 as originally planned<br>
 <strong>Impact:</strong> Product specification limitation<br>
@@ -1040,12 +1007,10 @@
 </div>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_risk_mitigation_plan">Risk Mitigation Plan</h2>
-<div class="sectionbody">
 <div class="sect2">
-<h3 id="_immediate_actions_next_30_days">Immediate Actions (Next 30 Days)</h3>
+<h3 id="_risk_mitigation_plan">Risk Mitigation Plan</h3>
+<div class="sect3">
+<h4 id="_immediate_actions_next_30_days">Immediate Actions (Next 30 Days)</h4>
 <div class="ulist checklist">
 <ul class="checklist">
 <li>
@@ -1063,8 +1028,8 @@
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_short_term_actions_next_90_days">Short-term Actions (Next 90 Days)</h3>
+<div class="sect3">
+<h4 id="_short_term_actions_next_90_days">Short-term Actions (Next 90 Days)</h4>
 <div class="ulist checklist">
 <ul class="checklist">
 <li>
@@ -1082,8 +1047,8 @@
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_long_term_actions_next_6_months">Long-term Actions (Next 6 Months)</h3>
+<div class="sect3">
+<h4 id="_long_term_actions_next_6_months">Long-term Actions (Next 6 Months)</h4>
 <div class="ulist checklist">
 <ul class="checklist">
 <li>
@@ -1102,12 +1067,10 @@
 </div>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_risk_monitoring">Risk Monitoring</h2>
-<div class="sectionbody">
 <div class="sect2">
-<h3 id="_weekly_reviews">Weekly Reviews</h3>
+<h3 id="_risk_monitoring">Risk Monitoring</h3>
+<div class="sect3">
+<h4 id="_weekly_reviews">Weekly Reviews</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1122,8 +1085,8 @@
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_monthly_reviews">Monthly Reviews</h3>
+<div class="sect3">
+<h4 id="_monthly_reviews">Monthly Reviews</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1138,8 +1101,8 @@
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_quarterly_reviews">Quarterly Reviews</h3>
+<div class="sect3">
+<h4 id="_quarterly_reviews">Quarterly Reviews</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1158,10 +1121,8 @@
 </div>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_risk_escalation_triggers">Risk Escalation Triggers</h2>
-<div class="sectionbody">
+<div class="sect2">
+<h3 id="_risk_escalation_triggers">Risk Escalation Triggers</h3>
 <div class="ulist">
 <ul>
 <li>
@@ -1177,6 +1138,7 @@
 <p><strong>Any</strong>: New risks emerge that threaten project success</p>
 </li>
 </ul>
+</div>
 </div>
 </div>
 </div>
