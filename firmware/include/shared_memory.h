@@ -50,31 +50,32 @@ typedef struct {
 // Performance counters  
 typedef struct {
     struct {
-        uint64_t bytes_transmitted;
-        uint64_t bytes_received;
-        uint32_t messages_transmitted;
-        uint32_t messages_received;
-        uint32_t error_count;
+        volatile uint64_t bytes_transmitted;
+        volatile uint64_t bytes_received;
+        volatile uint32_t messages_transmitted;
+        volatile uint32_t messages_received;
+        volatile uint32_t error_count;
     } uart_stats[4];
     
-    uint32_t uptime_seconds;
-    uint32_t ring_buffer_utilization_percent;
-    uint32_t cpu_usage_percent;
-} performance_counters_t;
+    volatile uint32_t uptime_seconds;
+    volatile uint32_t ring_buffer_utilization_percent;
+    volatile uint32_t cpu_usage_percent;
+} __attribute__((aligned(4))) performance_counters_t;
 
 // Log management variables
 typedef struct {
     volatile uint32_t write_head;    // Next write position
     volatile uint32_t read_head;     // Core1 print position  
-    uint32_t buffer_size;            // Calculated at compile time
+    volatile uint32_t buffer_size;   // Calculated at compile time
     spin_lock_t *reservation_lock;   // For pointer updates only
-} log_management_t;
+    volatile uint32_t total_messages_logged;  // Atomic counter moved here
+} __attribute__((aligned(4))) log_management_t;
 
 // Complete shared memory layout
 typedef struct {
     // Revision and integrity (at start for easy access)
-    uint32_t revision_counter;       // Incremented on each config change
-    uint8_t sha256_checksum[32];     // SHA256 of config + counters
+    volatile uint32_t revision_counter;       // Incremented on each config change
+    uint8_t sha256_checksum[32];              // SHA256 of config + counters
     
     // Configuration structures
     system_config_t config;
@@ -85,9 +86,9 @@ typedef struct {
     // Log management
     log_management_t log_mgmt;
     
-    // Ring buffer data (remainder of SRAM bank)
-    char log_buffer[];               // Variable size, \r\n terminated strings
-} shared_memory_layout_t;
+    // Ring buffer data (fixed size calculated at compile time)
+    char log_buffer[1];               // Flexible array member placeholder
+} __attribute__((aligned(4))) shared_memory_layout_t;
 
 // Function declarations
 bool shared_memory_init(void);

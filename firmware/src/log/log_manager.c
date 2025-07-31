@@ -17,20 +17,28 @@
 #include <stdio.h>
 #include <string.h>
 
-// Static variables for log manager state
-static bool g_log_manager_initialized = false;
-static shared_memory_layout_t* g_shared_memory = NULL;
-static uint32_t g_total_messages_logged = 0;
+// Log manager context for better state management
+typedef struct {
+    bool initialized;
+    shared_memory_layout_t* layout;
+} log_manager_context_t;
+
+static log_manager_context_t g_log_manager_ctx = {0};
 
 /**
- * Calculate number of bytes used in circular buffer
+ * Calculate number of bytes used in circular buffer (thread-safe)
  */
 static uint32_t calculate_bytes_used(void) {
-    if (!g_shared_memory) return 0;
+    if (!g_log_manager_ctx.layout) return 0;
     
-    uint32_t write_head = g_shared_memory->log_mgmt.write_head;
-    uint32_t read_head = g_shared_memory->log_mgmt.read_head;
-    uint32_t buffer_size = g_shared_memory->log_mgmt.buffer_size;
+    // Read atomically to avoid race conditions
+    uint32_t save = spin_lock_blocking(g_log_manager_ctx.layout->log_mgmt.reservation_lock);
+    
+    uint32_t write_head = g_log_manager_ctx.layout->log_mgmt.write_head;
+    uint32_t read_head = g_log_manager_ctx.layout->log_mgmt.read_head;
+    uint32_t buffer_size = g_log_manager_ctx.layout->log_mgmt.buffer_size;
+    
+    spin_unlock(g_log_manager_ctx.layout->log_mgmt.reservation_lock, save);
     
     if (write_head >= read_head) {
         return write_head - read_head;
@@ -43,17 +51,17 @@ static uint32_t calculate_bytes_used(void) {
  * Count number of pending messages by scanning for \r\n terminators
  */
 static uint32_t count_pending_messages(void) {
-    if (!g_shared_memory) return 0;
+    if (!g_log_manager_ctx.layout) return 0;
     
     uint32_t count = 0;
-    uint32_t read_head = g_shared_memory->log_mgmt.read_head;
-    uint32_t write_head = g_shared_memory->log_mgmt.write_head;
-    uint32_t buffer_size = g_shared_memory->log_mgmt.buffer_size;
+    uint32_t read_head = g_log_manager_ctx.layout->log_mgmt.read_head;
+    uint32_t write_head = g_log_manager_ctx.layout->log_mgmt.write_head;
+    uint32_t buffer_size = g_log_manager_ctx.layout->log_mgmt.buffer_size;
     
     uint32_t pos = read_head;
     while (pos != write_head) {
-        if (g_shared_memory->log_buffer[pos] == '\n' && 
-            pos > 0 && g_shared_memory->log_buffer[pos-1] == '\r') {
+        if (g_log_manager_ctx.layout->log_buffer[pos] == '\n' && 
+            pos > 0 && g_log_manager_ctx.layout->log_buffer[pos-1] == '\r') {
             count++;
         }
         pos = (pos + 1) % buffer_size;
@@ -68,20 +76,20 @@ static uint32_t count_pending_messages(void) {
  * @return true if initialization successful, false otherwise
  */
 bool log_manager_init(void) {
-    if (g_log_manager_initialized) {
+    if (g_log_manager_ctx.initialized) {
         return true;  // Already initialized
     }
     
     // Get shared memory layout
-    g_shared_memory = shared_memory_get_layout();
-    if (!g_shared_memory) {
+    g_log_manager_ctx.layout = shared_memory_get_layout();
+    if (!g_log_manager_ctx.layout) {
         return false;  // Shared memory not initialized
     }
     
-    // Initialize counters
-    g_total_messages_logged = 0;
+    // Initialize total message counter in shared memory
+    g_log_manager_ctx.layout->log_mgmt.total_messages_logged = 0;
     
-    g_log_manager_initialized = true;
+    g_log_manager_ctx.initialized = true;
     return true;
 }
 
@@ -94,13 +102,35 @@ bool log_manager_init(void) {
  * @param message Message text (max LOG_MESSAGE_MAX_LENGTH chars)
  * @return true if message was queued, false if buffer full or error
  */
+/**
+ * Log a message using lock-reserve-release-write pattern
+ * Thread-safe for both cores with comprehensive parameter validation
+ * 
+ * @param core_id Core ID (0 or 1)
+ * @param level Log level
+ * @param message Message text (max LOG_MESSAGE_MAX_LENGTH chars)
+ * @return true if message was queued, false if buffer full or error
+ */
 bool log_message(uint8_t core_id, log_level_t level, const char* message) {
-    if (!g_log_manager_initialized || !g_shared_memory) {
+    // Comprehensive parameter validation
+    if (!g_log_manager_ctx.initialized || !g_log_manager_ctx.layout) {
         return false;
     }
     
     if (core_id > 1) {
         return false;  // Invalid core ID
+    }
+    
+    if (level > LOG_LEVEL_ERROR) {
+        return false;  // Invalid log level
+    }
+    
+    if (!message) {
+        return false;  // NULL message
+    }
+    
+    if (strlen(message) > LOG_MESSAGE_MAX_LENGTH) {
+        return false;  // Message too long
     }
     
     // Format message with timestamp and core ID
@@ -116,28 +146,40 @@ bool log_message(uint8_t core_id, log_level_t level, const char* message) {
     }
     
     // PHASE 1: Lock-Reserve-Release (minimal lock time)
-    uint32_t save = spin_lock_blocking(g_shared_memory->log_mgmt.reservation_lock);
+    uint32_t save = spin_lock_blocking(g_log_manager_ctx.layout->log_mgmt.reservation_lock);
     
-    uint32_t buffer_size = g_shared_memory->log_mgmt.buffer_size;
-    uint32_t bytes_available = buffer_size - calculate_bytes_used();
+    uint32_t buffer_size = g_log_manager_ctx.layout->log_mgmt.buffer_size;
+    uint32_t write_head = g_log_manager_ctx.layout->log_mgmt.write_head;
+    uint32_t read_head = g_log_manager_ctx.layout->log_mgmt.read_head;
+    
+    // Calculate available space
+    uint32_t bytes_available;
+    if (write_head >= read_head) {
+        bytes_available = buffer_size - (write_head - read_head);
+    } else {
+        bytes_available = read_head - write_head;
+    }
     
     if (bytes_available < msg_len) {
-        spin_unlock(g_shared_memory->log_mgmt.reservation_lock, save);
+        spin_unlock(g_log_manager_ctx.layout->log_mgmt.reservation_lock, save);
         return false;  // Buffer full
     }
     
-    uint32_t reserved_pos = g_shared_memory->log_mgmt.write_head;
-    g_shared_memory->log_mgmt.write_head = (g_shared_memory->log_mgmt.write_head + msg_len) % buffer_size;
+    uint32_t reserved_pos = write_head;
+    g_log_manager_ctx.layout->log_mgmt.write_head = (write_head + msg_len) % buffer_size;
     
-    spin_unlock(g_shared_memory->log_mgmt.reservation_lock, save);
+    // Atomic increment of total message count
+    g_log_manager_ctx.layout->log_mgmt.total_messages_logged++;
+    
+    spin_unlock(g_log_manager_ctx.layout->log_mgmt.reservation_lock, save);
     
     // PHASE 2: Lock-free Write (space guaranteed)
     for (int i = 0; i < msg_len; i++) {
-        g_shared_memory->log_buffer[(reserved_pos + i) % buffer_size] = formatted_msg[i];
+        g_log_manager_ctx.layout->log_buffer[(reserved_pos + i) % buffer_size] = formatted_msg[i];
     }
     
-    // Update total count (atomic increment)
-    g_total_messages_logged++;
+    // Memory barrier to ensure write visibility across cores
+    __dmb();
     
     return true;
 }
@@ -149,24 +191,24 @@ bool log_message(uint8_t core_id, log_level_t level, const char* message) {
  * @return Number of messages printed
  */
 uint32_t log_manager_print_pending(void) {
-    if (!g_log_manager_initialized || !g_shared_memory) {
+    if (!g_log_manager_ctx.initialized || !g_log_manager_ctx.layout) {
         return 0;
     }
     
     uint32_t messages_printed = 0;
-    uint32_t buffer_size = g_shared_memory->log_mgmt.buffer_size;
+    uint32_t buffer_size = g_log_manager_ctx.layout->log_mgmt.buffer_size;
     char temp_buffer[LOG_FORMATTED_MAX_LENGTH];
     
-    while (g_shared_memory->log_mgmt.read_head != g_shared_memory->log_mgmt.write_head) {
+    while (g_log_manager_ctx.layout->log_mgmt.read_head != g_log_manager_ctx.layout->log_mgmt.write_head) {
         // Find next message (scan until \r\n)
-        uint32_t start_pos = g_shared_memory->log_mgmt.read_head;
+        uint32_t start_pos = g_log_manager_ctx.layout->log_mgmt.read_head;
         uint32_t pos = start_pos;
         uint32_t msg_len = 0;
         bool found_terminator = false;
         
         // Scan for \r\n terminator
-        while (pos != g_shared_memory->log_mgmt.write_head && msg_len < sizeof(temp_buffer) - 1) {
-            temp_buffer[msg_len] = g_shared_memory->log_buffer[pos];
+        while (pos != g_log_manager_ctx.layout->log_mgmt.write_head && msg_len < sizeof(temp_buffer) - 1) {
+            temp_buffer[msg_len] = g_log_manager_ctx.layout->log_buffer[pos];
             msg_len++;
             
             if (msg_len >= 2 && temp_buffer[msg_len-2] == '\r' && temp_buffer[msg_len-1] == '\n') {
@@ -186,8 +228,11 @@ uint32_t log_manager_print_pending(void) {
         printf("%s", temp_buffer);  // Already has \r\n
         fflush(stdout);
         
-        // Advance read head
-        g_shared_memory->log_mgmt.read_head = (start_pos + msg_len) % buffer_size;
+        // Advance read head atomically
+        uint32_t save = spin_lock_blocking(g_log_manager_ctx.layout->log_mgmt.reservation_lock);
+        g_log_manager_ctx.layout->log_mgmt.read_head = (start_pos + msg_len) % buffer_size;
+        spin_unlock(g_log_manager_ctx.layout->log_mgmt.reservation_lock, save);
+        
         messages_printed++;
     }
     
@@ -200,12 +245,12 @@ uint32_t log_manager_print_pending(void) {
  * @return Percentage (0-100) of log buffer currently used
  */
 uint32_t log_manager_get_utilization(void) {
-    if (!g_log_manager_initialized || !g_shared_memory) {
+    if (!g_log_manager_ctx.initialized || !g_log_manager_ctx.layout) {
         return 0;
     }
     
     uint32_t bytes_used = calculate_bytes_used();
-    uint32_t buffer_size = g_shared_memory->log_mgmt.buffer_size;
+    uint32_t buffer_size = g_log_manager_ctx.layout->log_mgmt.buffer_size;
     
     if (buffer_size == 0) return 0;
     
@@ -218,7 +263,7 @@ uint32_t log_manager_get_utilization(void) {
  * @return Number of pending messages
  */
 uint32_t log_manager_get_pending_count(void) {
-    if (!g_log_manager_initialized || !g_shared_memory) {
+    if (!g_log_manager_ctx.initialized || !g_log_manager_ctx.layout) {
         return 0;
     }
     
@@ -226,10 +271,15 @@ uint32_t log_manager_get_pending_count(void) {
 }
 
 /**
- * Get total number of messages logged since startup
+ * Get total number of messages logged since startup (atomic read)
  * 
  * @return Total message count
  */
 uint32_t log_manager_get_total_count(void) {
-    return g_total_messages_logged;
+    if (!g_log_manager_ctx.initialized || !g_log_manager_ctx.layout) {
+        return 0;
+    }
+    
+    // Atomic read of shared counter
+    return g_log_manager_ctx.layout->log_mgmt.total_messages_logged;
 }

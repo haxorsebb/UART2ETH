@@ -15,6 +15,7 @@
 #include "pico/stdlib.h"
 #include "hardware/sync.h"
 #include <string.h>
+#include <stddef.h>  // For offsetof
 
 // Static variables for shared memory management
 static shared_memory_layout_t* g_shared_memory = NULL;
@@ -27,8 +28,8 @@ static spin_lock_t* g_reservation_lock = NULL;
  * @return Size in bytes available for log ring buffer
  */
 static uint32_t calculate_log_buffer_size(void) {
-    // Calculate: Total Bank Size - (Fixed Structure Size)
-    size_t fixed_size = sizeof(shared_memory_layout_t) - sizeof(char);  // Subtract flexible array
+    // Calculate: Total Bank Size - (Fixed Structure Size excluding flexible array)
+    size_t fixed_size = offsetof(shared_memory_layout_t, log_buffer);
     uint32_t available_size = SRAM_BANK4_SIZE - fixed_size;
     
     // Ensure we have at least 32KB for log buffer as required by test
