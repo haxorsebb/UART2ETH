@@ -1,0 +1,46 @@
+:jbake-title: Architecture Decisions
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 9
+:filename: /chapters/09_architecture_decisions.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+
+
+[[section-design-decisions]]
+== Architecture Decisions
+
+
+ifdef::arc42help[]
+
+endif::arc42help[]
+
+This section references the Architecture Decision Records (ADRs) that document key technical decisions for the UART2ETH project. These decisions form the foundation of the system architecture and significantly influence capabilities, performance characteristics, and development approach.
+
+=== Hardware Platform Decisions
+
+* link:../adrs/ADR-001-microcontroller-selection.adoc[ADR-001: Microcontroller Platform Selection] - Documents the decision to use the Raspberry Pi RP2350 as the core microcontroller platform.
+* link:../adrs/ADR-002-ethernet-controller-selection.adoc[ADR-002: Ethernet Controller Selection] - Documents the decision to use the ENC28J60 as the Ethernet controller.
+
+=== Software Platform Decisions
+
+* link:../adrs/ADR-003-programming-language-selection.adoc[ADR-003: Programming Language Selection] - Documents the decision to use C programming language for firmware development, considering team expertise, delivery timeline, and memory model constraints.
+* link:../adrs/ADR-004-development-ecosystem.adoc[ADR-004: Development Ecosystem Selection] - Documents the decision to use Native Pico SDK + CMake development ecosystem for professional, industrial-grade development.
+
+=== Implementation Strategy Decisions
+
+* link:../adrs/ADR-005-buffer-allocation-strategy.adoc[ADR-005: Ring Buffer Memory Allocation Strategy] - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.
+
+=== Decision Interdependencies
+
+The ADRs reveal important interdependencies that influence architectural coherence:
+
+* *ADR-004 (Development Ecosystem) challenges ADR-002 (Ethernet Controller)*: The ecosystem analysis revealed that ENC28J60 lacks mature RP2350 SDK integration, potentially requiring significant custom development effort and impacting industrial reliability goals.
+
+* *ADR-003 (C Language) reinforces ADR-004 (Native SDK)*: The choice of C programming language aligns optimally with the Native Pico SDK approach, enabling direct application of team expertise.
+
+* *ADR-005 (Buffer Strategy) supports ADR-003 (C Language)*: Static allocation strategy leverages C's deterministic memory model and supports industrial reliability requirements.
+
