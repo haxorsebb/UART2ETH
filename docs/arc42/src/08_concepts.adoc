@@ -3,59 +3,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-concepts]]
 == Cross-cutting Concepts
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Content
-This section describes overall, principal regulations and solution ideas that are relevant in multiple parts (= cross-cutting) of your system.
-Such concepts are often related to multiple building blocks.
-They can include many different topics, such as
-
-* models, especially domain models
-* architecture or design patterns
-* rules for using specific technology
-* principal, often technical decisions of an overarching (= cross-cutting) nature
-* implementation rules
-
-
-.Motivation
-Concepts form the basis for _conceptual integrity_ (consistency, homogeneity) of the architecture. 
-Thus, they are an important contribution to achieve inner qualities of your system.
-
-Some of these concepts cannot be assigned to individual building blocks, e.g. security or safety. 
-
-
-.Form
-The form can be varied:
-
-* concept papers with any kind of structure
-* cross-cutting model excerpts or scenarios using notations of the architecture views
-* sample implementations, especially for technical concepts
-* reference to typical usage of standard frameworks (e.g. using Hibernate for object/relational mapping)
-
-.Structure
-A potential (but not mandatory) structure for this section could be:
-
-* Domain concepts
-* User Experience concepts (UX)
-* Safety and security concepts
-* Architecture and design patterns
-* "Under-the-hood"
-* development concepts
-* operational concepts
-
-Note: it might be difficult to assign individual concepts to one specific topic
-on this list.
-
-image::08-concepts-EN.drawio.png["Possible topics for crosscutting concepts"]
-
-
-.Further Information
-
-See https://docs.arc42.org/section-8/[Concepts] in the arc42 documentation.
-****
-endif::arc42help[]
-
 === Protocol Filtering
 
 Protocol filtering provides a configurable mechanism to determine packet boundaries in UART data streams. The system implements pluggable filters that analyze incoming byte streams to identify complete data units for efficient TCP transmission.
@@ -96,81 +43,303 @@ Each UART channel supports independent filter configuration:
 
 === Web Management Interface
 
-The web management interface provides system configuration and monitoring through three main functional areas.
+The web management interface provides system configuration and monitoring through a responsive web UI.
 
-==== Interface Structure
+==== Main Interface Mockup
 
-[plantuml, web-ui-structure, svg]
+[plantuml, web-management-interface, svg]
 ----
-@startuml
-!theme plain
-
-package "Web Management Interface" {
-  [Config Section] as config
-  [Performance Section] as perf
-  [Log Section] as log
+@startsalt
+{+
+{* File | Config | Monitor | System | Help }
+{/ <b>UART Config | <b>Network | <b>Filters | <b>OTA Updates }
+{
+{^"UART Channel Configuration"
+UART 1 | ^115200^ | ^8^ | ^None^ | ^1^ | ^None^ | [Test Connection]
+UART 2 | ^9600^   | ^8^ | ^None^ | ^1^ | ^None^ | [Test Connection]  
+UART 3 | ^38400^  | ^8^ | ^Even^ | ^1^ | ^None^ | [Test Connection]
+UART 4 | ^19200^  | ^8^ | ^None^ | ^2^ | ^None^ | [Test Connection]
+..
+TCP Port Mapping:
+UART 1 → Port: "2001" | [X] Auto-reconnect | Max Clients: "10"
+UART 2 → Port: "2002" | [X] Auto-reconnect | Max Clients: "5"
+UART 3 → Port: "2003" | [ ] Auto-reconnect | Max Clients: "1"
+UART 4 → Port: "2004" | [X] Auto-reconnect | Max Clients: "3"
+==
+Protocol Filter Assignment:
+UART 1: ^Line-based (\r\n)^
+UART 2: ^Fixed Length (64 bytes)^
+UART 3: ^Timeout-based (100ms)^
+UART 4: ^Custom Delimiter^
 }
-
-config : - UART 1-4 Configuration
-config : - TCP/IP Settings
-config : - Protocol Filter Settings
-
-perf : - Data Throughput Counters
-perf : - Connection Status
-perf : - Error Rate Statistics
-
-log : - System Log Entries
-log : - Most Recent First
-log : - Filterable by Level
-
-@enduml
+|
+{SI
+{^"System Status"
+<color:green><&circle-check> Network: Connected (192.168.1.100)
+<color:green><&circle-check> UART 1: Active (3 clients)
+<color:green><&circle-check> UART 2: Active (1 client)
+<color:orange><&warning> UART 3: No data (0 clients)
+<color:red><&circle-x> UART 4: Error - Framing error
+..
+Performance Metrics:
+UART 1: ↑ 1.2MB/s ↓ 0.8MB/s
+UART 2: ↑ 0.3MB/s ↓ 0.1MB/s  
+UART 3: ↑ 0.0MB/s ↓ 0.0MB/s
+UART 4: ↑ 0.0MB/s ↓ 0.0MB/s
+==
+Memory Usage: [||||||||  ] 67%
+CPU Usage:    [||||||    ] 43%
+Uptime:       15d 7h 23m
+}
+}
+}
+[Apply Changes] | [Reset to Defaults] | [Export Config] | [Import Config]
+}
+@endsalt
 ----
 
-==== Configuration Section
+==== Network Configuration Panel
 
-Provides interface for system parameter configuration:
+[plantuml, network-config-panel, svg]
+----
+@startsalt
+{+
+{^"Network Configuration"
+IP Configuration:
+() DHCP | (X) Static IP
+..
+IP Address:      "192.168.1.100  "
+Subnet Mask:     "255.255.255.0  "
+Default Gateway: "192.168.1.1    "
+DNS Server:      "8.8.8.8        "
+==
+Security Settings:
+[X] Require authentication
 
-**UART Configuration (4 channels)**
-* Baud rate selection (9600, 19200, 38400, 57600, 115200, 230400)
-* Data bits (7, 8)
-* Parity settings (None, Even, Odd)
-* Stop bits (1, 2)
-* Flow control (None, RTS/CTS, XON/XOFF)
-* Protocol filter assignment
+Username: "admin       "
+Password: "************"
+==
+Port Settings:
+Web Interface Port:  "80  " 
+}
+[Save Network Config] | [Test Connection] | [Reboot Required]
+}
+@endsalt
+----
 
-**TCP/IP Settings**
-* Network interface configuration (DHCP/Static IP)
-* Port assignments for each UART channel
-* Connection timeout parameters
-* Maximum concurrent connection limits
+==== Protocol Filter Configuration
 
-==== Performance Section
+[plantuml, filter-config-panel, svg]
+----
+@startsalt
+{+
+{^"Protocol Filter Configuration"
+{T
++Available Filters          | Configuration Parameters
++ Line-based Filters        | 
+++ CR+LF (\r\n)            | Delimiter: "\r\n"
+++ LF only (\n)            | Delimiter: "\n"  
+++ CR only (\r)            | Delimiter: "\r"
+++ Custom line ending      | Delimiter: "        "
++ Fixed-Length Filters      |
+++ 8-byte packets          | Length: 8 bytes
+++ 16-byte packets         | Length: 16 bytes
+++ 32-byte packets         | Length: 32 bytes
+++ Custom length           | Length: "    " bytes
++ Timeout-based Filters     |
+++ 50ms timeout            | Timeout: 50ms
+++ 100ms timeout           | Timeout: 100ms
+++ 500ms timeout           | Timeout: 500ms
+++ Custom timeout          | Timeout: "    " ms
++ Advanced Filters          |
+++ Modbus RTU              | Function codes: "01,02,03,04"
+++ Custom delimiter        | Start: "    " End: "    "
+}
+..
+Filter Assignment:
+UART Channel: ^UART 1^ | Filter: ^Line-based (\r\n)^ | [Test Filter]
+Max Packet Size: "1024" bytes | Buffer Size: "4096" bytes
+[X] Enable packet validation | [X] Log malformed packets
+}
+[Apply Filter Config] | [Test All Filters] | [Reset Filters]
+}
+@endsalt
+----
 
-Displays real-time system performance metrics:
+==== System Monitoring Dashboard
 
-**Data Flow Metrics**
-* Bytes transmitted/received per UART channel
-* TCP connection count per port
-* Packet processing rates
-* Buffer utilization levels
+[plantuml, monitoring-dashboard, svg]
+----
+@startsalt
+{+
+{^"Real-time System Monitor"
+{
+{SI
+  <color:blue><b>Live Log Feed
+  <color:green>[INFO]  2024-01-15 14:23:45 - UART1: Client connected from 192.168.1.50
+  <color:green>[INFO]  2024-01-15 14:23:44 - UART2: 1024 bytes transmitted
+  <color:orange>[WARN]  2024-01-15 14:23:43 - UART3: Connection timeout
+  <color:green>[INFO]  2024-01-15 14:23:42 - UART1: 512 bytes received
+  <color:red>[ERROR] 2024-01-15 14:23:41 - UART4: Framing error detected
+  <color:green>[INFO]  2024-01-15 14:23:40 - System: Config updated
+  <color:green>[INFO]  2024-01-15 14:23:39 - UART2: Packet filtered (64 bytes)
+  <color:green>[INFO]  2024-01-15 14:23:38 - Network: DHCP lease renewed
+  <color:orange>[WARN]  2024-01-15 14:23:37 - System: Memory usage 75%
+  <color:green>[INFO]  2024-01-15 14:23:36 - UART1: Filter applied successfully
+} |
+{
+Connection Matrix:
+{#
+. | UART1 | UART2 | UART3 | UART4
+Client 1 | <color:green>●</color> | . | . | .
+Client 2 | <color:green>●</color> | . | . | .  
+Client 3 | <color:green>●</color> | <color:green>●</color> | . | .
+Client 4 | . | . | . | <color:red>✕</color>
+}
+==
+Statistics (Last Hour):
+Packets processed: 15,234
+Errors detected: 3
+Bytes transferred: 2.1 MB
+Peak connections: 8
+}
+}
+Log Level: ^All Messages^ | [X] Auto-scroll | [Clear Log] | [Export Log]
+}
+}
+@endsalt
+----
 
-**System Health Indicators**
-* Network connection status
-* UART channel status
-* Error counters (parity, framing, overflow)
-* Memory usage statistics
+==== OTA Update Interface
 
-==== Log Section
+[plantuml, ota-update-interface, svg]
+----
+@startsalt
+{+
+{^"Over-The-Air Updates"
+{
+Current Firmware:
+Version: 1.2.3 | Built: 2024-01-10 | Partition: A
+==
+Update Status: <color:green>System Ready for Update</color>
+{
+Upload New Firmware:
+[Choose File...] "uart2eth_v1.2.4.bin                    " | [Upload]
+..
+Or Update from URL:
+"http://updates.uart2eth.local/firmware/latest.bin      " | [Download]
+==
+Update Options:
+[X] Verify firmware signature
+[X] Create backup before update  
+[X] Auto-reboot after update
+[ ] Schedule update (Date/Time: "                        ")
+}
+==
 
-Provides system activity monitoring:
+}
+[Start Update] | [Rollback to Previous] | [Factory Reset]
+}
+}
+@endsalt
+----
 
-**Log Entry Display**
-* Chronological list with most recent entries at top
-* Timestamp, log level, component, and message fields
-* Color coding by severity level (Error, Warning, Info, Debug)
+=== Error Handling Strategy
 
-**Log Management**
-* Real-time log updates via WebSocket connection
-* Configurable log level filtering
-* Log entry search and filtering capabilities
-* Export functionality for log analysis
+==== Hierarchical Error Management
+
+The system implements a three-tier error handling approach:
+
+**Application Layer Errors**
+* Protocol parsing failures
+* Configuration validation errors  
+* User authentication failures
+
+**Communication Layer Errors**
+* UART framing/parity errors
+* TCP connection failures
+* Network timeout conditions
+
+**System Layer Errors**
+* Memory allocation failures
+* Hardware malfunction detection
+* Critical system resource exhaustion
+
+==== Error Recovery Mechanisms
+
+Each error category implements specific recovery procedures:
+
+* **Graceful degradation**: Non-critical failures maintain partial functionality
+* **Automatic retry**: Transient errors trigger configurable retry attempts
+* **Failover switching**: Critical component failures activate backup systems
+* **User notification**: All error conditions generate appropriate user feedback
+
+=== Security Architecture
+
+==== Authentication and Authorization
+
+**Multi-level Access Control**
+* Administrator: Full system configuration access
+* Operator: Monitoring and basic configuration changes
+* Guest: Read-only monitoring access
+
+**Session Management**
+* Token-based authentication with configurable expiry
+* Automatic session timeout after inactivity
+* Concurrent session limits per user role
+
+==== Data Protection
+
+**Network Security**
+* Configurable firewall rules per UART channel
+* Rate limiting for TCP connections
+* Intrusion detection for unusual traffic patterns
+
+=== Configuration Management
+
+==== Persistent Storage
+
+Configuration data persistence uses JSON format with schema validation:
+
+* System settings (network, users, security)
+* UART channel configurations (baud rate, protocol filters)
+* Performance tuning parameters
+* Historical statistics and logs
+
+==== Backup and Restore
+
+**Automatic Backups**
+* Daily configuration snapshots
+* Pre-update system state capture
+* Critical setting change tracking
+
+**Manual Operations**
+* Configuration export/import via web interface
+* Factory reset with selective data preservation
+* Remote backup to external storage systems
+
+=== Performance Optimization
+
+==== Buffer Management
+
+**Dynamic Buffer Allocation**
+* Adaptive buffer sizes based on data flow patterns
+* Memory pool management for high-frequency allocations
+* Garbage collection for unused buffer segments
+
+**Flow Control**
+* Back-pressure mechanisms for overloaded channels
+* Priority queuing for different data types
+* Load balancing across multiple TCP connections
+
+==== Monitoring and Metrics
+
+**Real-time Performance Tracking**
+* Throughput measurements per UART channel
+* Latency monitoring for end-to-end data flow
+* Resource utilization (CPU, memory, network)
+
+**Historical Analysis**
+* Trend analysis for capacity planning
+* Performance regression detection
+* Automated alerting for threshold violations
