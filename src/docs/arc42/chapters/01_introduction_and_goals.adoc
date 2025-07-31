@@ -27,7 +27,7 @@ UART2ETH provides a hardware and firmware solution for bridging UART interfaces 
 *Hardware Capabilities:*
 
 * Support up to 4 independent UART interfaces
-* 100Mbit network interface with RJ45 connector
+* 10Mbit network interface with RJ45 connector
 
 *Networking Features:*
 
