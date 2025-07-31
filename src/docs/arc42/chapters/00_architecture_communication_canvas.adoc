@@ -1,4 +1,10 @@
-ifndef::imagesdir[:imagesdir: ../images]
+:jbake-title: Architecture Communication Canvas
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 1
+:filename: /chapters/00_architecture_communication_canvas.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
 
 [[section-architecture-communication-canvas]]
 
@@ -105,7 +111,7 @@ a| *Quality Requirements* +
 
 * Data Sources: Legacy PLCs, sensors, measurement instruments, and older industrial equipment with serial interfaces but no networking capabilities
 * Data Sinks: SCADA systems, custom data processing software, other UART2ETH devices (in Full Bridge mode)
-* Network Environment: Industrial and household LANs operating at 100Mbit
+* Network Environment: Industrial and household LANs operating at 10Mbit
 * Dependencies: Only requires correctly routed network infrastructure
 * No risky external interfaces or operational costs
 

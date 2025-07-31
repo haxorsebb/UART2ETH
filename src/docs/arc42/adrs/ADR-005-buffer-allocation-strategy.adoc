@@ -1,6 +1,14 @@
+:jbake-title: ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 1
+:filename: /adrs/ADR-005-buffer-allocation-strategy.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
 = ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH
 
-*Status:* PROPOSED +
+*Status:* ACCEPTED +
 *Date:* 2025-07-27 +
 *Deciders:* Architecture Team +
 *Consulted:* Senior Developer +
