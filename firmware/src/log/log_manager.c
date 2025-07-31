@@ -101,15 +101,17 @@ bool log_message(uint8_t core_id, log_level_t level, const char* message) {
     uint32_t write_head = g_shared_layout->log_mgmt.write_head;
     uint32_t read_head = g_shared_layout->log_mgmt.read_head;
     
-    // Check if we have enough space (simple check for now)
+    // Check if we have enough space (corrected ring buffer calculation)
     uint32_t available_space;
     if (write_head >= read_head) {
-        available_space = buffer_size - (write_head - read_head);
+        // Space from write_head to end + space from start to read_head - 1 (keep one byte free)
+        available_space = (buffer_size - write_head) + read_head - 1;
     } else {
-        available_space = read_head - write_head;
+        // Space from write_head to read_head - 1 (keep one byte free)
+        available_space = read_head - write_head - 1;
     }
     
-    if (available_space < (uint32_t)msg_len + 1) {
+    if (available_space < (uint32_t)msg_len) {
         spin_unlock_unsafe(g_shared_layout->log_mgmt.reservation_lock);
         return false;  // Buffer full
     }
