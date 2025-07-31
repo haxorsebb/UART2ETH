@@ -483,9 +483,9 @@ The shared buffer pool design provides elegant burst handling by allowing dynami
 
 ==== Whitebox Log Manager
 
-The Log Manager provides system-wide event logging and performance data collection through lock-free interfaces that ensure real-time operations on both cores are never blocked by logging activities.
+The Log Manager provides system-wide event logging through a lock-reserve-release-write pattern that ensures thread safety while minimizing lock contention. Core1 handles all output operations via periodic background tasks to maintain consistent USB-serial output.
 
-[plantuml, level2-log-manager-simple, svg]
+[plantuml, level2-log-manager-updated, svg]
 ----
 @startuml
 !theme plain
@@ -497,56 +497,44 @@ title Level 2 - Log Manager (Whitebox)
 cloud "Core 0 UART Subsystem\nUART Events + Performance" as C0
 cloud "Core 1 Network Subsystem\nNetwork Events + Performance" as C1
 cloud "Other System Components\nGSM, CFG, OTA, PBP, WD" as OTHER
+cloud "USB-Serial Interface\nStdout Output" as USB
 cloud "Management Interface\nLog Query + Display" as MI
-cloud "Flash Storage\nPersistent Logs" as FLASH
 
-package "Log Manager" {
-    component "Lock-Free Interface Core 0\nAtomic Write Operations\nNo blocking calls\nHigh-priority logging" as LF0 #lightgreen
+package "Log Manager - SRAM Bank Memory Layout" {
+    component "Logging Interface\nBoth Cores\nLock-Reserve-Release-Write\nThread-safe message reservation" as LOG_IF #lightgreen
     
-    component "Lock-Free Interface Core 1\nAtomic Write Operations\nNo blocking calls\nNetwork event logging" as LF1 #lightblue
+    component "Shared Memory Layout\nSRAM Bank 4\nConfig + Counters + Log Mgmt + Ring Buffer" as SHARED_MEM #lightyellow
     
-    component "Event Log Ring Buffer\nCircular Buffer\nFixed-size entries\nOverwrite oldest policy" as RING #lightyellow
+    component "Ring Buffer Management\nWrite Head/Read Head\nSpinlock for Reservation\nCore1 Print Position Tracking" as RING_MGMT #lightcyan
     
-    component "Log Entry Formatter\nStructured Logging\nTimestamp + Component ID\nSeverity + Message" as FORMAT #lightsalmon
+    component "Log Ring Buffer\nFixed-length \r\n Messages\n[TTTTTTTT][C] Message\r\n format" as RING_BUFFER #lightyellow
     
-    component "Log Level Filter\nConfigurable Filtering\nRuntime level control\nPer-component masks" as FILTER #lightcyan
+    component "Core1 Background Printer\nPeriodic Timer Task\nPrint read_head to write_head\nUpdate read_head after printing" as PRINTER #lightblue
     
-    component "Performance Data Collector\nMetrics Aggregation\nThroughput calculation\nLatency measurement" as PERF #lightpink
-    
-    component "Log Query Interface\nSearch + Retrieval\nReal-time streaming\nHistorical access" as QUERY #lightsteelblue
-    
-    component "Log Persistence Manager\nFlash Storage\nLog rotation\nCompress + archive" as PERSIST #wheat
+    component "Configuration Access\nShared Config Structures\nCore0 Read-only\nCore1 Read-write" as CONFIG_ACCESS #lightsteelblue
 }
 
 ' External connections
-C0 --> LF0 : Log Events\nPerformance Data
-C1 --> LF1 : Log Events\nPerformance Data
-OTHER --> LF0 : System Events\nLower Priority
-MI <--> QUERY : Log Requests\nSearch Results
-PERSIST <--> FLASH : Read/Write\nLog Files
+C0 --> LOG_IF : Log Messages\nLock-Reserve-Write
+C1 --> LOG_IF : Log Messages\nLock-Reserve-Write  
+OTHER --> LOG_IF : System Events\nLower Priority
+PRINTER --> USB : Formatted Output\nUSB-Serial stdout
+MI --> SHARED_MEM : Config Query\nDirect Memory Access
 
-' Internal connections - Core Data Flow
-LF0 --> FORMAT : Raw Log Data\nAtomic Writes
-LF1 --> FORMAT : Raw Log Data\nAtomic Writes
-FORMAT --> FILTER : Formatted Entries\nStructured Data
-FILTER --> RING : Filtered Entries\nLevel-appropriate
-
-' Internal connections - Performance Data
-LF0 --> PERF : Performance Metrics\nUART Statistics
-LF1 --> PERF : Performance Metrics\nNetwork Statistics
-PERF --> RING : Aggregated Metrics\nPerformance Reports
-
-' Internal connections - Output
-RING --> QUERY : Current Logs\nLive Data
-RING --> PERSIST : Log Entries\nPersistence Queue
-QUERY <--> RING : Search Operations\nData Retrieval
+' Internal connections
+LOG_IF --> RING_MGMT : Reserve Space\nSpinlock Operations
+LOG_IF --> RING_BUFFER : Write Message\nLock-free Write
+RING_MGMT --> RING_BUFFER : Pointer Management\nHead/Tail Updates
+PRINTER <--> RING_MGMT : Read Position\nPrint Progress Tracking
+PRINTER --> RING_BUFFER : Read Messages\nSequential Access
+CONFIG_ACCESS <--> SHARED_MEM : Config Data\nStructure Access
 
 @enduml
 ----
 
 ===== Motivation
 
-Lock-free logging interfaces prevent real-time operations from being blocked by logging activities. The dual-interface design allows each core to log independently without synchronization overhead, while the ring buffer provides bounded memory usage and predictable performance.
+The lock-reserve-release-write pattern minimizes lock contention by only holding locks during pointer updates, not during actual message writing. Core1-only output ensures consistent USB-serial formatting and prevents interference between cores during logging output.
 
 ===== Contained Building Blocks
 
@@ -554,50 +542,151 @@ Lock-free logging interfaces prevent real-time operations from being blocked by 
 |===
 |Name|Responsibility
 
-|*Lock-Free Interface Core 0*
-|Provides atomic write operations for Core 0 components. Uses lock-free algorithms to ensure UART processing is never blocked by logging operations.
+|*Logging Interface*
+|Provides thread-safe logging API for both cores using lock-reserve-release-write pattern. Handles space reservation with spinlock protection and lock-free message writing.
 
-|*Lock-Free Interface Core 1*
-|Provides atomic write operations for Core 1 components. Ensures network processing continues uninterrupted during logging activities.
+|*Shared Memory Layout*
+|Manages SRAM Bank 4 memory organization containing config structures, performance counters, log management variables, and ring buffer data in compile-time calculated layout.
 
-|*Event Log Ring Buffer*
-|Circular buffer storing formatted log entries with fixed-size allocation. Implements overwrite-oldest policy to handle log bursts without memory allocation.
+|*Ring Buffer Management*
+|Coordinates write_head/read_head pointers with spinlock protection for space reservation. Tracks Core1's print position for periodic background output processing.
 
-|*Log Entry Formatter*
-|Converts raw log data into structured entries with timestamps, component IDs, severity levels, and formatted messages for consistent log format.
+|*Log Ring Buffer*
+|Stores formatted log messages as fixed-length \r\n terminated strings with embedded 8-digit timestamp and core ID. Implements circular buffer with overwrite-oldest policy.
 
-|*Log Level Filter*
-|Runtime-configurable filtering based on severity levels and component masks. Reduces storage overhead by filtering out debug messages in production.
+|*Core1 Background Printer*
+|Periodic timer task (100ms) that outputs all pending log messages from read_head to write_head position to USB-serial stdout, then updates read_head position.
 
-|*Performance Data Collector*
-|Aggregates performance metrics from both cores including throughput calculations, latency measurements, and resource utilization statistics.
-
-|*Log Query Interface*
-|Provides search and retrieval capabilities for both real-time log streaming and historical log access via the management interface.
-
-|*Log Persistence Manager*
-|Handles optional flash storage with log rotation, compression, and archival. Manages persistent log files for post-mortem analysis.
+|*Configuration Access*
+|Provides structured access to shared configuration data with Core0 read-only and Core1 read-write permissions for system configuration management.
 |===
 
 ===== Important Interfaces
 
-====== Lock-Free Logging Interface
-* **Atomic Operations**: Single-writer, multiple-reader lock-free ring buffer
-* **Non-blocking**: Log calls never block or yield the calling thread
-* **Bounded Time**: Worst-case execution time guarantees for real-time systems
-* **Overflow Handling**: Graceful degradation when log buffer fills
+====== Logging Interface API
+* **Lock-Reserve-Release-Write**: Spinlock during pointer update, lock-free during message write
+* **Thread Safety**: Multiple producers (both cores), single consumer (Core1 printer)
+* **Message Format**: Fixed-length format: `[TTTTTTTT][C] Message text here\r\n`
+* **Overflow Policy**: Overwrite oldest messages when buffer is full
 
-====== Event Log Ring Buffer Structure
-* **Entry Size**: Fixed 128-byte entries for predictable memory usage
-* **Buffer Size**: Configurable (default 1024 entries = 128KB)
-* **Overflow Policy**: Drop oldest entries when buffer is full
-* **Memory Layout**: Cache-aligned for optimal performance
+====== SRAM Bank Memory Layout
+* **Config Structures**: System configuration data at bank start
+* **Performance Counters**: Real-time metrics after config structures  
+* **Log Management**: write_head, read_head, spinlock variables
+* **Ring Buffer**: Remainder of SRAM bank filled with message buffer space
+* **Compile-time Sizing**: Buffer size = Bank size - (config + counters + management)
 
-====== Performance Data Interface
-* **Metrics Collection**: Throughput, latency, error counts, resource usage
-* **Aggregation**: Time-based windowing for trend analysis
-* **Real-time Access**: Current performance data always available
-* **Historical Data**: Configurable retention period for trend analysis
+====== Log Message Format
+* **Timestamp**: 8-digit fixed-length numeric timestamp `[12345678]`
+* **Core ID**: Single-digit core identifier `[0]` or `[1]`
+* **Message**: Variable-length text message content
+* **Terminator**: Always ends with `\r\n` for consistent parsing
+* **Example**: `[00123456][1] Network interface initialized\r\n`
+
+====== Core1 Background Processing
+* **Timer Frequency**: 100ms periodic task execution
+* **Print Range**: Process all messages from read_head to write_head
+* **USB-Serial Output**: Single consistent output stream via stdout
+* **Position Update**: Update read_head after successful printing
+
+==== Whitebox Configuration Manager
+
+The Configuration Manager provides centralized storage and access control for all system settings using shared SRAM structures with core-specific access permissions and SHA256 integrity verification.
+
+[plantuml, level2-config-manager, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Configuration Manager (Whitebox)
+
+cloud "Core 0 UART Subsystem\nConfig Consumer\nRead-only Access" as C0
+cloud "Core 1 Network Subsystem\nConfig Consumer/Producer\nRead-write Access" as C1
+cloud "Management Interface\nConfig Producer\nWrite via Core1" as MI
+cloud "Flash Storage\nPersistent Storage\nLoad/Save Operations" as FLASH
+
+package "Configuration Manager - SRAM Bank Layout" {
+    component "Core0 Read Interface\nRead-only Config Access\nUART settings, system params\nDirect memory access" as READ_IF #lightgreen
+    
+    component "Core1 Write Interface\nRead-write Config Access\nConfiguration updates\nValidation + apply" as WRITE_IF #lightblue
+    
+    component "Config Data Structures\nUART channel settings\nNetwork configuration\nSystem parameters" as CONFIG_DATA #lightyellow
+    
+    component "Performance Counters\nReal-time metrics\nThroughput statistics\nError counters" as PERF_COUNTERS #lightpink
+    
+    component "Integrity Management\nRevision counter\nSHA256 checksum\nLoad/save validation" as INTEGRITY #lightcyan
+    
+    component "Flash Persistence\nLoad from flash on boot\nSave on configuration change\nA/B backup strategy" as PERSISTENCE #wheat
+}
+
+' External connections
+C0 --> READ_IF : Config Query\nDirect Access
+C1 <--> WRITE_IF : Config Update\nValidation + Apply
+MI --> WRITE_IF : User Changes\nWeb Interface
+PERSISTENCE <--> FLASH : Load/Save\nConfiguration Files
+
+' Internal connections
+READ_IF --> CONFIG_DATA : Read Access\nDirect Memory
+WRITE_IF <--> CONFIG_DATA : Read-write Access\nStructure Updates
+WRITE_IF --> PERF_COUNTERS : Metrics Update\nConfiguration Changes
+WRITE_IF --> INTEGRITY : Checksum Update\nRevision Increment
+INTEGRITY <--> CONFIG_DATA : Validation\nChecksum Calculation
+PERSISTENCE --> INTEGRITY : Load Validation\nChecksum Verification
+INTEGRITY --> PERSISTENCE : Save Trigger\nRevision Change
+
+@enduml
+----
+
+===== Motivation
+
+Shared SRAM configuration provides fast access for real-time Core0 operations while allowing Core1 to manage updates and persistence. SHA256 integrity checking ensures configuration corruption detection during flash load operations.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*Core0 Read Interface*
+|Provides read-only access to configuration structures for Core0 components. Direct memory access without locking for maximum UART processing performance.
+
+|*Core1 Write Interface*
+|Handles configuration updates with validation, applying changes atomically, and triggering persistence operations. Manages user configuration changes from management interface.
+
+|*Config Data Structures*
+|Organized configuration storage including UART channel settings, network parameters, system options, and operational parameters in structured memory layout.
+
+|*Performance Counters*
+|Real-time operational metrics including throughput statistics, error counters, and system utilization data accessible to both cores and management interface.
+
+|*Integrity Management*
+|Maintains revision counter and SHA256 checksum for configuration validation. Detects corruption during flash load operations and triggers recovery procedures.
+
+|*Flash Persistence*
+|Manages configuration save/load operations with wear leveling, A/B backup strategy, and atomic updates to prevent configuration corruption during power failures.
+|===
+
+===== Important Interfaces
+
+====== Core0 Configuration Access
+* **Read-only Access**: Direct memory access to configuration structures without locking
+* **Fast Access**: Optimized for real-time UART processing requirements  
+* **Structure Layout**: Cache-aligned configuration structures for optimal performance
+* **No Blocking**: Configuration reads never block Core0 operations
+
+====== Configuration Data Format
+* **UART Settings**: Per-channel baud rate, frame format, protocol filter settings
+* **Network Config**: IP address, port mappings, security parameters, connection limits
+* **System Settings**: Logging levels, watchdog timeouts, update settings
+* **User Preferences**: Web interface settings, display options, alert preferences
+
+====== Integrity Verification
+* **Revision Counter**: Incremented on each configuration change for tracking
+* **SHA256 Checksum**: Calculated over entire configuration block for corruption detection
+* **Load Validation**: Checksum verification during flash load with fallback to defaults
+* **Save Atomicity**: Atomic update of revision + checksum + data to prevent corruption
 
 ==== Whitebox Management Interface
 
