@@ -39,6 +39,7 @@ target_link_libraries(uart2eth
     hardware_gpio
     hardware_spi
     config_manager     # Our config manager library
+    log_manager        # Our log manager library
 )
 
 # Enable dual stdio (USB CDC + UART0)

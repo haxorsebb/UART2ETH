@@ -26,3 +26,26 @@ pico_enable_stdio_uart(test_shared_memory 1)
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_shared_memory)
+
+# Test for log manager
+add_executable(test_log_manager
+    test_log_manager.c
+    ../src/config/shared_memory.c
+    ../src/log/log_manager.c
+)
+
+target_link_libraries(test_log_manager
+    unity
+    pico_stdlib
+    pico_sync
+    hardware_sync
+)
+
+target_include_directories(test_log_manager PRIVATE ../include)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_log_manager 1)
+pico_enable_stdio_uart(test_log_manager 1)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_log_manager)
