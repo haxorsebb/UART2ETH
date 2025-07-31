@@ -1,0 +1,1013 @@
+<!doctype html>
+<html lang="de">
+<head>
+    
+    <!-- sourceuri: arc42/adrs/ADR-002-ethernet-controller-selection.html -->
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+    <meta content="jbake" name="generator">
+    <meta content="INDEX, FOLLOW" name="ROBOTS">
+
+    <title>ADR-002: Ethernet Controller Selection for UART2ETH</title>
+    <meta content="docToolchain" property="og:title">
+    <meta content="build your dev docs the easy way..." property="og:description">
+    <meta content="website" property="og:type">
+    <meta content="docToolchain" property="og:site_name">
+    <meta content="docToolchain" itemprop="name">
+    <meta content="build your dev docs the easy way..." itemprop="description">
+    <meta content="summary" name="twitter:card">
+    <meta content="docToolchain" name="twitter:title">
+    <meta content="build your dev docs the easy way..." name="twitter:description">
+
+    <link as="style"
+        href="../../css/main.min.881fe5f7b53609f55ebfb496c7097c3b30b2e8ceb20a54bc6a48350ded67224f.css"
+        rel="preload">
+    <link href="../../css/main.min.881fe5f7b53609f55ebfb496c7097c3b30b2e8ceb20a54bc6a48350ded67224f.css"
+        integrity=""
+        rel="stylesheet">
+    <link href="../../css/asciidoctor.css" rel="stylesheet">
+    <link href="../../css/prettify.css" rel="stylesheet">
+
+    <!-- favicon generated with https://www.favicon-generator.org/ -->
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="apple-touch-icon" sizes="57x57" href="../../apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="../../apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="../../apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="../../apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="../../apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="../../apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="../../apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="../../apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../../apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="../../android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../../favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="../../favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../../favicon-16x16.png">
+    <link rel="manifest" href="../../manifest.json">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="../../ms-icon-144x144.png">
+    <meta name="theme-color" content="#ffffff">
+
+    <script src="../../js/jquery-3.5.1.min.js"></script>
+    <style>
+    div.bg-light {
+        background-color: rgba(127, 180, 224, 0.3) !important;
+    }
+
+    /* for blog posts */
+    span.blogtag {
+        border-radius: 10px;
+        background-color: #30638E;
+        color: white;
+        padding: 5px 10px;
+    }
+
+    span.blogblogtag a {
+        color: white;
+        padding: 0
+    }
+
+    span.blogtag span {
+        margin-left: 10px;
+        border-radius: 10px;
+        background-color: white;
+        color: #30638E;
+    }
+
+    div.td-toc {
+        height: calc(100vh - 5rem) !important;
+    }
+
+    div#toctitle {
+        display: none
+    }
+
+    #td-section-nav {
+        max-height: calc(100vh - 4rem);
+        font-size: smaller;
+        line-height: 1.1;
+    }
+
+    .td-page-meta {
+        font-size: smaller;
+        line-height: 1.1;
+    }
+
+    #td-section-nav ul.td-sidebar-nav__section {
+        padding-left: 0;
+    }
+
+    span.navbar-logo {
+        padding-right: 1.5em;
+    }
+
+    .match {
+        font-size: smaller;
+    }
+
+    .admonitionblock td.icon .fa:before {
+        font-size: xxx-large;
+    }
+    </style>
+
+    <style>
+    div.openblock.primary div.content, div.openblock.secondary div.content {
+        border: 1px solid #7a2518;
+        padding: 5px;
+    }
+
+    div.openblock.primary div.content div.content, div.openblock.secondary div.content div.content {
+        border: 0 solid #7a2518;
+        padding: 0;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .switch {
+        border-width: 1px 1px 0 1px;
+        border-style: solid;
+        border-color: #7a2518;
+        display: inline-block;
+    }
+
+    .switch--item {
+        padding: 2px 10px;
+        background-color: #ffffff;
+        color: #7a2518;
+        display: inline-block;
+        cursor: pointer;
+    }
+
+    .switch--item:not(:first-child) {
+        border-width: 0 0 0 1px;
+        border-style: solid;
+        border-color: #7a2518;
+    }
+
+    .switch--item.selected {
+        background-color: #7a2519;
+        color: #ffffff;
+    }
+    </style>
+
+    <!-- copy-n-paste.js -->
+    <style>
+        div.listingblock {
+            position: relative;
+        }
+        div.listingblock > span.icon {
+            position: absolute;
+            top: 2px;
+            right: 6px;
+            visibility: hidden;
+            z-index: 2;
+            cursor: pointer;
+        }
+        div.listingblock:hover > span.icon {
+            visibility: visible;
+        }
+        div.listingblock div.content pre {
+            margin: 0;
+        }
+    </style>
+    <style>
+        .td-sidebar-nav__section {
+            padding-left: 9px;
+        }
+        details {
+            margin-left: 10px;
+        }
+        summary {
+            cursor: pointer;
+            padding-left: 10px; /* Erhöhter linker Padding für den Pfeil */
+            list-style: none;
+            position: relative; /* Für absolute Positionierung des Pfeils */
+        }
+        summary::before {
+            content: '>';
+            position: absolute;
+            left: 10px; /* Position des Pfeils */
+            top: 50%;
+            transform: translateY(-50%) translateX(-120%);
+            transition: transform 0.3s;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) translateX(-120%) rotate(90deg);
+        }
+    </style>
+</head>
+
+<body onload="prettyPrint()" class="td-section">
+<header>
+	
+<nav class="js-navbar-scroll navbar navbar-expand navbar-dark flex-column flex-md-row td-navbar">
+    <a class="navbar-brand" href="../../index.html">
+        <span class="navbar-logo"><img src="../../images/doctoolchain-logo-blue.png" alt="docToolchain" width="32px" /></span><span
+            class="font-weight-bold">docToolchain</span>
+    </a>
+    <div class="td-navbar-nav-scroll ml-md-auto" id="main_navbar">
+        <ul class="navbar-nav mt-2 mt-lg-0">
+    <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
+
+            <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a class="nav-link active" href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+            </li>
+
+            <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a class="nav-link " href="../../arc42/chapters/00_architecture_communication_canvas.html"><span>arc42</span></a>
+            </li>
+
+        </ul>
+    </div>
+    <div class="navbar-nav d-none d-lg-block" >
+        <form action="../../search.html">
+        <input aria-label="Search this site…" autocomplete="off" class="form-control td-search-input"
+               placeholder=" Search this site…" type="search" name="q">
+        </form>
+    </div>
+</nav>
+
+</header>
+<div class="container-fluid td-outer">
+	<div class="td-main">
+		<div class="row flex-xl-nowrap">
+			<div class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">
+				<div class="td-sidebar__inner" id="td-sidebar-menu" >
+					
+
+        <form class="td-sidebar__search d-flex align-items-center d-lg-none" action="../../search.html">
+
+            <input aria-label="Search this site…" name="q" autocomplete="off" class="form-control td-search-input"
+                   placeholder=" Search this site…" type="search">
+
+
+            <button aria-controls="td-docs-nav" aria-expanded="false"
+                    aria-label="Toggle section navigation" class="btn btn-link td-sidebar__toggle d-md-none p-0 ml-3 fas fa-bars" data-target="#td-section-nav"
+                    data-toggle="collapse" type="button">
+            </button>
+        </form>
+
+        <nav aria-label="Submenu" class="collapse td-sidebar-nav" id="td-section-nav" >
+
+            <ul class="td-sidebar-nav__section">
+                <li class="td-sidebar-nav__section-title">
+                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">adrs</span>
+                </li>
+                <li>
+                  <ul>
+                      <li class="collapse show" id="docs">
+                          
+                        <ul class="td-sidebar-nav__section ul-0">
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/adrs/ADR-001-microcontroller-selection.html" title="ADR-001: Microcontroller Platform Selection for UART2ETH">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                   href="../../arc42/adrs/ADR-002-ethernet-controller-selection.html" title="ADR-002: Ethernet Controller Selection for UART2ETH">ADR-002: Ethernet Controller Selection for UART2ETH</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/adrs/ADR-003-programming-language-selection.html" title="ADR-003: Programming Language Selection for UART2ETH">ADR-003: Programming Language Selection for UART2ETH</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/adrs/ADR-004-development-ecosystem.html" title="ADR-004: Development Ecosystem Selection for UART2ETH">ADR-004: Development Ecosystem Selection for UART2ETH</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/adrs/ADR-005-buffer-allocation-strategy.html" title="ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</a>
+                                
+                            </li>
+                        </ul>
+                      </li>
+                  </ul>
+                <li>
+        </nav>
+
+				</div>
+			</div>
+			<div class="d-none d-xl-block col-xl-2 td-toc d-print-none">
+				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
+					
+
+        <a href="##git-repo-url##/arc42/adrs/ADR-002-ethernet-controller-selection.adoc"
+           target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
+
+
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-002%3A+Ethernet+Controller+Selection+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-002-ethernet-controller-selection.adoc%0A%23branch:%20main" target="_blank"><i
+                class="fab fa-github fa-fw"></i> Create an issue</a>
+
+        
+
+        <hr />
+
+        <div id="toc" class="toc">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel0">
+<li><a href="#_adr_002_ethernet_controller_selection_for_uart2eth">ADR-002: Ethernet Controller Selection for UART2ETH</a>
+<ul class="sectlevel1">
+<li><a href="#_context">Context</a></li>
+<li><a href="#_decision_drivers">Decision Drivers</a>
+<ul class="sectlevel2">
+<li><a href="#_primary_requirements">Primary Requirements</a></li>
+<li><a href="#_constraints">Constraints</a></li>
+</ul>
+</li>
+<li><a href="#_options_considered">Options Considered</a>
+<ul class="sectlevel2">
+<li><a href="#_option_a_wiznet_w5500">Option A: WIZnet W5500</a></li>
+<li><a href="#_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</a></li>
+</ul>
+</li>
+<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
+<li><a href="#_decision">Decision</a></li>
+<li><a href="#_rationale">Rationale</a>
+<ul class="sectlevel2">
+<li><a href="#_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</a></li>
+<li><a href="#_trade_offs_accepted">Trade-offs Accepted</a></li>
+</ul>
+</li>
+<li><a href="#_consequences">Consequences</a>
+<ul class="sectlevel2">
+<li><a href="#_positive">Positive</a></li>
+<li><a href="#_negative">Negative</a></li>
+<li><a href="#_risks_and_mitigation">Risks and Mitigation</a></li>
+</ul>
+</li>
+<li><a href="#_implementation_notes">Implementation Notes</a>
+<ul class="sectlevel2">
+<li><a href="#_performance_optimization">Performance Optimization</a></li>
+</ul>
+</li>
+<li><a href="#_follow_up_actions">Follow-up Actions</a></li>
+</ul>
+</li>
+</ul>
+</div>
+
+
+
+
+				</div>
+			</div>
+			<main class="col-12 col-md-9 col-xl-8 pl-md-5" role="main">
+				    <nav aria-label="breadcrumb" class="d-none d-md-block d-print-none">
+        <ol class="breadcrumb spb-1">
+            <!--li aria-current="page" class="breadcrumb-item active">
+                <a href="https://example.docsy.dev/docs/">Documentation</a>
+            </li-->
+
+        </ol>
+    </nav>
+
+
+    <div class="td-content">
+        <p>
+            
+<h1 id="_adr_002_ethernet_controller_selection_for_uart2eth" class="sect0">ADR-002: Ethernet Controller Selection for UART2ETH</h1>
+<div class="paragraph">
+<p><strong>Status:</strong> ACCEPTED<br>
+<strong>Date:</strong> 2025-07-26<br>
+<strong>Deciders:</strong> Architecture Team<br>
+<strong>Consulted:</strong> Senior Developer<br>
+<strong>Informed:</strong> Development Team</p>
+</div>
+<div class="sect1">
+<h2 id="_context">Context</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The UART2ETH system requires an Ethernet controller that interfaces with the RP2350 microcontroller via SPI to provide reliable TCP/IP connectivity. This component is critical for the core networking functionality of our product.</p>
+</div>
+<div class="paragraph">
+<p>Based on our microcontroller selection (ADR-001), we need to determine the most appropriate Ethernet controller solution that can:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Support at least 10 Mbps Ethernet connectivity</p>
+</li>
+<li>
+<p>Interface with the RP2350 via SPI</p>
+</li>
+<li>
+<p>Handle the networking requirements of up to 4 concurrent UART-to-TCP bridges</p>
+</li>
+<li>
+<p>Operate reliably in industrial environments (-40°C to +85°C)</p>
+</li>
+<li>
+<p>Maintain low latency while supporting our 500 kbps per port requirement</p>
+</li>
+<li>
+<p>Simplify firmware development with minimal microcontroller overhead</p>
+</li>
+<li>
+<p>Meet our cost target for volume production</p>
+</li>
+<li>
+<p>Does not contain firmware on its own</p>
+</li>
+<li>
+<p>Comes from a 'western' supplier</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The Ethernet controller selection impacts system performance, reliability, development complexity, and overall BOM cost.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_decision_drivers">Decision Drivers</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_primary_requirements">Primary Requirements</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Network Performance</strong>: Support for full 100 Mbps Ethernet with sufficient throughput for our use case</p>
+</li>
+<li>
+<p><strong>Memory Buffer Size</strong>: Sufficient buffer for packet handling and multiple connections</p>
+</li>
+<li>
+<p><strong>SPI Interface Speed</strong>: Fast and efficient communication with the microcontroller</p>
+</li>
+<li>
+<p><strong>Industrial Reliability</strong>: Operating temperature range and robustness for industrial use</p>
+</li>
+<li>
+<p><strong>Cost Effectiveness</strong>: Component cost for volume production</p>
+</li>
+<li>
+<p><strong>Development Complexity</strong>: Readily available OpenSource library for integration</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_constraints">Constraints</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Must use SPI interface to connect with the RP2350 microcontroller</p>
+</li>
+<li>
+<p>Must operate reliably in industrial environments (-40°C to +85°C)</p>
+</li>
+<li>
+<p>Must fit within the overall $10 system cost target for volume production</p>
+</li>
+<li>
+<p>Must use open-source compatible software stacks (GPL license compatible)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_options_considered">Options Considered</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_option_a_wiznet_w5500">Option A: WIZnet W5500</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Interface</strong>: SPI (up to 80 MHz)</p>
+</li>
+<li>
+<p><strong>Network Speed</strong>: 10/100 Mbps Ethernet</p>
+</li>
+<li>
+<p><strong>TCP/IP Stack</strong>: Hardwired TCP/IP stack (integrated)</p>
+</li>
+<li>
+<p><strong>Buffer Memory</strong>: 32 KB internal buffer</p>
+</li>
+<li>
+<p><strong>Concurrent Connections</strong>: 8 independent hardware sockets</p>
+</li>
+<li>
+<p><strong>Protocols Support</strong>: TCP, UDP, IPv4, ICMP, ARP, IGMP, PPPoE</p>
+</li>
+<li>
+<p><strong>Temperature Range</strong>: -40°C to +85°C</p>
+</li>
+<li>
+<p><strong>Voltage Supply</strong>: 2.97V to 3.63V</p>
+</li>
+<li>
+<p><strong>Power Consumption</strong>: 132mA typical</p>
+</li>
+<li>
+<p><strong>Package Options</strong>: 48-LQFP (7x7mm)</p>
+</li>
+<li>
+<p><strong>Cost (Volume)</strong>: ~$2.00 per unit</p>
+</li>
+<li>
+<p><strong>Development Ecosystem</strong>: Extensive documentation, libraries for multiple platforms</p>
+</li>
+<li>
+<p><strong>Manufacturer</strong>: WIZnet.io (South Korea)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Interface</strong>: SPI (up to 20 MHz)</p>
+</li>
+<li>
+<p><strong>Network Speed</strong>: 10 Mbps Ethernet only</p>
+</li>
+<li>
+<p><strong>TCP/IP Stack</strong>: Software stack required (on microcontroller)</p>
+</li>
+<li>
+<p><strong>Buffer Memory</strong>: 8 KB internal buffer</p>
+</li>
+<li>
+<p><strong>Concurrent Connections</strong>: Limited by microcontroller implementation</p>
+</li>
+<li>
+<p><strong>Protocols Support</strong>: Requires microcontroller implementation (typically lwIP)</p>
+</li>
+<li>
+<p><strong>Temperature Range</strong>: 0°C to +70°C (commercial), -40°C to +85°C (industrial version)</p>
+</li>
+<li>
+<p><strong>Voltage Supply</strong>: 3.1V to 3.6V</p>
+</li>
+<li>
+<p><strong>Power Consumption</strong>: 160mA typical</p>
+</li>
+<li>
+<p><strong>Package Options</strong>: 28-pin SPDIP, SOIC, SSOP, QFN</p>
+</li>
+<li>
+<p><strong>Cost (Volume)</strong>: ~$2.50 per unit</p>
+</li>
+<li>
+<p><strong>Development Ecosystem</strong>: Mature, widely used in Arduino and other platforms</p>
+</li>
+<li>
+<p><strong>Manufacturer</strong>: Microchip Technology (USA)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
+<em>Baseline: ENC28J60 (all scores = 0)</em></p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 38.4615%;">
+<col style="width: 15.3846%;">
+<col style="width: 23.0769%;">
+<col style="width: 23.077%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
+<th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
+<th class="tableblock halign-left valign-top"><strong>ENC28J60</strong></th>
+<th class="tableblock halign-left valign-top"><strong>W5500</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Speed</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (100 Mbps vs 10 Mbps)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>TCP/IP Implementation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (hardwired vs software)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Microcontroller Overhead</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (minimal vs significant)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Buffer Size</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (32KB vs 8KB)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>SPI Interface Performance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (80MHz vs 20MHz)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Temperature Range</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (standard -40°C to +85°C)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Ecosystem</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (both well-supported)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Firmware Complexity</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (simple socket programming)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Open Internal Firmware</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (Complex, Closed Source)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Western Manufacturer</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (South Korea)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Auditable Sourcecode</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (Closed Source)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total PUGH Score</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-6</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_decision">Decision</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><strong>Selected: ENC28J60</strong></p>
+</div>
+<div class="paragraph">
+<p>While the W5500 is technically superior in every aspect and more easy to integrate, the ENC28J60 is a <strong>dumb</strong> device, which is, given to goal of maximum control, auditable software and upgradeable software, exactly what we want. And additionally it is from a 'western' manufacturer.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_rationale">Rationale</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Dumb</strong>: The ENC28J60 has no complex firmware.</p>
+</li>
+<li>
+<p><strong>Auditable Sourcecode</strong>: The main network code is in the microcontrollers firmware, which we have total control over. This allows us to show <strong>all</strong> relevant code for audits.</p>
+</li>
+<li>
+<p><strong>Western Manufacturer</strong>: Because of supply chain considerations we want this project to contain only 'western' manufacturers. While technically South Korea is a western ally, it is still in the east.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_trade_offs_accepted">Trade-offs Accepted</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Cost Premium</strong>: The $0.50 additional cost per unit for the W5500 is justified by the significant performance advantages, reduced development complexity, and system resource savings.</p>
+</li>
+<li>
+<p><strong>Lower Performance</strong>: The W5500 is superior in all aspects of performance. But the ENC28J60 is <strong>good enough</strong> to match the performance criteria.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_consequences">Consequences</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_positive">Positive</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>✅ <strong>Minimal Performance</strong>: ENC28J60 provides enough network bandwidth for current needs</p>
+</li>
+<li>
+<p>✅ <strong>Physical Size</strong>: 28SSOP package requires slightly less PCB space</p>
+</li>
+<li>
+<p>✅ <strong>Industrial Reliability</strong>: Full industrial temperature range support</p>
+</li>
+<li>
+<p>✅ <strong>External Dependency</strong>: Reliance on a more generic controller with more alternatives</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_negative">Negative</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>⚠️ <strong>Resource Spending</strong>: More microcontroller overhead diminishes resources for other features</p>
+</li>
+<li>
+<p>⚠️ <strong>Slightly Higher Cost</strong>: $0.50 cost premium per unit compared to W5500</p>
+</li>
+<li>
+<p>⚠️ <strong>More Complex Development</strong>: Software TCP/IP stack incraeses code complexity and development time</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_risks_and_mitigation">Risks and Mitigation</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Supply Chain Risk</strong>: Establish multiple supplier relationships, consider inventory strategy</p>
+</li>
+<li>
+<p><strong>Single-Source Component</strong>: Document adaptation path to alternative controllers if necessary</p>
+</li>
+<li>
+<p><strong>Integration Complexity</strong>: Thoroughly validate the ENC28J60-RP2350 integration early in development</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_implementation_notes">Implementation Notes</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_performance_optimization">Performance Optimization</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Use burst SPI mode for maximum throughput (up to 25 MHz)</p>
+</li>
+<li>
+<p>Optimize buffer management for latency-sensitive applications)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_follow_up_actions">Follow-up Actions</h2>
+<div class="sectionbody">
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Procurement</strong>: Source ENC28J60 components from multiple suppliers to validate availability</p>
+</li>
+<li>
+<p><strong>Prototyping</strong>: Develop initial integration test for RP2350 + ENC28J60 communication</p>
+</li>
+<li>
+<p><strong>Performance Testing</strong>: Benchmark SPI communication speeds and TCP throughput</p>
+</li>
+<li>
+<p><strong>Industrial Validation</strong>: Test operation across full temperature range</p>
+</li>
+</ol>
+</div>
+<hr>
+<div class="paragraph">
+<p><strong>Review Notes:</strong></p>
+</div>
+<div class="ulist checklist">
+<ul class="checklist">
+<li>
+<p>&#10063; Validate pricing from multiple suppliers</p>
+</li>
+<li>
+<p>&#10063; Confirm SPI bus configuration with other peripherals</p>
+</li>
+<li>
+<p>&#10063; Verify EMI/EMC considerations with ENC28J60 placement</p>
+</li>
+<li>
+<p>&#10063; Test actual power consumption under various load scenarios</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+        </p>
+
+        <style>
+.feedback--answer {
+    display: inline-block;
+}
+
+.feedback--answer-no {
+    margin-left: 1em;
+}
+
+.feedback--response {
+    display: none;
+    margin-top: 1em;
+}
+
+.feedback--response__visible {
+    display: block;
+}
+</style>
+
+<div class="d-print-none">
+    <h2 class="feedback--title">Feedback</h2>
+    <p class="feedback--question">Was this page helpful?</p>
+    <button class="feedback--answer feedback--answer-yes">Yes</button>
+    <button class="feedback--answer feedback--answer-no">No</button>
+    <p class="feedback--response feedback--response-yes">
+        Glad to hear it! Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-002%3A+Ethernet+Controller+Selection+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-002-ethernet-controller-selection.adoc">tell us
+    how we can improve</a>.
+    </p>
+    <p class="feedback--response feedback--response-no">
+        Sorry to hear that. Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27ADR-002%3A+Ethernet+Controller+Selection+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-002-ethernet-controller-selection.adoc">tell
+    us how we can improve</a>.
+    </p>
+</div>
+<script>
+    const yesButton = document.querySelector('.feedback--answer-yes');
+    const noButton = document.querySelector('.feedback--answer-no');
+    const yesResponse = document.querySelector('.feedback--response-yes');
+    const noResponse = document.querySelector('.feedback--response-no');
+    const disableButtons = () => {
+        yesButton.disabled = true;
+        noButton.disabled = true;
+    };
+    const sendFeedback = (value) => {
+        if (typeof ga !== 'function') return;
+        const args = {
+            command: 'send',
+            hitType: 'event',
+            category: 'Helpful',
+            action: 'click',
+            label: window.location.pathname,
+            value: value
+        };
+        ga(args.command, args.hitType, args.category, args.action, args.label, args.value);
+    };
+    yesButton.addEventListener('click', () => {
+        yesResponse.classList.add('feedback--response__visible');
+        disableButtons();
+        sendFeedback(1);
+    });
+    noButton.addEventListener('click', () => {
+        noResponse.classList.add('feedback--response__visible');
+        disableButtons();
+        sendFeedback(0);
+    });
+</script>
+
+
+        <br>
+
+        <!--div class="text-muted mt-5 pt-3 border-top">Last modified July 3, 2019: <a
+                href="https://github.com/google/docsy-example/commit/d6aa89c8b24089d7e6741030864eff209465e896">Added
+            links to user guide repo (d6aa89c)</a>
+        </div-->
+    </div>
+
+
+			</main>
+
+		</div>
+	</div>
+
+
+	
+    <!--footer class="footer mt-auto py-3 bg-light">
+        <div class="container">
+            <span class="text-muted">&copy; 2020 | based on <a href="https://arc42.org">arc42 7.0</a> | mixed with <a href="http://getbootstrap.com/">Bootstrap v5.0.0-beta</a> | Baked with <a href="http://jbake.org">JBake v2.6.7</a></span>
+        </div>
+    </footer-->
+
+    <footer class="bg-dark py-5 row d-print-none">
+        <div class="container-fluid mx-sm-5">
+            <div class="row">
+                <div class="col-6 col-sm-4 text-xs-center order-sm-2">
+
+
+                    <ul class="list-inline mb-0">
+                        
+                        <li aria-label="User mailing list" class="list-inline-item mx-2 h3" data-original-title="User mailing list" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="mailto:##footer-email##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fa fa-envelope"></i>
+                            </a>
+                        </li>
+                        
+                        
+                        <li aria-label="Twitter" class="list-inline-item mx-2 h3" data-original-title="Twitter" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##twitter-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-twitter"></i>
+                            </a>
+                        </li>
+                        
+                        
+                        <li aria-label="Stack Overflow" class="list-inline-item mx-2 h3" data-original-title="Stack Overflow" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##Stackoverflow-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-stack-overflow"></i>
+                            </a>
+                        </li>
+                        
+                    </ul>
+
+
+                </div>
+                <div class="col-6 col-sm-4 text-right text-xs-center order-sm-3">
+
+
+                    <ul class="list-inline mb-0">
+
+                        
+                        <li aria-label="GitHub" class="list-inline-item mx-2 h3" data-original-title="GitHub" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##Github-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-github"></i>
+                            </a>
+                        </li>
+                        
+
+                        
+                        <li aria-label="Slack" class="list-inline-item mx-2 h3" data-original-title="Slack" data-placement="top"
+                            data-toggle="tooltip" title="">
+                            <a class="text-white" href="##Slack-url##" rel="noopener noreferrer"
+                               target="_blank">
+                                <i class="fab fa-slack"></i>
+                            </a>
+                        </li>
+                        
+
+
+                    </ul>
+
+
+                </div>
+                <div class="col-12 col-sm-4 text-center py-2 order-sm-2">
+
+                        <small class="text-white">built with <a href="https://doctoolchain.org">docToolchain</a> and <a href="https://jbake.org">jBake</a> <br /> theme: <a href="https://www.docsy.dev/">docsy</a></small>
+
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../../js/popper.min.js"></script>
+    <script src="../../js/bootstrap.min.js"></script>
+
+
+    <script src="../../js/main.min.b5fc1b29d2465835844254bd4d804738eaf24c0cec53009b4c6899989be55a47.js"></script>
+    <script src="../../js/blocks.js" ></script>
+    <script src="../../js/prettify.js"></script>
+    <script src="../../js/copy-n-paste.js"></script>
+    <script src="../../js/submenucollapse.js"></script>
+
+
+</body>
+</html>
