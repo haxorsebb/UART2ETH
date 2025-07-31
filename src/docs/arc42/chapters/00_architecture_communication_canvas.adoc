@@ -85,8 +85,8 @@ Strategic:
 
 .3+a| *Technologies* +
 
-* Programming: C/C++ with Arduino framework
-* Development: VSCodium IDE, PlatformIO build system
+* Programming: Misra-C + Native Pico SDK + CMake Development Ecosystem
+* Development: VSCodium IDE, CMake build system
 * Hardware: RP2350 microcontroller, ENC28J60 SPI Ethernet controller
 * Protocols: Raw TCP sockets, HTTP for WebUI
 * Security: RP2350 Boot ROM provided security mechanisms

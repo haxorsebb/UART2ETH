@@ -17,3 +17,6 @@ Thumbs.db
 
 # docToolchain cache
 .asciidoctor/
+
+#build dir
+build/

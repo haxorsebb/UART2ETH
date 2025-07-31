@@ -1,0 +1,4 @@
+technical debt:
+- no flow control for uart
+- no HTTPS/TLS
+- only 3 PIO UART, 1 must be hardware UART, but conficts with debug UART, other hardware UART is used for spi 
