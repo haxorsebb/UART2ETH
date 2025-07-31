@@ -9,7 +9,7 @@ outputPath = 'build'
 // This path is appended to the docDir property specified in gradle.properties
 // or in the command line, and therefore must be relative to it.
 
-inputPath = 'docs';
+inputPath = 'src/docs';
 
 // if you need to register custom Asciidoctor extensions, this is the right place
 // configure the name and path to your extension, relative to the root of your project
@@ -25,8 +25,8 @@ inputPath = 'docs';
 inputFiles = [
         //[file: 'doctoolchain_demo.adoc',       formats: ['html','pdf']],
         //[file: 'arc42-template.adoc',    formats: ['html','pdf']],
-        /** inputFiles **/
 	[file: 'arc42/arc42.adoc', formats: ['html','pdf']],
+	/** inputFiles **/
 ]
 
 //folders in which asciidoc will find images.
@@ -38,8 +38,9 @@ inputFiles = [
 // ifndef::imagesdir[:imagesdir: ./whatsoever]
 // as doctoolchain defines :imagesdir: during generation
 imageDirs = [
-    /** imageDirs **/
-	"../images",
+    'images/.',
+	'images/.',
+	/** imageDirs **/
 ]
 
 // whether the build should fail when detecting broken image references
