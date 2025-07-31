@@ -1,6 +1,14 @@
+:jbake-title: ADR-003: Programming Language Selection for UART2ETH
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 1
+:filename: /adrs/ADR-003-programming-language-selection.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
 = ADR-003: Programming Language Selection for UART2ETH
 
-*Status:* PROPOSED +
+*Status:* ACCEPTED +
 *Date:* 2025-07-26 +
 *Deciders:* Architecture Team +
 *Consulted:* Senior Developer +

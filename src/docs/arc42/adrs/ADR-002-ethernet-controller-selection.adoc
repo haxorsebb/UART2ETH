@@ -1,6 +1,14 @@
+:jbake-title: ADR-002: Ethernet Controller Selection for UART2ETH
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 1
+:filename: /adrs/ADR-002-ethernet-controller-selection.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
 # ADR-002: Ethernet Controller Selection for UART2ETH
 
-*Status:* PROPOSED +
+*Status:* ACCEPTED +
 *Date:* 2025-07-26 +
 *Deciders:* Architecture Team +
 *Consulted:* Senior Developer +
@@ -12,7 +20,7 @@ The UART2ETH system requires an Ethernet controller that interfaces with the RP2
 
 Based on our microcontroller selection (ADR-001), we need to determine the most appropriate Ethernet controller solution that can:
 
-* Support 100 Mbps Ethernet connectivity
+* Support at least 10 Mbps Ethernet connectivity
 * Interface with the RP2350 via SPI
 * Handle the networking requirements of up to 4 concurrent UART-to-TCP bridges
 * Operate reliably in industrial environments (-40°C to +85°C)
