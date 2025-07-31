@@ -3,7 +3,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-concepts]]
 == Cross-cutting Concepts
 
-
 ifdef::arc42help[]
 [role="arc42help"]
 ****
@@ -57,18 +56,121 @@ See https://docs.arc42.org/section-8/[Concepts] in the arc42 documentation.
 ****
 endif::arc42help[]
 
-=== _<Concept 1>_
+=== Protocol Filtering
 
-_<explanation>_
+Protocol filtering provides a configurable mechanism to determine packet boundaries in UART data streams. The system implements pluggable filters that analyze incoming byte streams to identify complete data units for efficient TCP transmission.
 
+==== Packet Determination Algorithm
 
+The protocol filter operates on incoming UART data to identify discrete packets using configurable delimiters and patterns:
 
-=== _<Concept 2>_
+.Basic Line-Based Filter Example
+[source]
+----
+Input stream:  "sensor1=23.5\r\ntemperature=18.2\r\nhumidity=65\r\n"
+Delimiter:     "\r\n"
+Output packets: 
+  - "sensor1=23.5"
+  - "temperature=18.2" 
+  - "humidity=65"
+----
 
-_<explanation>_
+==== Filter Types
 
-...
+The system supports multiple filter implementations:
 
-=== _<Concept n>_
+* **Line-based filters**: Use configurable line terminators (\r\n, \n, \r)
+* **Fixed-length filters**: Extract packets of predetermined byte count
+* **Delimiter-based filters**: Use custom byte sequences as packet boundaries
+* **Timeout-based filters**: Form packets after configurable idle periods
 
-_<explanation>_
+==== Configuration Parameters
+
+Each UART channel supports independent filter configuration:
+
+* Filter type selection
+* Delimiter specification (for delimiter-based filters)
+* Packet length (for fixed-length filters)
+* Timeout values (for timeout-based filters)
+* Maximum packet size limits
+
+=== Web Management Interface
+
+The web management interface provides system configuration and monitoring through three main functional areas.
+
+==== Interface Structure
+
+[plantuml, web-ui-structure, svg]
+----
+@startuml
+!theme plain
+
+package "Web Management Interface" {
+  [Config Section] as config
+  [Performance Section] as perf
+  [Log Section] as log
+}
+
+config : - UART 1-4 Configuration
+config : - TCP/IP Settings
+config : - Protocol Filter Settings
+
+perf : - Data Throughput Counters
+perf : - Connection Status
+perf : - Error Rate Statistics
+
+log : - System Log Entries
+log : - Most Recent First
+log : - Filterable by Level
+
+@enduml
+----
+
+==== Configuration Section
+
+Provides interface for system parameter configuration:
+
+**UART Configuration (4 channels)**
+* Baud rate selection (9600, 19200, 38400, 57600, 115200, 230400)
+* Data bits (7, 8)
+* Parity settings (None, Even, Odd)
+* Stop bits (1, 2)
+* Flow control (None, RTS/CTS, XON/XOFF)
+* Protocol filter assignment
+
+**TCP/IP Settings**
+* Network interface configuration (DHCP/Static IP)
+* Port assignments for each UART channel
+* Connection timeout parameters
+* Maximum concurrent connection limits
+
+==== Performance Section
+
+Displays real-time system performance metrics:
+
+**Data Flow Metrics**
+* Bytes transmitted/received per UART channel
+* TCP connection count per port
+* Packet processing rates
+* Buffer utilization levels
+
+**System Health Indicators**
+* Network connection status
+* UART channel status
+* Error counters (parity, framing, overflow)
+* Memory usage statistics
+
+==== Log Section
+
+Provides system activity monitoring:
+
+**Log Entry Display**
+* Chronological list with most recent entries at top
+* Timestamp, log level, component, and message fields
+* Color coding by severity level (Error, Warning, Info, Debug)
+
+**Log Management**
+* Real-time log updates via WebSocket connection
+* Configurable log level filtering
+* Log entry search and filtering capabilities
+* Export functionality for log analysis
