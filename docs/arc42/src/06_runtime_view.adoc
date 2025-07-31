@@ -63,12 +63,12 @@ participant "Network Stack" as NET
 HW -> C0 : System Reset
 activate C0
 
-note over C0 : Basic System Init
+note left of C0 : Basic System Init
 C0 -> C0 : Initialize clocks
 C0 -> C0 : Configure GPIO pins
 C0 -> C0 : Initialize memory controller
 
-note over C0 : Shared Infrastructure Init
+note left of C0 : Shared Infrastructure Init
 C0 -> RB : Initialize ring buffer\n4 banks, 128 entries\nCache-aligned allocation
 activate RB
 C0 -> LOG : Initialize log manager\nFlash + UART logging
@@ -76,11 +76,12 @@ activate LOG
 C0 -> WD : Initialize watchdog\n200ms timeout per core
 activate WD
 
-note over C0 : Core 1 Startup
+note left of C0 : Core 1 Startup
 C0 -> C1 : Start Core 1
 activate C1
 
-note over C0, C1 : Concurrent Core-Specific Init
+note left of C0 : Concurrent Core-Specific Init
+note left of C1 : Concurrent Core-Specific Init
 
 par Core 0 Initialization
     C0 -> UART : Initialize all 4 UART channels\nInterrupt + DMA setup
@@ -92,7 +93,8 @@ else Core 1 Initialization
     C1 -> WD : Register Core 1 keepalive
 end
 
-note over C0, C1 : System Operational
+note left of C0 : System Operational
+note left of C1 : System Operational
 
 alt Core 1 Startup Failure
     C1 -> LOG : Log startup failure
@@ -101,7 +103,8 @@ alt Core 1 Startup Failure
 else Successful Startup
     C0 -> LOG : Log system ready
     C1 -> LOG : Log network ready
-    note over C0, C1 : Enter operational state\nBoth cores ping watchdog every <200ms
+    note left of C0 : Enter operational state\nBoth cores ping watchdog every <200ms
+    note left of C1 : Enter operational state\nBoth cores ping watchdog every <200ms
 end
 
 @enduml
@@ -126,7 +129,8 @@ end
 4. **Concurrent Core-Specific Init**:
    - Core 0: UART hardware initialization, interrupt/DMA configuration
    - Core 1: Network stack initialization, ENC28J60 setup, TCP socket creation
-   - Both cores register with watchdog system
+   - Both cores register with watch
+3. **Core 1 Startup**:dog system
 
 **Critical Startup Requirements:**
 - Shared infrastructure must be fully initialized before Core 1 startup
@@ -165,7 +169,7 @@ activate DMA0
 DMA0 -> RB : Bulk transfer to\ncache-aligned entry\n(Bank-striped allocation)
 activate RB
 
-note over RB : Cache-Coherent Ring Buffer Access\nBank 0: 0x20000000 (32 entries)\nBank 1: 0x2000D000 (32 entries)\nBank 2: 0x2001A000 (32 entries)\nBank 3: 0x20027000 (32 entries)\nStride: 52KB between banks
+note left of RB : Cache-Coherent Ring Buffer Access\nBank 0: 0x20000000 (32 entries)\nBank 1: 0x2000D000 (32 entries)\nBank 2: 0x2001A000 (32 entries)\nBank 3: 0x20027000 (32 entries)\nStride: 52KB between banks
 
 RB -> RB : Mark entry as READY\nUpdate metadata:\n- UART channel (0-3)\n- Direction (UART_TO_TCP)\n- Payload length\n- Timestamp\n- Sequence ID
 
@@ -183,7 +187,8 @@ activate CLIENT
 C1 -> RB : Mark entry as CONSUMED\nFree for reuse
 deactivate RB
 
-note over ISR, C1 : Process continues for\nsubsequent UART data\nwith automatic bank rotation
+note left of IS : Process continues for\nsubsequent UART data\nwith automatic bank rotation
+note left of C1 : Process continues for\nsubsequent UART data\nwith automatic bank rotation
 
 @enduml
 ----
@@ -198,13 +203,14 @@ note over ISR, C1 : Process continues for\nsubsequent UART data\nwith automatic 
 
 **Memory Bank Allocation Strategy:**
 ```
-Entry 0:  Bank 0 (0x20000000) - 1664 bytes
-Entry 1:  Bank 1 (0x2000D000) - 1664 bytes  
-Entry 2:  Bank 2 (0x2001A000) - 1664 bytes
-Entry 3:  Bank 3 (0x20027000) - 1664 bytes
-Entry 4:  Bank 0 (0x20000680) - 1664 bytes
+Entry 0:  Bank 0 (0x20000000) - 1664 bytes (padded from 1088 bytes)
+Entry 1:  Bank 1 (0x2000D000) - 1664 bytes (52KB stride)
+Entry 2:  Bank 2 (0x2001A000) - 1664 bytes (52KB stride)
+Entry 3:  Bank 3 (0x20027000) - 1664 bytes (52KB stride)
+Entry 4:  Bank 0 (0x20001680) - 1664 bytes (next slot in Bank 0)
 ...
 32 entries per bank × 4 banks = 128 total entries
+Total ring buffer memory: 4 × 52KB = 208KB
 ```
 
 === TCP-to-UART Data Flow
@@ -258,7 +264,8 @@ activate DEV
 C0 -> RB : Mark entry as CONSUMED\nFree for reuse
 deactivate RB
 
-note over C1, C0 : Process continues for\nsubsequent TCP data\nwith automatic load balancing
+note left of C1 : Process continues for\nsubsequent TCP data\nwith automatic load 
+note left of C0 : Process continues for\nsubsequent TCP data\nwith automatic load balancing
 
 @enduml
 ----
@@ -311,7 +318,7 @@ E4 --> Bank0 : Maps to
 E127 --> Bank3 : Maps to
 
 C0 --> E0 : Access without\ncache contention
-C1 --> E1 : Concurrent access\ndifferent bank
+C1 --> E1 : Concurrent access\ndifferent bank  
 C0 --> E2 : Alternating access\npattern ensures\ncache efficiency
 C1 --> E3 : Both cores can\noperate simultaneously
 
@@ -325,8 +332,9 @@ C1 --> E3 : Both cores can\noperate simultaneously
 #define RING_BUFFER_BASE      0x20000000
 #define BANK_SIZE            (52 * 1024)  // 52KB per bank
 #define ENTRIES_PER_BANK     32
-#define ENTRY_SIZE           1664         // Aligned to bank boundaries
+#define ENTRY_SIZE           1664         // Padded from 1088 to align at bank boundaries
 #define TOTAL_ENTRIES        128          // 32 × 4 banks
+#define TOTAL_RING_MEMORY    (4 * BANK_SIZE)  // 208KB total
 
 typedef struct {
     uint32_t bank_id;        // 0-3
@@ -334,7 +342,7 @@ typedef struct {
     void*    entry_ptr;      // Cache-aligned pointer
 } ring_entry_location_t;
 
-// Calculate cache-coherent entry address
+// Calculate cache-coherent entry address with bank striping
 ring_entry_location_t calculate_entry_location(uint32_t entry_index) {
     ring_entry_location_t loc;
     loc.bank_id = entry_index % 4;  // Rotate through banks 0-3
@@ -383,7 +391,7 @@ alt Ring Buffer Has Free Space
 else Ring Buffer Full (All 128 Entries Used)
     RBM -> RBM : Find oldest READY entry\n(Lowest sequence_id)
     
-    note over RBM : Drop-Oldest Policy\nDeterministic overflow handling
+    note left of RBM : Drop-Oldest Policy\nDeterministic overflow handling
     
     RBM -> LOG : Log overflow event:\n- Dropped sequence_id\n- Channel affected\n- Timestamp\n- Current load
     activate LOG
@@ -396,7 +404,8 @@ else Ring Buffer Full (All 128 Entries Used)
     MEM -> RBM : Mark entry as READY
 end
 
-note over PROD, CONS : System continues operation\nConsumer unaware of overflow\nAll overflow events logged
+note left of PROD : System continues operation\nConsumer unaware of overflow\nAll overflow events logged
+note left of CONS : System continues operation\nConsumer unaware of overflow\nAll overflow events logged
 
 @enduml
 ----
@@ -433,24 +442,27 @@ participant "Watchdog Timer\nHardware" as WD
 participant "Log Manager" as LOG
 participant "System Reset\nHardware" as RST
 
-note over C0, C1 : Normal Operation\nBoth cores operational
+note left of C0 : Normal Operation\nBoth cores operational
+note left of C1 : Normal Operation\nBoth cores operational
 
 loop Every <200ms
     par Core 0 Keepalive
         C0 -> C0 : Execute background tasks:\n- UART processing\n- Ring buffer management\n- Statistics collection
         C0 -> WD : Send Core 0 keepalive\n(Hardware register write)
     else Core 1 Keepalive
-        C1 -> C1 : Execute background tasks:\n- Network processing\n- TCP connection management\n- HTTP management interface
+        C1 -> C1 : Execute background tasks:\n- Network processing\n- TCP connection management\n- HTTP management
         C1 -> WD : Send Core 1 keepalive\n(Hardware register write)
     end
 end
 
 alt Normal Operation
-    note over C0, C1, WD : Both cores send keepalive\nwithin 200ms timeout
+    note left of C0 : Both cores send keepalive\nwithin 200ms timeout
+    note left of C1 : Both cores send keepalive\nwithin 200ms timeout
+    note left of WD : Both cores send keepalive\nwithin 200ms timeout
 else Core 0 Failure
     C0 -> C0 : Core hangs/crashes\n(Software or hardware failure)
     
-    note over C0 : Core 0 fails to\nsend keepalive within 200ms
+    note left of C0 : Core 0 fails to\nsend keepalive within 200ms
     
     WD -> LOG : Log Core 0 failure:\n- Timestamp\n- Last keepalive time\n- System state
     activate LOG
@@ -464,7 +476,7 @@ else Core 0 Failure
 else Core 1 Failure
     C1 -> C1 : Core hangs/crashes\n(Software or hardware failure)
     
-    note over C1 : Core 1 fails to\nsend keepalive within 200ms
+    note left of C1 : Core 1 fails to\nsend keepalive within 200ms
     
     WD -> LOG : Log Core 1 failure:\n- Timestamp\n- Last keepalive time\n- Network state
     LOG -> LOG : Store failure log\nto flash memory
@@ -474,13 +486,14 @@ else Core 1 Failure
     RST -> RST : Hardware reset\nBoth cores restarted
     
 else Both Cores Failure
-    note over C0, C1 : Simultaneous failure\n(Power, clock, or shared resource)
+    note left of C0 : Simultaneous failure\n(Power, clock, or shared resource)
+    note left of C1 : Simultaneous failure\n(Power, clock, or shared resource)
     
     WD -> RST : Immediate system reset\n(No logging possible)
     RST -> RST : Hardware reset\nComplete system restart
 end
 
-note over RST : After reset:\nSystem restarts with\nstartup sequence
+note left of RST : After reset:\nSystem restarts with\nstartup sequence
 
 @enduml
 ----
@@ -489,7 +502,7 @@ note over RST : After reset:\nSystem restarts with\nstartup sequence
 
 1. **Independent Monitoring**: Each core has separate watchdog channel with 200ms timeout
 2. **Background Task Integration**: Keepalive signals sent during regular 100ms background tasks
-3. **Failure Logging**: All watchdog timeouts logged to flash memory and debug UART
+3. **Failure Logging**: All watchdog timeouts logged to log ring buffer (stored to flash) and debug UART (if enabled)
 4. **Immediate Recovery**: Hardware reset triggered immediately upon timeout detection
 5. **Post-Reset Analysis**: Failure logs available after system restart for diagnostics
 
@@ -540,7 +553,7 @@ alt Connection Accepted
     SM -> TCP : Accept connection
     TCP -> CLIENT : Connection established
     
-    note over SM : Connection state:\nCONNECTED
+    note left of SM : Connection state:\nCONNECTED
     
 else Connection Rejected
     SM -> LOG : Log connection rejected:\n- Reason (limit exceeded,\n  invalid port, etc.)\n- Client IP address
@@ -566,7 +579,7 @@ end
 alt Network Cable Disconnected
     TCP -> SM : TCP connection timeout\n(No ACK from client)
     
-    note over SM : Connection state:\nTIMEOUT_DETECTED
+    note left of SM : Connection state:\nTIMEOUT_DETECTED
     
     SM -> LOG : Log connection timeout:\n- Duration of connection\n- Data transfer statistics\n- Timeout reason
     
@@ -578,13 +591,13 @@ alt Network Cable Disconnected
         SM -> RB : Flush buffered data\nto new connection
         SM -> LOG : Log reconnection success
         
-        note over SM : Connection state:\nRECONNECTED
+        note left of SM : Connection state:\nRECONNECTED
         
     else Buffer Time Exceeded
         SM -> SM : Discard buffered data
         SM -> LOG : Log data loss:\n- Amount of data discarded\n- Buffer timeout exceeded
         
-        note over SM : Connection state:\nDISCONNECTED
+        note left of SM : Connection state:\nDISCONNECTED
     end
     
 else Client Application Shutdown
@@ -595,7 +608,7 @@ else Client Application Shutdown
     
     SM -> SM : Clean up connection state
     
-    note over SM : Connection state:\nCLOSED
+    note left of SM : Connection state:\nCLOSED
 end
 
 == Error Recovery ==
@@ -650,7 +663,7 @@ title Hardware-in-the-Loop Testing Architecture
 
 package "Development Machine (10.10.10.11)" {
     component "Test Controller\nPython/C++" as TC
-    component "UART Simulator\n/dev/ttyUSB1-3" as USIM
+    component "UART Simulator\n/dev/ttyUSB1-3" as USIM  
     component "TCP Test Client\nSocket connections" as TCLIENT
     component "Debug UART Monitor\n/dev/ttyUSB0" as DBGMON
     component "Test Results\nCollector & Analyzer" as TRC
@@ -665,34 +678,36 @@ package "UART2ETH Device (10.10.10.10)" {
     component "Test Event Log\nStructured logging" as TEL
 }
 
-== Test Compilation & Deployment ==
+note left of TC : Test Compilation and Deployment
 
 TC -> TC : Compile instrumented\ntest binary with:\n- Performance counters\n- Debug assertions\n- Event logging\n- Test hooks
 
 TC -> HW : Flash test binary\nvia debug interface
 
-== Test Execution & Data Collection ==
+note left of TC : Test Execution and Data Collection
+note left of HW : Test Execution and Data Collection
 
 TC -> USIM : Generate UART\ntest patterns:\n- Throughput tests\n- Latency tests\n- Burst patterns\n- Error conditions
 
 TC -> TCLIENT : Create TCP\nconnections:\n- Connect to ports 4001-4004\n- Send/receive test data\n- Monitor connection state
 
-par Data Collection Sources
-    USIM -> SYSUART : UART test data\n230400 8N1
-    SYSUART -> ITB : Process UART data\n(Instrumented)
-    
-    TCLIENT -> TCPSOCK : TCP test data\nPort-specific
-    TCPSOCK -> ITB : Process TCP data\n(Instrumented)
-    
-    ITB -> DBGUART : Debug output:\n- System state\n- Performance metrics\n- Error conditions\n115200 8N1
-    DBGMON -> TC : Capture debug output
-    
-    ITB -> TEL : Structured event log:\n- Timestamp\n- Event type\n- Performance data\n- Error details
-    TEL -> TCPSOCK : Log data via TCP\n(Management port)
-    TCLIENT -> TC : Retrieve event logs
-end
 
-== Test Analysis & Validation ==
+USIM -> SYSUART : UART test data\n230400 8N1
+SYSUART -> ITB : Process UART data\n(Instrumented)
+
+TCLIENT -> TCPSOCK : TCP test data\nPort-specific
+TCPSOCK -> ITB : Process TCP data\n(Instrumented)
+
+ITB -> DBGUART : Debug output:\n- System state\n- Performance metrics\n- Error conditions\n115200 8N1
+DBGMON -> TC : Capture debug output
+
+ITB -> TEL : Structured event log:\n- Timestamp\n- Event type\n- Performance data\n- Error details
+TEL -> TCPSOCK : Log data via TCP\n(Management port)
+TCLIENT -> TC : Retrieve event logs
+
+
+note left of TC : Test Analysis and Validation
+note left of TRC : Test Analysis and Validation
 
 TC -> TRC : Correlate data from\n4 collection sources:\n1. Debug UART output\n2. TCP event logs\n3. System UART responses\n4. TCP socket data
 
@@ -711,10 +726,10 @@ TRC -> TRC : Generate test report:\n- Pass/fail status\n- Performance metrics\n-
 ip addr add 10.10.10.11/24 dev eth0
 
 # UART device mapping
-/dev/ttyUSB0 → Debug UART (115200 8N1)
-/dev/ttyUSB1 → System UART 0 (230400 8N1) 
-/dev/ttyUSB2 → System UART 1 (230400 8N1)
-/dev/ttyUSB3 → System UART 2 (230400 8N1)
+/dev/ttyUSB0 → Debug UART (115200 8N1) - Debug output and flashing
+/dev/ttyUSB1 → System UART 0 (230400 8N1) - Test channel 0
+/dev/ttyUSB2 → System UART 1 (230400 8N1) - Test channel 1  
+/dev/ttyUSB3 → System UART 2 (230400 8N1) - Test channel 2
 # UART 3 uses internal loopback for testing
 ```
 
@@ -728,6 +743,10 @@ ip addr add 10.10.10.11/24 dev eth0
 // Test-specific ports
 #define TEST_LOG_PORT      8080  // Event log retrieval
 #define MGMT_PORT         80     // Management interface
+
+// UART Test Configuration
+#define DEBUG_UART_BAUD    115200  // /dev/ttyUSB0 - 8N1
+#define SYSTEM_UART_BAUD   230400  // /dev/ttyUSB1-3 - 8N1
 ```
 
 **Test Data Collection Sources:**
@@ -805,4 +824,4 @@ The HiL testing framework ensures comprehensive validation of the UART2ETH syste
 |Ready for data processing
 |===
 
-This runtime view provides the foundation for implementing and validating the UART2ETH system behavior, ensuring all critical scenarios are properly documented and testable through our hardware-in-the-loop testing framework.
+
