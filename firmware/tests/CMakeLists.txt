@@ -1,0 +1,28 @@
+cmake_minimum_required(VERSION 3.13)
+
+# Unity test framework - simple embedded testing
+add_library(unity
+    unity/src/unity.c
+)
+
+target_include_directories(unity PUBLIC unity/src)
+
+# Test for shared memory layout
+add_executable(test_shared_memory
+    test_shared_memory.c
+    ../src/config/shared_memory.c
+)
+
+target_link_libraries(test_shared_memory
+    unity
+    pico_stdlib
+    pico_sync
+    hardware_sync
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_shared_memory 1)
+pico_enable_stdio_uart(test_shared_memory 1)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_shared_memory)
