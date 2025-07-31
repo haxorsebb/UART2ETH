@@ -34,14 +34,14 @@ add_executable(test_log_manager
     ../src/log/log_manager.c
 )
 
+target_include_directories(test_log_manager PRIVATE ../include)
+
 target_link_libraries(test_log_manager
     unity
     pico_stdlib
     pico_sync
     hardware_sync
 )
-
-target_include_directories(test_log_manager PRIVATE ../include)
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_log_manager 1)
