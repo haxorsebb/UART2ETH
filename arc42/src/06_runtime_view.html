@@ -362,10 +362,15 @@
 <ul class="sectlevel1">
 <li><a href="#section-runtime-view">Runtime View</a>
 <ul class="sectlevel2">
-<li><a href="#_runtime_scenario_1">&lt;Runtime Scenario 1&gt;</a></li>
-<li><a href="#_runtime_scenario_2">&lt;Runtime Scenario 2&gt;</a></li>
-<li><a href="#">&#8230;&#8203;</a></li>
-<li><a href="#_runtime_scenario_n">&lt;Runtime Scenario n&gt;</a></li>
+<li><a href="#_system_startup_sequence">System Startup Sequence</a></li>
+<li><a href="#_uart_to_tcp_data_flow">UART-to-TCP Data Flow</a></li>
+<li><a href="#_tcp_to_uart_data_flow">TCP-to-UART Data Flow</a></li>
+<li><a href="#_ring_buffer_cache_coherent_access_pattern">Ring Buffer Cache-Coherent Access Pattern</a></li>
+<li><a href="#_ring_buffer_overflow_handling">Ring Buffer Overflow Handling</a></li>
+<li><a href="#_watchdog_health_monitoring">Watchdog Health Monitoring</a></li>
+<li><a href="#_network_connection_handling">Network Connection Handling</a></li>
+<li><a href="#_hardware_in_the_loop_testing_scenario">Hardware-in-the-Loop Testing Scenario</a></li>
+<li><a href="#_performance_and_timing_requirements">Performance and Timing Requirements</a></li>
 </ul>
 </li>
 </ul>
@@ -393,31 +398,577 @@
 <div class="sect1">
 <h2 id="section-runtime-view">Runtime View</h2>
 <div class="sectionbody">
+<div class="paragraph">
+<p>The UART2ETH runtime view focuses on architecturally significant scenarios that demonstrate the dual-core coordination, cache-coherent ring buffer operations, and critical system behaviors required for industrial reliability.</p>
+</div>
 <div class="sect2">
-<h3 id="_runtime_scenario_1">&lt;Runtime Scenario 1&gt;</h3>
+<h3 id="_system_startup_sequence">System Startup Sequence</h3>
+<div class="paragraph">
+<p>The system follows a carefully orchestrated startup sequence ensuring proper initialization of shared resources before concurrent operation begins.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/system-startup-sequence.svg" alt="system startup sequence" width="1234" height="1201">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Startup Sequence Details:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Basic System Init</strong> (Core 0 only):</p>
 <div class="ulist">
 <ul>
 <li>
-<p><em>&lt;insert runtime diagram or textual description of the scenario&gt;</em></p>
+<p>Clock configuration to operational frequency</p>
 </li>
 <li>
-<p><em>&lt;insert description of the notable aspects of the interactions between the
-building block instances depicted in this diagram.&gt;</em></p>
+<p>GPIO pin configuration for UART and SPI interfaces</p>
+</li>
+<li>
+<p>Memory controller initialization for cache-coherent operation</p>
 </li>
 </ul>
 </div>
+</li>
+<li>
+<p><strong>Shared Infrastructure Init</strong> (Core 0 only):</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Ring buffer allocation across 4 memory banks (128 entries total)</p>
+</li>
+<li>
+<p>Log manager initialization with flash storage and debug UART output</p>
+</li>
+<li>
+<p>Watchdog timer configuration with 200ms timeout per core</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>Core 1 Startup</strong>:</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Core 0 releases Core 1 from reset state</p>
+</li>
+<li>
+<p>If Core 1 fails to respond within timeout, system reset is triggered</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>Concurrent Core-Specific Init</strong>:</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Core 0: UART hardware initialization, interrupt/DMA configuration</p>
+</li>
+<li>
+<p>Core 1: Network stack initialization, ENC28J60 setup, TCP socket creation</p>
+</li>
+<li>
+<p>Both cores register with watch</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>Core 1 Startup</strong>:dog system</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Critical Startup Requirements:</strong>
+- Shared infrastructure must be fully initialized before Core 1 startup
+- Core-specific initialization can proceed concurrently once both cores are active
+- Any startup failure triggers immediate system reset for fail-safe operation</p>
+</div>
 </div>
 <div class="sect2">
-<h3 id="_runtime_scenario_2">&lt;Runtime Scenario 2&gt;</h3>
-
+<h3 id="_uart_to_tcp_data_flow">UART-to-TCP Data Flow</h3>
+<div class="paragraph">
+<p>This scenario demonstrates the complete data path from UART reception to TCP transmission, highlighting the cache-coherent ring buffer operation and inter-core coordination.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/uart-to-tcp-dataflow.svg" alt="uart to tcp dataflow" width="1335" height="909">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Data Flow Key Points:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Interrupt-Driven Reception</strong>: UART RX interrupt triggers immediate DMA setup for bulk transfer</p>
+</li>
+<li>
+<p><strong>Cache-Coherent Allocation</strong>: Ring buffer entries use bank-striped allocation to avoid cache contention</p>
+</li>
+<li>
+<p><strong>Metadata Management</strong>: Each entry includes channel, direction, timing, and sequence information</p>
+</li>
+<li>
+<p><strong>Consumer Notification</strong>: Ring buffer signals Core 1 when data is ready for transmission</p>
+</li>
+<li>
+<p><strong>Automatic Cleanup</strong>: Consumed entries are immediately marked for reuse</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Memory Bank Allocation Strategy:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code>Entry 0:  Bank 0 (0x20000000) - 1664 bytes (padded from 1088 bytes)
+Entry 1:  Bank 1 (0x2000D000) - 1664 bytes (52KB stride)
+Entry 2:  Bank 2 (0x2001A000) - 1664 bytes (52KB stride)
+Entry 3:  Bank 3 (0x20027000) - 1664 bytes (52KB stride)
+Entry 4:  Bank 0 (0x20001680) - 1664 bytes (next slot in Bank 0)
+...
+32 entries per bank × 4 banks = 128 total entries
+Total ring buffer memory: 4 × 52KB = 208KB</code></pre>
+</div>
+</div>
 </div>
 <div class="sect2">
-<h3 id="">&#8230;&#8203;</h3>
-
+<h3 id="_tcp_to_uart_data_flow">TCP-to-UART Data Flow</h3>
+<div class="paragraph">
+<p>This scenario shows the reverse data path from TCP reception to UART transmission, demonstrating the bidirectional nature of the ring buffer system.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/tcp-to-uart-dataflow.svg" alt="tcp to uart dataflow" width="1319" height="887">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Reverse Data Flow Characteristics:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>TCP Reception</strong>: lwIP stack triggers callback on Core 1 with received data</p>
+</li>
+<li>
+<p><strong>Producer Allocation</strong>: Core 1 acts as producer, allocating ring buffer entries</p>
+</li>
+<li>
+<p><strong>Channel Routing</strong>: TCP port number maps to specific UART channel for data routing</p>
+</li>
+<li>
+<p><strong>Consumer Processing</strong>: Core 0 consumes entries and triggers UART transmission</p>
+</li>
+<li>
+<p><strong>DMA Efficiency</strong>: Bulk transfers minimize CPU overhead for high-throughput operation</p>
+</li>
+</ol>
+</div>
 </div>
 <div class="sect2">
-<h3 id="_runtime_scenario_n">&lt;Runtime Scenario n&gt;</h3>
+<h3 id="_ring_buffer_cache_coherent_access_pattern">Ring Buffer Cache-Coherent Access Pattern</h3>
+<div class="paragraph">
+<p>The ring buffer implementation uses bank-striped memory allocation to ensure cache coherency between cores without explicit synchronization overhead.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/ring-buffer-cache-coherent-access.svg" alt="ring buffer cache coherent access" width="938" height="538">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Cache-Coherent Access Implementation:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Ring buffer entry calculation for cache coherency
+#define RING_BUFFER_BASE      0x20000000
+#define BANK_SIZE            (52 * 1024)  // 52KB per bank
+#define ENTRIES_PER_BANK     32
+#define ENTRY_SIZE           1664         // Padded from 1088 to align at bank boundaries
+#define TOTAL_ENTRIES        128          // 32 × 4 banks
+#define TOTAL_RING_MEMORY    (4 * BANK_SIZE)  // 208KB total
 
+typedef struct {
+    uint32_t bank_id;        // 0-3
+    uint32_t bank_offset;    // Offset within bank
+    void*    entry_ptr;      // Cache-aligned pointer
+} ring_entry_location_t;
+
+// Calculate cache-coherent entry address with bank striping
+ring_entry_location_t calculate_entry_location(uint32_t entry_index) {
+    ring_entry_location_t loc;
+    loc.bank_id = entry_index % 4;  // Rotate through banks 0-3
+    loc.bank_offset = (entry_index / 4) * ENTRY_SIZE;
+    loc.entry_ptr = (void*)(RING_BUFFER_BASE + (loc.bank_id * BANK_SIZE) + loc.bank_offset);
+    return loc;
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Cache Coherency Benefits:</strong>
+- <strong>No Explicit Synchronization</strong>: Bank striping eliminates cache line conflicts
+- <strong>Concurrent Access</strong>: Both cores can access ring buffer simultaneously
+- <strong>Predictable Performance</strong>: No cache coherency protocol overhead
+- <strong>Scalable Design</strong>: Adding more entries maintains cache efficiency</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_ring_buffer_overflow_handling">Ring Buffer Overflow Handling</h3>
+<div class="paragraph">
+<p>When the ring buffer reaches capacity during data bursts, the drop-oldest policy ensures deterministic behavior without blocking either core.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/ring-buffer-overflow.svg" alt="ring buffer overflow" width="927" height="1013">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Overflow Handling Characteristics:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Deterministic Behavior</strong>: Drop-oldest policy provides predictable response to overload</p>
+</li>
+<li>
+<p><strong>Non-Blocking Operation</strong>: Neither producer nor consumer cores are ever blocked</p>
+</li>
+<li>
+<p><strong>Comprehensive Logging</strong>: All overflow events are logged with detailed context</p>
+</li>
+<li>
+<p><strong>Transparent Recovery</strong>: System continues normal operation after overflow</p>
+</li>
+<li>
+<p><strong>Performance Preservation</strong>: Overflow handling adds minimal latency to normal operation</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Overflow Prevention Strategies:</strong>
+- Monitor ring buffer utilization via management interface
+- Adjust TCP connection parameters to reduce data bursts
+- Configure UART baud rates to match expected data flow
+- Use performance counters to identify problematic traffic patterns</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_watchdog_health_monitoring">Watchdog Health Monitoring</h3>
+<div class="paragraph">
+<p>The dual-core watchdog system ensures system reliability by monitoring both cores independently and triggering recovery when failures are detected.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/watchdog-health-monitoring.svg" alt="watchdog health monitoring" width="1283" height="1871">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Watchdog Implementation Details:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Independent Monitoring</strong>: Each core has separate watchdog channel with 200ms timeout</p>
+</li>
+<li>
+<p><strong>Background Task Integration</strong>: Keepalive signals sent during regular 100ms background tasks</p>
+</li>
+<li>
+<p><strong>Failure Logging</strong>: All watchdog timeouts logged to log ring buffer (stored to flash) and debug UART (if enabled)</p>
+</li>
+<li>
+<p><strong>Immediate Recovery</strong>: Hardware reset triggered immediately upon timeout detection</p>
+</li>
+<li>
+<p><strong>Post-Reset Analysis</strong>: Failure logs available after system restart for diagnostics</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Watchdog Configuration:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">#define WATCHDOG_TIMEOUT_MS     200
+#define BACKGROUND_TASK_MS      100  // Provides safety margin
+#define CORE0_WATCHDOG_CHANNEL  0
+#define CORE1_WATCHDOG_CHANNEL  1
+
+// Keepalive function called from background tasks
+void watchdog_keepalive(uint8_t core_id) {
+    hw_watchdog_update(core_id);
+    last_keepalive_timestamp[core_id] = get_system_time_ms();
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_network_connection_handling">Network Connection Handling</h3>
+<div class="paragraph">
+<p>Network connections are managed dynamically with automatic recovery mechanisms to handle real-world network conditions.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/network-connection-handling.svg" alt="network connection handling" width="915" height="2469">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Connection Management Features:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Dynamic Port Mapping</strong>: TCP ports 4001-4004 map to UART channels 0-3 respectively</p>
+</li>
+<li>
+<p><strong>Connection Validation</strong>: Client connections validated against configured limits and permissions</p>
+</li>
+<li>
+<p><strong>Automatic Buffering</strong>: Temporary data buffering during connection interruptions (30-second window)</p>
+</li>
+<li>
+<p><strong>Graceful Recovery</strong>: Both graceful and ungraceful disconnection handling</p>
+</li>
+<li>
+<p><strong>Comprehensive Logging</strong>: All connection events logged for diagnostics and monitoring</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Network Configuration Parameters:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">#define TCP_PORT_UART0     4001
+#define TCP_PORT_UART1     4002
+#define TCP_PORT_UART2     4003
+#define TCP_PORT_UART3     4004
+#define MAX_CONNECTIONS    4     // One per UART channel
+#define BUFFER_TIMEOUT_MS  30000 // 30 seconds</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_hardware_in_the_loop_testing_scenario">Hardware-in-the-Loop Testing Scenario</h3>
+<div class="paragraph">
+<p>The hardware-in-the-loop (HiL) testing framework enables automated validation of system behavior using real RP2350 hardware with comprehensive data collection from multiple sources.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/hil-testing-scenario.svg" alt="hil testing scenario" width="4776" height="376">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>HiL Testing Configuration:</strong></p>
+</div>
+<div class="paragraph">
+<p><strong>Development Machine Setup:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="bash"># Network configuration
+ip addr add 10.10.10.11/24 dev eth0
+
+# UART device mapping
+/dev/ttyUSB0 → Debug UART (115200 8N1) - Debug output and flashing
+/dev/ttyUSB1 → System UART 0 (230400 8N1) - Test channel 0
+/dev/ttyUSB2 → System UART 1 (230400 8N1) - Test channel 1
+/dev/ttyUSB3 → System UART 2 (230400 8N1) - Test channel 2
+# UART 3 uses internal loopback for testing</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Device Network Configuration:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">#define DEVICE_IP_ADDR     "10.10.10.10"
+#define DEVICE_SUBNET      "255.255.255.0"
+#define DEVICE_GATEWAY     "10.10.10.1"
+#define DEV_MACHINE_IP     "10.10.10.11"
+
+// Test-specific ports
+#define TEST_LOG_PORT      8080  // Event log retrieval
+#define MGMT_PORT         80     // Management interface
+
+// UART Test Configuration
+#define DEBUG_UART_BAUD    115200  // /dev/ttyUSB0 - 8N1
+#define SYSTEM_UART_BAUD   230400  // /dev/ttyUSB1-3 - 8N1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Test Data Collection Sources:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Debug UART Output</strong> (<code>/dev/ttyUSB0</code>):</p>
+<div class="ulist">
+<ul>
+<li>
+<p>System startup messages</p>
+</li>
+<li>
+<p>Real-time performance counters</p>
+</li>
+<li>
+<p>Error and warning messages</p>
+</li>
+<li>
+<p>Watchdog timeout notifications</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>TCP Event Log</strong> (Port 8080):</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Structured JSON event records</p>
+</li>
+<li>
+<p>Timing measurements with microsecond precision</p>
+</li>
+<li>
+<p>Ring buffer utilization statistics</p>
+</li>
+<li>
+<p>Network connection state changes</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>System UART Responses</strong> (<code>/dev/ttyUSB1-3</code>):</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Actual serial data transmitted by device</p>
+</li>
+<li>
+<p>Response timing verification</p>
+</li>
+<li>
+<p>Data integrity validation</p>
+</li>
+<li>
+<p>Protocol compliance testing</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>TCP Socket Data</strong> (Ports 4001-4004):</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Network data transmission verification</p>
+</li>
+<li>
+<p>Connection establishment timing</p>
+</li>
+<li>
+<p>Error recovery behavior</p>
+</li>
+<li>
+<p>Multi-channel coordination</p>
+</li>
+</ul>
+</div>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Automated Test Scenarios:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Throughput Testing</strong>: Sustained 500kBaud operation across all channels</p>
+</li>
+<li>
+<p><strong>Latency Measurement</strong>: End-to-end timing from UART RX to TCP TX</p>
+</li>
+<li>
+<p><strong>Stress Testing</strong>: Ring buffer overflow conditions and recovery</p>
+</li>
+<li>
+<p><strong>Error Injection</strong>: Network disconnection, UART errors, power fluctuations</p>
+</li>
+<li>
+<p><strong>Regression Testing</strong>: Automated validation of all critical scenarios</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>The HiL testing framework ensures comprehensive validation of the UART2ETH system behavior under real-world conditions while maintaining the benefits of automated testing for continuous integration.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_performance_and_timing_requirements">Performance and Timing Requirements</h3>
+<div class="paragraph">
+<p><strong>Critical Timing Specifications:</strong></p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 30%;">
+<col style="width: 20%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Performance Metric</th>
+<th class="tableblock halign-left valign-top">Target Value</th>
+<th class="tableblock halign-left valign-top">Measurement Method</th>
+<th class="tableblock halign-left valign-top">Validation Criteria</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>End-to-End Latency</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt; 5ms</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HiL timestamp correlation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">99% of messages under 5ms</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Sustained Throughput</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">500kBaud per channel</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Long-duration data streaming</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No data loss over 1 hour</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Access Time</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt; 100μs</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware performance counters</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Cache-coherent bank access</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Watchdog Response Time</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt; 200ms</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Failure injection testing</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System reset within timeout</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Recovery Time</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt; 30 seconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Connection interruption tests</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automatic reconnection success</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>System Boot Time</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt; 5 seconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Power-on to operational state</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ready for data processing</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 </div>
