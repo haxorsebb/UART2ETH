@@ -27,7 +27,7 @@ endif::arc42help[]
 
 This document identifies and assesses risks for the UART2ETH project, providing mitigation strategies and ownership assignments. Risk assessment follows systematic evaluation across technical, organizational, external, and business categories.
 
-== Risk Overview
+=== Risk Overview
 
 [cols="1,3,1,1,1,1"]
 |===
@@ -43,9 +43,9 @@ This document identifies and assesses risks for the UART2ETH project, providing 
 | R-008 | Industrial Performance Requirements | Business | Medium | High | **HIGH**
 |===
 
-== Detailed Risk Analysis
+=== Detailed Risk Analysis
 
-=== R-001: ENC28J60 Ecosystem Maturity Risk
+==== R-001: ENC28J60 Ecosystem Maturity Risk
 
 [cols="1,3"]
 |===
@@ -68,7 +68,7 @@ This document identifies and assesses risks for the UART2ETH project, providing 
 | **Review Date** | Monthly during development
 |===
 
-=== R-002: UART Hardware Resource Conflicts
+==== R-002: UART Hardware Resource Conflicts
 
 [cols="1,3"]
 |===
@@ -89,7 +89,7 @@ This document identifies and assesses risks for the UART2ETH project, providing 
 | **Review Date** | During hardware design finalization
 |===
 
-=== R-003: No TLS/HTTPS Security Implementation
+==== R-003: No TLS/HTTPS Security Implementation
 
 [cols="1,3"]
 |===
@@ -111,7 +111,7 @@ This document identifies and assesses risks for the UART2ETH project, providing 
 | **Review Date** | Quarterly
 |===
 
-=== R-004: No UART Flow Control Implementation
+==== R-004: No UART Flow Control Implementation
 
 [cols="1,3"]
 |===
@@ -133,7 +133,7 @@ This document identifies and assesses risks for the UART2ETH project, providing 
 | **Review Date** | During UART testing phase
 |===
 
-=== R-005: Single Developer Knowledge Dependencies
+==== R-005: Single Developer Knowledge Dependencies
 
 [cols="1,3"]
 |===
@@ -155,7 +155,7 @@ This document identifies and assesses risks for the UART2ETH project, providing 
 | **Review Date** | Monthly
 |===
 
-=== R-006: RP2350 Platform Learning Curve
+==== R-006: RP2350 Platform Learning Curve
 
 [cols="1,3"]
 |===
@@ -177,7 +177,7 @@ This document identifies and assesses risks for the UART2ETH project, providing 
 | **Review Date** | Bi-weekly during development
 |===
 
-=== R-007: Component Supply Chain Availability
+==== R-007: Component Supply Chain Availability
 
 [cols="1,3"]
 |===
@@ -199,7 +199,7 @@ This document identifies and assesses risks for the UART2ETH project, providing 
 | **Review Date** | Quarterly
 |===
 
-=== R-008: Industrial Performance Requirements
+==== R-008: Industrial Performance Requirements
 
 [cols="1,3"]
 |===
@@ -222,11 +222,11 @@ This document identifies and assesses risks for the UART2ETH project, providing 
 | **Review Date** | Weekly during testing
 |===
 
-== Technical Debt Register
+=== Technical Debt Register
 
 The following technical debts have been identified and require future resolution:
 
-=== TD-001: UART Flow Control
+==== TD-001: UART Flow Control
 
 **Description:** No hardware flow control implementation for UART interfaces +
 **Impact:** Potential data loss under high throughput conditions +
@@ -234,7 +234,7 @@ The following technical debts have been identified and require future resolution
 **Effort:** Medium (2-3 weeks) +
 **Resolution Plan:** Implement XON/XOFF software flow control and add hardware pins in next revision
 
-=== TD-002: TLS/HTTPS Security
+==== TD-002: TLS/HTTPS Security
 
 **Description:** No TLS/HTTPS security implementation for network communications +
 **Impact:** Security vulnerability in industrial environments +
@@ -242,7 +242,7 @@ The following technical debts have been identified and require future resolution
 **Effort:** High (4-6 weeks) +
 **Resolution Plan:** Integrate mbedTLS library in firmware v2.0
 
-=== TD-003: UART Resource Limitations
+==== TD-003: UART Resource Limitations
 
 **Description:** Only 3 UARTs available due to debug and SPI conflicts, not 4 as originally planned +
 **Impact:** Product specification limitation +
@@ -250,45 +250,45 @@ The following technical debts have been identified and require future resolution
 **Effort:** High (hardware redesign) +
 **Resolution Plan:** Document limitation clearly, investigate external UART expansion options
 
-== Risk Mitigation Plan
+=== Risk Mitigation Plan
 
-=== Immediate Actions (Next 30 Days)
+==== Immediate Actions (Next 30 Days)
 - [ ] Allocate ENC28J60 integration development time (R-001)
 - [ ] Finalize UART hardware configuration to avoid conflicts (R-002)
 - [ ] Begin RP2350 platform training sessions (R-006)
 - [ ] Create detailed technical documentation templates (R-005)
 
-=== Short-term Actions (Next 90 Days)
+==== Short-term Actions (Next 90 Days)
 - [ ] Complete ENC28J60 integration prototype (R-001)
 - [ ] Implement comprehensive performance testing (R-008)
 - [ ] Document security limitations and alternatives (R-003)
 - [ ] Establish component supplier relationships (R-007)
 
-=== Long-term Actions (Next 6 Months)
+==== Long-term Actions (Next 6 Months)
 - [ ] Plan TLS implementation for v2.0 (R-003)
 - [ ] Evaluate hardware flow control addition (R-004)
 - [ ] Quarterly risk assessment reviews
 - [ ] Post-implementation risk validation
 
-== Risk Monitoring
+=== Risk Monitoring
 
-=== Weekly Reviews
+==== Weekly Reviews
 - Monitor ENC28J60 integration progress
 - Review performance testing results
 - Track component availability
 
-=== Monthly Reviews
+==== Monthly Reviews
 - Assess risk mitigation progress
 - Identify new risks from development discoveries
 - Update risk levels based on current status
 
-=== Quarterly Reviews
+==== Quarterly Reviews
 - Complete comprehensive risk register review
 - Validate mitigation effectiveness
 - Update risk management process
 - Review technical debt resolution progress
 
-== Risk Escalation Triggers
+=== Risk Escalation Triggers
 
 - **Critical**: ENC28J60 integration proves unfeasible
 - **High**: Performance targets consistently missed
