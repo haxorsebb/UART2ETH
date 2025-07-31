@@ -129,8 +129,7 @@ end
 4. **Concurrent Core-Specific Init**:
    - Core 0: UART hardware initialization, interrupt/DMA configuration
    - Core 1: Network stack initialization, ENC28J60 setup, TCP socket creation
-   - Both cores register with watch
-3. **Core 1 Startup**:dog system
+   - Both cores register with watchdog system
 
 **Critical Startup Requirements:**
 - Shared infrastructure must be fully initialized before Core 1 startup
