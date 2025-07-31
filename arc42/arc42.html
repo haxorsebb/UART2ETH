@@ -9,7 +9,7 @@
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>image:arc42-logo.png[arc42] Template</title>
+    <title>image:arc42-logo.png[arc42] UART2ETH</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -263,7 +263,7 @@
                         <ul class="td-sidebar-nav__section ul-0">
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
-                                   href="../arc42/arc42.html" title="image:arc42-logo.png[arc42] Template">image:arc42-logo.png[arc42] Template</a>
+                                   href="../arc42/arc42.html" title="image:arc42-logo.png[arc42] UART2ETH">image:arc42-logo.png[arc42] UART2ETH</a>
                                 
                             </li>
 <details id="d25d902c24283ab8cfbac54dfa101ad31"><summary><span class="label"><a style="margin-left: 0px;" class="" href="../arc42/src/00_architecture_communication_canvas.html" title="Architecture Communication Canvas">Architecture Communication Canvas</a></span></summary>
@@ -350,7 +350,7 @@
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+Template%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/arc42.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/arc42.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -360,8 +360,7 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
-<li><a href="#_template"><span class="image"><img src="./images/arc42-logo.png" alt="arc42"></span> Template</a></li>
-<li><a href="#_architecture_communication_canvas">Architecture Communication Canvas</a></li>
+<li><a href="#_uart2eth"><span class="image"><img src="./images/arc42-logo.png" alt="arc42"></span> UART2ETH</a></li>
 <li><a href="#section-introduction-and-goals">1. Introduction and Goals</a>
 <ul class="sectlevel2">
 <li><a href="#_requirements_overview">1.1. Requirements Overview</a></li>
@@ -498,7 +497,7 @@
         <p>
             
 <div class="sect1">
-<h2 id="_template"><span class="image"><img src="./images/arc42-logo.png" alt="arc42"></span> Template</h2>
+<h2 id="_uart2eth"><span class="image"><img src="./images/arc42-logo.png" alt="arc42"></span> UART2ETH</h2>
 <div class="sectionbody">
 <style>
 .arc42help {font-size:small; width: 14px; height: 16px; overflow: hidden; position: absolute; right: 0; padding: 2px 0 3px 2px;}
@@ -516,328 +515,13 @@
 <p>arc42, the template for documentation of software and system architecture.</p>
 </div>
 <div class="paragraph">
-<p>Template Version 8.2 EN. (based upon AsciiDoc version), January 2023</p>
+<p>Template Version 1.0 EN. (intital revision), 2025-07-31</p>
 </div>
 <div class="paragraph">
 <p>Created, maintained and &#169; by Dr. Peter Hruschka, Dr. Gernot Starke and contributors.
-See <a href="https://arc42.org" class="bare">https://arc42.org</a>.
-:jbake-status: published
-:jbake-order: 0
-:jbake-type: page_toc
-:jbake-menu: arc42
-:jbake-title: Architecture Communication Canvas</p>
-</div>
-<style>
-.canvas ul {
-    margin-left: 0px;
-    padding-left: 1em;
-    list-style: square;
-}
-.canvas tr:nth-child(1) td:nth-child(1),
-.canvas tr:nth-child(1) td:nth-child(2),
-.canvas tr:nth-child(2) td:nth-child(1),
-.canvas tr:nth-child(3) td:nth-child(1),
-.canvas tr:nth-child(4) td:nth-child(1)
-{
-    background-color: #8fe4b4;
-    border: 1px solid black;
-}
-
-.canvas tr:nth-child(1) td:nth-child(3),
-.canvas tr:nth-child(1) td:nth-child(4),
-.canvas tr:nth-child(4) td:nth-child(2)
-{
-    background-color: #94d7ef;
-    border: 1px solid black;
-}
-
-.canvas tr:nth-child(5) td:nth-child(1),
-.canvas tr:nth-child(5) td:nth-child(2)
-{
-    background-color: #ffc7c6;
-    border: 1px solid black;
-}
-</style>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_architecture_communication_canvas">Architecture Communication Canvas</h2>
-<div class="sectionbody">
-<div class="paragraph">
-<p>Designed for: UART2ETH<br>
-Designed by: Development Team</p>
-</div>
-<table class="tableblock frame-all grid-all stretch canvas">
-<colgroup>
-<col style="width: 25%;">
-<col style="width: 25%;">
-<col style="width: 25%;">
-<col style="width: 25%;">
-</colgroup>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong>Value Proposition</strong><br></p>
-</div>
-<div class="paragraph">
-<p>Provide a low-cost, open source, western-component based, regulatory-compliant alternative to expensive or black-box UART-to-TCP bridge solutions for adding networking capabilities to legacy equipment.</p>
-</div></div></td>
-<td class="tableblock halign-left valign-top" rowspan="2"><div class="content"><div class="paragraph">
-<p><strong>Core Functions</strong><br></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Full Bridge mode: Transparent UART over TCP for distant device connections</p>
-</li>
-<li>
-<p>Gateway mode: Add networking capabilities to products without development</p>
-</li>
-<li>
-<p>Up to 4 UARTs exposed as TCP sockets on individual ports</p>
-</li>
-<li>
-<p>Secure OTA firmware updates with A/B update mechanism</p>
-</li>
-<li>
-<p>Custom pluggable serial protocol filters for efficient TCP packaging</p>
-</li>
-<li>
-<p>Package caching with custom transmit timeouts for latency/bulk optimization</p>
-</li>
-</ul>
-</div></div></td>
-<td class="tableblock halign-left valign-top" rowspan="3"><div class="content"><div class="paragraph">
-<p><strong>Core Decisions - Good or Bad</strong><br></p>
-</div>
-<div class="paragraph">
-<p>Good:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>RP2350 selection for open ecosystem, long-term support, and secure update capabilities</p>
-</li>
-<li>
-<p>Moving from ATMega328 due to baudrate inflexibility and security limitations</p>
-</li>
-<li>
-<p>Western-only component supply chain for regulatory compliance</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<p>Bad:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>No major problematic decisions identified yet</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<p>Strategic:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Anticipating new regulations requiring updateable and auditable firmware</p>
-</li>
-<li>
-<p>Addressing gap left by discontinued commercial solutions</p>
-</li>
-</ul>
-</div></div></td>
-<td class="tableblock halign-left valign-top" rowspan="3"><div class="content"><div class="paragraph">
-<p><strong>Technologies</strong><br></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Programming: C/C++ with Arduino framework</p>
-</li>
-<li>
-<p>Development: VSCodium IDE, PlatformIO build system</p>
-</li>
-<li>
-<p>Hardware: RP2350 microcontroller, ENC28J60 SPI Ethernet controller</p>
-</li>
-<li>
-<p>Protocols: Raw TCP sockets, HTTP for WebUI</p>
-</li>
-<li>
-<p>Security: RP2350 Boot ROM provided security mechanisms</p>
-</li>
-<li>
-<p>Infrastructure: GitHub runners for CI/CD</p>
-</li>
-<li>
-<p>Documentation: docToolchain with AsciiDoc</p>
-</li>
-</ul>
-</div></div></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top" rowspan="2"><div class="content"><div class="paragraph">
-<p><strong>Key Stakeholder</strong><br></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Industrial engineers dealing with infrastructure challenges (noise, cable length issues) requiring networking solutions for existing equipment</p>
-</li>
-<li>
-<p>System integrators needing regulatory-compliant, ready-to-use networking solutions for their products without custom development</p>
-</li>
-</ul>
-</div></div></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong>Quality Requirements</strong><br></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Performance: 500kBaud sustained throughput, &lt;5ms latency</p>
-</li>
-<li>
-<p>Reliability: Critical uptime as long as hardware operates within environmental specifications</p>
-</li>
-<li>
-<p>Security: Prevention of data distortion and lateral network movement attacks</p>
-</li>
-<li>
-<p>Usability: Users need basic understanding of serial communication and TCP/IP</p>
-</li>
-<li>
-<p>Scalability: 1 TCP connection per UART port</p>
-</li>
-<li>
-<p>Compliance: CE certification for hardware</p>
-</li>
-</ul>
-</div></div></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top" colspan="2"><div class="content"><div class="paragraph">
-<p><strong>Business Context</strong><br></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Data Sources: Legacy PLCs, sensors, measurement instruments, and older industrial equipment with serial interfaces but no networking capabilities</p>
-</li>
-<li>
-<p>Data Sinks: SCADA systems, custom data processing software, other UART2ETH devices (in Full Bridge mode)</p>
-</li>
-<li>
-<p>Network Environment: Industrial and household LANs operating at 100Mbit</p>
-</li>
-<li>
-<p>Dependencies: Only requires correctly routed network infrastructure</p>
-</li>
-<li>
-<p>No risky external interfaces or operational costs</p>
-</li>
-</ul>
-</div></div></td>
-<td class="tableblock halign-left valign-top" colspan="2"><div class="content"><div class="paragraph">
-<p><strong>Components / Modules</strong><br></p>
-</div>
-<div class="paragraph">
-<p>Hardware Components:
-* RP2350 microcontroller
-* Microchip ENC28J60 SPI Ethernet Controller
-* RJ45 connector with integrated magnetics
-* Crystal clock source
-* SPI EEPROM for firmware storage</p>
-</div>
-<div class="paragraph">
-<p>Software Modules:
-* TCP/IP communication module
-* UART instance modules (up to 4)
-* OTA update manager with A/B update support
-* Protocol filtering/packet splitting engine
-* Caching module with flexible ring buffer
-* Configuration management module
-* Optional WebUI module
-* PIO-based UART implementation (send/receive tasks on GPIO)</p>
-</div></div></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top" colspan="2"><div class="content"><div class="paragraph">
-<p><strong>Core Risks</strong><br></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Primary security risk: Device compromise allowing data distortion or use as attack vector for lateral network movement</p>
-</li>
-<li>
-<p>Hardware component availability and supply chain disruptions</p>
-</li>
-<li>
-<p>Regulatory changes requiring additional compliance measures</p>
-</li>
-<li>
-<p>Performance degradation under high concurrent load scenarios</p>
-</li>
-</ul>
-</div></div></td>
-<td class="tableblock halign-left valign-top" colspan="2"><div class="content"><div class="paragraph">
-<p><strong>Missing Information</strong><br></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Testing framework selection not yet decided</p>
-</li>
-<li>
-<p>Specific cryptographic implementation details for OTA security</p>
-</li>
-<li>
-<p>WebUI design and user experience specifications</p>
-</li>
-<li>
-<p>Detailed protocol filter plugin architecture</p>
-</li>
-<li>
-<p>Performance benchmarking under various network conditions</p>
-</li>
-<li>
-<p>Industrial certification requirements beyond CE marking</p>
-</li>
-</ul>
-</div></div></td>
-</tr>
-</tbody>
-</table>
-<div class="paragraph">
-<p><a href="https://canvas.arc42.org/">Software Architecture Canvas</a> by Gernot Starke, Patrick Roos and arc42 Contributors is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/?ref=chooser-v1">Attribution-ShareAlike 4.0 International</a></p>
+See <a href="https://arc42.org" class="bare">https://arc42.org</a>.</p>
 </div>
 <hr>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-<div class="paragraph">
-<p>This version of the template contains some help and explanations.
-It is used for familiarization with arc42 and the understanding of the concepts.
-For documentation of your own system you use better the <em>plain</em> version.</p>
-</div>
-</td>
-</tr>
-</table>
-</div>
-</div>
-</div>
 <div style="page-break-after: always;"></div>
 </div>
 </div>
@@ -7356,11 +7040,11 @@ concrete and measurable.</p>
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+Template%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/arc42.adoc">tell us
+        Glad to hear it! Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/arc42.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+Template%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/arc42.adoc">tell
+        Sorry to hear that. Please <a href="##issue-url##?title=Docs%3A+Feedback+for+%27image%3Aarc42-logo.png%5Barc42%5D+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/arc42.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
