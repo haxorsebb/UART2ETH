@@ -22,17 +22,17 @@ This section references the Architecture Decision Records (ADRs) that document k
 
 === Hardware Platform Decisions
 
-* link:../adrs/ADR-001-microcontroller-selection.adoc[ADR-001: Microcontroller Platform Selection] - Documents the decision to use the Raspberry Pi RP2350 as the core microcontroller platform.
-* link:../adrs/ADR-002-ethernet-controller-selection.adoc[ADR-002: Ethernet Controller Selection] - Documents the decision to use the ENC28J60 as the Ethernet controller.
+* link:../adrs/ADR-001-microcontroller-selection.html[ADR-001: Microcontroller Platform Selection] - Documents the decision to use the Raspberry Pi RP2350 as the core microcontroller platform.
+* link:../adrs/ADR-002-ethernet-controller-selection.html[ADR-002: Ethernet Controller Selection] - Documents the decision to use the ENC28J60 as the Ethernet controller.
 
 === Software Platform Decisions
 
-* link:../adrs/ADR-003-programming-language-selection.adoc[ADR-003: Programming Language Selection] - Documents the decision to use C programming language for firmware development, considering team expertise, delivery timeline, and memory model constraints.
-* link:../adrs/ADR-004-development-ecosystem.adoc[ADR-004: Development Ecosystem Selection] - Documents the decision to use Native Pico SDK + CMake development ecosystem for professional, industrial-grade development.
+* link:../adrs/ADR-003-programming-language-selection.html[ADR-003: Programming Language Selection] - Documents the decision to use C programming language for firmware development, considering team expertise, delivery timeline, and memory model constraints.
+* link:../adrs/ADR-004-development-ecosystem.html[ADR-004: Development Ecosystem Selection] - Documents the decision to use Native Pico SDK + CMake development ecosystem for professional, industrial-grade development.
 
 === Implementation Strategy Decisions
 
-* link:../adrs/ADR-005-buffer-allocation-strategy.adoc[ADR-005: Ring Buffer Memory Allocation Strategy] - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.
+* link:../adrs/ADR-005-buffer-allocation-strategy.html[ADR-005: Ring Buffer Memory Allocation Strategy] - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.
 
 === Decision Interdependencies
 
