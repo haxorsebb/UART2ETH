@@ -17,6 +17,33 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// Constants for buffer sizing and event ranges
+#define LOG_MAX_MESSAGE_LENGTH 256
+#define LOG_MAX_FORMAT_LENGTH 200
+
+// Event type ranges for better code organization and validation
+#define SYSTEM_EVENT_BASE    0
+#define SYSTEM_EVENT_MAX     99
+#define UART_EVENT_BASE      100
+#define UART_EVENT_MAX       199
+#define NETWORK_EVENT_BASE   200
+#define NETWORK_EVENT_MAX    299
+#define CONFIG_EVENT_BASE    300
+#define CONFIG_EVENT_MAX     399
+#define OTA_EVENT_BASE       400
+#define OTA_EVENT_MAX        499
+
+// Error codes for detailed error reporting
+typedef enum {
+    LOG_ERROR_NONE = 0,
+    LOG_ERROR_NOT_INITIALIZED,
+    LOG_ERROR_INVALID_EVENT_TYPE,
+    LOG_ERROR_INVALID_EVENT_SOURCE,
+    LOG_ERROR_BUFFER_FULL,
+    LOG_ERROR_SHARED_MEMORY_CORRUPT,
+    LOG_ERROR_SPINLOCK_TIMEOUT
+} log_error_t;
+
 // Log levels (maintained for compatibility)
 typedef enum {
     LOG_LEVEL_DEBUG = 0,
@@ -156,5 +183,20 @@ bool log_manager_reset_for_testing(void);
  * @return Format string for the event type, or NULL if invalid
  */
 const char* log_manager_get_event_format_string(uint16_t event_type);
+
+/**
+ * Get the last error that occurred in the log manager
+ * 
+ * @return Last error code
+ */
+log_error_t log_manager_get_last_error(void);
+
+/**
+ * Get human-readable description of error code
+ * 
+ * @param error Error code
+ * @return Error description string
+ */
+const char* log_manager_get_error_string(log_error_t error);
 
 #endif // LOG_MANAGER_H

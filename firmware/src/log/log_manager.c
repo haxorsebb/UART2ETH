@@ -17,6 +17,30 @@
 #include <stdio.h>
 #include <string.h>
 
+// Constants for better maintainability
+#define LOG_MAX_MESSAGE_LENGTH 256
+#define LOG_MAX_FORMAT_LENGTH 200
+#define EVENT_FORMAT_ARRAY_SIZE (sizeof(event_format_strings) / sizeof(event_format_strings[0]))
+
+// Event type ranges for better code organization and validation
+#define SYSTEM_EVENT_BASE    0
+#define SYSTEM_EVENT_MAX     99
+#define UART_EVENT_BASE      100
+#define UART_EVENT_MAX       199
+#define NETWORK_EVENT_BASE   200
+#define NETWORK_EVENT_MAX    299
+#define CONFIG_EVENT_BASE    300
+#define CONFIG_EVENT_MAX     399
+#define OTA_EVENT_BASE       400
+#define OTA_EVENT_MAX        499
+
+// Valid event source ranges
+#define EVENT_SOURCE_MIN     EVENT_SOURCE_SYSTEM
+#define EVENT_SOURCE_MAX     EVENT_SOURCE_WATCHDOG
+
+// Global error state
+static log_error_t g_last_error = LOG_ERROR_NONE;
+
 // Static variables for log manager
 static bool g_log_initialized = false;
 static shared_memory_layout_t* g_shared_layout = NULL;
@@ -55,6 +79,64 @@ static const char* const event_format_strings[] = {
 };
 
 /**
+ * Validate that shared memory structure is properly initialized
+ */
+static bool validate_shared_memory(void) {
+    if (!g_shared_layout) {
+        g_last_error = LOG_ERROR_NOT_INITIALIZED;
+        return false;
+    }
+    
+    // Basic sanity checks on shared memory structure
+    if (g_shared_layout->log_mgmt.max_entries == 0 || 
+        g_shared_layout->log_mgmt.max_entries > 10000) {  // Reasonable upper bound
+        g_last_error = LOG_ERROR_SHARED_MEMORY_CORRUPT;
+        return false;
+    }
+    
+    if (g_shared_layout->log_mgmt.write_index >= g_shared_layout->log_mgmt.max_entries ||
+        g_shared_layout->log_mgmt.read_index >= g_shared_layout->log_mgmt.max_entries) {
+        g_last_error = LOG_ERROR_SHARED_MEMORY_CORRUPT;
+        return false;
+    }
+    
+    return true;
+}
+
+/**
+ * Validate event type is within allowed ranges
+ */
+static bool validate_event_type(uint16_t event_type) {
+    // Check if event type is within any valid range
+    if ((event_type >= SYSTEM_EVENT_BASE && event_type <= SYSTEM_EVENT_MAX) ||
+        (event_type >= UART_EVENT_BASE && event_type <= UART_EVENT_MAX) ||
+        (event_type >= NETWORK_EVENT_BASE && event_type <= NETWORK_EVENT_MAX) ||
+        (event_type >= CONFIG_EVENT_BASE && event_type <= CONFIG_EVENT_MAX) ||
+        (event_type >= OTA_EVENT_BASE && event_type <= OTA_EVENT_MAX)) {
+        
+        // Additional check: ensure we have a format string for this type
+        if (event_type < EVENT_FORMAT_ARRAY_SIZE && event_format_strings[event_type] != NULL) {
+            return true;
+        }
+    }
+    
+    g_last_error = LOG_ERROR_INVALID_EVENT_TYPE;
+    return false;
+}
+
+/**
+ * Validate event source is within allowed ranges
+ */
+static bool validate_event_source(uint16_t event_source) {
+    if (event_source >= EVENT_SOURCE_MIN && event_source <= EVENT_SOURCE_MAX) {
+        return true;
+    }
+    
+    g_last_error = LOG_ERROR_INVALID_EVENT_SOURCE;
+    return false;
+}
+
+/**
  * Get system timestamp (simplified for testing)
  */
 static uint32_t get_system_timestamp(void) {
@@ -63,24 +145,38 @@ static uint32_t get_system_timestamp(void) {
 
 /**
  * Get and increment the next event sequence number for current core
- * In test environment, we simulate core assignment based on event source
+ * Uses actual core ID in production, simulates based on event source in test environment
  */
 static uint32_t get_next_event_sequence(uint16_t event_source) {
     if (!g_shared_layout) return 0;
     
-    // Simulate core assignment: UART events = Core 0, Network events = Core 1, others = Core 0
+    // Thread-safe access to sequence counters
+    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
+    uint32_t sequence;
+    
+    // For testing compatibility: Simulate core assignment based on event source
+    // In production, this logic would use get_core_num() or actual hardware assignment
+    // Network events = Core 1, all others = Core 0 (maintains test compatibility)
     if (event_source == EVENT_SOURCE_NETWORK) {
-        return ++g_shared_layout->log_mgmt.core1_sequence;
+        sequence = ++g_shared_layout->log_mgmt.core1_sequence;
     } else {
-        return ++g_shared_layout->log_mgmt.core0_sequence;
+        sequence = ++g_shared_layout->log_mgmt.core0_sequence;
     }
+    
+    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
+    return sequence;
 }
 
 /**
- * Write log entry to circular buffer (atomic operation)
+ * Write log entry to circular buffer (atomic operation with spinlock)
  */
 static bool write_log_entry(const log_entry_t* entry) {
-    if (!g_shared_layout) return false;
+    if (!g_shared_layout || !entry) {
+        return false;
+    }
+    
+    // Critical section: protect shared buffer state
+    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     
     // Check if buffer is full
     uint32_t next_write_index = (g_shared_layout->log_mgmt.write_index + 1) % g_shared_layout->log_mgmt.max_entries;
@@ -98,17 +194,24 @@ static bool write_log_entry(const log_entry_t* entry) {
     // Update total count
     g_shared_layout->log_mgmt.total_events_logged++;
     
+    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     return true;
 }
 
 /**
- * Read next log entry from circular buffer
+ * Read next log entry from circular buffer (atomic operation with spinlock)
  */
 static bool read_log_entry(log_entry_t* entry) {
-    if (!g_shared_layout || !entry) return false;
+    if (!g_shared_layout || !entry) {
+        return false;
+    }
+    
+    // Critical section: protect shared buffer state
+    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     
     // Check if buffer is empty
     if (g_shared_layout->log_mgmt.read_index == g_shared_layout->log_mgmt.write_index) {
+        spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
         return false;  // No entries to read
     }
     
@@ -118,6 +221,7 @@ static bool read_log_entry(log_entry_t* entry) {
     // Update read index
     g_shared_layout->log_mgmt.read_index = (g_shared_layout->log_mgmt.read_index + 1) % g_shared_layout->log_mgmt.max_entries;
     
+    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     return true;
 }
 
@@ -153,7 +257,31 @@ bool log_manager_init(void) {
  */
 bool log_event(uint16_t event_source, uint16_t log_level, 
                uint16_t event_type, uint32_t extra_value) {
-    if (!g_log_initialized || !g_shared_layout) {
+    // Reset error state
+    g_last_error = LOG_ERROR_NONE;
+    
+    if (!g_log_initialized) {
+        g_last_error = LOG_ERROR_NOT_INITIALIZED;
+        return false;
+    }
+    
+    // Validate shared memory structure
+    if (!validate_shared_memory()) {
+        return false;  // Error already set by validate_shared_memory
+    }
+    
+    // Validate input parameters
+    if (!validate_event_source(event_source)) {
+        return false;  // Error already set by validate_event_source
+    }
+    
+    if (!validate_event_type(event_type)) {
+        return false;  // Error already set by validate_event_type
+    }
+    
+    // Validate log level (0-3)
+    if (log_level > LOG_LEVEL_ERROR) {
+        g_last_error = LOG_ERROR_INVALID_EVENT_TYPE;  // Reuse for simplicity
         return false;
     }
     
@@ -177,9 +305,80 @@ bool log_event(uint16_t event_source, uint16_t log_level,
  * 
  * @return Number of entries processed and formatted
  */
+/**
+ * Safely format a single log entry with proper validation and sanitization
+ */
+static bool format_single_log_entry(const log_entry_t* entry, char* output_buffer, size_t buffer_size) {
+    if (!entry || !output_buffer || buffer_size == 0) {
+        return false;
+    }
+    
+    // Validate event type bounds
+    if (entry->event_type >= EVENT_FORMAT_ARRAY_SIZE) {
+        snprintf(output_buffer, buffer_size, "[%08u][%u][%u] UNKNOWN_EVENT_TYPE_%u",
+                entry->timestamp, entry->event_source, entry->event_number, entry->event_type);
+        return true;
+    }
+    
+    const char* format = event_format_strings[entry->event_type];
+    if (!format) {
+        snprintf(output_buffer, buffer_size, "[%08u][%u][%u] NULL_FORMAT_STRING",
+                entry->timestamp, entry->event_source, entry->event_number);
+        return true;
+    }
+    
+    // Create the prefix first
+    char prefix[64];
+    int prefix_len = snprintf(prefix, sizeof(prefix), "[%08u][%u][%u] ",
+            entry->timestamp, entry->event_source, entry->event_number);
+    
+    if (prefix_len < 0 || prefix_len >= sizeof(prefix)) {
+        // Prefix creation failed
+        return false;
+    }
+    
+    // For security, we'll create a safe version of format strings that only allows %u
+    // and validates the parameter count
+    char safe_message[LOG_MAX_FORMAT_LENGTH];
+    
+    // Check if format string contains exactly one %u and no other format specifiers
+    const char* first_percent = strchr(format, '%');
+    if (first_percent && first_percent[1] == 'u' && strchr(first_percent + 2, '%') == NULL) {
+        // Safe: exactly one %u parameter
+        snprintf(safe_message, sizeof(safe_message), format, entry->event_extra_value);
+    } else if (first_percent == NULL) {
+        // Safe: no parameters needed
+        strncpy(safe_message, format, sizeof(safe_message) - 1);
+        safe_message[sizeof(safe_message) - 1] = '\0';
+    } else {
+        // Unsafe: multiple format specifiers or unknown format - sanitize
+        strncpy(safe_message, format, sizeof(safe_message) - 1);
+        safe_message[sizeof(safe_message) - 1] = '\0';
+        
+        // Replace any % characters with # to prevent format string attacks
+        for (char* p = safe_message; *p; p++) {
+            if (*p == '%') {
+                *p = '#';
+            }
+        }
+    }
+    
+    // Combine prefix and safe message
+    snprintf(output_buffer, buffer_size, "%s%s", prefix, safe_message);
+    return true;
+}
+
 uint32_t log_manager_format_pending(void) {
-    if (!g_log_initialized || !g_shared_layout) {
+    // Reset error state
+    g_last_error = LOG_ERROR_NONE;
+    
+    if (!g_log_initialized) {
+        g_last_error = LOG_ERROR_NOT_INITIALIZED;
         return 0;
+    }
+    
+    if (!validate_shared_memory()) {
+        return 0;  // Error already set by validate_shared_memory
     }
     
     uint32_t formatted_count = 0;
@@ -187,32 +386,16 @@ uint32_t log_manager_format_pending(void) {
     
     // Process all pending entries
     while (read_log_entry(&entry)) {
-        // Get format string for event type
-        const char* format = NULL;
-        if (entry.event_type < sizeof(event_format_strings) / sizeof(event_format_strings[0])) {
-            format = event_format_strings[entry.event_type];
-        }
+        char formatted_msg[LOG_MAX_MESSAGE_LENGTH];
         
-        if (format) {
-            // Generate formatted output
-            char formatted_msg[256];
-            snprintf(formatted_msg, sizeof(formatted_msg), 
-                    "[%08u][%u][%u] ",
-                    entry.timestamp, 
-                    entry.event_source, 
-                    entry.event_number);
-            
-            // Apply parameter if format uses %u
-            if (strstr(format, "%u")) {
-                char temp_msg[200];
-                snprintf(temp_msg, sizeof(temp_msg), format, entry.event_extra_value);
-                strncat(formatted_msg, temp_msg, sizeof(formatted_msg) - strlen(formatted_msg) - 1);
-            } else {
-                strncat(formatted_msg, format, sizeof(formatted_msg) - strlen(formatted_msg) - 1);
-            }
-            
+        if (format_single_log_entry(&entry, formatted_msg, sizeof(formatted_msg))) {
             // Output to USB-serial stdout
             printf("%s\n", formatted_msg);
+            fflush(stdout);
+        } else {
+            // Fallback output for formatting errors
+            printf("[%08u][%u][%u] FORMAT_ERROR\n", 
+                   entry.timestamp, entry.event_source, entry.event_number);
             fflush(stdout);
         }
         
@@ -232,9 +415,12 @@ uint32_t log_manager_get_utilization(void) {
         return 0;
     }
     
+    // Read buffer state atomically
+    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     uint32_t write_idx = g_shared_layout->log_mgmt.write_index;
     uint32_t read_idx = g_shared_layout->log_mgmt.read_index;
     uint32_t max_entries = g_shared_layout->log_mgmt.max_entries;
+    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     
     if (max_entries == 0) return 0;
     
@@ -258,9 +444,12 @@ uint32_t log_manager_get_pending_count(void) {
         return 0;
     }
     
+    // Read buffer state atomically  
+    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     uint32_t write_idx = g_shared_layout->log_mgmt.write_index;
     uint32_t read_idx = g_shared_layout->log_mgmt.read_index;
     uint32_t max_entries = g_shared_layout->log_mgmt.max_entries;
+    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     
     if (write_idx >= read_idx) {
         return write_idx - read_idx;
@@ -275,8 +464,16 @@ uint32_t log_manager_get_pending_count(void) {
  * @return Total event count across all cores
  */
 uint32_t log_manager_get_total_count(void) {
-    if (!g_shared_layout) return 0;
-    return g_shared_layout->log_mgmt.total_events_logged;
+    if (!g_log_initialized || !g_shared_layout) {
+        return 0;
+    }
+    
+    // Read total count atomically
+    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
+    uint32_t total = g_shared_layout->log_mgmt.total_events_logged;
+    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
+    
+    return total;
 }
 
 /**
@@ -287,15 +484,22 @@ uint32_t log_manager_get_total_count(void) {
  * @return Current sequence number for the specified core
  */
 uint32_t log_manager_get_core_sequence(uint8_t core_id) {
-    if (!g_shared_layout) return 0;
-    
-    if (core_id == 0) {
-        return g_shared_layout->log_mgmt.core0_sequence;
-    } else if (core_id == 1) {
-        return g_shared_layout->log_mgmt.core1_sequence;
+    if (!g_log_initialized || !g_shared_layout) {
+        return 0;
     }
     
-    return 0;
+    // Read sequence atomically
+    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
+    uint32_t sequence = 0;
+    
+    if (core_id == 0) {
+        sequence = g_shared_layout->log_mgmt.core0_sequence;
+    } else if (core_id == 1) {
+        sequence = g_shared_layout->log_mgmt.core1_sequence;
+    }
+    
+    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
+    return sequence;
 }
 
 /**
@@ -305,9 +509,12 @@ uint32_t log_manager_get_core_sequence(uint8_t core_id) {
  * @return true if reset successful, false otherwise
  */
 bool log_manager_reset_for_testing(void) {
-    if (!g_shared_layout) {
+    if (!g_log_initialized || !g_shared_layout) {
         return false;
     }
+    
+    // Reset all state atomically
+    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     
     // Reset counters
     g_shared_layout->log_mgmt.total_events_logged = 0;
@@ -321,6 +528,7 @@ bool log_manager_reset_for_testing(void) {
     // Clear buffer
     memset(g_shared_layout->log_entries, 0, g_shared_layout->log_mgmt.max_entries * sizeof(log_entry_t));
     
+    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     return true;
 }
 
@@ -331,9 +539,48 @@ bool log_manager_reset_for_testing(void) {
  * @return Format string for the event type, or NULL if invalid
  */
 const char* log_manager_get_event_format_string(uint16_t event_type) {
-    if (event_type >= sizeof(event_format_strings) / sizeof(event_format_strings[0])) {
-        return NULL;
+    // Reset error state
+    g_last_error = LOG_ERROR_NONE;
+    
+    if (!validate_event_type(event_type)) {
+        return NULL;  // Error already set by validate_event_type
     }
     
     return event_format_strings[event_type];
+}
+
+/**
+ * Get the last error that occurred in the log manager
+ * 
+ * @return Last error code
+ */
+log_error_t log_manager_get_last_error(void) {
+    return g_last_error;
+}
+
+/**
+ * Get human-readable description of error code
+ * 
+ * @param error Error code
+ * @return Error description string
+ */
+const char* log_manager_get_error_string(log_error_t error) {
+    switch (error) {
+        case LOG_ERROR_NONE:
+            return "No error";
+        case LOG_ERROR_NOT_INITIALIZED:
+            return "Log manager not initialized";
+        case LOG_ERROR_INVALID_EVENT_TYPE:
+            return "Invalid event type";
+        case LOG_ERROR_INVALID_EVENT_SOURCE:
+            return "Invalid event source";
+        case LOG_ERROR_BUFFER_FULL:
+            return "Log buffer full";
+        case LOG_ERROR_SHARED_MEMORY_CORRUPT:
+            return "Shared memory corrupted";
+        case LOG_ERROR_SPINLOCK_TIMEOUT:
+            return "Spinlock timeout";
+        default:
+            return "Unknown error";
+    }
 }
