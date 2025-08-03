@@ -106,7 +106,7 @@ static bool validate_shared_memory(void) {
 /**
  * Validate event type is within allowed ranges
  */
-static bool validate_event_type(uint16_t event_type) {
+static bool validate_event_type(event_type_t event_type) {
     // Check if event type is within any valid range
     if ((event_type >= SYSTEM_EVENT_BASE && event_type <= SYSTEM_EVENT_MAX) ||
         (event_type >= UART_EVENT_BASE && event_type <= UART_EVENT_MAX) ||
@@ -127,7 +127,7 @@ static bool validate_event_type(uint16_t event_type) {
 /**
  * Validate event source is within allowed ranges
  */
-static bool validate_event_source(uint16_t event_source) {
+static bool validate_event_source(event_source_t event_source) {
     if (event_source >= EVENT_SOURCE_MIN && event_source <= EVENT_SOURCE_MAX) {
         return true;
     }
@@ -147,7 +147,7 @@ static uint32_t get_system_timestamp(void) {
  * Get and increment the next event sequence number for current core
  * Uses actual core ID in production, simulates based on event source in test environment
  */
-static uint32_t get_next_event_sequence(uint16_t event_source) {
+static uint32_t get_next_event_sequence(event_source_t event_source) {
     if (!g_shared_layout) return 0;
     
     // Thread-safe access to sequence counters
@@ -169,6 +169,7 @@ static uint32_t get_next_event_sequence(uint16_t event_source) {
 
 /**
  * Write log entry to circular buffer (atomic operation with spinlock)
+ * Uses fast conditional check instead of expensive modulo operation
  */
 static bool write_log_entry(const log_entry_t* entry) {
     if (!g_shared_layout || !entry) {
@@ -178,17 +179,25 @@ static bool write_log_entry(const log_entry_t* entry) {
     // Critical section: protect shared buffer state
     uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     
+    // Calculate next write index without expensive modulo
+    uint32_t next_write_index = g_shared_layout->log_mgmt.write_index + 1;
+    if (next_write_index >= g_shared_layout->log_mgmt.max_entries) {
+        next_write_index = 0;
+    }
+    
     // Check if buffer is full
-    uint32_t next_write_index = (g_shared_layout->log_mgmt.write_index + 1) % g_shared_layout->log_mgmt.max_entries;
     if (next_write_index == g_shared_layout->log_mgmt.read_index) {
         // Buffer full - drop oldest entry (move read_index forward)
-        g_shared_layout->log_mgmt.read_index = (g_shared_layout->log_mgmt.read_index + 1) % g_shared_layout->log_mgmt.max_entries;
+        g_shared_layout->log_mgmt.read_index += 1;
+        if (g_shared_layout->log_mgmt.read_index >= g_shared_layout->log_mgmt.max_entries) {
+            g_shared_layout->log_mgmt.read_index = 0;
+        }
     }
     
     // Write entry to buffer
     g_shared_layout->log_entries[g_shared_layout->log_mgmt.write_index] = *entry;
     
-    // Update write index
+    // Update write index with fast ring buffer advance
     g_shared_layout->log_mgmt.write_index = next_write_index;
     
     // Update total count
@@ -200,6 +209,7 @@ static bool write_log_entry(const log_entry_t* entry) {
 
 /**
  * Read next log entry from circular buffer (atomic operation with spinlock)
+ * Uses fast conditional check instead of expensive modulo operation
  */
 static bool read_log_entry(log_entry_t* entry) {
     if (!g_shared_layout || !entry) {
@@ -218,8 +228,11 @@ static bool read_log_entry(log_entry_t* entry) {
     // Read entry from buffer
     *entry = g_shared_layout->log_entries[g_shared_layout->log_mgmt.read_index];
     
-    // Update read index
-    g_shared_layout->log_mgmt.read_index = (g_shared_layout->log_mgmt.read_index + 1) % g_shared_layout->log_mgmt.max_entries;
+    // Update read index with fast ring buffer advance
+    g_shared_layout->log_mgmt.read_index += 1;
+    if (g_shared_layout->log_mgmt.read_index >= g_shared_layout->log_mgmt.max_entries) {
+        g_shared_layout->log_mgmt.read_index = 0;
+    }
     
     spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     return true;
@@ -255,8 +268,8 @@ bool log_manager_init(void) {
  * @param extra_value Context-specific parameter (e.g., port number, baud rate)
  * @return true if event was logged, false if buffer full or error
  */
-bool log_event(uint16_t event_source, uint16_t log_level, 
-               uint16_t event_type, uint32_t extra_value) {
+bool log_event(event_source_t event_source, log_level_t log_level, 
+               event_type_t event_type, uint32_t extra_value) {
     // Reset error state
     g_last_error = LOG_ERROR_NONE;
     
@@ -424,6 +437,7 @@ uint32_t log_manager_get_utilization(void) {
     
     if (max_entries == 0) return 0;
     
+    // Fast ring buffer utilization calculation without modulo
     uint32_t used_entries;
     if (write_idx >= read_idx) {
         used_entries = write_idx - read_idx;
@@ -451,6 +465,7 @@ uint32_t log_manager_get_pending_count(void) {
     uint32_t max_entries = g_shared_layout->log_mgmt.max_entries;
     spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     
+    // Fast ring buffer count calculation without modulo
     if (write_idx >= read_idx) {
         return write_idx - read_idx;
     } else {
@@ -538,7 +553,7 @@ bool log_manager_reset_for_testing(void) {
  * @param event_type Event type from log_event_type_t enum
  * @return Format string for the event type, or NULL if invalid
  */
-const char* log_manager_get_event_format_string(uint16_t event_type) {
+const char* log_manager_get_event_format_string(event_type_t event_type) {
     // Reset error state
     g_last_error = LOG_ERROR_NONE;
     

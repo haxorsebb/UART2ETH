@@ -44,67 +44,65 @@ typedef enum {
     LOG_ERROR_SPINLOCK_TIMEOUT
 } log_error_t;
 
-// Log levels (maintained for compatibility)
-typedef enum {
-    LOG_LEVEL_DEBUG = 0,
-    LOG_LEVEL_INFO = 1,
-    LOG_LEVEL_WARN = 2,
-    LOG_LEVEL_ERROR = 3
-} log_level_t;
+// Strong typing with uint16_t base for proper alignment and type safety
+typedef uint16_t log_level_t;
+#define LOG_LEVEL_DEBUG ((log_level_t)0)
+#define LOG_LEVEL_INFO  ((log_level_t)1)
+#define LOG_LEVEL_WARN  ((log_level_t)2)
+#define LOG_LEVEL_ERROR ((log_level_t)3)
 
-// Event source definitions
-typedef enum {
-    EVENT_SOURCE_SYSTEM = 0,
-    EVENT_SOURCE_UART0 = 1,
-    EVENT_SOURCE_UART1 = 2,
-    EVENT_SOURCE_UART2 = 3,
-    EVENT_SOURCE_UART3 = 4,
-    EVENT_SOURCE_NETWORK = 5,
-    EVENT_SOURCE_CONFIG = 6,
-    EVENT_SOURCE_OTA = 7,
-    EVENT_SOURCE_WATCHDOG = 8,
-} event_source_t;
+// Event source definitions with uint16_t base for alignment
+typedef uint16_t event_source_t;
+#define EVENT_SOURCE_SYSTEM    ((event_source_t)0)
+#define EVENT_SOURCE_UART0     ((event_source_t)1)
+#define EVENT_SOURCE_UART1     ((event_source_t)2)
+#define EVENT_SOURCE_UART2     ((event_source_t)3)
+#define EVENT_SOURCE_UART3     ((event_source_t)4)
+#define EVENT_SOURCE_NETWORK   ((event_source_t)5)
+#define EVENT_SOURCE_CONFIG    ((event_source_t)6)
+#define EVENT_SOURCE_OTA       ((event_source_t)7)
+#define EVENT_SOURCE_WATCHDOG  ((event_source_t)8)
 
-// Event type definitions with explicit numbering for version compatibility
-typedef enum {
-    // System events (0-99)
-    LOG_EVENT_SYSTEM_BOOT = 0,
-    LOG_EVENT_SYSTEM_READY = 1,
-    LOG_EVENT_WATCHDOG_RESET = 2,
-    LOG_EVENT_MEMORY_INIT = 3,
-    
-    // UART events (100-199)
-    LOG_EVENT_UART_INIT = 100,
-    LOG_EVENT_UART_DATA_RX = 101,
-    LOG_EVENT_UART_DATA_TX = 102,
-    LOG_EVENT_UART_ERROR = 103,
-    LOG_EVENT_UART_OVERFLOW = 104,
-    
-    // Network events (200-299)  
-    LOG_EVENT_TCP_CONNECT = 200,
-    LOG_EVENT_TCP_DISCONNECT = 201,
-    LOG_EVENT_NETWORK_ERROR = 202,
-    LOG_EVENT_TCP_DATA_RX = 203,
-    LOG_EVENT_TCP_DATA_TX = 204,
-    
-    // Configuration events (300-399)
-    LOG_EVENT_CONFIG_CHANGED = 300,
-    LOG_EVENT_CONFIG_SAVED = 301,
-    LOG_EVENT_CONFIG_LOADED = 302,
-    
-    // OTA events (400-499)
-    LOG_EVENT_OTA_START = 400,
-    LOG_EVENT_OTA_COMPLETE = 401,
-    LOG_EVENT_OTA_ERROR = 402,
-} log_event_type_t;
+// Event type definitions with uint16_t base and explicit numbering for version compatibility
+typedef uint16_t event_type_t;
+
+// System events (0-99)
+#define LOG_EVENT_SYSTEM_BOOT     ((event_type_t)0)
+#define LOG_EVENT_SYSTEM_READY    ((event_type_t)1)
+#define LOG_EVENT_WATCHDOG_RESET  ((event_type_t)2)
+#define LOG_EVENT_MEMORY_INIT     ((event_type_t)3)
+
+// UART events (100-199)
+#define LOG_EVENT_UART_INIT       ((event_type_t)100)
+#define LOG_EVENT_UART_DATA_RX    ((event_type_t)101)
+#define LOG_EVENT_UART_DATA_TX    ((event_type_t)102)
+#define LOG_EVENT_UART_ERROR      ((event_type_t)103)
+#define LOG_EVENT_UART_OVERFLOW   ((event_type_t)104)
+
+// Network events (200-299)  
+#define LOG_EVENT_TCP_CONNECT     ((event_type_t)200)
+#define LOG_EVENT_TCP_DISCONNECT  ((event_type_t)201)
+#define LOG_EVENT_NETWORK_ERROR   ((event_type_t)202)
+#define LOG_EVENT_TCP_DATA_RX     ((event_type_t)203)
+#define LOG_EVENT_TCP_DATA_TX     ((event_type_t)204)
+
+// Configuration events (300-399)
+#define LOG_EVENT_CONFIG_CHANGED  ((event_type_t)300)
+#define LOG_EVENT_CONFIG_SAVED    ((event_type_t)301)
+#define LOG_EVENT_CONFIG_LOADED   ((event_type_t)302)
+
+// OTA events (400-499)
+#define LOG_EVENT_OTA_START       ((event_type_t)400)
+#define LOG_EVENT_OTA_COMPLETE    ((event_type_t)401)
+#define LOG_EVENT_OTA_ERROR       ((event_type_t)402)
 
 // Fixed-size log entry structure (16 bytes total, 32-bit aligned)
 typedef struct {
     uint32_t timestamp;             // System timestamp in milliseconds
-    uint16_t event_source;          // Event source (UART0-3, NETWORK, etc.)
+    event_source_t event_source;    // Event source (UART0-3, NETWORK, etc.) - uint16_t
     uint16_t event_number;          // Per-core sequence counter
-    uint16_t log_level;             // DEBUG, INFO, WARN, ERROR
-    uint16_t event_type;            // Explicitly numbered event enum
+    log_level_t log_level;          // DEBUG, INFO, WARN, ERROR - uint16_t
+    event_type_t event_type;        // Explicitly numbered event enum - uint16_t
     uint32_t event_extra_value;     // Context-specific parameter
 } __attribute__((packed, aligned(4))) log_entry_t;
 
@@ -123,12 +121,12 @@ bool log_manager_init(void);
  * 
  * @param event_source Event source (UART0-3, NETWORK, SYSTEM, etc.)
  * @param log_level Log level (DEBUG, INFO, WARN, ERROR)
- * @param event_type Event type from log_event_type_t enum
+ * @param event_type Event type from event_type_t
  * @param extra_value Context-specific parameter (e.g., port number, baud rate)
  * @return true if event was logged, false if buffer full or error
  */
-bool log_event(uint16_t event_source, uint16_t log_level, 
-               uint16_t event_type, uint32_t extra_value);
+bool log_event(event_source_t event_source, log_level_t log_level, 
+               event_type_t event_type, uint32_t extra_value);
 
 /**
  * Core1 background task: format and print all pending log entries
@@ -179,10 +177,10 @@ bool log_manager_reset_for_testing(void);
 /**
  * Get human-readable string for event type (for testing/debugging)
  * 
- * @param event_type Event type from log_event_type_t enum
+ * @param event_type Event type from event_type_t
  * @return Format string for the event type, or NULL if invalid
  */
-const char* log_manager_get_event_format_string(uint16_t event_type);
+const char* log_manager_get_event_format_string(event_type_t event_type);
 
 /**
  * Get the last error that occurred in the log manager
