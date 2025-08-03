@@ -483,58 +483,58 @@ The shared buffer pool design provides elegant burst handling by allowing dynami
 
 ==== Whitebox Log Manager
 
-The Log Manager provides system-wide event logging through a lock-reserve-release-write pattern that ensures thread safety while minimizing lock contention. Core1 handles all output operations via periodic background tasks to maintain consistent USB-serial output.
+The Log Manager provides system-wide event logging through fixed-size entries with enumerated event types. This design eliminates variable-length message parsing complexity while providing efficient, predictable memory usage for embedded systems.
 
-[plantuml, level2-log-manager-updated, svg]
+[plantuml, level2-log-manager-fixed-entries, svg]
 ----
 @startuml
 !theme plain
 skinparam backgroundColor transparent
 skinparam componentStyle rectangle
 
-title Level 2 - Log Manager (Whitebox)
+title Level 2 - Log Manager Fixed-Size Entries (Whitebox)
 
-cloud "Core 0 UART Subsystem\nUART Events + Performance" as C0
-cloud "Core 1 Network Subsystem\nNetwork Events + Performance" as C1
-cloud "Other System Components\nGSM, CFG, OTA, PBP, WD" as OTHER
-cloud "USB-Serial Interface\nStdout Output" as USB
-cloud "Management Interface\nLog Query + Display" as MI
+cloud "Core 0 UART Subsystem\nEvent Logging" as C0
+cloud "Core 1 Network Subsystem\nEvent Logging" as C1
+cloud "Other System Components\nSystem Events" as OTHER
+cloud "USB-Serial Interface\nFormatted Output" as USB
+cloud "Management Interface\nEvent Query + Display" as MI
 
-package "Log Manager - SRAM Bank Memory Layout" {
-    component "Logging Interface\nBoth Cores\nLock-Reserve-Release-Write\nThread-safe message reservation" as LOG_IF #lightgreen
+package "Log Manager - Fixed-Size Entry System" {
+    component "Event Logging Interface\nBoth Cores\nlog_event() API\nFixed-size entry allocation" as LOG_IF #lightgreen
     
-    component "Shared Memory Layout\nSRAM Bank 4\nConfig + Counters + Log Mgmt + Ring Buffer" as SHARED_MEM #lightyellow
+    component "Event Entry Buffer\nFixed 16-byte entries\nPredictable memory layout\nEntry-aligned addressing" as ENTRY_BUFFER #lightyellow
     
-    component "Ring Buffer Management\nWrite Head/Read Head\nSpinlock for Reservation\nCore1 Print Position Tracking" as RING_MGMT #lightcyan
+    component "Event Type Definitions\nExplicitly numbered enums\nCompatibility across versions\nEvent categorization" as EVENT_TYPES #lightcyan
     
-    component "Log Ring Buffer\nFixed-length \r\n Messages\n[TTTTTTTT][C] Message\r\n format" as RING_BUFFER #lightyellow
+    component "String Lookup Table\nPrintf-style formatting\nEvent type → format string\nRuntime string generation" as STRING_TABLE #lightblue
     
-    component "Core1 Background Printer\nPeriodic Timer Task\nPrint read_head to write_head\nUpdate read_head after printing" as PRINTER #lightblue
+    component "Core1 Background Formatter\nPeriodic processing\nEntry → formatted string\nUSB-Serial output" as FORMATTER #lightblue
     
-    component "Configuration Access\nShared Config Structures\nCore0 Read-only\nCore1 Read-write" as CONFIG_ACCESS #lightsteelblue
+    component "Per-Core Event Counters\nSequence tracking\nEvent loss detection\nDebug assistance" as COUNTERS #lightpink
 }
 
 ' External connections
-C0 --> LOG_IF : Log Messages\nLock-Reserve-Write
-C1 --> LOG_IF : Log Messages\nLock-Reserve-Write  
-OTHER --> LOG_IF : System Events\nLower Priority
-PRINTER --> USB : Formatted Output\nUSB-Serial stdout
-MI --> SHARED_MEM : Config Query\nDirect Memory Access
+C0 --> LOG_IF : Event Logging\nlog_event(source, level, type, value)
+C1 --> LOG_IF : Event Logging\nlog_event(source, level, type, value)
+OTHER --> LOG_IF : System Events\nlog_event() calls
+FORMATTER --> USB : Formatted Messages\nUSB-Serial stdout
+MI --> ENTRY_BUFFER : Raw Event Query\nDirect Entry Access
 
 ' Internal connections
-LOG_IF --> RING_MGMT : Reserve Space\nSpinlock Operations
-LOG_IF --> RING_BUFFER : Write Message\nLock-free Write
-RING_MGMT --> RING_BUFFER : Pointer Management\nHead/Tail Updates
-PRINTER <--> RING_MGMT : Read Position\nPrint Progress Tracking
-PRINTER --> RING_BUFFER : Read Messages\nSequential Access
-CONFIG_ACCESS <--> SHARED_MEM : Config Data\nStructure Access
+LOG_IF --> ENTRY_BUFFER : Fixed Entry Write\n16-byte aligned access
+LOG_IF --> COUNTERS : Update Sequence\nPer-core increment
+FORMATTER <--> ENTRY_BUFFER : Read Entries\nSequential processing
+FORMATTER <--> STRING_TABLE : Format Lookup\nEvent type → string
+FORMATTER --> COUNTERS : Sequence Validation\nGap detection
+EVENT_TYPES --> STRING_TABLE : Type Mapping\nEnum → format string
 
 @enduml
 ----
 
 ===== Motivation
 
-The lock-reserve-release-write pattern minimizes lock contention by only holding locks during pointer updates, not during actual message writing. Core1-only output ensures consistent USB-serial formatting and prevents interference between cores during logging output.
+Fixed-size log entries provide predictable memory usage and eliminate complex message parsing overhead. Enumerated event types enable efficient storage while maintaining human-readable output through string lookup tables. Per-core event numbering enables detection of lost events during system debugging.
 
 ===== Contained Building Blocks
 
@@ -542,52 +542,56 @@ The lock-reserve-release-write pattern minimizes lock contention by only holding
 |===
 |Name|Responsibility
 
-|*Logging Interface*
-|Provides thread-safe logging API for both cores using lock-reserve-release-write pattern. Handles space reservation with spinlock protection and lock-free message writing.
+|*Event Logging Interface*
+|Provides thread-safe event logging API using fixed-size entry allocation. Single function: log_event(event_source, log_level, event_type, extra_value) for all system components.
 
-|*Shared Memory Layout*
-|Manages SRAM Bank 4 memory organization containing config structures, performance counters, log management variables, and ring buffer data in compile-time calculated layout.
+|*Event Entry Buffer*
+|Manages circular buffer of fixed 16-byte log entries with predictable memory layout. Entry count-based addressing eliminates variable-length parsing complexity.
 
-|*Ring Buffer Management*
-|Coordinates write_head/read_head pointers with spinlock protection for space reservation. Tracks Core1's print position for periodic background output processing.
+|*Event Type Definitions*
+|Maintains explicitly numbered enumeration of all system events for cross-version compatibility. Categories include SYSTEM, UART, NETWORK, CONFIG, and OTA events.
 
-|*Log Ring Buffer*
-|Stores formatted log messages as fixed-length \r\n terminated strings with embedded 8-digit timestamp and core ID. Implements circular buffer with overwrite-oldest policy.
+|*String Lookup Table*
+|Maps event types to printf-style format strings for human-readable output generation. Supports parameterized messages using event_extra_value field.
 
-|*Core1 Background Printer*
-|Periodic timer task (100ms) that outputs all pending log messages from read_head to write_head position to USB-serial stdout, then updates read_head position.
+|*Core1 Background Formatter*
+|Periodic timer task (100ms) that processes pending log entries, generates formatted output strings using lookup table, and outputs to USB-serial interface.
 
-|*Configuration Access*
-|Provides structured access to shared configuration data with Core0 read-only and Core1 read-write permissions for system configuration management.
+|*Per-Core Event Counters*
+|Maintains separate event sequence numbers for each core to enable detection of lost events during debugging. Global sequence tracking across all event sources.
 |===
 
 ===== Important Interfaces
 
-====== Logging Interface API
-* **Lock-Reserve-Release-Write**: Spinlock during pointer update, lock-free during message write
-* **Thread Safety**: Multiple producers (both cores), single consumer (Core1 printer)
-* **Message Format**: Fixed-length format: `[TTTTTTTT][C] Message text here\r\n`
-* **Overflow Policy**: Overwrite oldest messages when buffer is full
+====== Event Logging API
+* **Single Function Interface**: `log_event(event_source, log_level, event_type, extra_value)`
+* **Fixed Entry Size**: All log entries exactly 16 bytes for predictable memory usage
+* **Thread Safety**: Atomic entry allocation with per-core sequence numbering
+* **Overflow Policy**: Drop oldest entries when buffer is full, log overflow events
 
-====== SRAM Bank Memory Layout
-* **Config Structures**: System configuration data at bank start
-* **Performance Counters**: Real-time metrics after config structures  
-* **Log Management**: write_head, read_head, spinlock variables
-* **Ring Buffer**: Remainder of SRAM bank filled with message buffer space
-* **Compile-time Sizing**: Buffer size = Bank size - (config + counters + management)
+====== Log Entry Structure
+* **Entry Size**: 16 bytes total (32-bit aligned for optimal access)
+* **Fields**: timestamp (uint32_t), event_source (uint16_t), event_number (uint16_t), log_level (uint16_t), event_type (uint16_t), event_extra_value (uint32_t)
+* **Buffer Sizing**: Buffer size specified in number of entries, not bytes
+* **Memory Layout**: n × sizeof(log_entry_t) allocation ensures entry alignment
 
-====== Log Message Format
-* **Timestamp**: 8-digit fixed-length numeric timestamp `[12345678]`
-* **Core ID**: Single-digit core identifier `[0]` or `[1]`
-* **Message**: Variable-length text message content
-* **Terminator**: Always ends with `\r\n` for consistent parsing
-* **Example**: `[00123456][1] Network interface initialized\r\n`
+====== Event Type System
+* **Explicit Numbering**: All event types explicitly numbered for version compatibility
+* **Event Sources**: SYSTEM, UART0-3, NETWORK, CONFIG, OTA, WATCHDOG categories
+* **Log Levels**: DEBUG, INFO, WARN, ERROR levels maintained for filtering
+* **Example Events**: UART_INIT=100, TCP_CONNECT=200, CONFIG_CHANGED=300
+
+====== String Formatting System
+* **Lookup Table**: Event type enum maps to printf-style format strings
+* **Parameter Support**: Single uint32_t parameter per event via event_extra_value
+* **Format Examples**: [UART_INIT] = "UART channel %u initialized", [TCP_CONNECT] = "TCP connection on port %u"
+* **Runtime Generation**: Formatted strings generated only during output processing
 
 ====== Core1 Background Processing
 * **Timer Frequency**: 100ms periodic task execution
-* **Print Range**: Process all messages from read_head to write_head
-* **USB-Serial Output**: Single consistent output stream via stdout
-* **Position Update**: Update read_head after successful printing
+* **Entry Processing**: Sequential processing of fixed-size entries from buffer
+* **String Generation**: Runtime formatting using lookup table and event parameters
+* **USB-Serial Output**: Formatted strings output to stdout for debugging
 
 ==== Whitebox Configuration Manager
 

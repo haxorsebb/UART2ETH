@@ -708,67 +708,113 @@ end
 @enduml
 ----
 
-**Synchronization Pattern Benefits:**
+**Fixed-Size Entry Pattern Benefits:**
 
-1. **Minimal Lock Contention**: Spinlock held only during pointer updates, not during message writing
-2. **Lock-free Writing**: Once space is reserved, message writing never blocks or waits
-3. **Single Output Stream**: Core1-only printing ensures consistent USB-serial formatting
-4. **Bounded Latency**: Logging operations have deterministic worst-case timing
-5. **Overflow Resilience**: Ring buffer handles overflow gracefully without blocking cores
+1. **Predictable Memory Usage**: Fixed 16-byte entries enable precise buffer capacity calculation
+2. **Eliminated Parsing Complexity**: No variable-length message boundary detection required
+3. **Atomic Operations**: Single 16-byte writes are atomic on 32-bit architectures
+4. **Event Loss Detection**: Per-core sequence numbering enables gap detection during debugging
+5. **Version Compatibility**: Explicitly numbered event types maintain compatibility across firmware versions
 
 **Implementation Details:**
 
 ```c
-// Shared memory layout in SRAM Bank 4
+// Fixed-size log entry structure (16 bytes total)
 typedef struct {
-    // Configuration structures (at bank start)
-    system_config_t config;
-    performance_counters_t counters;
-    
-    // Log management variables
-    volatile uint32_t write_head;    // Next write position
-    volatile uint32_t read_head;     // Core1 print position  
-    volatile uint32_t buffer_size;   // Calculated at compile time
-    spinlock_t reservation_lock;     // For pointer updates only
-    
-    // Log ring buffer (remainder of SRAM bank)
-    char log_messages[];             // Variable size, \r\n terminated strings
-} shared_memory_layout_t;
+    uint32_t timestamp;             // System timestamp in milliseconds
+    uint16_t event_source;          // UART0-3, NETWORK, SYSTEM, etc.
+    uint16_t event_number;          // Per-core sequence counter
+    uint16_t log_level;             // DEBUG, INFO, WARN, ERROR
+    uint16_t event_type;            // Explicitly numbered event enum
+    uint32_t event_extra_value;     // Context-specific parameter
+} __attribute__((packed, aligned(4))) log_entry_t;
 
-// Lock-reserve-release-write logging function
-void log_message(uint8_t core_id, const char* message) {
-    char formatted_msg[256];
-    uint32_t timestamp = get_system_timestamp();
+// Event type definitions with explicit numbering
+typedef enum {
+    // System events (0-99)
+    LOG_EVENT_SYSTEM_BOOT = 0,
+    LOG_EVENT_SYSTEM_READY = 1,
+    LOG_EVENT_WATCHDOG_RESET = 2,
     
-    // Format message with fixed-length prefix
-    int msg_len = snprintf(formatted_msg, sizeof(formatted_msg), 
-                          "[%08u][%u] %s\r\n", timestamp, core_id, message);
+    // UART events (100-199)
+    LOG_EVENT_UART_INIT = 100,
+    LOG_EVENT_UART_DATA_RX = 101,
+    LOG_EVENT_UART_ERROR = 102,
     
-    // PHASE 1: Lock-Reserve-Release (minimal lock time)
-    spin_lock(&shared_mem.reservation_lock);
+    // Network events (200-299)
+    LOG_EVENT_TCP_CONNECT = 200,
+    LOG_EVENT_TCP_DISCONNECT = 201,
+    LOG_EVENT_NETWORK_ERROR = 202,
     
-    uint32_t reserved_pos = shared_mem.write_head;
-    shared_mem.write_head = (shared_mem.write_head + msg_len) % shared_mem.buffer_size;
+    // Configuration events (300-399)
+    LOG_EVENT_CONFIG_CHANGED = 300,
+    LOG_EVENT_CONFIG_SAVED = 301,
+} log_event_type_t;
+
+// Event source definitions
+typedef enum {
+    EVENT_SOURCE_SYSTEM = 0,
+    EVENT_SOURCE_UART0 = 1,
+    EVENT_SOURCE_UART1 = 2,
+    EVENT_SOURCE_UART2 = 3,
+    EVENT_SOURCE_UART3 = 4,
+    EVENT_SOURCE_NETWORK = 5,
+    EVENT_SOURCE_CONFIG = 6,
+    EVENT_SOURCE_OTA = 7,
+    EVENT_SOURCE_WATCHDOG = 8,
+} event_source_t;
+
+// String lookup table for formatted output
+static const char* const event_format_strings[] = {
+    [LOG_EVENT_SYSTEM_BOOT] = "System boot sequence initiated",
+    [LOG_EVENT_SYSTEM_READY] = "System ready for operation",
+    [LOG_EVENT_UART_INIT] = "UART channel %u initialized at %u baud",
+    [LOG_EVENT_TCP_CONNECT] = "TCP connection established on port %u",
+    [LOG_EVENT_CONFIG_CHANGED] = "Configuration parameter %u changed",
+};
+
+// Event logging function
+void log_event(uint16_t event_source, uint16_t log_level, 
+               uint16_t event_type, uint32_t extra_value) {
+    log_entry_t entry = {
+        .timestamp = get_system_timestamp(),
+        .event_source = event_source,
+        .event_number = get_next_event_number(),  // Per-core counter
+        .log_level = log_level,
+        .event_type = event_type,
+        .event_extra_value = extra_value
+    };
     
-    spin_unlock(&shared_mem.reservation_lock);
-    
-    // PHASE 2: Lock-free Write (space guaranteed)
-    memcpy(&shared_mem.log_messages[reserved_pos], formatted_msg, msg_len);
+    // Atomic 16-byte write to circular buffer
+    write_log_entry(&entry);
 }
 
-// Core1 background printer task (100ms periodic)
-void core1_log_printer_task(void) {
-    while (shared_mem.read_head != shared_mem.write_head) {
-        // Find next message (null-terminated or \r\n terminated)
-        char* msg_ptr = &shared_mem.log_messages[shared_mem.read_head];
-        int msg_len = strlen(msg_ptr) + 1; // Include terminator
-        
-        // Output to USB-serial stdout
-        printf("%s", msg_ptr);
-        fflush(stdout);
-        
-        // Advance read head
-        shared_mem.read_head = (shared_mem.read_head + msg_len) % shared_mem.buffer_size;
+// Core1 background formatter task (100ms periodic)
+void core1_log_formatter_task(void) {
+    log_entry_t entry;
+    while (read_log_entry(&entry)) {
+        // Get format string for event type
+        const char* format = event_format_strings[entry.event_type];
+        if (format) {
+            // Generate formatted output
+            char formatted_msg[256];
+            snprintf(formatted_msg, sizeof(formatted_msg), 
+                    "[%08u][%u][%u] %s", 
+                    entry.timestamp, 
+                    entry.event_source, 
+                    entry.event_number,
+                    format);
+            
+            // Apply parameter if format uses %u
+            if (strstr(format, "%u")) {
+                char final_msg[256];
+                snprintf(final_msg, sizeof(final_msg), formatted_msg, entry.event_extra_value);
+                printf("%s\n", final_msg);
+            } else {
+                printf("%s\n", formatted_msg);
+            }
+            fflush(stdout);
+        }
     }
 }
 ```

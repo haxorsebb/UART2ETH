@@ -1,0 +1,119 @@
+##
+# Automated Flash and Monitor Makefile
+# Integration with automated RP2350 control system
+##
+
+# Default configuration
+SERIAL_PORT ?= /dev/ttyUSB0
+BAUDRATE ?= 115200
+MONITOR_TIME ?= 30
+
+# Paths
+TOOLS_DIR = ../tools
+FLASH_SCRIPT = $(TOOLS_DIR)/flash_and_monitor.sh
+BUILD_DIR = build
+
+# Default target
+.PHONY: help
+help:
+	@echo "RP2350 Automated Flash & Monitor Targets:"
+	@echo ""
+	@echo "Flash firmware:"
+	@echo "  flash-main           Flash main application (uart2eth.uf2)"
+	@echo "  flash-log-test       Flash log manager tests"
+	@echo "  flash-mem-test       Flash shared memory tests"
+	@echo "  flash-basic-test     Flash basic diagnostic test"
+	@echo ""
+	@echo "Control only:"
+	@echo "  boot-mode            Reset to BOOTSEL boot mode"
+	@echo "  reset-normal         Reset to normal application mode"
+	@echo ""
+	@echo "Options (set as environment variables):"
+	@echo "  SERIAL_PORT=$(SERIAL_PORT)"
+	@echo "  BAUDRATE=$(BAUDRATE)" 
+	@echo "  MONITOR_TIME=$(MONITOR_TIME)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make flash-main"
+	@echo "  make flash-log-test MONITOR_TIME=60"
+	@echo "  SERIAL_PORT=/dev/ttyUSB1 make flash-main"
+
+# Main application targets
+.PHONY: flash-main
+flash-main: $(BUILD_DIR)/uart2eth.uf2
+	@echo "🚀 Flashing main application..."
+	$(FLASH_SCRIPT) $(BUILD_DIR)/uart2eth.uf2 --port $(SERIAL_PORT) --baudrate $(BAUDRATE) --monitor-time $(MONITOR_TIME)
+
+# Test targets  
+.PHONY: flash-log-test
+flash-log-test: $(BUILD_DIR)/tests/test_log_manager.uf2
+	@echo "📋 Flashing log manager tests..."
+	$(FLASH_SCRIPT) $(BUILD_DIR)/tests/test_log_manager.uf2 --port $(SERIAL_PORT) --baudrate $(BAUDRATE) --monitor-time $(MONITOR_TIME)
+
+.PHONY: flash-mem-test  
+flash-mem-test: $(BUILD_DIR)/tests/test_shared_memory.uf2
+	@echo "💾 Flashing shared memory tests..."
+	$(FLASH_SCRIPT) $(BUILD_DIR)/tests/test_shared_memory.uf2 --port $(SERIAL_PORT) --baudrate $(BAUDRATE) --monitor-time $(MONITOR_TIME)
+
+.PHONY: flash-basic-test
+flash-basic-test: $(BUILD_DIR)/tests/test_basic_diagnostic.uf2
+	@echo "🔧 Flashing basic diagnostic test..."
+	$(FLASH_SCRIPT) $(BUILD_DIR)/tests/test_basic_diagnostic.uf2 --port $(SERIAL_PORT) --baudrate $(BAUDRATE) --monitor-time $(MONITOR_TIME)
+
+.PHONY: flash-enhanced-test
+flash-enhanced-test: $(BUILD_DIR)/tests/test_enhanced_diagnostic.uf2
+	@echo "🔍 Flashing enhanced diagnostic test..."
+	$(FLASH_SCRIPT) $(BUILD_DIR)/tests/test_enhanced_diagnostic.uf2 --port $(SERIAL_PORT) --baudrate $(BAUDRATE) --monitor-time $(MONITOR_TIME)
+
+# Control-only targets
+.PHONY: boot-mode
+boot-mode:
+	@echo "⚡ Resetting RP2350 to boot mode..."
+	$(FLASH_SCRIPT) --boot-only --port $(SERIAL_PORT) --baudrate $(BAUDRATE)
+
+.PHONY: reset-normal
+reset-normal:
+	@echo "🔄 Resetting RP2350 to normal mode..."
+	$(FLASH_SCRIPT) --reset-only --port $(SERIAL_PORT) --baudrate $(BAUDRATE)
+
+# Build dependencies (ensure UF2 files exist)
+$(BUILD_DIR)/uart2eth.uf2:
+	@echo "❌ Main application not built. Run 'make' first."
+	@exit 1
+
+$(BUILD_DIR)/tests/test_%.uf2:
+	@echo "❌ Test $(notdir $@) not built. Run 'make test_$(basename $(basename $(notdir $@)))' first."
+	@exit 1
+
+# Quick build and flash combinations
+.PHONY: build-flash-main
+build-flash-main:
+	@echo "🏗️ Building and flashing main application..."
+	make uart2eth
+	make flash-main
+
+.PHONY: build-flash-log-test
+build-flash-log-test:
+	@echo "🏗️ Building and flashing log manager tests..."
+	make test_log_manager
+	make flash-log-test
+
+.PHONY: build-flash-mem-test
+build-flash-mem-test:
+	@echo "🏗️ Building and flashing shared memory tests..."
+	make test_shared_memory
+	make flash-mem-test
+
+# Monitor existing output without flashing
+.PHONY: monitor
+monitor:
+	@echo "👁️ Monitoring output from $(SERIAL_PORT)..."
+	@echo "Press Ctrl+C to stop"
+	@timeout $(MONITOR_TIME)s cat $(SERIAL_PORT) || true
+
+# Development convenience targets
+.PHONY: quick-test
+quick-test: build-flash-log-test
+
+.PHONY: quick-main
+quick-main: build-flash-main

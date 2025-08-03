@@ -21,10 +21,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "pico/sync.h"
+#include "hardware/regs/addressmap.h"
+#include "log_manager.h"  // For log_entry_t definition
 
 // SRAM Bank 4 base address and size (RP2350)
-#define SRAM_BANK4_BASE     0x20040000
-#define SRAM_BANK4_SIZE     (64 * 1024)  // 64KB
+// Note: RP2350 has non-contiguous SRAM banks: SRAM0, SRAM4, SRAM8, SRAM9
+// No SRAM1-3 or SRAM5-7 exist. SRAM4 spans 0x20040000-0x20080000 (256KB total)
+// but we only use 64KB for shared memory to avoid conflicts with other allocations
+#define SRAM_BANK4_BASE     SRAM4_BASE        // Use official SDK constant (0x20040000)
+#define SRAM_BANK4_SIZE     (64 * 1024)      // 64KB (design choice for shared memory)
 
 // System configuration structures
 typedef struct {
@@ -62,13 +67,15 @@ typedef struct {
     volatile uint32_t cpu_usage_percent;
 } __attribute__((aligned(4))) performance_counters_t;
 
-// Log management variables
+// Log management variables for fixed-size entries
 typedef struct {
-    volatile uint32_t write_head;    // Next write position
-    volatile uint32_t read_head;     // Core1 print position  
-    volatile uint32_t buffer_size;   // Calculated at compile time
-    spin_lock_t *reservation_lock;   // For pointer updates only
-    volatile uint32_t total_messages_logged;  // Atomic counter moved here
+    volatile uint32_t write_index;         // Next entry write position (in entries, not bytes)
+    volatile uint32_t read_index;          // Core1 format position (in entries, not bytes)
+    volatile uint32_t max_entries;         // Total number of log entries in buffer
+    volatile uint32_t total_events_logged; // Total events logged across all cores
+    volatile uint32_t core0_sequence;      // Per-core event sequence counter
+    volatile uint32_t core1_sequence;      // Per-core event sequence counter
+    spin_lock_t *entry_lock;               // For entry allocation protection
 } __attribute__((aligned(4))) log_management_t;
 
 // Complete shared memory layout
@@ -87,13 +94,13 @@ typedef struct {
     // Log management
     log_management_t log_mgmt;
     
-    // Ring buffer data (fixed size calculated at compile time)
-    char log_buffer[1];               // Flexible array member placeholder
+    // Log entry buffer (fixed-size entries calculated at compile time)
+    log_entry_t log_entries[1];       // Flexible array member placeholder
 } __attribute__((aligned(4))) shared_memory_layout_t;
 
 // Function declarations
 bool shared_memory_init(void);
-uint32_t shared_memory_get_log_buffer_size(void);
+uint32_t shared_memory_get_log_buffer_capacity(void);  // Returns number of entries, not bytes
 shared_memory_layout_t* shared_memory_get_layout(void);
 
 #endif // SHARED_MEMORY_H
