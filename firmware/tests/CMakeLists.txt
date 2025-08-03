@@ -45,6 +45,7 @@ target_link_libraries(test_log_manager
     unity
     pico_stdlib
     pico_sync
+    pico_multicore      # Dual core support for performance tests
     hardware_sync
     hardware_watchdog   # Watchdog for stability
 )

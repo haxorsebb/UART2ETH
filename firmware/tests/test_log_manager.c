@@ -19,6 +19,7 @@
 #include "log_manager.h"
 #include "shared_memory.h"
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -285,6 +286,341 @@ void test_log_buffer_wraparound_fixed_entries(void) {
         "Final utilization should not exceed 100%");
 }
 
+// Performance test constants
+#define CORE1_STARTUP_DELAY_MS 200
+#define CORE1_TIMEOUT_MS 10000
+#define MIN_EXPECTED_EVENTS_PER_SEC 1000.0
+#define MIN_EXPECTED_CONCURRENT_EVENTS_PER_SEC 1500.0
+
+// Global variables for concurrent test synchronization
+static volatile bool g_start_concurrent_logging = false;
+static volatile uint32_t g_core1_events_logged = 0;
+static volatile uint64_t g_core1_time_us = 0;
+static volatile bool g_core1_error = false;
+static volatile char g_core1_error_message[64] = {0};
+
+/**
+ * Helper function to report performance metrics (DRY principle)
+ */
+static double report_performance(const char* label, uint32_t events, uint64_t time_us) {
+    double time_seconds = (double)time_us / 1000000.0;
+    double events_per_second = (double)events / time_seconds;
+    
+    printf("%s: %u events in %llu us (%.2f events/sec)\n", 
+           label, events, time_us, events_per_second);
+    
+    return events_per_second;
+}
+
+/**
+ * Helper function for Core1 buffer fill performance test
+ * Runs on Core1 and fills buffer with performance timing
+ */
+static void core1_buffer_fill_helper(void) {
+    // Reset error state
+    g_core1_error = false;
+    g_core1_error_message[0] = '\0';
+    
+    // Get buffer capacity
+    uint32_t buffer_capacity = shared_memory_get_log_buffer_capacity();
+    if (buffer_capacity == 0) {
+        g_core1_error = true;
+        strncpy((char*)g_core1_error_message, "Buffer capacity is zero", sizeof(g_core1_error_message) - 1);
+        g_core1_error_message[sizeof(g_core1_error_message) - 1] = '\0';
+        return;
+    }
+    
+    // Start timing
+    absolute_time_t start_time = get_absolute_time();
+    
+    // Fill buffer completely from Core1 (use NETWORK events to ensure Core1)
+    uint32_t events_logged = 0;
+    for (uint32_t i = 0; i < buffer_capacity; i++) {
+        bool result = log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, 
+                               LOG_EVENT_TCP_CONNECT, i);
+        if (result) {
+            events_logged++;
+        } else {
+            break; // Buffer full or error
+        }
+    }
+    
+    // End timing
+    absolute_time_t end_time = get_absolute_time();
+    uint64_t time_diff_us = absolute_time_diff_us(start_time, end_time);
+    
+    // Validate results
+    if (events_logged < buffer_capacity / 4) {
+        g_core1_error = true;
+        strncpy((char*)g_core1_error_message, "Too few events logged", sizeof(g_core1_error_message) - 1);
+        g_core1_error_message[sizeof(g_core1_error_message) - 1] = '\0';
+        return;
+    }
+    
+    // Store results in global variables for main core to read
+    g_core1_events_logged = events_logged;
+    g_core1_time_us = time_diff_us;
+    
+    // Memory barrier to ensure visibility on Core0
+    __dmb();
+}
+
+/**
+ * Helper function for concurrent Core1 logging
+ * Waits for start signal, then logs half the buffer capacity
+ */
+static void core1_concurrent_helper(void) {
+    // Reset error state
+    g_core1_error = false;
+    g_core1_error_message[0] = '\0';
+    
+    // Busy wait for start signal with timeout
+    absolute_time_t start_wait = get_absolute_time();
+    while (!g_start_concurrent_logging) {
+        if (absolute_time_diff_us(start_wait, get_absolute_time()) > CORE1_TIMEOUT_MS * 1000) {
+            g_core1_error = true;
+            strncpy((char*)g_core1_error_message, "Timeout waiting for start signal", 
+                    sizeof(g_core1_error_message) - 1);
+            g_core1_error_message[sizeof(g_core1_error_message) - 1] = '\0';
+            return;
+        }
+        tight_loop_contents();
+    }
+    
+    // Memory barrier to ensure start signal is properly read
+    __dmb();
+    
+    // Get half buffer capacity
+    uint32_t buffer_capacity = shared_memory_get_log_buffer_capacity();
+    if (buffer_capacity == 0) {
+        g_core1_error = true;
+        strncpy((char*)g_core1_error_message, "Buffer capacity is zero", sizeof(g_core1_error_message) - 1);
+        g_core1_error_message[sizeof(g_core1_error_message) - 1] = '\0';
+        return;
+    }
+    
+    uint32_t half_capacity = buffer_capacity / 2;
+    
+    // Start timing
+    absolute_time_t start_time = get_absolute_time();
+    
+    // Fill half buffer from Core1 (use NETWORK events to ensure Core1)
+    uint32_t events_logged = 0;
+    for (uint32_t i = 0; i < half_capacity; i++) {
+        bool result = log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, 
+                               LOG_EVENT_TCP_DATA_RX, i);
+        if (result) {
+            events_logged++;
+        } else {
+            break; // Buffer full or error
+        }
+    }
+    
+    // End timing
+    absolute_time_t end_time = get_absolute_time();
+    uint64_t time_diff_us = absolute_time_diff_us(start_time, end_time);
+    
+    // Validate results
+    if (events_logged < half_capacity / 4) {
+        g_core1_error = true;
+        strncpy((char*)g_core1_error_message, "Too few events logged in concurrent test", sizeof(g_core1_error_message) - 1);
+        g_core1_error_message[sizeof(g_core1_error_message) - 1] = '\0';
+        return;
+    }
+    
+    // Store results for main core
+    g_core1_events_logged = events_logged;
+    g_core1_time_us = time_diff_us;
+    
+    // Memory barrier to ensure visibility on Core0
+    __dmb();
+}
+
+/**
+ * Test: Core0 buffer fill performance
+ * 
+ * Tests how fast Core0 can fill the entire log buffer and measures events/sec.
+ */
+void test_core0_buffer_fill_performance(void) {
+    // ARRANGE: Reset log manager and get buffer capacity
+    log_manager_reset_for_testing();
+    uint32_t buffer_capacity = shared_memory_get_log_buffer_capacity();
+    TEST_ASSERT_GREATER_THAN_MESSAGE(10, buffer_capacity, 
+        "Buffer should have reasonable capacity for performance test");
+    
+    printf("Core0 Performance Test: Filling %u entries...\n", buffer_capacity);
+    
+    // ACT: Time the buffer fill operation from Core0
+    absolute_time_t start_time = get_absolute_time();
+    
+    uint32_t events_logged = 0;
+    for (uint32_t i = 0; i < buffer_capacity; i++) {
+        bool result = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, 
+                               LOG_EVENT_UART_DATA_TX, i);
+        if (result) {
+            events_logged++;
+        } else {
+            break; // Buffer full or error
+        }
+    }
+    
+    absolute_time_t end_time = get_absolute_time();
+    uint64_t time_diff_us = absolute_time_diff_us(start_time, end_time);
+    
+    // ASSERT: Should have logged events successfully
+    TEST_ASSERT_GREATER_THAN_MESSAGE(buffer_capacity / 2, events_logged,
+        "Should have logged at least half the buffer capacity");
+    
+    // Calculate and display performance metrics
+    double events_per_second = report_performance("Core0 Results", events_logged, time_diff_us);
+    
+    // ASSERT: Performance should be reasonable
+    TEST_ASSERT_GREATER_THAN_MESSAGE(MIN_EXPECTED_EVENTS_PER_SEC, events_per_second,
+        "Core0 should achieve minimum expected performance");
+}
+
+/**
+ * Test: Core1 buffer fill performance
+ * 
+ * Tests how fast Core1 can fill the entire log buffer and measures events/sec.
+ */
+void test_core1_buffer_fill_performance(void) {
+    // ARRANGE: Reset log manager
+    log_manager_reset_for_testing();
+    uint32_t buffer_capacity = shared_memory_get_log_buffer_capacity();
+    TEST_ASSERT_GREATER_THAN_MESSAGE(10, buffer_capacity,
+        "Buffer should have reasonable capacity for performance test");
+    
+    printf("Core1 Performance Test: Filling %u entries...\n", buffer_capacity);
+    
+    // Reset global variables
+    g_core1_events_logged = 0;
+    g_core1_time_us = 0;
+    g_core1_error = false;
+    g_core1_error_message[0] = '\0';
+    
+    // ACT: Launch Core1 helper function
+    multicore_launch_core1(core1_buffer_fill_helper);
+    
+    // Wait for Core1 to complete with timeout
+    uint32_t elapsed_ms = 0;
+    while (g_core1_time_us == 0 && elapsed_ms < CORE1_TIMEOUT_MS) {
+        sleep_ms(10);
+        elapsed_ms += 10;
+    }
+    
+    // ASSERT: Check for timeout
+    TEST_ASSERT_FALSE_MESSAGE(elapsed_ms >= CORE1_TIMEOUT_MS, 
+        "Core1 test timed out - possible deadlock or failure");
+    
+    // ASSERT: Check for Core1 errors
+    TEST_ASSERT_FALSE_MESSAGE(g_core1_error, (char*)g_core1_error_message);
+    
+    // ASSERT: Should have logged events successfully
+    TEST_ASSERT_GREATER_THAN_MESSAGE(buffer_capacity / 2, g_core1_events_logged,
+        "Core1 should have logged at least half the buffer capacity");
+    
+    // Calculate and display performance metrics
+    double events_per_second = report_performance("Core1 Results", g_core1_events_logged, g_core1_time_us);
+    
+    // ASSERT: Performance should be reasonable
+    TEST_ASSERT_GREATER_THAN_MESSAGE(MIN_EXPECTED_EVENTS_PER_SEC, events_per_second,
+        "Core1 should achieve minimum expected performance");
+    
+    // Reset core1 for next test
+    multicore_reset_core1();
+}
+
+/**
+ * Test: Concurrent buffer fill performance from both cores
+ * 
+ * Tests concurrent logging performance with both cores writing half the buffer each.
+ */
+void test_concurrent_buffer_fill_performance(void) {
+    // ARRANGE: Reset log manager
+    log_manager_reset_for_testing();
+    uint32_t buffer_capacity = shared_memory_get_log_buffer_capacity();
+    uint32_t half_capacity = buffer_capacity / 2;
+    TEST_ASSERT_GREATER_THAN_MESSAGE(10, buffer_capacity,
+        "Buffer should have reasonable capacity for performance test");
+    
+    printf("Concurrent Performance Test: Both cores filling %u entries each...\n", half_capacity);
+    
+    // Reset synchronization variables
+    g_start_concurrent_logging = false;
+    g_core1_events_logged = 0;
+    g_core1_time_us = 0;
+    g_core1_error = false;
+    g_core1_error_message[0] = '\0';
+    
+    // ACT: Launch Core1 helper (it will wait for start signal)
+    multicore_launch_core1(core1_concurrent_helper);
+    
+    // Give Core1 time to start waiting
+    printf("Waiting for Core1 to initialize...\n");
+    sleep_ms(CORE1_STARTUP_DELAY_MS);
+    printf("Starting concurrent test...\n");
+    
+    // Start timing for Core0
+    absolute_time_t core0_start_time = get_absolute_time();
+    
+    // Signal start with memory barrier and immediately begin Core0 logging
+    // Note: This test intentionally creates a race condition between cores
+    // to stress-test the log manager's thread safety mechanisms.
+    g_start_concurrent_logging = true;
+    __dmb(); // Memory barrier to ensure visibility on Core1
+    
+    uint32_t core0_events_logged = 0;
+    for (uint32_t i = 0; i < half_capacity; i++) {
+        bool result = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, 
+                               LOG_EVENT_UART_DATA_RX, i);
+        if (result) {
+            core0_events_logged++;
+        } else {
+            break; // Buffer full or error
+        }
+    }
+    
+    absolute_time_t core0_end_time = get_absolute_time();
+    uint64_t core0_time_us = absolute_time_diff_us(core0_start_time, core0_end_time);
+    
+    // Wait for Core1 to complete with timeout
+    uint32_t elapsed_ms = 0;
+    while (g_core1_time_us == 0 && elapsed_ms < CORE1_TIMEOUT_MS) {
+        sleep_ms(10);
+        elapsed_ms += 10;
+    }
+    
+    // ASSERT: Check for timeout
+    TEST_ASSERT_FALSE_MESSAGE(elapsed_ms >= CORE1_TIMEOUT_MS, 
+        "Core1 concurrent test timed out - possible deadlock or failure");
+    
+    // ASSERT: Check for Core1 errors
+    TEST_ASSERT_FALSE_MESSAGE(g_core1_error, (char*)g_core1_error_message);
+    
+    // ASSERT: Both cores should have logged events
+    TEST_ASSERT_GREATER_THAN_MESSAGE(half_capacity / 2, core0_events_logged,
+        "Core0 should have logged at least half its target");
+    TEST_ASSERT_GREATER_THAN_MESSAGE(half_capacity / 2, g_core1_events_logged,
+        "Core1 should have logged at least half its target");
+    
+    // Calculate performance metrics using helper
+    printf("Concurrent Results:\n");
+    double core0_events_per_second = report_performance("  Core0", core0_events_logged, core0_time_us);
+    double core1_events_per_second = report_performance("  Core1", g_core1_events_logged, g_core1_time_us);
+    
+    uint32_t total_events = core0_events_logged + g_core1_events_logged;
+    uint64_t max_time_us = (core0_time_us > g_core1_time_us) ? core0_time_us : g_core1_time_us;
+    double combined_events_per_second = report_performance("  Combined", total_events, max_time_us);
+    
+    // ASSERT: Combined performance should be better than single core
+    TEST_ASSERT_GREATER_THAN_MESSAGE(MIN_EXPECTED_CONCURRENT_EVENTS_PER_SEC, combined_events_per_second,
+        "Concurrent logging should achieve minimum expected combined performance");
+    
+    // Reset core1 for next test
+    multicore_reset_core1();
+}
+
 // Test runner
 int main() {
     // Initialize Pico SDK
@@ -305,6 +641,11 @@ int main() {
     RUN_TEST(test_per_core_event_sequence_numbering);
     RUN_TEST(test_event_format_string_lookup);
     // RUN_TEST(test_log_buffer_wraparound_fixed_entries); // Temporarily disabled - causing loop
+    
+    // Performance tests
+    RUN_TEST(test_core0_buffer_fill_performance);
+    RUN_TEST(test_core1_buffer_fill_performance);
+    RUN_TEST(test_concurrent_buffer_fill_performance);
         
     while (true) {
         printf("Tests completed\n");
