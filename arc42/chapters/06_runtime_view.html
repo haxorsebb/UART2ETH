@@ -361,6 +361,7 @@
 <li><a href="#_ring_buffer_overflow_handling">Ring Buffer Overflow Handling</a></li>
 <li><a href="#_watchdog_health_monitoring">Watchdog Health Monitoring</a></li>
 <li><a href="#_network_connection_handling">Network Connection Handling</a></li>
+<li><a href="#_log_manager_synchronization_pattern">Log Manager Synchronization Pattern</a></li>
 <li><a href="#_hardware_in_the_loop_testing_scenario">Hardware-in-the-Loop Testing Scenario</a></li>
 <li><a href="#_performance_and_timing_requirements">Performance and Timing Requirements</a></li>
 </ul>
@@ -736,6 +737,98 @@ void watchdog_keepalive(uint8_t core_id) {
 #define TCP_PORT_UART3     4004
 #define MAX_CONNECTIONS    4     // One per UART channel
 #define BUFFER_TIMEOUT_MS  30000 // 30 seconds</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_log_manager_synchronization_pattern">Log Manager Synchronization Pattern</h3>
+<div class="paragraph">
+<p>The Log Manager implements a lock-reserve-release-write pattern that ensures thread safety while minimizing lock contention between cores, with Core1 handling all output operations via periodic background tasks.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/log-synchronization-pattern.svg" alt="log synchronization pattern" width="1465" height="1762">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Synchronization Pattern Benefits:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Minimal Lock Contention</strong>: Spinlock held only during pointer updates, not during message writing</p>
+</li>
+<li>
+<p><strong>Lock-free Writing</strong>: Once space is reserved, message writing never blocks or waits</p>
+</li>
+<li>
+<p><strong>Single Output Stream</strong>: Core1-only printing ensures consistent USB-serial formatting</p>
+</li>
+<li>
+<p><strong>Bounded Latency</strong>: Logging operations have deterministic worst-case timing</p>
+</li>
+<li>
+<p><strong>Overflow Resilience</strong>: Ring buffer handles overflow gracefully without blocking cores</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Implementation Details:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Shared memory layout in SRAM Bank 4
+typedef struct {
+    // Configuration structures (at bank start)
+    system_config_t config;
+    performance_counters_t counters;
+
+    // Log management variables
+    volatile uint32_t write_head;    // Next write position
+    volatile uint32_t read_head;     // Core1 print position
+    volatile uint32_t buffer_size;   // Calculated at compile time
+    spinlock_t reservation_lock;     // For pointer updates only
+
+    // Log ring buffer (remainder of SRAM bank)
+    char log_messages[];             // Variable size, \r\n terminated strings
+} shared_memory_layout_t;
+
+// Lock-reserve-release-write logging function
+void log_message(uint8_t core_id, const char* message) {
+    char formatted_msg[256];
+    uint32_t timestamp = get_system_timestamp();
+
+    // Format message with fixed-length prefix
+    int msg_len = snprintf(formatted_msg, sizeof(formatted_msg),
+                          "[%08u][%u] %s\r\n", timestamp, core_id, message);
+
+    // PHASE 1: Lock-Reserve-Release (minimal lock time)
+    spin_lock(&amp;shared_mem.reservation_lock);
+
+    uint32_t reserved_pos = shared_mem.write_head;
+    shared_mem.write_head = (shared_mem.write_head + msg_len) % shared_mem.buffer_size;
+
+    spin_unlock(&amp;shared_mem.reservation_lock);
+
+    // PHASE 2: Lock-free Write (space guaranteed)
+    memcpy(&amp;shared_mem.log_messages[reserved_pos], formatted_msg, msg_len);
+}
+
+// Core1 background printer task (100ms periodic)
+void core1_log_printer_task(void) {
+    while (shared_mem.read_head != shared_mem.write_head) {
+        // Find next message (null-terminated or \r\n terminated)
+        char* msg_ptr = &amp;shared_mem.log_messages[shared_mem.read_head];
+        int msg_len = strlen(msg_ptr) + 1; // Include terminator
+
+        // Output to USB-serial stdout
+        printf("%s", msg_ptr);
+        fflush(stdout);
+
+        // Advance read head
+        shared_mem.read_head = (shared_mem.read_head + msg_len) % shared_mem.buffer_size;
+    }
+}</code></pre>
 </div>
 </div>
 </div>

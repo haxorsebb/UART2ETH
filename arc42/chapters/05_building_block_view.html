@@ -826,17 +826,17 @@
 <div class="sect3">
 <h4 id="_whitebox_log_manager">Whitebox Log Manager</h4>
 <div class="paragraph">
-<p>The Log Manager provides system-wide event logging and performance data collection through lock-free interfaces that ensure real-time operations on both cores are never blocked by logging activities.</p>
+<p>The Log Manager provides system-wide event logging through a lock-reserve-release-write pattern that ensures thread safety while minimizing lock contention. Core1 handles all output operations via periodic background tasks to maintain consistent USB-serial output.</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="../../images/level2-log-manager-simple.svg" alt="level2 log manager simple" width="854" height="1196">
+<img src="../../images/level2-log-manager-updated.svg" alt="level2 log manager updated" width="1380" height="745">
 </div>
 </div>
 <div class="sect4">
 <h5 id="_motivation_5">Motivation</h5>
 <div class="paragraph">
-<p>Lock-free logging interfaces prevent real-time operations from being blocked by logging activities. The dual-interface design allows each core to log independently without synchronization overhead, while the ring buffer provides bounded memory usage and predictable performance.</p>
+<p>The lock-reserve-release-write pattern minimizes lock contention by only holding locks during pointer updates, not during actual message writing. Core1-only output ensures consistent USB-serial formatting and prevents interference between cores during logging output.</p>
 </div>
 </div>
 <div class="sect4">
@@ -854,36 +854,28 @@
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Lock-Free Interface Core 0</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Provides atomic write operations for Core 0 components. Uses lock-free algorithms to ensure UART processing is never blocked by logging operations.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Logging Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides thread-safe logging API for both cores using lock-reserve-release-write pattern. Handles space reservation with spinlock protection and lock-free message writing.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Lock-Free Interface Core 1</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Provides atomic write operations for Core 1 components. Ensures network processing continues uninterrupted during logging activities.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Shared Memory Layout</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages SRAM Bank 4 memory organization containing config structures, performance counters, log management variables, and ring buffer data in compile-time calculated layout.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Event Log Ring Buffer</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Circular buffer storing formatted log entries with fixed-size allocation. Implements overwrite-oldest policy to handle log bursts without memory allocation.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Management</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Coordinates write_head/read_head pointers with spinlock protection for space reservation. Tracks Core1&#8217;s print position for periodic background output processing.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Entry Formatter</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Converts raw log data into structured entries with timestamps, component IDs, severity levels, and formatted messages for consistent log format.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Ring Buffer</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stores formatted log messages as fixed-length \r\n terminated strings with embedded 8-digit timestamp and core ID. Implements circular buffer with overwrite-oldest policy.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Level Filter</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Runtime-configurable filtering based on severity levels and component masks. Reduces storage overhead by filtering out debug messages in production.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core1 Background Printer</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Periodic timer task (100ms) that outputs all pending log messages from read_head to write_head position to USB-serial stdout, then updates read_head position.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance Data Collector</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Aggregates performance metrics from both cores including throughput calculations, latency measurements, and resource utilization statistics.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Query Interface</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Provides search and retrieval capabilities for both real-time log streaming and historical log access via the management interface.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Persistence Manager</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Handles optional flash storage with log rotation, compression, and archival. Manages persistent log files for post-mortem analysis.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Configuration Access</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides structured access to shared configuration data with Core0 read-only and Core1 read-write permissions for system configuration management.</p></td>
 </tr>
 </tbody>
 </table>
@@ -891,58 +883,201 @@
 <div class="sect4">
 <h5 id="_important_interfaces_2">Important Interfaces</h5>
 <div class="sect5">
-<h6 id="_lock_free_logging_interface">Lock-Free Logging Interface</h6>
+<h6 id="_logging_interface_api">Logging Interface API</h6>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Atomic Operations</strong>: Single-writer, multiple-reader lock-free ring buffer</p>
+<p><strong>Lock-Reserve-Release-Write</strong>: Spinlock during pointer update, lock-free during message write</p>
 </li>
 <li>
-<p><strong>Non-blocking</strong>: Log calls never block or yield the calling thread</p>
+<p><strong>Thread Safety</strong>: Multiple producers (both cores), single consumer (Core1 printer)</p>
 </li>
 <li>
-<p><strong>Bounded Time</strong>: Worst-case execution time guarantees for real-time systems</p>
+<p><strong>Message Format</strong>: Fixed-length format: <code>[TTTTTTTT][C] Message text here\r\n</code></p>
 </li>
 <li>
-<p><strong>Overflow Handling</strong>: Graceful degradation when log buffer fills</p>
+<p><strong>Overflow Policy</strong>: Overwrite oldest messages when buffer is full</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect5">
-<h6 id="_event_log_ring_buffer_structure">Event Log Ring Buffer Structure</h6>
+<h6 id="_sram_bank_memory_layout">SRAM Bank Memory Layout</h6>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Entry Size</strong>: Fixed 128-byte entries for predictable memory usage</p>
+<p><strong>Config Structures</strong>: System configuration data at bank start</p>
 </li>
 <li>
-<p><strong>Buffer Size</strong>: Configurable (default 1024 entries = 128KB)</p>
+<p><strong>Performance Counters</strong>: Real-time metrics after config structures</p>
 </li>
 <li>
-<p><strong>Overflow Policy</strong>: Drop oldest entries when buffer is full</p>
+<p><strong>Log Management</strong>: write_head, read_head, spinlock variables</p>
 </li>
 <li>
-<p><strong>Memory Layout</strong>: Cache-aligned for optimal performance</p>
+<p><strong>Ring Buffer</strong>: Remainder of SRAM bank filled with message buffer space</p>
+</li>
+<li>
+<p><strong>Compile-time Sizing</strong>: Buffer size = Bank size - (config + counters + management)</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect5">
-<h6 id="_performance_data_interface">Performance Data Interface</h6>
+<h6 id="_log_message_format">Log Message Format</h6>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Metrics Collection</strong>: Throughput, latency, error counts, resource usage</p>
+<p><strong>Timestamp</strong>: 8-digit fixed-length numeric timestamp <code>[12345678]</code></p>
 </li>
 <li>
-<p><strong>Aggregation</strong>: Time-based windowing for trend analysis</p>
+<p><strong>Core ID</strong>: Single-digit core identifier <code>[0]</code> or <code>[1]</code></p>
 </li>
 <li>
-<p><strong>Real-time Access</strong>: Current performance data always available</p>
+<p><strong>Message</strong>: Variable-length text message content</p>
 </li>
 <li>
-<p><strong>Historical Data</strong>: Configurable retention period for trend analysis</p>
+<p><strong>Terminator</strong>: Always ends with <code>\r\n</code> for consistent parsing</p>
+</li>
+<li>
+<p><strong>Example</strong>: <code>[00123456][1] Network interface initialized\r\n</code></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_core1_background_processing">Core1 Background Processing</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Timer Frequency</strong>: 100ms periodic task execution</p>
+</li>
+<li>
+<p><strong>Print Range</strong>: Process all messages from read_head to write_head</p>
+</li>
+<li>
+<p><strong>USB-Serial Output</strong>: Single consistent output stream via stdout</p>
+</li>
+<li>
+<p><strong>Position Update</strong>: Update read_head after successful printing</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_whitebox_configuration_manager">Whitebox Configuration Manager</h4>
+<div class="paragraph">
+<p>The Configuration Manager provides centralized storage and access control for all system settings using shared SRAM structures with core-specific access permissions and SHA256 integrity verification.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level2-config-manager.svg" alt="level2 config manager" width="1101" height="875">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_6">Motivation</h5>
+<div class="paragraph">
+<p>Shared SRAM configuration provides fast access for real-time Core0 operations while allowing Core1 to manage updates and persistence. SHA256 integrity checking ensures configuration corruption detection during flash load operations.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_6">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core0 Read Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides read-only access to configuration structures for Core0 components. Direct memory access without locking for maximum UART processing performance.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core1 Write Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles configuration updates with validation, applying changes atomically, and triggering persistence operations. Manages user configuration changes from management interface.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Config Data Structures</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Organized configuration storage including UART channel settings, network parameters, system options, and operational parameters in structured memory layout.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance Counters</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Real-time operational metrics including throughput statistics, error counters, and system utilization data accessible to both cores and management interface.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Integrity Management</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maintains revision counter and SHA256 checksum for configuration validation. Detects corruption during flash load operations and triggers recovery procedures.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Flash Persistence</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages configuration save/load operations with wear leveling, A/B backup strategy, and atomic updates to prevent configuration corruption during power failures.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_important_interfaces_3">Important Interfaces</h5>
+<div class="sect5">
+<h6 id="_core0_configuration_access">Core0 Configuration Access</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Read-only Access</strong>: Direct memory access to configuration structures without locking</p>
+</li>
+<li>
+<p><strong>Fast Access</strong>: Optimized for real-time UART processing requirements</p>
+</li>
+<li>
+<p><strong>Structure Layout</strong>: Cache-aligned configuration structures for optimal performance</p>
+</li>
+<li>
+<p><strong>No Blocking</strong>: Configuration reads never block Core0 operations</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_configuration_data_format">Configuration Data Format</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>UART Settings</strong>: Per-channel baud rate, frame format, protocol filter settings</p>
+</li>
+<li>
+<p><strong>Network Config</strong>: IP address, port mappings, security parameters, connection limits</p>
+</li>
+<li>
+<p><strong>System Settings</strong>: Logging levels, watchdog timeouts, update settings</p>
+</li>
+<li>
+<p><strong>User Preferences</strong>: Web interface settings, display options, alert preferences</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_integrity_verification">Integrity Verification</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Revision Counter</strong>: Incremented on each configuration change for tracking</p>
+</li>
+<li>
+<p><strong>SHA256 Checksum</strong>: Calculated over entire configuration block for corruption detection</p>
+</li>
+<li>
+<p><strong>Load Validation</strong>: Checksum verification during flash load with fallback to defaults</p>
+</li>
+<li>
+<p><strong>Save Atomicity</strong>: Atomic update of revision + checksum + data to prevent corruption</p>
 </li>
 </ul>
 </div>
@@ -960,13 +1095,13 @@
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_6">Motivation</h5>
+<h5 id="_motivation_7">Motivation</h5>
 <div class="paragraph">
 <p>The modular management interface design separates concerns between web serving, authentication, data collection, and configuration UIs. This enables independent development and testing of each component while providing a comprehensive administration solution.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_6">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_7">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -1017,13 +1152,13 @@
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_7">Motivation</h5>
+<h5 id="_motivation_8">Motivation</h5>
 <div class="paragraph">
 <p>UART processing utilizing UART specific ISR and DMA transfers for maximum troughput.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_7">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_8">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">

@@ -995,6 +995,16 @@
 <strong>Resolution Plan:</strong> Document limitation clearly, investigate external UART expansion options</p>
 </div>
 </div>
+<div class="sect3">
+<h4 id="_td_004_shared_memory_configurationlogging">TD-004: Shared Memory Configuration/Logging</h4>
+<div class="paragraph">
+<p><strong>Description:</strong> Config manager and log manager use shared SRAM bank with spinlock synchronization, creating potential single point of failure and lock contention<br>
+<strong>Impact:</strong> Spinlock contention could impact real-time performance; memory corruption could affect both cores<br>
+<strong>Priority:</strong> Medium<br>
+<strong>Effort:</strong> Medium (2-3 weeks)<br>
+<strong>Resolution Plan:</strong> Monitor spinlock contention in performance testing; consider lock-free alternatives if contention becomes problematic</p>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_risk_mitigation_plan">Risk Mitigation Plan</h3>
