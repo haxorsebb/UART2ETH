@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/chapters/09_architecture_decisions.html -->
+    <!-- sourceuri: arc42/adrs/ADR-006-flash-persistence-strategy.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>Architecture Decisions</title>
+    <title>ADR-006: Flash Persistence Strategy</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -213,11 +213,11 @@
     <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link " href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+                <a class="nav-link active" href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
             </li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link active" href="../../arc42/chapters/00_architecture_communication_canvas.html"><span>arc42</span></a>
+                <a class="nav-link " href="../../arc42/chapters/00_architecture_communication_canvas.html"><span>arc42</span></a>
             </li>
 
         </ul>
@@ -307,7 +307,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/chapters/09_architecture_decisions.html" title="Architecture Decisions">Architecture Decisions</a>
                                 
                             </li>
@@ -338,11 +338,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/chapters/09_architecture_decisions.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-006-flash-persistence-strategy.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27Architecture+Decisions%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/chapters/09_architecture_decisions.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-006-flash-persistence-strategy.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -352,12 +352,28 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
-<li><a href="#section-design-decisions">Architecture Decisions</a>
+<li><a href="#_adr_006_flash_persistence_strategy">ADR-006: Flash Persistence Strategy</a>
 <ul class="sectlevel2">
-<li><a href="#_hardware_platform_decisions">Hardware Platform Decisions</a></li>
-<li><a href="#_software_platform_decisions">Software Platform Decisions</a></li>
-<li><a href="#_implementation_strategy_decisions">Implementation Strategy Decisions</a></li>
-<li><a href="#_decision_interdependencies">Decision Interdependencies</a></li>
+<li><a href="#_status">Status</a></li>
+<li><a href="#_date">Date</a></li>
+<li><a href="#_context">Context</a></li>
+<li><a href="#_decision">Decision</a></li>
+<li><a href="#_storage_format">Storage Format</a></li>
+<li><a href="#_ring_buffer_management">Ring Buffer Management</a></li>
+<li><a href="#_write_strategy">Write Strategy</a></li>
+<li><a href="#_recovery_process">Recovery Process</a></li>
+</ul>
+</li>
+<li><a href="#_rationale">Rationale</a>
+<ul class="sectlevel2">
+<li><a href="#_advantages">Advantages</a></li>
+<li><a href="#_rejected_alternatives">Rejected Alternatives</a></li>
+<li><a href="#_trade_offs">Trade-offs</a></li>
+<li><a href="#_consequences">Consequences</a></li>
+<li><a href="#_positive">Positive</a></li>
+<li><a href="#_negative">Negative</a></li>
+<li><a href="#_implementation_requirements">Implementation Requirements</a></li>
+<li><a href="#_implementation_notes">Implementation Notes</a></li>
 </ul>
 </li>
 </ul>
@@ -383,67 +399,257 @@
         <p>
             
 <div class="sect1">
-<h2 id="section-design-decisions">Architecture Decisions</h2>
+<h2 id="_adr_006_flash_persistence_strategy">ADR-006: Flash Persistence Strategy</h2>
 <div class="sectionbody">
+<div class="sect2">
+<h3 id="_status">Status</h3>
 <div class="paragraph">
-<p>This section references the Architecture Decision Records (ADRs) that document key technical decisions for the UART2ETH project. These decisions form the foundation of the system architecture and significantly influence capabilities, performance characteristics, and development approach.</p>
-</div>
-<div class="sect2">
-<h3 id="_hardware_platform_decisions">Hardware Platform Decisions</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><a href="../adrs/ADR-001-microcontroller-selection.html">ADR-001: Microcontroller Platform Selection</a> - Documents the decision to use the Raspberry Pi RP2350 as the core microcontroller platform.</p>
-</li>
-<li>
-<p><a href="../adrs/ADR-002-ethernet-controller-selection.html">ADR-002: Ethernet Controller Selection</a> - Documents the decision to use the ENC28J60 as the Ethernet controller.</p>
-</li>
-</ul>
+<p>Accepted</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_software_platform_decisions">Software Platform Decisions</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><a href="../adrs/ADR-003-programming-language-selection.html">ADR-003: Programming Language Selection</a> - Documents the decision to use C programming language for firmware development, considering team expertise, delivery timeline, and memory model constraints.</p>
-</li>
-<li>
-<p><a href="../adrs/ADR-004-development-ecosystem.html">ADR-004: Development Ecosystem Selection</a> - Documents the decision to use Native Pico SDK + CMake development ecosystem for professional, industrial-grade development.</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_implementation_strategy_decisions">Implementation Strategy Decisions</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><a href="../adrs/ADR-005-buffer-allocation-strategy.html">ADR-005: Ring Buffer Memory Allocation Strategy</a> - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.</p>
-</li>
-<li>
-<p><a href="../adrs/ADR-006-flash-persistence-strategy.html">ADR-006: Flash Persistence Strategy</a> - Documents the decision to use 4-page ring buffer for configuration persistence, providing wear leveling and power-loss safety through deferred write-back with SHA256 integrity verification.</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_decision_interdependencies">Decision Interdependencies</h3>
+<h3 id="_date">Date</h3>
 <div class="paragraph">
-<p>The ADRs reveal important interdependencies that influence architectural coherence:</p>
+<p>2024-01-15</p>
 </div>
+</div>
+<div class="sect2">
+<h3 id="_context">Context</h3>
+<div class="paragraph">
+<p>The UART2ETH system requires persistent storage of configuration data to survive power cycles and system resets. The configuration includes UART channel settings, network parameters, user accounts, and system preferences stored in the <code>g_shared_memory</code> structure.</p>
+</div>
+<div class="paragraph">
+<p>Key requirements:
+* Embedded system constraints (limited flash, no external storage)
+* Power-loss safety (industrial environment)
+* Flash wear leveling (device longevity)
+* Fast startup times (minimize boot delays)
+* Simple implementation (avoid complex file systems)
+* Integrity verification (detect corruption)</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_decision">Decision</h3>
+<div class="paragraph">
+<p>We will implement flash persistence using a <strong>4-page ring buffer strategy</strong> with the following characteristics:</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_storage_format">Storage Format</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>ADR-004 (Development Ecosystem) challenges ADR-002 (Ethernet Controller)</strong>: The ecosystem analysis revealed that ENC28J60 lacks mature RP2350 SDK integration, potentially requiring significant custom development effort and impacting industrial reliability goals.</p>
+<p><strong>Raw binary storage</strong>: Direct copy of <code>g_shared_memory</code> structure to flash</p>
 </li>
 <li>
-<p><strong>ADR-003 (C Language) reinforces ADR-004 (Native SDK)</strong>: The choice of C programming language aligns optimally with the Native Pico SDK approach, enabling direct application of team expertise.</p>
+<p><strong>No JSON or schema validation</strong>: Eliminates parsing overhead and complexity</p>
 </li>
 <li>
-<p><strong>ADR-005 (Buffer Strategy) supports ADR-003 (C Language)</strong>: Static allocation strategy leverages C&#8217;s deterministic memory model and supports industrial reliability requirements.</p>
+<p><strong>Complete structure per page</strong>: Atomic writes of entire configuration</p>
 </li>
 </ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_ring_buffer_management">Ring Buffer Management</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>4 flash pages</strong> organized as circular ring buffer</p>
+</li>
+<li>
+<p><strong>Wear leveling</strong>: Sequential writes advance through ring</p>
+</li>
+<li>
+<p><strong>Page metadata</strong>: Revision counter + SHA256 checksum per page</p>
+</li>
+<li>
+<p><strong>Magic number</strong>: Page validity marker (<code>0xC0FFEEAA</code>)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_write_strategy">Write Strategy</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Deferred write-back</strong>: Integrated into Core1 main loop</p>
+</li>
+<li>
+<p><strong>Frequency limiting</strong>: Maximum once per 30 seconds</p>
+</li>
+<li>
+<p><strong>Change detection</strong>: Write only when <code>revision_counter</code> increments</p>
+</li>
+<li>
+<p><strong>Atomic operations</strong>: Complete page written or nothing</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_recovery_process">Recovery Process</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Startup validation</strong>: Read all 4 pages, verify checksums</p>
+</li>
+<li>
+<p><strong>Page selection</strong>: Use page with highest revision + valid checksum</p>
+</li>
+<li>
+<p><strong>Corruption handling</strong>: Skip invalid pages, fallback to factory defaults</p>
+</li>
+<li>
+<p><strong>Error logging</strong>: Track corruption events for diagnostics</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_rationale">Rationale</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_advantages">Advantages</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Power-loss safety</strong>: Atomic page writes prevent partial corruption</p>
+</li>
+<li>
+<p><strong>Wear leveling</strong>: Ring buffer distributes writes across 4 pages</p>
+</li>
+<li>
+<p><strong>Fast recovery</strong>: Simple page validation, no complex parsing</p>
+</li>
+<li>
+<p><strong>Integrity verification</strong>: SHA256 detects any data corruption</p>
+</li>
+<li>
+<p><strong>Embedded-friendly</strong>: No file system overhead or external dependencies</p>
+</li>
+<li>
+<p><strong>Deterministic behavior</strong>: Known write patterns, predictable performance</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_rejected_alternatives">Rejected Alternatives</h3>
+<div class="paragraph">
+<p><strong>File System Approach</strong>
+* Rejected due to complexity and flash overhead
+* Would require FAT or custom file system implementation
+* Higher RAM usage for file system structures</p>
+</div>
+<div class="paragraph">
+<p><strong>JSON Configuration Files</strong>
+* Rejected due to parsing overhead and complexity
+* Would require JSON parser library (code size increase)
+* Schema validation adds unnecessary complexity for embedded use</p>
+</div>
+<div class="paragraph">
+<p><strong>A/B Partition Strategy</strong>
+* Rejected as insufficient for wear leveling
+* Only 2 locations would wear out faster
+* No automatic progression through multiple backup copies</p>
+</div>
+<div class="paragraph">
+<p><strong>EEPROM External Storage</strong>
+* Rejected to avoid additional hardware components
+* Increases BOM cost and PCB complexity
+* RP2350 internal flash sufficient for configuration data</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_trade_offs">Trade-offs</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Flash usage</strong>: 4 pages (16KB) reserved for configuration ring buffer</p>
+</li>
+<li>
+<p><strong>Write frequency</strong>: Limited to 30-second intervals (acceptable for config changes)</p>
+</li>
+<li>
+<p><strong>Recovery time</strong>: Startup requires reading/validating 4 pages (minimal impact)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_consequences">Consequences</h3>
+
+</div>
+<div class="sect2">
+<h3 id="_positive">Positive</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Reliable configuration persistence with power-loss safety</p>
+</li>
+<li>
+<p>Automatic wear leveling extends flash lifetime</p>
+</li>
+<li>
+<p>Simple implementation reduces bugs and maintenance</p>
+</li>
+<li>
+<p>Fast startup with minimal validation overhead</p>
+</li>
+<li>
+<p>Integrity verification provides corruption detection</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_negative">Negative</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Fixed 16KB flash reservation (4 × 4KB pages)</p>
+</li>
+<li>
+<p>Write frequency limitation may delay immediate persistence</p>
+</li>
+<li>
+<p>No incremental updates (entire structure written each time)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_requirements">Implementation Requirements</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Flash operations abstraction layer for RP2350</p>
+</li>
+<li>
+<p>SHA256 hash implementation for integrity verification</p>
+</li>
+<li>
+<p>Integration with Core1 main loop for deferred writes</p>
+</li>
+<li>
+<p>Factory reset capability for complete corruption recovery</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_notes">Implementation Notes</h3>
+<div class="paragraph">
+<p>The persistence system will be integrated into the existing shared memory module rather than implemented as a separate component. This maintains architectural simplicity while providing the required functionality.</p>
+</div>
+<div class="paragraph">
+<p>The <code>revision_counter</code> in <code>g_shared_memory</code> serves dual purposes:
+1. Coordination between cores for configuration changes
+2. Flash persistence trigger and page selection during recovery</p>
 </div>
 </div>
 </div>
@@ -475,11 +681,11 @@
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27Architecture+Decisions%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/chapters/09_architecture_decisions.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-006-flash-persistence-strategy.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27Architecture+Decisions%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/chapters/09_architecture_decisions.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-006-flash-persistence-strategy.adoc">tell
     us how we can improve</a>.
     </p>
 </div>

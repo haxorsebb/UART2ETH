@@ -582,40 +582,63 @@ Output packets:
 <div class="sect2">
 <h3 id="_configuration_management">Configuration Management</h3>
 <div class="sect3">
-<h4 id="_persistent_storage">Persistent Storage</h4>
+<h4 id="_flash_persistence_strategy">Flash Persistence Strategy</h4>
 <div class="paragraph">
-<p>Configuration data persistence uses JSON format with schema validation:</p>
+<p>Configuration data persistence uses raw binary storage with flash ring buffer management for wear leveling and power-loss safety:</p>
 </div>
-<div class="ulist">
-<ul>
-<li>
-<p>System settings (network, users, security)</p>
-</li>
-<li>
-<p>UART channel configurations (baud rate, protocol filters)</p>
-</li>
-<li>
-<p>Performance tuning parameters</p>
-</li>
-<li>
-<p>Historical statistics and logs</p>
-</li>
-</ul>
+<div class="paragraph">
+<p><strong>Storage Format</strong>
+* Raw binary copy of <code>g_shared_memory</code> structure written directly to flash
+* SHA256 checksum per flash page for integrity verification
+* Revision counter incremented on each write operation
+* No JSON parsing or schema validation overhead</p>
+</div>
+<div class="paragraph">
+<p><strong>Flash Ring Buffer Management</strong>
+* 4 flash pages organized as circular ring buffer
+* Each page stores complete <code>g_shared_memory</code> snapshot + metadata
+* Write operations advance to next page in ring (wear leveling)
+* Power-loss safety through atomic page writes with checksums</p>
+</div>
+<div class="paragraph">
+<p><strong>Startup Recovery Process</strong>
+* Read all 4 ring buffer pages from flash
+* Verify SHA256 checksum for each page
+* Select page with highest revision counter AND valid checksum
+* Load selected page data into <code>g_shared_memory</code>
+* Invalid pages ignored, fallback to factory defaults if no valid pages</p>
+</div>
+<div class="paragraph">
+<p><strong>Write-Back Strategy</strong>
+* Deferred writes executed by Core1 main loop
+* Write frequency limited to maximum once per 30 seconds
+* Write triggered only when <code>g_shared_memory</code> revision counter changes
+* Complete shared memory structure written atomically per page</p>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_backup_and_restore">Backup and Restore</h4>
+<h4 id="_configuration_data_scope">Configuration Data Scope</h4>
 <div class="paragraph">
-<p><strong>Automatic Backups</strong>
-* Daily configuration snapshots
-* Pre-update system state capture
-* Critical setting change tracking</p>
+<p>Persistent configuration includes:
+* System settings (network, users, security)
+* UART channel configurations (baud rate, protocol filters)
+* Performance tuning parameters
+* User account data and authentication settings</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_factory_reset_and_recovery">Factory Reset and Recovery</h4>
+<div class="paragraph">
+<p><strong>Factory Reset Process</strong>
+* Erase all ring buffer pages
+* Initialize <code>g_shared_memory</code> with factory defaults
+* Force immediate write to establish initial page</p>
 </div>
 <div class="paragraph">
-<p><strong>Manual Operations</strong>
-* Configuration export/import via web interface
-* Factory reset with selective data preservation
-* Remote backup to external storage systems</p>
+<p><strong>Error Recovery</strong>
+* Corrupted pages detected via SHA256 mismatch
+* Fallback to previous valid page if available
+* Complete factory reset if no valid pages found</p>
 </div>
 </div>
 </div>

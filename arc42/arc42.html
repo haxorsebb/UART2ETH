@@ -2653,8 +2653,8 @@ typedef struct {
 <td class="tableblock halign-left valign-top"><p class="tableblock">Maintains revision counter and SHA256 checksum for configuration validation. Detects corruption during flash load operations and triggers recovery procedures.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Flash Persistence</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Manages configuration save/load operations with wear leveling, A/B backup strategy, and atomic updates to prevent configuration corruption during power failures.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Flash Ring Buffer Persistence</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages configuration save/load operations using 4-page flash ring buffer for wear leveling and power-loss safety. Implements deferred write-back with SHA256 integrity verification and atomic page updates.</p></td>
 </tr>
 </tbody>
 </table>
@@ -2700,20 +2700,26 @@ typedef struct {
 </div>
 </div>
 <div class="sect5">
-<h6 id="_integrity_verification">Integrity Verification</h6>
+<h6 id="_flash_ring_buffer_management">Flash Ring Buffer Management</h6>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Revision Counter</strong>: Incremented on each configuration change for tracking</p>
+<p><strong>4-Page Ring Buffer</strong>: Circular buffer of flash pages for wear leveling</p>
 </li>
 <li>
-<p><strong>SHA256 Checksum</strong>: Calculated over entire configuration block for corruption detection</p>
+<p><strong>Revision Counter</strong>: Incremented on each write, used for startup page selection</p>
 </li>
 <li>
-<p><strong>Load Validation</strong>: Checksum verification during flash load with fallback to defaults</p>
+<p><strong>SHA256 Checksum</strong>: Per-page integrity verification during startup recovery</p>
 </li>
 <li>
-<p><strong>Save Atomicity</strong>: Atomic update of revision + checksum + data to prevent corruption</p>
+<p><strong>Startup Recovery</strong>: Load all pages, select highest revision + valid checksum</p>
+</li>
+<li>
+<p><strong>Deferred Writes</strong>: Core1 write-back limited to maximum once per 30 seconds</p>
+</li>
+<li>
+<p><strong>Atomic Operations</strong>: Complete shared memory written per page for consistency</p>
 </li>
 </ul>
 </div>
@@ -3036,7 +3042,153 @@ uint32_t uart_channel_get_status(uint8_t channel);</code></pre>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_whitebox_management_interface_internal_structure">5.3.4. Whitebox Management Interface Internal Structure</h4>
+<h4 id="_whitebox_flash_persistence_system">5.3.4. Whitebox Flash Persistence System</h4>
+<div class="paragraph">
+<p>The Flash Persistence System provides reliable storage and recovery of the complete shared memory structure using a flash ring buffer approach that ensures wear leveling and power-loss safety for embedded systems.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../images/level2-flash-persistence.svg" alt="level2 flash persistence" width="1160" height="1241">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_9">Motivation</h5>
+<div class="paragraph">
+<p>Flash persistence ensures configuration survival across power cycles while preventing flash wear-out and corruption. The ring buffer approach provides automatic wear leveling and power-loss safety without complex file systems.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_9">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Write Controller</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages deferred write-back strategy with Core1 integration. Limits write frequency to maximum once per 30 seconds and only writes when shared memory revision counter changes.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Flash Ring Buffer Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implements 4-page circular buffer for wear leveling. Tracks current write position, manages page allocation sequence, and maintains ring buffer state across power cycles.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Integrity Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles SHA256 checksum generation and verification for each flash page. Maintains revision counters for startup page selection and detects data corruption.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Page Operations</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides hardware abstraction layer for RP2350 flash operations. Implements atomic page write/erase operations and manages flash sector alignment requirements.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Recovery System</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles startup configuration loading by validating all ring buffer pages. Selects page with highest revision and valid checksum, implements factory reset fallback for total corruption.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Page Metadata</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages per-page metadata including revision counters, SHA256 checksums, and page status flags. Provides efficient page validation and selection during recovery.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_important_interfaces_4">Important Interfaces</h5>
+<div class="sect5">
+<h6 id="_flash_page_structure">Flash Page Structure</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Page Size</strong>: Aligned to RP2350 flash sector size (4096 bytes)</p>
+</li>
+<li>
+<p><strong>Data Section</strong>: Complete <code>g_shared_memory</code> structure (raw binary)</p>
+</li>
+<li>
+<p><strong>Metadata Section</strong>: Revision counter (32-bit) + SHA256 checksum (256-bit)</p>
+</li>
+<li>
+<p><strong>Magic Number</strong>: Page validity marker for ring buffer management</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_write_back_interface">Write-Back Interface</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Trigger Condition</strong>: <code>g_shared_memory.revision_counter</code> increment detection</p>
+</li>
+<li>
+<p><strong>Frequency Limit</strong>: Maximum once per 30 seconds via Core1 timer</p>
+</li>
+<li>
+<p><strong>Atomic Operation</strong>: Complete shared memory + metadata written per page</p>
+</li>
+<li>
+<p><strong>Ring Advancement</strong>: Automatic progression to next page in 4-page ring</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_recovery_interface">Recovery Interface</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Page Scanning</strong>: Read all 4 ring buffer pages during startup</p>
+</li>
+<li>
+<p><strong>Validation Logic</strong>: SHA256 verification + magic number check per page</p>
+</li>
+<li>
+<p><strong>Selection Criteria</strong>: Highest revision counter among valid pages</p>
+</li>
+<li>
+<p><strong>Fallback Strategy</strong>: Factory defaults if no valid pages found</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_flash_ring_buffer_layout">Flash Ring Buffer Layout</h6>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Flash page structure (4096 bytes aligned)
+typedef struct {
+    uint32_t magic_number;           // 0xC0FFEEAA - page validity
+    uint32_t revision_counter;       // Incremented on each write
+    uint8_t  sha256_checksum[32];    // Integrity verification
+    uint32_t reserved[4];            // Future use
+
+    // Complete shared memory structure (raw binary)
+    shared_memory_layout_t shared_memory_data;
+
+    // Padding to flash sector boundary
+    uint8_t padding[...];
+} __attribute__((packed, aligned(4096))) flash_page_t;
+
+// Ring buffer management
+typedef struct {
+    uint8_t current_write_page;      // 0-3, next page to write
+    uint8_t last_valid_page;         // 0-3, last successfully read page
+    uint32_t total_writes;           // Lifetime write counter
+    uint32_t corruption_count;       // Detected corruption events
+} ring_buffer_state_t;</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_whitebox_management_interface_internal_structure">5.3.5. Whitebox Management Interface Internal Structure</h4>
 <div class="paragraph">
 <p>The Management Interface provides comprehensive web-based administration through specialized components for HTTP serving, authentication, statistics, and configuration management.</p>
 </div>
@@ -4513,40 +4665,63 @@ Output packets:
 <div class="sect2">
 <h3 id="_configuration_management_2">8.5. Configuration Management</h3>
 <div class="sect3">
-<h4 id="_persistent_storage">8.5.1. Persistent Storage</h4>
+<h4 id="_flash_persistence_strategy">8.5.1. Flash Persistence Strategy</h4>
 <div class="paragraph">
-<p>Configuration data persistence uses JSON format with schema validation:</p>
+<p>Configuration data persistence uses raw binary storage with flash ring buffer management for wear leveling and power-loss safety:</p>
 </div>
-<div class="ulist">
-<ul>
-<li>
-<p>System settings (network, users, security)</p>
-</li>
-<li>
-<p>UART channel configurations (baud rate, protocol filters)</p>
-</li>
-<li>
-<p>Performance tuning parameters</p>
-</li>
-<li>
-<p>Historical statistics and logs</p>
-</li>
-</ul>
+<div class="paragraph">
+<p><strong>Storage Format</strong>
+* Raw binary copy of <code>g_shared_memory</code> structure written directly to flash
+* SHA256 checksum per flash page for integrity verification
+* Revision counter incremented on each write operation
+* No JSON parsing or schema validation overhead</p>
+</div>
+<div class="paragraph">
+<p><strong>Flash Ring Buffer Management</strong>
+* 4 flash pages organized as circular ring buffer
+* Each page stores complete <code>g_shared_memory</code> snapshot + metadata
+* Write operations advance to next page in ring (wear leveling)
+* Power-loss safety through atomic page writes with checksums</p>
+</div>
+<div class="paragraph">
+<p><strong>Startup Recovery Process</strong>
+* Read all 4 ring buffer pages from flash
+* Verify SHA256 checksum for each page
+* Select page with highest revision counter AND valid checksum
+* Load selected page data into <code>g_shared_memory</code>
+* Invalid pages ignored, fallback to factory defaults if no valid pages</p>
+</div>
+<div class="paragraph">
+<p><strong>Write-Back Strategy</strong>
+* Deferred writes executed by Core1 main loop
+* Write frequency limited to maximum once per 30 seconds
+* Write triggered only when <code>g_shared_memory</code> revision counter changes
+* Complete shared memory structure written atomically per page</p>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_backup_and_restore">8.5.2. Backup and Restore</h4>
+<h4 id="_configuration_data_scope">8.5.2. Configuration Data Scope</h4>
 <div class="paragraph">
-<p><strong>Automatic Backups</strong>
-* Daily configuration snapshots
-* Pre-update system state capture
-* Critical setting change tracking</p>
+<p>Persistent configuration includes:
+* System settings (network, users, security)
+* UART channel configurations (baud rate, protocol filters)
+* Performance tuning parameters
+* User account data and authentication settings</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_factory_reset_and_recovery">8.5.3. Factory Reset and Recovery</h4>
+<div class="paragraph">
+<p><strong>Factory Reset Process</strong>
+* Erase all ring buffer pages
+* Initialize <code>g_shared_memory</code> with factory defaults
+* Force immediate write to establish initial page</p>
 </div>
 <div class="paragraph">
-<p><strong>Manual Operations</strong>
-* Configuration export/import via web interface
-* Factory reset with selective data preservation
-* Remote backup to external storage systems</p>
+<p><strong>Error Recovery</strong>
+* Corrupted pages detected via SHA256 mismatch
+* Fallback to previous valid page if available
+* Complete factory reset if no valid pages found</p>
 </div>
 </div>
 </div>
@@ -4624,6 +4799,9 @@ Output packets:
 <ul>
 <li>
 <p><a href="../adrs/ADR-005-buffer-allocation-strategy.html">ADR-005: Ring Buffer Memory Allocation Strategy</a> - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.</p>
+</li>
+<li>
+<p><a href="../adrs/ADR-006-flash-persistence-strategy.html">ADR-006: Flash Persistence Strategy</a> - Documents the decision to use 4-page ring buffer for configuration persistence, providing wear leveling and power-loss safety through deferred write-back with SHA256 integrity verification.</p>
 </li>
 </ul>
 </div>
