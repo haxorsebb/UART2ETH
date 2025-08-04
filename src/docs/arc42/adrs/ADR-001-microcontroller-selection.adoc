@@ -153,37 +153,13 @@ _Baseline: ATMega328P (all scores = 0)_
 | 0 (same - external PHY)
 | -1 (WiFi overhead)
 
+| *Total Weighted PUGH Score*
+| 
+| 0 (baseline)
+| 30
+| 22
+
 |===
-
-=== Weighted Scores
-
-*RP2350 Total Score:*
-
-* UART: 3×(+2) = +6
-* Processing: 3×(+2) = +6
-* Memory: 2×(+2) = +4
-* A/B Updates: 3×(+2) = +6
-* Security: 3×(+2) = +6
-* Real-time: 2×(+2) = +4
-* Ecosystem: 2×(-1) = -2
-* Reliability: 2×(-1) = -2
-* Cost: 1×(+2) = +2
-* Network: 2×(0) = 0
-* *Total: +30*
-
-*ESP32 Total Score:*
-
-* UART: 3×(+1) = +3
-* Processing: 3×(+2) = +6
-* Memory: 2×(+2) = +4
-* A/B Updates: 3×(+2) = +6
-* Security: 3×(+1) = +3
-* Real-time: 2×(+1) = +2
-* Ecosystem: 2×(0) = 0
-* Reliability: 2×(0) = 0
-* Cost: 1×(0) = 0
-* Network: 2×(-1) = -2
-* *Total: +22*
 
 == Decision
 
@@ -197,30 +173,6 @@ The RP2350 scores significantly higher (+30 vs +22) in the weighted PUGH analysi
 . *Cost Advantage*: 37% lower total system cost while providing better capabilities
 . *Real-time Determinism*: PIO subsystem + dual-core architecture enables predictable performance
 
-== Rationale
-
-=== Why RP2350 Over ATMega328P
-
-* *Performance Gap*: 328P cannot handle 4 concurrent UARTs + TCP processing
-* *Memory Limitation*: 2KB SRAM insufficient for networking stack and buffering
-* *A/B Update Impossibility*: 32KB flash insufficient for dual firmware images (need ~64KB minimum)
-* *Security Gap*: No hardware security features compromise OTA update integrity
-* *Future Flexibility*: PIO enables protocol adaptations without hardware changes
-
-=== Why RP2350 Over ESP32
-
-* *Industrial Focus*: No unnecessary WiFi attack surface in industrial environments
-* *Cost Efficiency*: Lower total system cost for same networking capability
-* *Architectural Fit*: PIO subsystem specifically designed for custom I/O protocols
-* *Security Model*: TrustZone provides more comprehensive security architecture
-* *UART Flexibility*: Superior support for multiple custom UART implementations
-
-*Industrial Reliability Trade-off*: While ESP32 has solid 8+ years of industrial deployment vs RP2350's zero field history, neither matches ATMega328P's decades of proven reliability.
-
-*Development Ecosystem Trade-off*: ATMega328P's Arduino ecosystem is unmatched in accessibility, tutorials, and community support. Both RP2350 and ESP32 have smaller ecosystems despite good documentation.
-
-Despite these disadvantages, the RP2350's technical advantages outweigh these risks for our specific application requirements.
-
 == Consequences
 
 === Positive
@@ -233,10 +185,10 @@ Despite these disadvantages, the RP2350's technical advantages outweigh these ri
 
 === Negative
 
-* ⚠️ *External Dependency*: Requires ENC28J60 Ethernet controller
+* ⚠️ *External Dependency*: Requires external Ethernet controller
 * ⚠️ *Industrial Deployment Risk*: Zero field deployment history in industrial environments (released August 2024)
 * ⚠️ *Platform Maturity*: Less proven than ATMega328P's decades of industrial use
-* ⚠️ *Development Ecosystem*: Smaller community and fewer resources compared to Arduino's massive ecosystem
+* ⚠️ *Development Ecosystem*: Smaller community and fewer resources in Arduino's massive ecosystem compared to ATMega328P
 * ⚠️ *Custom Development*: PIO programming requires specialized knowledge
 
 === Risks and Mitigation
@@ -250,16 +202,10 @@ Despite these disadvantages, the RP2350's technical advantages outweigh these ri
 
 === Required External Components
 
-* *ENC28J60 Ethernet Controller*: Hardware TCP/IP stack, SPI interface
+* *external Ethernet Controller*: Hardware Ethernet stack, SPI interface
 * *Crystal/Oscillator*: For precise timing if required by application
 * *Power Supply*: 3.3V regulation and filtering
 * *Protection*: ESD protection for industrial environments
-
-=== Development Approach
-
-* *Phase 1*: Basic RP2350 + ENC28J60 integration with single UART
-* *Phase 2*: PIO-based additional UART implementation
-* *Phase 3*: Security features and OTA update system
 
 === Architecture Implications
 
