@@ -328,18 +328,8 @@
 <li><a href="#_option_c_esp32">Option C: ESP32</a></li>
 </ul>
 </li>
-<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a>
-<ul class="sectlevel2">
-<li><a href="#_weighted_scores">Weighted Scores</a></li>
-</ul>
-</li>
+<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
 <li><a href="#_decision">Decision</a></li>
-<li><a href="#_rationale">Rationale</a>
-<ul class="sectlevel2">
-<li><a href="#_why_rp2350_over_atmega328p">Why RP2350 Over ATMega328P</a></li>
-<li><a href="#_why_rp2350_over_esp32">Why RP2350 Over ESP32</a></li>
-</ul>
-</li>
 <li><a href="#_consequences">Consequences</a>
 <ul class="sectlevel2">
 <li><a href="#_positive">Positive</a></li>
@@ -350,7 +340,6 @@
 <li><a href="#_implementation_notes">Implementation Notes</a>
 <ul class="sectlevel2">
 <li><a href="#_required_external_components">Required External Components</a></li>
-<li><a href="#_development_approach">Development Approach</a></li>
 <li><a href="#_architecture_implications">Architecture Implications</a></li>
 </ul>
 </li>
@@ -674,91 +663,15 @@
 <td class="tableblock halign-left valign-top"><p class="tableblock">0 (same - external PHY)</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">-1 (WiFi overhead)</p></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total Weighted PUGH Score</strong></p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">30</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">22</p></td>
+</tr>
 </tbody>
 </table>
-<div class="sect2">
-<h3 id="_weighted_scores">Weighted Scores</h3>
-<div class="paragraph">
-<p><strong>RP2350 Total Score:</strong></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>UART: 3×(+2) = +6</p>
-</li>
-<li>
-<p>Processing: 3×(+2) = +6</p>
-</li>
-<li>
-<p>Memory: 2×(+2) = +4</p>
-</li>
-<li>
-<p>A/B Updates: 3×(+2) = +6</p>
-</li>
-<li>
-<p>Security: 3×(+2) = +6</p>
-</li>
-<li>
-<p>Real-time: 2×(+2) = +4</p>
-</li>
-<li>
-<p>Ecosystem: 2×(-1) = -2</p>
-</li>
-<li>
-<p>Reliability: 2×(-1) = -2</p>
-</li>
-<li>
-<p>Cost: 1×(+2) = +2</p>
-</li>
-<li>
-<p>Network: 2×(0) = 0</p>
-</li>
-<li>
-<p><strong>Total: +30</strong></p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<p><strong>ESP32 Total Score:</strong></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>UART: 3×(+1) = +3</p>
-</li>
-<li>
-<p>Processing: 3×(+2) = +6</p>
-</li>
-<li>
-<p>Memory: 2×(+2) = +4</p>
-</li>
-<li>
-<p>A/B Updates: 3×(+2) = +6</p>
-</li>
-<li>
-<p>Security: 3×(+1) = +3</p>
-</li>
-<li>
-<p>Real-time: 2×(+1) = +2</p>
-</li>
-<li>
-<p>Ecosystem: 2×(0) = 0</p>
-</li>
-<li>
-<p>Reliability: 2×(0) = 0</p>
-</li>
-<li>
-<p>Cost: 1×(0) = 0</p>
-</li>
-<li>
-<p>Network: 2×(-1) = -2</p>
-</li>
-<li>
-<p><strong>Total: +22</strong></p>
-</li>
-</ul>
-</div>
-</div>
 </div>
 </div>
 <div class="sect1">
@@ -792,64 +705,6 @@
 </div>
 </div>
 <div class="sect1">
-<h2 id="_rationale">Rationale</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_why_rp2350_over_atmega328p">Why RP2350 Over ATMega328P</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Performance Gap</strong>: 328P cannot handle 4 concurrent UARTs + TCP processing</p>
-</li>
-<li>
-<p><strong>Memory Limitation</strong>: 2KB SRAM insufficient for networking stack and buffering</p>
-</li>
-<li>
-<p><strong>A/B Update Impossibility</strong>: 32KB flash insufficient for dual firmware images (need ~64KB minimum)</p>
-</li>
-<li>
-<p><strong>Security Gap</strong>: No hardware security features compromise OTA update integrity</p>
-</li>
-<li>
-<p><strong>Future Flexibility</strong>: PIO enables protocol adaptations without hardware changes</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_why_rp2350_over_esp32">Why RP2350 Over ESP32</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Industrial Focus</strong>: No unnecessary WiFi attack surface in industrial environments</p>
-</li>
-<li>
-<p><strong>Cost Efficiency</strong>: Lower total system cost for same networking capability</p>
-</li>
-<li>
-<p><strong>Architectural Fit</strong>: PIO subsystem specifically designed for custom I/O protocols</p>
-</li>
-<li>
-<p><strong>Security Model</strong>: TrustZone provides more comprehensive security architecture</p>
-</li>
-<li>
-<p><strong>UART Flexibility</strong>: Superior support for multiple custom UART implementations</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<p><strong>Industrial Reliability Trade-off</strong>: While ESP32 has solid 8+ years of industrial deployment vs RP2350&#8217;s zero field history, neither matches ATMega328P&#8217;s decades of proven reliability.</p>
-</div>
-<div class="paragraph">
-<p><strong>Development Ecosystem Trade-off</strong>: ATMega328P&#8217;s Arduino ecosystem is unmatched in accessibility, tutorials, and community support. Both RP2350 and ESP32 have smaller ecosystems despite good documentation.</p>
-</div>
-<div class="paragraph">
-<p>Despite these disadvantages, the RP2350&#8217;s technical advantages outweigh these risks for our specific application requirements.</p>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
 <h2 id="_consequences">Consequences</h2>
 <div class="sectionbody">
 <div class="sect2">
@@ -879,7 +734,7 @@
 <div class="ulist">
 <ul>
 <li>
-<p>⚠️ <strong>External Dependency</strong>: Requires ENC28J60 Ethernet controller</p>
+<p>⚠️ <strong>External Dependency</strong>: Requires external Ethernet controller</p>
 </li>
 <li>
 <p>⚠️ <strong>Industrial Deployment Risk</strong>: Zero field deployment history in industrial environments (released August 2024)</p>
@@ -888,7 +743,7 @@
 <p>⚠️ <strong>Platform Maturity</strong>: Less proven than ATMega328P&#8217;s decades of industrial use</p>
 </li>
 <li>
-<p>⚠️ <strong>Development Ecosystem</strong>: Smaller community and fewer resources compared to Arduino&#8217;s massive ecosystem</p>
+<p>⚠️ <strong>Development Ecosystem</strong>: Smaller community and fewer resources in Arduino&#8217;s massive ecosystem compared to ATMega328P</p>
 </li>
 <li>
 <p>⚠️ <strong>Custom Development</strong>: PIO programming requires specialized knowledge</p>
@@ -925,7 +780,7 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>ENC28J60 Ethernet Controller</strong>: Hardware TCP/IP stack, SPI interface</p>
+<p><strong>external Ethernet Controller</strong>: Hardware Ethernet stack, SPI interface</p>
 </li>
 <li>
 <p><strong>Crystal/Oscillator</strong>: For precise timing if required by application</p>
@@ -935,22 +790,6 @@
 </li>
 <li>
 <p><strong>Protection</strong>: ESD protection for industrial environments</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_development_approach">Development Approach</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Phase 1</strong>: Basic RP2350 + ENC28J60 integration with single UART</p>
-</li>
-<li>
-<p><strong>Phase 2</strong>: PIO-based additional UART implementation</p>
-</li>
-<li>
-<p><strong>Phase 3</strong>: Security features and OTA update system</p>
 </li>
 </ul>
 </div>
