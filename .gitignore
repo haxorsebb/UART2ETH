@@ -20,3 +20,7 @@ Thumbs.db
 
 #build dir
 build/
+
+# Log files
+logs/
+*.log

@@ -60,6 +60,7 @@ void test_log_buffer_size_calculation(void) {
     // ASSERT: Buffer size should not exceed SRAM bank size
     TEST_ASSERT_LESS_THAN_MESSAGE(SRAM_BANK4_SIZE, buffer_size,
         "Log buffer size should be less than total SRAM bank size");
+        
 }
 
 /**
@@ -70,7 +71,9 @@ void test_log_buffer_size_calculation(void) {
  */
 void test_shared_memory_layout_access(void) {
     // ARRANGE: Initialize shared memory
+    
     bool init_result = shared_memory_init();
+    
     TEST_ASSERT_TRUE(init_result);
     
     // ACT: Get layout pointer
@@ -85,6 +88,7 @@ void test_shared_memory_layout_access(void) {
         "Layout should be at or after SRAM Bank 4 base address");
     TEST_ASSERT_LESS_THAN_MESSAGE(SRAM_BANK4_BASE + SRAM_BANK4_SIZE, layout_addr,
         "Layout should be within SRAM Bank 4 bounds");
+    
 }
 
 /**
@@ -93,6 +97,7 @@ void test_shared_memory_layout_access(void) {
  * Tests that the log management variables are initialized to correct values.
  */
 void test_log_management_initialization(void) {
+    
     // ARRANGE: Initialize shared memory
     bool init_result = shared_memory_init();
     TEST_ASSERT_TRUE(init_result);
@@ -116,6 +121,7 @@ void test_log_management_initialization(void) {
     // ASSERT: Spinlock should be initialized
     TEST_ASSERT_NOT_NULL_MESSAGE(layout->log_mgmt.reservation_lock,
         "Reservation spinlock should be initialized");
+    
 }
 
 // Test runner
@@ -135,5 +141,9 @@ int main() {
     RUN_TEST(test_shared_memory_layout_access);
     RUN_TEST(test_log_management_initialization);
     
-    return UNITY_END();
+    while (true) {
+        printf("Tests completed\n");
+        UNITY_END();
+        sleep_ms(1000);
+    }
 }

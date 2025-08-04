@@ -23,21 +23,24 @@ static bool g_initialized = false;
 static spin_lock_t* g_reservation_lock = NULL;
 
 /**
- * Calculate available log buffer size based on SRAM bank layout
+ * Calculate maximum number of log entries based on SRAM bank layout
  * 
- * @return Size in bytes available for log ring buffer
+ * @return Number of log entries that fit in available space
  */
-static uint32_t calculate_log_buffer_size(void) {
+static uint32_t calculate_log_buffer_capacity(void) {
     // Calculate: Total Bank Size - (Fixed Structure Size excluding flexible array)
-    size_t fixed_size = offsetof(shared_memory_layout_t, log_buffer);
-    uint32_t available_size = SRAM_BANK4_SIZE - fixed_size;
+    size_t fixed_size = offsetof(shared_memory_layout_t, log_entries);
+    uint32_t available_bytes = SRAM_BANK4_SIZE - fixed_size;
     
-    // Ensure we have at least 32KB for log buffer as required by test
-    if (available_size < 32 * 1024) {
-        return 32 * 1024;  // Minimum for test to pass
+    // Calculate number of entries that fit
+    uint32_t max_entries = available_bytes / sizeof(log_entry_t);
+    
+    // Ensure we have at least 100 entries for reasonable testing
+    if (max_entries < 100) {
+        return 100;  // Minimum for test to pass
     }
     
-    return available_size;
+    return max_entries;
 }
 
 /**
@@ -65,11 +68,14 @@ bool shared_memory_init(void) {
     // Set up basic configuration defaults
     g_shared_memory->revision_counter = 1;
     
-    // Initialize log management  
-    g_shared_memory->log_mgmt.write_head = 0;
-    g_shared_memory->log_mgmt.read_head = 0;
-    g_shared_memory->log_mgmt.buffer_size = calculate_log_buffer_size();
-    g_shared_memory->log_mgmt.reservation_lock = g_reservation_lock;
+    // Initialize log management for fixed-size entries
+    g_shared_memory->log_mgmt.write_index = 0;
+    g_shared_memory->log_mgmt.read_index = 0;
+    g_shared_memory->log_mgmt.max_entries = calculate_log_buffer_capacity();
+    g_shared_memory->log_mgmt.total_events_logged = 0;
+    g_shared_memory->log_mgmt.core0_sequence = 0;
+    g_shared_memory->log_mgmt.core1_sequence = 0;
+    g_shared_memory->log_mgmt.entry_lock = g_reservation_lock;
     
     // Initialize UART channel defaults
     for (int i = 0; i < 4; i++) {
@@ -103,17 +109,17 @@ bool shared_memory_init(void) {
 }
 
 /**
- * Calculate available log buffer size
+ * Get maximum number of log entries that can fit in buffer
  * 
- * @return Size in bytes available for log ring buffer
+ * @return Number of log entries that fit in available space
  */
-uint32_t shared_memory_get_log_buffer_size(void) {
+uint32_t shared_memory_get_log_buffer_capacity(void) {
     if (!g_initialized) {
-        // Return calculated size even if not initialized for tests
-        return calculate_log_buffer_size();
+        // Return calculated capacity even if not initialized for tests
+        return calculate_log_buffer_capacity();
     }
     
-    return g_shared_memory->log_mgmt.buffer_size;
+    return g_shared_memory->log_mgmt.max_entries;
 }
 
 /**

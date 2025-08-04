@@ -1,20 +1,34 @@
 cmake_minimum_required(VERSION 3.13)
 
-# Include pico-sdk import cmake file
-include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+# Set board before initializing SDK
+set(PICO_BOARD pico2)
+
+# Pull in SDK (must be before project)
+include(pico_sdk_import.cmake)
+
 
 # Set project name
 project(uart2eth C CXX ASM)
 
-# Set board before initializing SDK
-set(PICO_BOARD pico2)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
-# Target RP2350 with pico2 board
+if (PICO_SDK_VERSION_STRING VERSION_LESS "2.2.0")
+    message(FATAL_ERROR "Raspberry Pi Pico SDK version 2.2.0 (or later) required. Your version is ${PICO_SDK_VERSION_STRING}")
+endif()
+
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 # Initialize the SDK
 pico_sdk_init()
+
+
+add_compile_options(-Wall
+        -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
+        -Wno-unused-function # we have some for the docs that aren't called
+        )
 
 # Add include directories
 include_directories(include)
@@ -31,13 +45,12 @@ add_executable(uart2eth
 # Link libraries
 target_link_libraries(uart2eth 
     pico_stdlib
-    pico_stdio_usb     # USB CDC serial
-    pico_stdio_uart    # Hardware UART serial
     pico_multicore     # Dual core support
     pico_sync          # Synchronization primitives
     hardware_uart
     hardware_gpio
     hardware_spi
+    hardware_watchdog  # Watchdog for stability
     config_manager     # Our config manager library
     log_manager        # Our log manager library
 )
