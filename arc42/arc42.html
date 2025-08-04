@@ -2447,17 +2447,17 @@ typedef struct {
 <div class="sect3">
 <h4 id="_whitebox_log_manager">5.2.4. Whitebox Log Manager</h4>
 <div class="paragraph">
-<p>The Log Manager provides system-wide event logging through a lock-reserve-release-write pattern that ensures thread safety while minimizing lock contention. Core1 handles all output operations via periodic background tasks to maintain consistent USB-serial output.</p>
+<p>The Log Manager provides system-wide event logging through fixed-size entries with enumerated event types. This design eliminates variable-length message parsing complexity while providing efficient, predictable memory usage for embedded systems.</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="../images/level2-log-manager-updated.svg" alt="level2 log manager updated" width="1380" height="745">
+<img src="../images/level2-log-manager-fixed-entries.svg" alt="level2 log manager fixed entries" width="1512" height="518">
 </div>
 </div>
 <div class="sect4">
 <h5 id="_motivation_5">Motivation</h5>
 <div class="paragraph">
-<p>The lock-reserve-release-write pattern minimizes lock contention by only holding locks during pointer updates, not during actual message writing. Core1-only output ensures consistent USB-serial formatting and prevents interference between cores during logging output.</p>
+<p>Fixed-size log entries provide predictable memory usage and eliminate complex message parsing overhead. Enumerated event types enable efficient storage while maintaining human-readable output through string lookup tables. Per-core event numbering enables detection of lost events during system debugging.</p>
 </div>
 </div>
 <div class="sect4">
@@ -2475,28 +2475,28 @@ typedef struct {
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Logging Interface</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Provides thread-safe logging API for both cores using lock-reserve-release-write pattern. Handles space reservation with spinlock protection and lock-free message writing.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Event Logging Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides thread-safe event logging API using fixed-size entry allocation. Single function: log_event(event_source, log_level, event_type, extra_value) for all system components.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Shared Memory Layout</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Manages SRAM Bank 4 memory organization containing config structures, performance counters, log management variables, and ring buffer data in compile-time calculated layout.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Event Entry Buffer</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages circular buffer of fixed 16-byte log entries with predictable memory layout. Entry count-based addressing eliminates variable-length parsing complexity.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Management</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Coordinates write_head/read_head pointers with spinlock protection for space reservation. Tracks Core1&#8217;s print position for periodic background output processing.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Event Type Definitions</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maintains explicitly numbered enumeration of all system events for cross-version compatibility. Categories include SYSTEM, UART, NETWORK, CONFIG, and OTA events.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Ring Buffer</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Stores formatted log messages as fixed-length \r\n terminated strings with embedded 8-digit timestamp and core ID. Implements circular buffer with overwrite-oldest policy.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>String Lookup Table</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maps event types to printf-style format strings for human-readable output generation. Supports parameterized messages using event_extra_value field.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core1 Background Printer</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Periodic timer task (100ms) that outputs all pending log messages from read_head to write_head position to USB-serial stdout, then updates read_head position.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core1 Background Formatter</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Periodic timer task (100ms) that processes pending log entries, generates formatted output strings using lookup table, and outputs to USB-serial interface.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Configuration Access</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Provides structured access to shared configuration data with Core0 read-only and Core1 read-write permissions for system configuration management.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Per-Core Event Counters</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maintains separate event sequence numbers for each core to enable detection of lost events during debugging. Global sequence tracking across all event sources.</p></td>
 </tr>
 </tbody>
 </table>
@@ -2504,64 +2504,77 @@ typedef struct {
 <div class="sect4">
 <h5 id="_important_interfaces_2">Important Interfaces</h5>
 <div class="sect5">
-<h6 id="_logging_interface_api">Logging Interface API</h6>
+<h6 id="_event_logging_api">Event Logging API</h6>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Lock-Reserve-Release-Write</strong>: Spinlock during pointer update, lock-free during message write</p>
+<p><strong>Single Function Interface</strong>: <code>log_event(event_source, log_level, event_type, extra_value)</code></p>
 </li>
 <li>
-<p><strong>Thread Safety</strong>: Multiple producers (both cores), single consumer (Core1 printer)</p>
+<p><strong>Fixed Entry Size</strong>: All log entries exactly 16 bytes for predictable memory usage</p>
 </li>
 <li>
-<p><strong>Message Format</strong>: Fixed-length format: <code>[TTTTTTTT][C] Message text here\r\n</code></p>
+<p><strong>Thread Safety</strong>: Atomic entry allocation with per-core sequence numbering</p>
 </li>
 <li>
-<p><strong>Overflow Policy</strong>: Overwrite oldest messages when buffer is full</p>
+<p><strong>Overflow Policy</strong>: Drop oldest entries when buffer is full, log overflow events</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect5">
-<h6 id="_sram_bank_memory_layout">SRAM Bank Memory Layout</h6>
+<h6 id="_log_entry_structure">Log Entry Structure</h6>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Config Structures</strong>: System configuration data at bank start</p>
+<p><strong>Entry Size</strong>: 16 bytes total (32-bit aligned for optimal access)</p>
 </li>
 <li>
-<p><strong>Performance Counters</strong>: Real-time metrics after config structures</p>
+<p><strong>Fields</strong>: timestamp (uint32_t), event_source (uint16_t), event_number (uint16_t), log_level (uint16_t), event_type (uint16_t), event_extra_value (uint32_t)</p>
 </li>
 <li>
-<p><strong>Log Management</strong>: write_head, read_head, spinlock variables</p>
+<p><strong>Buffer Sizing</strong>: Buffer size specified in number of entries, not bytes</p>
 </li>
 <li>
-<p><strong>Ring Buffer</strong>: Remainder of SRAM bank filled with message buffer space</p>
-</li>
-<li>
-<p><strong>Compile-time Sizing</strong>: Buffer size = Bank size - (config + counters + management)</p>
+<p><strong>Memory Layout</strong>: n × sizeof(log_entry_t) allocation ensures entry alignment</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect5">
-<h6 id="_log_message_format">Log Message Format</h6>
+<h6 id="_event_type_system">Event Type System</h6>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Timestamp</strong>: 8-digit fixed-length numeric timestamp <code>[12345678]</code></p>
+<p><strong>Explicit Numbering</strong>: All event types explicitly numbered for version compatibility</p>
 </li>
 <li>
-<p><strong>Core ID</strong>: Single-digit core identifier <code>[0]</code> or <code>[1]</code></p>
+<p><strong>Event Sources</strong>: SYSTEM, UART0-3, NETWORK, CONFIG, OTA, WATCHDOG categories</p>
 </li>
 <li>
-<p><strong>Message</strong>: Variable-length text message content</p>
+<p><strong>Log Levels</strong>: DEBUG, INFO, WARN, ERROR levels maintained for filtering</p>
 </li>
 <li>
-<p><strong>Terminator</strong>: Always ends with <code>\r\n</code> for consistent parsing</p>
+<p><strong>Example Events</strong>: UART_INIT=100, TCP_CONNECT=200, CONFIG_CHANGED=300</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_string_formatting_system">String Formatting System</h6>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Lookup Table</strong>: Event type enum maps to printf-style format strings</p>
 </li>
 <li>
-<p><strong>Example</strong>: <code>[00123456][1] Network interface initialized\r\n</code></p>
+<p><strong>Parameter Support</strong>: Single uint32_t parameter per event via event_extra_value</p>
+</li>
+<li>
+<p><strong>Format Examples</strong>: [UART_INIT] = "UART channel %u initialized", [TCP_CONNECT] = "TCP connection on port %u"</p>
+</li>
+<li>
+<p><strong>Runtime Generation</strong>: Formatted strings generated only during output processing</p>
 </li>
 </ul>
 </div>
@@ -2574,13 +2587,13 @@ typedef struct {
 <p><strong>Timer Frequency</strong>: 100ms periodic task execution</p>
 </li>
 <li>
-<p><strong>Print Range</strong>: Process all messages from read_head to write_head</p>
+<p><strong>Entry Processing</strong>: Sequential processing of fixed-size entries from buffer</p>
 </li>
 <li>
-<p><strong>USB-Serial Output</strong>: Single consistent output stream via stdout</p>
+<p><strong>String Generation</strong>: Runtime formatting using lookup table and event parameters</p>
 </li>
 <li>
-<p><strong>Position Update</strong>: Update read_head after successful printing</p>
+<p><strong>USB-Serial Output</strong>: Formatted strings output to stdout for debugging</p>
 </li>
 </ul>
 </div>
@@ -3533,24 +3546,24 @@ void watchdog_keepalive(uint8_t core_id) {
 </div>
 </div>
 <div class="paragraph">
-<p><strong>Synchronization Pattern Benefits:</strong></p>
+<p><strong>Fixed-Size Entry Pattern Benefits:</strong></p>
 </div>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><strong>Minimal Lock Contention</strong>: Spinlock held only during pointer updates, not during message writing</p>
+<p><strong>Predictable Memory Usage</strong>: Fixed 16-byte entries enable precise buffer capacity calculation</p>
 </li>
 <li>
-<p><strong>Lock-free Writing</strong>: Once space is reserved, message writing never blocks or waits</p>
+<p><strong>Eliminated Parsing Complexity</strong>: No variable-length message boundary detection required</p>
 </li>
 <li>
-<p><strong>Single Output Stream</strong>: Core1-only printing ensures consistent USB-serial formatting</p>
+<p><strong>Atomic Operations</strong>: Single 16-byte writes are atomic on 32-bit architectures</p>
 </li>
 <li>
-<p><strong>Bounded Latency</strong>: Logging operations have deterministic worst-case timing</p>
+<p><strong>Event Loss Detection</strong>: Per-core sequence numbering enables gap detection during debugging</p>
 </li>
 <li>
-<p><strong>Overflow Resilience</strong>: Ring buffer handles overflow gracefully without blocking cores</p>
+<p><strong>Version Compatibility</strong>: Explicitly numbered event types maintain compatibility across firmware versions</p>
 </li>
 </ol>
 </div>
@@ -3559,56 +3572,102 @@ void watchdog_keepalive(uint8_t core_id) {
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Shared memory layout in SRAM Bank 4
+<pre class="prettyprint highlight"><code data-lang="c">// Fixed-size log entry structure (16 bytes total)
 typedef struct {
-    // Configuration structures (at bank start)
-    system_config_t config;
-    performance_counters_t counters;
+    uint32_t timestamp;             // System timestamp in milliseconds
+    uint16_t event_source;          // UART0-3, NETWORK, SYSTEM, etc.
+    uint16_t event_number;          // Per-core sequence counter
+    uint16_t log_level;             // DEBUG, INFO, WARN, ERROR
+    uint16_t event_type;            // Explicitly numbered event enum
+    uint32_t event_extra_value;     // Context-specific parameter
+} __attribute__((packed, aligned(4))) log_entry_t;
 
-    // Log management variables
-    volatile uint32_t write_head;    // Next write position
-    volatile uint32_t read_head;     // Core1 print position
-    volatile uint32_t buffer_size;   // Calculated at compile time
-    spinlock_t reservation_lock;     // For pointer updates only
+// Event type definitions with explicit numbering
+typedef enum {
+    // System events (0-99)
+    LOG_EVENT_SYSTEM_BOOT = 0,
+    LOG_EVENT_SYSTEM_READY = 1,
+    LOG_EVENT_WATCHDOG_RESET = 2,
 
-    // Log ring buffer (remainder of SRAM bank)
-    char log_messages[];             // Variable size, \r\n terminated strings
-} shared_memory_layout_t;
+    // UART events (100-199)
+    LOG_EVENT_UART_INIT = 100,
+    LOG_EVENT_UART_DATA_RX = 101,
+    LOG_EVENT_UART_ERROR = 102,
 
-// Lock-reserve-release-write logging function
-void log_message(uint8_t core_id, const char* message) {
-    char formatted_msg[256];
-    uint32_t timestamp = get_system_timestamp();
+    // Network events (200-299)
+    LOG_EVENT_TCP_CONNECT = 200,
+    LOG_EVENT_TCP_DISCONNECT = 201,
+    LOG_EVENT_NETWORK_ERROR = 202,
 
-    // Format message with fixed-length prefix
-    int msg_len = snprintf(formatted_msg, sizeof(formatted_msg),
-                          "[%08u][%u] %s\r\n", timestamp, core_id, message);
+    // Configuration events (300-399)
+    LOG_EVENT_CONFIG_CHANGED = 300,
+    LOG_EVENT_CONFIG_SAVED = 301,
+} log_event_type_t;
 
-    // PHASE 1: Lock-Reserve-Release (minimal lock time)
-    spin_lock(&amp;shared_mem.reservation_lock);
+// Event source definitions
+typedef enum {
+    EVENT_SOURCE_SYSTEM = 0,
+    EVENT_SOURCE_UART0 = 1,
+    EVENT_SOURCE_UART1 = 2,
+    EVENT_SOURCE_UART2 = 3,
+    EVENT_SOURCE_UART3 = 4,
+    EVENT_SOURCE_NETWORK = 5,
+    EVENT_SOURCE_CONFIG = 6,
+    EVENT_SOURCE_OTA = 7,
+    EVENT_SOURCE_WATCHDOG = 8,
+} event_source_t;
 
-    uint32_t reserved_pos = shared_mem.write_head;
-    shared_mem.write_head = (shared_mem.write_head + msg_len) % shared_mem.buffer_size;
+// String lookup table for formatted output
+static const char* const event_format_strings[] = {
+    [LOG_EVENT_SYSTEM_BOOT] = "System boot sequence initiated",
+    [LOG_EVENT_SYSTEM_READY] = "System ready for operation",
+    [LOG_EVENT_UART_INIT] = "UART channel %u initialized at %u baud",
+    [LOG_EVENT_TCP_CONNECT] = "TCP connection established on port %u",
+    [LOG_EVENT_CONFIG_CHANGED] = "Configuration parameter %u changed",
+};
 
-    spin_unlock(&amp;shared_mem.reservation_lock);
+// Event logging function
+void log_event(uint16_t event_source, uint16_t log_level,
+               uint16_t event_type, uint32_t extra_value) {
+    log_entry_t entry = {
+        .timestamp = get_system_timestamp(),
+        .event_source = event_source,
+        .event_number = get_next_event_number(),  // Per-core counter
+        .log_level = log_level,
+        .event_type = event_type,
+        .event_extra_value = extra_value
+    };
 
-    // PHASE 2: Lock-free Write (space guaranteed)
-    memcpy(&amp;shared_mem.log_messages[reserved_pos], formatted_msg, msg_len);
+    // Atomic 16-byte write to circular buffer
+    write_log_entry(&amp;entry);
 }
 
-// Core1 background printer task (100ms periodic)
-void core1_log_printer_task(void) {
-    while (shared_mem.read_head != shared_mem.write_head) {
-        // Find next message (null-terminated or \r\n terminated)
-        char* msg_ptr = &amp;shared_mem.log_messages[shared_mem.read_head];
-        int msg_len = strlen(msg_ptr) + 1; // Include terminator
+// Core1 background formatter task (100ms periodic)
+void core1_log_formatter_task(void) {
+    log_entry_t entry;
+    while (read_log_entry(&amp;entry)) {
+        // Get format string for event type
+        const char* format = event_format_strings[entry.event_type];
+        if (format) {
+            // Generate formatted output
+            char formatted_msg[256];
+            snprintf(formatted_msg, sizeof(formatted_msg),
+                    "[%08u][%u][%u] %s",
+                    entry.timestamp,
+                    entry.event_source,
+                    entry.event_number,
+                    format);
 
-        // Output to USB-serial stdout
-        printf("%s", msg_ptr);
-        fflush(stdout);
-
-        // Advance read head
-        shared_mem.read_head = (shared_mem.read_head + msg_len) % shared_mem.buffer_size;
+            // Apply parameter if format uses %u
+            if (strstr(format, "%u")) {
+                char final_msg[256];
+                snprintf(final_msg, sizeof(final_msg), formatted_msg, entry.event_extra_value);
+                printf("%s\n", final_msg);
+            } else {
+                printf("%s\n", formatted_msg);
+            }
+            fflush(stdout);
+        }
     }
 }</code></pre>
 </div>
