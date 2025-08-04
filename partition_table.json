@@ -1,0 +1,48 @@
+{
+  "version": [1, 0],
+  "unpartitioned": {
+    "families": ["absolute"],
+    "permissions": {
+      "secure": "rw",
+      "nonsecure": "rw", 
+      "bootloader": "rw"
+    }
+  },
+  "partitions": [
+    {
+      "name": "Firmware A",
+      "id": 0,
+      "size": "1792K",
+      "families": ["rp2350-arm-s"],
+      "permissions": {
+        "secure": "rw",
+        "nonsecure": "rw",
+        "bootloader": "rw"
+      }
+    },
+    {
+      "name": "Firmware B", 
+      "id": 1,
+      "size": "1792K",
+      "families": ["rp2350-arm-s"],
+      "permissions": {
+        "secure": "rw",
+        "nonsecure": "rw",
+        "bootloader": "rw"
+      }
+    },
+    {
+      "name": "Configuration Data",
+      "id": 2,
+      "size": "512K",
+      "families": ["data"],
+      "permissions": {
+        "secure": "rw",
+        "nonsecure": "rw",
+        "bootloader": "rw"
+      },
+      "link": ["owner", 0],
+      "ignored_during_arm_boot": true
+    }
+  ]
+}

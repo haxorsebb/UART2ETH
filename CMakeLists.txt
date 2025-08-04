@@ -59,5 +59,11 @@ target_link_libraries(uart2eth
 pico_enable_stdio_usb(uart2eth 1)
 pico_enable_stdio_uart(uart2eth 1)
 
+# Set UF2 family for RP2350
+pico_set_uf2_family(uart2eth "rp2350-arm-s")
+
+# Embed partition table for flash isolation
+pico_embed_pt_in_binary(uart2eth "${CMAKE_CURRENT_SOURCE_DIR}/partition_table.json")
+
 # Create UF2 output
 pico_add_extra_outputs(uart2eth)
