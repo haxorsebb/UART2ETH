@@ -993,3 +993,229 @@ The HiL testing framework ensures comprehensive validation of the UART2ETH syste
 |Power-on to operational state
 |Ready for data processing
 |===
+
+=== OTA Firmware Update Process
+
+This scenario shows the secure firmware update process with A/B partition management and automatic rollback capability.
+
+[plantuml, ota-update-process, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+
+title OTA Firmware Update Process with A/B Partitions
+
+participant "Management UI" as UI
+participant "OTA Manager" as OTA
+participant "HTTP Client" as HTTP
+participant "Firmware Server" as FW_SRV
+participant "Flash Manager" as FLASH
+participant "Crypto Validator" as CRYPTO
+participant "Global State Machine" as GSM
+participant "Watchdog System" as WD
+participant "ROM Bootloader" as ROM
+
+UI -> OTA: trigger_firmware_update()
+activate OTA
+OTA -> GSM: request_update_mode()
+activate GSM
+GSM -> GSM: Set State = UPDATE_MODE
+GSM -> OTA: Update Mode Approved
+deactivate GSM
+
+OTA -> HTTP: check_firmware_server()
+activate HTTP
+HTTP -> FW_SRV: GET /firmware/latest
+activate FW_SRV
+FW_SRV --> HTTP: Firmware Metadata + URL
+deactivate FW_SRV
+HTTP --> OTA: Update Available
+
+OTA -> FLASH: get_inactive_partition()
+activate FLASH
+FLASH -> FLASH: Determine Inactive Partition
+FLASH --> OTA: Partition B Available
+
+OTA -> HTTP: download_firmware()
+HTTP -> FW_SRV: GET /firmware/uart2eth-v2.0.bin
+activate FW_SRV
+FW_SRV --> HTTP: Firmware Binary Stream
+deactivate FW_SRV
+
+loop Download Progress
+    HTTP -> FLASH: write_chunk_to_partition_b()
+    FLASH -> FLASH: Write to Flash Memory
+    HTTP -> UI: update_progress()
+end
+
+HTTP --> OTA: Download Complete
+deactivate HTTP
+
+OTA -> CRYPTO: verify_firmware_signature()
+activate CRYPTO
+CRYPTO -> CRYPTO: Extract Embedded Signature
+CRYPTO -> CRYPTO: Validate Against Public Key
+CRYPTO -> CRYPTO: Compute SHA-256 Hash
+CRYPTO --> OTA: Signature Valid
+
+alt Signature Valid
+    OTA -> FLASH: mark_partition_b_active()
+    FLASH -> FLASH: Update Partition Table
+    FLASH -> FLASH: Set Boot Flags
+    FLASH --> OTA: Partition Switch Configured
+    
+    OTA -> UI: firmware_ready_reboot_required()
+    UI -> UI: Display "Reboot Required"
+    
+    note over UI: Manual reboot initiated by user
+    UI -> GSM: system_reboot()
+    GSM -> ROM: Trigger Hardware Reset
+    activate ROM
+    ROM -> ROM: Read Partition Table
+    ROM -> ROM: Boot from Partition B
+    ROM -> GSM: Start New Firmware
+    activate GSM
+    GSM -> WD: start_confirmation_timer()
+    activate WD
+    
+    alt Firmware Starts Successfully
+        GSM -> GSM: Complete Initialization
+        GSM -> WD: disable_watchdog_confirmation()
+        WD -> FLASH: mark_partition_confirmed()
+        FLASH -> FLASH: Set Partition as Stable
+        deactivate WD
+        note over GSM: Update successful\nPartition B now primary
+    else Firmware Fails to Start
+        WD -> WD: Confirmation Timer Expires
+        WD -> ROM: trigger_rollback()
+        ROM -> FLASH: switch_to_partition_a()
+        FLASH -> FLASH: Restore Previous Boot Config
+        ROM -> ROM: Boot from Partition A
+        note over ROM: Automatic rollback\nSystem recovers to previous version
+    end
+    
+    deactivate ROM
+    deactivate GSM
+else Signature Invalid
+    CRYPTO --> OTA: Signature Verification Failed
+    OTA -> FLASH: erase_partition_b()
+    FLASH -> FLASH: Clear Invalid Firmware
+    OTA -> UI: update_failed_invalid_signature()
+    note over OTA: Security preserved\nInvalid firmware rejected
+end
+
+deactivate CRYPTO
+deactivate FLASH
+deactivate OTA
+
+note over UI, ROM: Zero-downtime updates with automatic rollback\nCryptographic security throughout process
+@enduml
+----
+
+
+=== Management Interface Configuration Scenario
+
+This scenario shows how system configuration changes are applied through the web-based management interface with proper validation and persistence.
+
+[plantuml, management-configuration, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+
+title Management Interface Configuration Scenario
+
+participant "Field Technician" as TECH
+participant "Web Browser" as BROWSER
+participant "HTTP Server" as HTTP
+participant "Authentication" as AUTH
+participant "Config Validator" as VALIDATOR
+participant "Configuration Manager" as CFG
+participant "Core 0 UART" as C0
+participant "Core 1 Network" as C1
+participant "Flash Storage" as FLASH
+
+TECH -> BROWSER: Access Device Web UI
+BROWSER -> HTTP: GET http://192.168.1.100
+activate HTTP
+HTTP -> AUTH: check_session()
+activate AUTH
+
+alt No Valid Session
+    AUTH --> HTTP: Authentication Required
+    HTTP --> BROWSER: Login Page
+    BROWSER -> HTTP: POST /login (credentials)
+    HTTP -> AUTH: validate_credentials()
+    AUTH -> AUTH: Check Username/Password
+    AUTH --> HTTP: Session Token
+    HTTP --> BROWSER: Set-Cookie Session
+else Valid Session
+    AUTH --> HTTP: Authorized
+end
+
+HTTP --> BROWSER: Main Configuration Page
+deactivate AUTH
+
+TECH -> BROWSER: Modify UART Settings
+note over TECH: Change UART1: 9600→115200 baud\nChange Port mapping: 4002→4012
+
+BROWSER -> HTTP: POST /api/uart/config
+activate HTTP
+HTTP -> VALIDATOR: validate_uart_config()
+activate VALIDATOR
+VALIDATOR -> VALIDATOR: Check Baud Rate Range
+VALIDATOR -> VALIDATOR: Validate Port Assignment
+VALIDATOR -> VALIDATOR: Check for Conflicts
+
+alt Configuration Valid
+    VALIDATOR --> HTTP: Validation Passed
+    HTTP -> CFG: apply_uart_configuration()
+    activate CFG
+    CFG -> CFG: Prepare Configuration Change
+    CFG -> C0: configure_uart_channel_1()
+    activate C0
+    C0 -> C0: Stop Current UART1 Operations
+    C0 -> C0: Reconfigure Hardware Registers
+    C0 -> C0: Update Baud Rate to 115200
+    C0 -> C0: Restart UART1 Operations
+    C0 --> CFG: UART1 Reconfigured
+    deactivate C0
+    
+    CFG -> C1: update_port_mapping()
+    activate C1
+    C1 -> C1: Close Socket on Port 4002
+    C1 -> C1: Open Socket on Port 4012
+    C1 -> C1: Update Routing Table
+    C1 --> CFG: Port Mapping Updated
+    deactivate C1
+    
+    CFG -> FLASH: persist_configuration()
+    activate FLASH
+    FLASH -> FLASH: Write to Flash Memory
+    FLASH -> FLASH: Verify Write Success
+    FLASH --> CFG: Configuration Persisted
+    deactivate FLASH
+    
+    CFG --> HTTP: Configuration Applied
+    deactivate CFG
+    HTTP --> BROWSER: Success Response
+else Configuration Invalid
+    VALIDATOR --> HTTP: Validation Failed
+    HTTP --> BROWSER: Error Response (Conflicts)
+    note over BROWSER: Display validation errors\nNo changes applied
+end
+
+deactivate VALIDATOR
+deactivate HTTP
+
+TECH -> BROWSER: Verify Configuration
+BROWSER -> HTTP: GET /api/system/status
+HTTP -> CFG: get_current_configuration()
+CFG --> HTTP: Current Settings
+HTTP --> BROWSER: Status JSON
+BROWSER -> BROWSER: Display Updated Configuration
+
+note over TECH, FLASH: Configuration changes applied atomically\nPersisted for power-cycle recovery\nValidation prevents invalid states
+@enduml
+----
