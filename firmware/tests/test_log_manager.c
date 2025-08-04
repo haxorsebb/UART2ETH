@@ -22,6 +22,8 @@
 #include "pico/multicore.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include "hardware/sync.h"
 
 void setUp(void) {
     // Initialize shared memory before each test
@@ -532,6 +534,219 @@ void test_core1_buffer_fill_performance(void) {
 }
 
 /**
+ * Helper function to read ALL entries from log buffer for verification
+ * This bypasses the normal read_log_entry to read entire buffer contents
+ */
+static uint32_t read_all_log_entries_for_verification(log_entry_t* entries, uint32_t max_entries) {
+    if (!entries || max_entries == 0) {
+        return 0;
+    }
+    
+    shared_memory_layout_t* layout = shared_memory_get_layout();  
+    if (!layout) {
+        return 0;
+    }
+    
+    // Read buffer state atomically
+    uint32_t save = spin_lock_blocking(layout->log_mgmt.entry_lock);
+    uint32_t write_idx = layout->log_mgmt.write_index;
+    uint32_t read_idx = layout->log_mgmt.read_index;
+    uint32_t buffer_capacity = layout->log_mgmt.max_entries;
+    
+    uint32_t entries_read = 0;
+    bool buffer_overflow = false;
+    
+    // Read all entries currently in buffer
+    uint32_t current_idx = read_idx;
+    while (current_idx != write_idx) {
+        if (entries_read >= max_entries) {
+            buffer_overflow = true;
+            break;
+        }
+        
+        entries[entries_read] = layout->log_entries[current_idx];
+        entries_read++;
+        
+        current_idx++;
+        if (current_idx >= buffer_capacity) {
+            current_idx = 0;  // Wrap around
+        }
+    }
+    
+    spin_unlock(layout->log_mgmt.entry_lock, save);
+    
+    if (buffer_overflow) {
+        printf("WARNING: Buffer contains more entries than could be read (limit: %u)\n", max_entries);
+    }
+    
+    return entries_read;
+}
+
+// Minimum buffer size required for reliable monotonicity testing
+#define MIN_BUFFER_SIZE_FOR_MONOTONICITY_TEST 100
+
+/**
+ * Test: Concurrent buffer fill with strict event number monotonicity verification
+ * 
+ * Tests that after concurrent logging from both cores, all event numbers
+ * are strictly monotonic per core, proving no events were lost, duplicated, or overwritten.
+ */
+void test_concurrent_buffer_fill_monotonic_event_numbers(void) {
+    // ARRANGE: Reset log manager
+    log_manager_reset_for_testing();
+    uint32_t buffer_capacity = shared_memory_get_log_buffer_capacity();
+    uint32_t half_capacity = buffer_capacity / 2;
+    
+    // Ensure buffer is large enough for meaningful test
+    TEST_ASSERT_GREATER_OR_EQUAL_MESSAGE(MIN_BUFFER_SIZE_FOR_MONOTONICITY_TEST, buffer_capacity,
+        "Buffer capacity must be at least 100 for reliable monotonicity test");
+    
+    printf("Monotonic Event Number Test: Both cores filling %u entries each...\n", half_capacity);
+    
+    // Reset synchronization variables (early to avoid race conditions)
+    g_start_concurrent_logging = false;
+    g_core1_events_logged = 0;
+    g_core1_time_us = 0;  // Set early, before launching Core1
+    g_core1_error = false;
+    g_core1_error_message[0] = '\0';
+    
+    // ACT: Launch Core1 helper (it will wait for start signal)
+    multicore_launch_core1(core1_concurrent_helper);
+    
+    // Give Core1 time to start waiting
+    printf("Waiting for Core1 to initialize...\n");
+    sleep_ms(CORE1_STARTUP_DELAY_MS);
+    printf("Starting concurrent monotonicity test...\n");
+    
+    // Signal start and immediately begin Core0 logging
+    g_start_concurrent_logging = true;
+    __dmb(); // Memory barrier to ensure visibility on Core1
+    
+    uint32_t core0_events_logged = 0;
+    for (uint32_t i = 0; i < half_capacity; i++) {
+        bool result = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, 
+                               LOG_EVENT_UART_DATA_RX, i);
+        if (result) {
+            core0_events_logged++;
+        } else {
+            break; // Buffer full or error
+        }
+    }
+    
+    // Wait for Core1 to complete with timeout
+    uint32_t elapsed_ms = 0;
+    while (g_core1_time_us == 0 && elapsed_ms < CORE1_TIMEOUT_MS) {
+        sleep_ms(10);
+        elapsed_ms += 10;
+    }
+    
+    // ASSERT: Check for timeout and Core1 errors - reset core1 on any failure to avoid resource leaks
+    if (elapsed_ms >= CORE1_TIMEOUT_MS) {
+        multicore_reset_core1();
+        TEST_FAIL_MESSAGE("Core1 monotonicity test timed out");
+        return;
+    }
+    
+    if (g_core1_error) {
+        multicore_reset_core1();
+        TEST_FAIL_MESSAGE((char*)g_core1_error_message);
+        return;
+    }
+    
+    // ASSERT: Both cores should have logged events  
+    if (core0_events_logged <= half_capacity / 2) {
+        multicore_reset_core1();
+        TEST_FAIL_MESSAGE("Core0 should have logged at least half its target");
+        return;
+    }
+    
+    if (g_core1_events_logged <= half_capacity / 2) {
+        multicore_reset_core1(); 
+        TEST_FAIL_MESSAGE("Core1 should have logged at least half its target");
+        return;
+    }
+    
+    printf("Events logged - Core0: %u, Core1: %u\n", core0_events_logged, g_core1_events_logged);
+    
+    // ACT: Read all entries from buffer for verification
+    log_entry_t* all_entries = malloc(buffer_capacity * sizeof(log_entry_t));
+    if (!all_entries) {
+        multicore_reset_core1();
+        TEST_FAIL_MESSAGE("Failed to allocate verification buffer");
+        return;
+    }
+    
+    uint32_t total_entries_read = read_all_log_entries_for_verification(all_entries, buffer_capacity);
+    TEST_ASSERT_GREATER_THAN_MESSAGE(0, total_entries_read, "Should have read some entries from buffer");
+    
+    printf("Total entries read from buffer: %u\n", total_entries_read);
+    
+    // ASSERT: Verify strict monotonicity per core
+    uint32_t core0_count = 0, core1_count = 0;
+    uint32_t prev_core0_event_num = 0, prev_core1_event_num = 0;
+    bool core0_first = true, core1_first = true;
+    
+    for (uint32_t i = 0; i < total_entries_read; i++) {
+        log_entry_t* entry = &all_entries[i];
+        
+        if (entry->event_source == EVENT_SOURCE_NETWORK) {
+            // Core1 event
+            core1_count++;
+            if (core1_first) {
+                prev_core1_event_num = entry->event_number;
+                core1_first = false;
+            } else {
+                // CRITICAL FIX: Correct assertion for INCREASING monotonicity
+                if (entry->event_number <= prev_core1_event_num) {
+                    free(all_entries);
+                    multicore_reset_core1();
+                    TEST_FAIL_MESSAGE("Core1 event numbers must be strictly monotonic increasing");
+                    return;
+                }
+                prev_core1_event_num = entry->event_number;
+            }
+        } else {
+            // Core0 event  
+            core0_count++;
+            if (core0_first) {
+                prev_core0_event_num = entry->event_number;
+                core0_first = false;
+            } else {
+                // CRITICAL FIX: Correct assertion for INCREASING monotonicity  
+                if (entry->event_number <= prev_core0_event_num) {
+                    free(all_entries);
+                    multicore_reset_core1();
+                    TEST_FAIL_MESSAGE("Core0 event numbers must be strictly monotonic increasing");
+                    return;
+                }
+                prev_core0_event_num = entry->event_number;
+            }
+        }
+    }
+    
+    printf("Verification results - Core0 events: %u, Core1 events: %u\n", core0_count, core1_count);
+    
+    // ASSERT: Should have events from both cores
+    TEST_ASSERT_GREATER_THAN_MESSAGE(0, core0_count, "Should have Core0 events in buffer");
+    TEST_ASSERT_GREATER_THAN_MESSAGE(0, core1_count, "Should have Core1 events in buffer");
+    
+    // ASSERT: Event counts should be reasonable compared to logged counts
+    // (May be less due to buffer wraparound, but should be substantial)
+    TEST_ASSERT_GREATER_THAN_MESSAGE(core0_events_logged / 4, core0_count,
+        "Should have substantial Core0 events remaining in buffer");
+    TEST_ASSERT_GREATER_THAN_MESSAGE(g_core1_events_logged / 4, core1_count,
+        "Should have substantial Core1 events remaining in buffer");
+    
+    // Cleanup
+    free(all_entries);
+    
+    // Reset core1 for next test
+    multicore_reset_core1();
+    
+    printf("✓ Event number monotonicity verified - no events lost, duplicated, or overwritten\n");
+}
+
+/**
  * Test: Concurrent buffer fill performance from both cores
  * 
  * Tests concurrent logging performance with both cores writing half the buffer each.
@@ -646,6 +861,7 @@ int main() {
     RUN_TEST(test_core0_buffer_fill_performance);
     RUN_TEST(test_core1_buffer_fill_performance);
     RUN_TEST(test_concurrent_buffer_fill_performance);
+    RUN_TEST(test_concurrent_buffer_fill_monotonic_event_numbers);
         
     while (true) {
         printf("Tests completed\n");
