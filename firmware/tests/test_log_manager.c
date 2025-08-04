@@ -697,10 +697,11 @@ void test_concurrent_buffer_fill_monotonic_event_numbers(void) {
                 core1_first = false;
             } else {
                 // CRITICAL FIX: Correct assertion for INCREASING monotonicity
-                if (entry->event_number <= prev_core1_event_num) {
-                    free(all_entries);
+                if (entry->event_number != prev_core1_event_num + 1) {
                     multicore_reset_core1();
+                    printf("prev: %d, current: %d", prev_core1_event_num,entry->event_number);
                     TEST_FAIL_MESSAGE("Core1 event numbers must be strictly monotonic increasing");
+                    free(all_entries);
                     return;
                 }
                 prev_core1_event_num = entry->event_number;
@@ -713,10 +714,11 @@ void test_concurrent_buffer_fill_monotonic_event_numbers(void) {
                 core0_first = false;
             } else {
                 // CRITICAL FIX: Correct assertion for INCREASING monotonicity  
-                if (entry->event_number <= prev_core0_event_num) {
-                    free(all_entries);
+                if (entry->event_number != prev_core0_event_num + 1 ) {
                     multicore_reset_core1();
+                    printf("prev: %d, current: %d", prev_core0_event_num,entry->event_number);
                     TEST_FAIL_MESSAGE("Core0 event numbers must be strictly monotonic increasing");
+                    free(all_entries);
                     return;
                 }
                 prev_core0_event_num = entry->event_number;
