@@ -358,6 +358,7 @@
 <li><a href="#_date">Date</a></li>
 <li><a href="#_context">Context</a></li>
 <li><a href="#_decision">Decision</a></li>
+<li><a href="#_flash_partitioning_strategy">Flash Partitioning Strategy</a></li>
 <li><a href="#_storage_format">Storage Format</a></li>
 <li><a href="#_ring_buffer_management">Ring Buffer Management</a></li>
 <li><a href="#_write_strategy">Write Strategy</a></li>
@@ -431,7 +432,26 @@
 <div class="sect2">
 <h3 id="_decision">Decision</h3>
 <div class="paragraph">
-<p>We will implement flash persistence using a <strong>4-page ring buffer strategy</strong> with the following characteristics:</p>
+<p>We will implement flash persistence using a <strong>4-page ring buffer strategy</strong> with <strong>RP2350 partition table isolation</strong> for industrial reliability:</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_flash_partitioning_strategy">Flash Partitioning Strategy</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>RP2350 Partition Table</strong>: Use native partition system for true isolation</p>
+</li>
+<li>
+<p><strong>Configuration Data Partition</strong>: Dedicated 512KB data partition (ID=2)</p>
+</li>
+<li>
+<p><strong>A/B Firmware Isolation</strong>: Firmware updates never touch configuration partition</p>
+</li>
+<li>
+<p><strong>Industrial Safety</strong>: <code>"ignored_during_arm_boot": true</code> prevents accidental erasure</p>
+</li>
+</ul>
 </div>
 </div>
 <div class="sect2">
@@ -445,7 +465,7 @@
 <p><strong>No JSON or schema validation</strong>: Eliminates parsing overhead and complexity</p>
 </li>
 <li>
-<p><strong>Complete structure per page</strong>: Atomic writes of entire configuration</p>
+<p><strong>Complete structure per snapshot</strong>: Atomic writes of entire configuration</p>
 </li>
 </ul>
 </div>
@@ -455,16 +475,19 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>4 flash pages</strong> organized as circular ring buffer</p>
+<p><strong>4 Configuration Snapshots</strong> organized as circular ring buffer within data partition</p>
 </li>
 <li>
 <p><strong>Wear leveling</strong>: Sequential writes advance through ring</p>
 </li>
 <li>
-<p><strong>Page metadata</strong>: Revision counter + SHA256 checksum per page</p>
+<p><strong>Snapshot metadata</strong>: Revision counter + SHA256 checksum per snapshot</p>
 </li>
 <li>
-<p><strong>Magic number</strong>: Page validity marker (<code>0xC0FFEEAA</code>)</p>
+<p><strong>Magic number</strong>: Snapshot validity marker (<code>0xC0FFEEAA</code>)</p>
+</li>
+<li>
+<p><strong>Partition isolation</strong>: 512KB data partition provides 128x current needs</p>
 </li>
 </ul>
 </div>
@@ -483,7 +506,7 @@
 <p><strong>Change detection</strong>: Write only when <code>revision_counter</code> increments</p>
 </li>
 <li>
-<p><strong>Atomic operations</strong>: Complete page written or nothing</p>
+<p><strong>Atomic operations</strong>: Complete snapshot written or nothing</p>
 </li>
 </ul>
 </div>
@@ -493,13 +516,13 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Startup validation</strong>: Read all 4 pages, verify checksums</p>
+<p><strong>Startup validation</strong>: Read all 4 snapshots, verify checksums</p>
 </li>
 <li>
-<p><strong>Page selection</strong>: Use page with highest revision + valid checksum</p>
+<p><strong>Snapshot selection</strong>: Use snapshot with highest revision + valid checksum</p>
 </li>
 <li>
-<p><strong>Corruption handling</strong>: Skip invalid pages, fallback to factory defaults</p>
+<p><strong>Corruption handling</strong>: Skip invalid snapshots, fallback to factory defaults</p>
 </li>
 <li>
 <p><strong>Error logging</strong>: Track corruption events for diagnostics</p>
@@ -569,13 +592,16 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Flash usage</strong>: 4 pages (16KB) reserved for configuration ring buffer</p>
+<p><strong>Flash usage</strong>: 512KB data partition (32x current needs) for configuration ring buffer</p>
 </li>
 <li>
 <p><strong>Write frequency</strong>: Limited to 30-second intervals (acceptable for config changes)</p>
 </li>
 <li>
-<p><strong>Recovery time</strong>: Startup requires reading/validating 4 pages (minimal impact)</p>
+<p><strong>Recovery time</strong>: Startup requires reading/validating 4 snapshots (minimal impact)</p>
+</li>
+<li>
+<p><strong>Partition complexity</strong>: Requires RP2350 partition table support in build system</p>
 </li>
 </ul>
 </div>
@@ -589,19 +615,28 @@
 <div class="ulist">
 <ul>
 <li>
-<p>Reliable configuration persistence with power-loss safety</p>
+<p><strong>Partition Isolation</strong>: Configuration data completely isolated from firmware updates</p>
 </li>
 <li>
-<p>Automatic wear leveling extends flash lifetime</p>
+<p><strong>A/B Update Safety</strong>: Software updates never risk configuration data corruption</p>
 </li>
 <li>
-<p>Simple implementation reduces bugs and maintenance</p>
+<p><strong>Industrial Reliability</strong>: RP2350 partition table provides true isolation guarantees</p>
 </li>
 <li>
-<p>Fast startup with minimal validation overhead</p>
+<p><strong>Future Growth</strong>: 512KB partition allows 32x expansion for new features</p>
 </li>
 <li>
-<p>Integrity verification provides corruption detection</p>
+<p><strong>Automatic wear leveling</strong>: Ring buffer distributes writes across larger space</p>
+</li>
+<li>
+<p><strong>Simple implementation</strong>: Raw binary storage reduces bugs and maintenance</p>
+</li>
+<li>
+<p><strong>Fast startup</strong>: Minimal validation overhead with integrity verification</p>
+</li>
+<li>
+<p><strong>Power-loss safety</strong>: Atomic snapshot writes prevent partial corruption</p>
 </li>
 </ul>
 </div>
@@ -611,13 +646,16 @@
 <div class="ulist">
 <ul>
 <li>
-<p>Fixed 16KB flash reservation (4 × 4KB pages)</p>
+<p><strong>Flash usage</strong>: 512KB data partition reservation (generous allocation)</p>
 </li>
 <li>
-<p>Write frequency limitation may delay immediate persistence</p>
+<p><strong>Write frequency</strong>: Limited to 30-second intervals (acceptable for config changes)</p>
 </li>
 <li>
-<p>No incremental updates (entire structure written each time)</p>
+<p><strong>Build complexity</strong>: Requires partition table embedding in build system</p>
+</li>
+<li>
+<p><strong>No incremental updates</strong>: Entire structure written each time</p>
 </li>
 </ul>
 </div>
@@ -627,7 +665,7 @@
 <div class="ulist">
 <ul>
 <li>
-<p>Flash operations abstraction layer for RP2350</p>
+<p>Flash operations abstraction layer for RP2350 with partition awareness</p>
 </li>
 <li>
 <p>SHA256 hash implementation for integrity verification</p>
@@ -637,6 +675,9 @@
 </li>
 <li>
 <p>Factory reset capability for complete corruption recovery</p>
+</li>
+<li>
+<p>Configuration Snapshot format definition and serialization functions</p>
 </li>
 </ul>
 </div>
