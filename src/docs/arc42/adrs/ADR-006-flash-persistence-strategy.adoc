@@ -20,7 +20,13 @@ Key requirements:
 
 == Decision
 
-We will implement flash persistence using a **4-page ring buffer strategy** with the following characteristics:
+We will implement flash persistence using a **4-page ring buffer strategy** with **RP2350 partition table isolation** for industrial reliability:
+
+### Flash Partitioning Strategy
+* **RP2350 Partition Table**: Use native partition system for true isolation
+* **Configuration Data Partition**: Dedicated 512KB data partition (ID=2)
+* **A/B Firmware Isolation**: Firmware updates never touch configuration partition
+* **Industrial Safety**: `"ignored_during_arm_boot": true` prevents accidental erasure
 
 ### Storage Format
 * **Raw binary storage**: Direct copy of `g_shared_memory` structure to flash
@@ -28,10 +34,11 @@ We will implement flash persistence using a **4-page ring buffer strategy** with
 * **Complete structure per page**: Atomic writes of entire configuration
 
 ### Ring Buffer Management
-* **4 flash pages** organized as circular ring buffer
+* **4 flash pages** organized as circular ring buffer within data partition
 * **Wear leveling**: Sequential writes advance through ring
 * **Page metadata**: Revision counter + SHA256 checksum per page
 * **Magic number**: Page validity marker (`0xC0FFEEAA`)
+* **Partition isolation**: 512KB data partition provides 128x current needs
 
 ### Write Strategy
 * **Deferred write-back**: Integrated into Core1 main loop
@@ -78,23 +85,28 @@ We will implement flash persistence using a **4-page ring buffer strategy** with
 * RP2350 internal flash sufficient for configuration data
 
 ### Trade-offs
-* **Flash usage**: 4 pages (16KB) reserved for configuration ring buffer
+* **Flash usage**: 512KB data partition (32x current needs) for configuration ring buffer
 * **Write frequency**: Limited to 30-second intervals (acceptable for config changes)
 * **Recovery time**: Startup requires reading/validating 4 pages (minimal impact)
+* **Partition complexity**: Requires RP2350 partition table support in build system
 
 == Consequences
 
 ### Positive
-* Reliable configuration persistence with power-loss safety
-* Automatic wear leveling extends flash lifetime
-* Simple implementation reduces bugs and maintenance
-* Fast startup with minimal validation overhead
-* Integrity verification provides corruption detection
+* **Partition Isolation**: Configuration data completely isolated from firmware updates
+* **A/B Update Safety**: Software updates never risk configuration data corruption
+* **Industrial Reliability**: RP2350 partition table provides true isolation guarantees
+* **Future Growth**: 512KB partition allows 32x expansion for new features
+* **Automatic wear leveling**: Ring buffer distributes writes across larger space
+* **Simple implementation**: Raw binary storage reduces bugs and maintenance
+* **Fast startup**: Minimal validation overhead with integrity verification
+* **Power-loss safety**: Atomic page writes prevent partial corruption
 
 ### Negative
-* Fixed 16KB flash reservation (4 × 4KB pages)
-* Write frequency limitation may delay immediate persistence
-* No incremental updates (entire structure written each time)
+* **Flash usage**: 512KB data partition reservation (generous allocation)
+* **Write frequency**: Limited to 30-second intervals (acceptable for config changes)
+* **Build complexity**: Requires partition table embedding in build system
+* **No incremental updates**: Entire structure written each time
 
 ### Implementation Requirements
 * Flash operations abstraction layer for RP2350

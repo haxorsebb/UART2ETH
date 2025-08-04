@@ -98,11 +98,13 @@ typedef struct {
     log_entry_t log_entries[1];       // Flexible array member placeholder
 } __attribute__((aligned(4))) shared_memory_layout_t;
 
-// Flash persistence constants
+// Flash persistence constants - RP2350 Partition Table Approach
 #define FLASH_PERSISTENCE_RING_SIZE 4                    // 4 pages in ring buffer
 #define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
 #define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
 #define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
+#define FLASH_PERSISTENCE_PARTITION_ID 2                 // Configuration Data partition ID
+#define FLASH_PERSISTENCE_PARTITION_SIZE (512 * 1024)   // 512KB partition size
 
 // Flash page structure for ring buffer persistence
 typedef struct {
