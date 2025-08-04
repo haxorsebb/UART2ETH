@@ -241,6 +241,14 @@ The following technical debts have been identified and require future resolution
 **Effort:** High (hardware redesign) +
 **Resolution Plan:** Document limitation clearly, investigate external UART expansion options
 
+==== TD-004: Shared Memory Configuration/Logging
+
+**Description:** Config manager and log manager use shared SRAM bank with spinlock synchronization, creating potential single point of failure and lock contention +
+**Impact:** Spinlock contention could impact real-time performance; memory corruption could affect both cores +
+**Priority:** Medium +
+**Effort:** Medium (2-3 weeks) +
+**Resolution Plan:** Monitor spinlock contention in performance testing; consider lock-free alternatives if contention becomes problematic
+
 === Risk Mitigation Plan
 
 ==== Immediate Actions (Next 30 Days)

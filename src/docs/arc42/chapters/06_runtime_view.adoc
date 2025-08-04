@@ -627,6 +627,152 @@ end
 #define BUFFER_TIMEOUT_MS  30000 // 30 seconds
 ```
 
+=== Log Manager Synchronization Pattern
+
+The Log Manager implements a lock-reserve-release-write pattern that ensures thread safety while minimizing lock contention between cores, with Core1 handling all output operations via periodic background tasks.
+
+[plantuml, log-synchronization-pattern, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+
+title Log Manager - Lock-Reserve-Release-Write Synchronization
+
+participant "Core 0\nUART Logging" as C0
+participant "Core 1\nNetwork Logging" as C1
+participant "Shared Spinlock\nSRAM Bank" as LOCK
+participant "Log Ring Buffer\nSRAM Bank" as BUFFER
+participant "Core1 Background\nPrinter Task" as PRINTER
+participant "USB-Serial\nStdout" as USB
+
+== Concurrent Logging from Both Cores ==
+
+par Core 0 Log Operation
+    C0 -> C0 : Format log message:\n[12345678][0] UART0 initialized\r\n
+    note left of C0 : Calculate message length\n(32 bytes including \r\n)
+    
+    C0 -> LOCK : Acquire spinlock\n(write_head protection)
+    activate LOCK
+    
+    C0 -> BUFFER : Reserve space:\n- Check available space\n- Update write_head pointer\n- Reserve 32 bytes
+    activate BUFFER
+    
+    C0 -> LOCK : Release spinlock\n(reservation complete)
+    deactivate LOCK
+    
+    note left of C0 : Lock-free write phase\nSpace guaranteed available
+    
+    C0 -> BUFFER : Write message to reserved space:\n[12345678][0] UART0 initialized\r\n
+    
+else Core 1 Log Operation
+    C1 -> C1 : Format log message:\n[12345679][1] TCP connection accepted\r\n
+    note left of C1 : Calculate message length\n(35 bytes including \r\n)
+    
+    C1 -> LOCK : Acquire spinlock\n(wait if Core 0 holds lock)
+    
+    C1 -> BUFFER : Reserve space:\n- Check available space\n- Update write_head pointer\n- Reserve 35 bytes
+    
+    C1 -> LOCK : Release spinlock\n(reservation complete)
+    
+    note left of C1 : Lock-free write phase\nSpace guaranteed available
+    
+    C1 -> BUFFER : Write message to reserved space:\n[12345679][1] TCP connection accepted\r\n
+end
+
+== Core1 Background Output Processing ==
+
+note left of PRINTER : Periodic 100ms timer task\nCore1 background processing
+
+PRINTER -> PRINTER : Check for pending messages:\nread_head vs write_head
+
+alt Messages Available
+    loop Print All Pending Messages
+        PRINTER -> BUFFER : Read message from read_head position
+        BUFFER -> PRINTER : Return formatted message:\n[12345678][0] UART0 initialized\r\n
+        
+        PRINTER -> USB : Output to USB-serial stdout:\n[12345678][0] UART0 initialized\r\n
+        activate USB
+        
+        PRINTER -> PRINTER : Advance read_head pointer\nto next message
+        
+        note left of PRINTER : Continue until\nread_head == write_head
+    end
+    
+    PRINTER -> PRINTER : Update read_head position\n(all messages printed)
+    
+else No Messages Available
+    note left of PRINTER : read_head == write_head\nNo action required
+end
+
+@enduml
+----
+
+**Synchronization Pattern Benefits:**
+
+1. **Minimal Lock Contention**: Spinlock held only during pointer updates, not during message writing
+2. **Lock-free Writing**: Once space is reserved, message writing never blocks or waits
+3. **Single Output Stream**: Core1-only printing ensures consistent USB-serial formatting
+4. **Bounded Latency**: Logging operations have deterministic worst-case timing
+5. **Overflow Resilience**: Ring buffer handles overflow gracefully without blocking cores
+
+**Implementation Details:**
+
+```c
+// Shared memory layout in SRAM Bank 4
+typedef struct {
+    // Configuration structures (at bank start)
+    system_config_t config;
+    performance_counters_t counters;
+    
+    // Log management variables
+    volatile uint32_t write_head;    // Next write position
+    volatile uint32_t read_head;     // Core1 print position  
+    volatile uint32_t buffer_size;   // Calculated at compile time
+    spinlock_t reservation_lock;     // For pointer updates only
+    
+    // Log ring buffer (remainder of SRAM bank)
+    char log_messages[];             // Variable size, \r\n terminated strings
+} shared_memory_layout_t;
+
+// Lock-reserve-release-write logging function
+void log_message(uint8_t core_id, const char* message) {
+    char formatted_msg[256];
+    uint32_t timestamp = get_system_timestamp();
+    
+    // Format message with fixed-length prefix
+    int msg_len = snprintf(formatted_msg, sizeof(formatted_msg), 
+                          "[%08u][%u] %s\r\n", timestamp, core_id, message);
+    
+    // PHASE 1: Lock-Reserve-Release (minimal lock time)
+    spin_lock(&shared_mem.reservation_lock);
+    
+    uint32_t reserved_pos = shared_mem.write_head;
+    shared_mem.write_head = (shared_mem.write_head + msg_len) % shared_mem.buffer_size;
+    
+    spin_unlock(&shared_mem.reservation_lock);
+    
+    // PHASE 2: Lock-free Write (space guaranteed)
+    memcpy(&shared_mem.log_messages[reserved_pos], formatted_msg, msg_len);
+}
+
+// Core1 background printer task (100ms periodic)
+void core1_log_printer_task(void) {
+    while (shared_mem.read_head != shared_mem.write_head) {
+        // Find next message (null-terminated or \r\n terminated)
+        char* msg_ptr = &shared_mem.log_messages[shared_mem.read_head];
+        int msg_len = strlen(msg_ptr) + 1; // Include terminator
+        
+        // Output to USB-serial stdout
+        printf("%s", msg_ptr);
+        fflush(stdout);
+        
+        // Advance read head
+        shared_mem.read_head = (shared_mem.read_head + msg_len) % shared_mem.buffer_size;
+    }
+}
+```
+
 === Hardware-in-the-Loop Testing Scenario
 
 The hardware-in-the-loop (HiL) testing framework enables automated validation of system behavior using real RP2350 hardware with comprehensive data collection from multiple sources.
