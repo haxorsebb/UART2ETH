@@ -6769,6 +6769,10 @@ Output packets:
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>Cross-platform, open-source build system generator that creates native build files (Makefiles, Visual Studio projects, Xcode projects) from platform-independent configuration files. CMake manages complex build dependencies, compiler flags, and linking requirements across different operating systems and compilers, simplifying the build process for C/C++ projects and enabling consistent builds across development teams.</em></p></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Configuration Snapshot</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Complete copy of the system&#8217;s configuration data stored as a single atomic unit in flash memory for persistence. Each Configuration Snapshot contains the entire shared_memory structure plus metadata (revision counter, SHA256 checksum, magic number) and padding to align with flash sector boundaries (4KB). The flash persistence system maintains a 4-snapshot ring buffer within the dedicated Configuration Data partition, providing wear leveling and power-loss safety through atomic write operations. This term replaces the ambiguous "page" terminology to clearly distinguish between hardware flash sectors and logical configuration storage units.</em></p></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>ENC28J60</em></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><em>Low-cost Ethernet controller chip from Microchip Technology that provides 10Base-T Ethernet connectivity via SPI interface. This single-chip solution includes MAC (Media Access Control) and PHY (Physical Layer) functions, making it popular for adding basic Ethernet capabilities to microcontroller projects. It requires external TCP/IP stack implementation and offers a cost-effective alternative to more integrated solutions.</em></p></td>
 </tr>
