@@ -40,26 +40,25 @@ void test_shared_memory_initialization(void) {
 }
 
 /**
- * Test: Log buffer size calculation should be correct
+ * Test: Log buffer capacity calculation should be correct
  * 
- * Tests that the log buffer size is calculated correctly as:
- * Buffer Size = SRAM Bank Size - (config + counters + log_mgmt + overhead)
+ * Tests that the log buffer capacity (number of entries) is calculated correctly.
  */
 void test_log_buffer_size_calculation(void) {
     // ARRANGE: Initialize shared memory first
     bool init_result = shared_memory_init();
     TEST_ASSERT_TRUE(init_result);
     
-    // ACT: Get calculated buffer size
-    uint32_t buffer_size = shared_memory_get_log_buffer_size();
+    // ACT: Get calculated buffer capacity (number of entries)
+    uint32_t buffer_capacity = shared_memory_get_log_buffer_capacity();
     
-    // ASSERT: Buffer size should be reasonable (at least 32KB available for logs)
-    TEST_ASSERT_GREATER_THAN_MESSAGE(32 * 1024, buffer_size, 
-        "Log buffer should have at least 32KB available");
+    // ASSERT: Buffer capacity should be reasonable (at least 100 entries)
+    TEST_ASSERT_GREATER_THAN_MESSAGE(100, buffer_capacity, 
+        "Log buffer should have at least 100 entries");
     
-    // ASSERT: Buffer size should not exceed SRAM bank size
-    TEST_ASSERT_LESS_THAN_MESSAGE(SRAM_BANK4_SIZE, buffer_size,
-        "Log buffer size should be less than total SRAM bank size");
+    // ASSERT: Buffer capacity should not be excessive (less than 10000 entries)
+    TEST_ASSERT_LESS_THAN_MESSAGE(10000, buffer_capacity,
+        "Log buffer capacity should be reasonable (less than 10000 entries)");
         
 }
 
@@ -105,22 +104,22 @@ void test_log_management_initialization(void) {
     // ACT: Get layout and examine log management
     shared_memory_layout_t* layout = shared_memory_get_layout();
     
-    // ASSERT: Write head should start at 0
-    TEST_ASSERT_EQUAL_MESSAGE(0, layout->log_mgmt.write_head,
-        "Log write_head should initialize to 0");
+    // ASSERT: Write index should start at 0
+    TEST_ASSERT_EQUAL_MESSAGE(0, layout->log_mgmt.write_index,
+        "Log write_index should initialize to 0");
     
-    // ASSERT: Read head should start at 0  
-    TEST_ASSERT_EQUAL_MESSAGE(0, layout->log_mgmt.read_head,
-        "Log read_head should initialize to 0");
+    // ASSERT: Read index should start at 0  
+    TEST_ASSERT_EQUAL_MESSAGE(0, layout->log_mgmt.read_index,
+        "Log read_index should initialize to 0");
     
-    // ASSERT: Buffer size should match calculated size
-    uint32_t expected_size = shared_memory_get_log_buffer_size();
-    TEST_ASSERT_EQUAL_MESSAGE(expected_size, layout->log_mgmt.buffer_size,
-        "Log buffer_size should match calculated size");
+    // ASSERT: Max entries should match calculated capacity
+    uint32_t expected_capacity = shared_memory_get_log_buffer_capacity();
+    TEST_ASSERT_EQUAL_MESSAGE(expected_capacity, layout->log_mgmt.max_entries,
+        "Log max_entries should match calculated capacity");
     
-    // ASSERT: Spinlock should be initialized
-    TEST_ASSERT_NOT_NULL_MESSAGE(layout->log_mgmt.reservation_lock,
-        "Reservation spinlock should be initialized");
+    // ASSERT: Entry lock should be initialized
+    TEST_ASSERT_NOT_NULL_MESSAGE(layout->log_mgmt.entry_lock,
+        "Entry lock should be initialized");
     
 }
 
