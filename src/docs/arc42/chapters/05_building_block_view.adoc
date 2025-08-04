@@ -622,7 +622,7 @@ package "Configuration Manager - SRAM Bank Layout" {
     
     component "Integrity Management\nRevision counter\nSHA256 checksum\nLoad/save validation" as INTEGRITY #lightcyan
     
-    component "Flash Persistence\nLoad from flash on boot\nSave on configuration change\nA/B backup strategy" as PERSISTENCE #wheat
+    component "Flash Ring Buffer\nLoad from flash on boot\nDeferred write-back strategy\nWear leveling + power-loss safety" as PERSISTENCE #wheat
 }
 
 ' External connections
@@ -668,8 +668,8 @@ Shared SRAM configuration provides fast access for real-time Core0 operations wh
 |*Integrity Management*
 |Maintains revision counter and SHA256 checksum for configuration validation. Detects corruption during flash load operations and triggers recovery procedures.
 
-|*Flash Persistence*
-|Manages configuration save/load operations with wear leveling, A/B backup strategy, and atomic updates to prevent configuration corruption during power failures.
+|*Flash Ring Buffer Persistence*
+|Manages configuration save/load operations using 4-page flash ring buffer for wear leveling and power-loss safety. Implements deferred write-back with SHA256 integrity verification and atomic page updates.
 |===
 
 ===== Important Interfaces
@@ -686,11 +686,13 @@ Shared SRAM configuration provides fast access for real-time Core0 operations wh
 * **System Settings**: Logging levels, watchdog timeouts, update settings
 * **User Preferences**: Web interface settings, display options, alert preferences
 
-====== Integrity Verification
-* **Revision Counter**: Incremented on each configuration change for tracking
-* **SHA256 Checksum**: Calculated over entire configuration block for corruption detection
-* **Load Validation**: Checksum verification during flash load with fallback to defaults
-* **Save Atomicity**: Atomic update of revision + checksum + data to prevent corruption
+====== Flash Ring Buffer Management
+* **4-Page Ring Buffer**: Circular buffer of flash pages for wear leveling
+* **Revision Counter**: Incremented on each write, used for startup page selection
+* **SHA256 Checksum**: Per-page integrity verification during startup recovery
+* **Startup Recovery**: Load all pages, select highest revision + valid checksum
+* **Deferred Writes**: Core1 write-back limited to maximum once per 30 seconds
+* **Atomic Operations**: Complete shared memory written per page for consistency
 
 ==== Whitebox Management Interface
 
@@ -1160,6 +1162,136 @@ typedef struct {
     uint32_t frames_received;
     uint32_t frames_transmitted;
 } uart_channel_status_t;
+----
+
+==== Whitebox Flash Persistence System
+
+The Flash Persistence System provides reliable storage and recovery of the complete shared memory structure using a flash ring buffer approach that ensures wear leveling and power-loss safety for embedded systems.
+
+[plantuml, level2-flash-persistence, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Flash Persistence System (Whitebox)
+
+cloud "Core1 Main Loop\nDeferred Write Trigger\n30-second maximum frequency" as CORE1
+cloud "System Startup\nBoot Sequence\nConfiguration Loading" as STARTUP
+cloud "Shared Memory System\ng_shared_memory structure\nRevision counter tracking" as SHMEM
+cloud "RP2350 Internal Flash\nNon-volatile Storage\n4 pages ring buffer" as FLASH
+
+package "Flash Persistence System" {
+    component "Write Controller\nDeferred Write-Back\nCore1 integration\nFrequency limiting" as WRITE_CTRL #lightgreen
+    
+    component "Flash Ring Buffer Manager\n4-page circular buffer\nWear leveling strategy\nPage allocation logic" as RING_MGR #lightyellow
+    
+    component "Integrity Manager\nSHA256 checksums\nRevision tracking\nCorruption detection" as INTEGRITY #lightcyan
+    
+    component "Page Operations\nFlash read/write/erase\nAtomic operations\nHardware abstraction" as PAGE_OPS #lightblue
+    
+    component "Recovery System\nStartup page validation\nCorruption recovery\nFactory reset fallback" as RECOVERY #lightpink
+    
+    component "Page Metadata\nRevision counters\nChecksum storage\nPage status tracking" as METADATA #wheat
+}
+
+' External connections
+CORE1 --> WRITE_CTRL : Write Trigger\nPeriodic Check
+STARTUP --> RECOVERY : Boot Recovery\nConfiguration Load
+WRITE_CTRL <--> SHMEM : Read g_shared_memory\nRevision Check
+RECOVERY --> SHMEM : Load Configuration\nValid Page Data
+PAGE_OPS <--> FLASH : Flash I/O\nRead/Write/Erase
+
+' Internal connections
+WRITE_CTRL --> RING_MGR : Write Request\nNext Page Allocation
+RING_MGR --> PAGE_OPS : Page Write\nRing Advancement
+WRITE_CTRL --> INTEGRITY : Checksum Generation\nRevision Update
+INTEGRITY --> METADATA : Store Checksums\nRevision Tracking
+
+RECOVERY --> RING_MGR : Read All Pages\nPage Discovery
+RING_MGR --> PAGE_OPS : Read Operations\nPage Validation
+PAGE_OPS --> INTEGRITY : Page Data\nChecksum Verification
+INTEGRITY --> RECOVERY : Validation Results\nPage Selection
+
+RING_MGR <--> METADATA : Page Status\nRing Management
+
+@enduml
+----
+
+===== Motivation
+
+Flash persistence ensures configuration survival across power cycles while preventing flash wear-out and corruption. The ring buffer approach provides automatic wear leveling and power-loss safety without complex file systems.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*Write Controller*
+|Manages deferred write-back strategy with Core1 integration. Limits write frequency to maximum once per 30 seconds and only writes when shared memory revision counter changes.
+
+|*Flash Ring Buffer Manager*
+|Implements 4-page circular buffer for wear leveling. Tracks current write position, manages page allocation sequence, and maintains ring buffer state across power cycles.
+
+|*Integrity Manager*
+|Handles SHA256 checksum generation and verification for each flash page. Maintains revision counters for startup page selection and detects data corruption.
+
+|*Page Operations*
+|Provides hardware abstraction layer for RP2350 flash operations. Implements atomic page write/erase operations and manages flash sector alignment requirements.
+
+|*Recovery System*
+|Handles startup configuration loading by validating all ring buffer pages. Selects page with highest revision and valid checksum, implements factory reset fallback for total corruption.
+
+|*Page Metadata*
+|Manages per-page metadata including revision counters, SHA256 checksums, and page status flags. Provides efficient page validation and selection during recovery.
+|===
+
+===== Important Interfaces
+
+====== Flash Page Structure
+* **Page Size**: Aligned to RP2350 flash sector size (4096 bytes)
+* **Data Section**: Complete `g_shared_memory` structure (raw binary)
+* **Metadata Section**: Revision counter (32-bit) + SHA256 checksum (256-bit)
+* **Magic Number**: Page validity marker for ring buffer management
+
+====== Write-Back Interface
+* **Trigger Condition**: `g_shared_memory.revision_counter` increment detection
+* **Frequency Limit**: Maximum once per 30 seconds via Core1 timer
+* **Atomic Operation**: Complete shared memory + metadata written per page
+* **Ring Advancement**: Automatic progression to next page in 4-page ring
+
+====== Recovery Interface
+* **Page Scanning**: Read all 4 ring buffer pages during startup
+* **Validation Logic**: SHA256 verification + magic number check per page
+* **Selection Criteria**: Highest revision counter among valid pages
+* **Fallback Strategy**: Factory defaults if no valid pages found
+
+====== Flash Ring Buffer Layout
+[source,c]
+----
+// Flash page structure (4096 bytes aligned)
+typedef struct {
+    uint32_t magic_number;           // 0xC0FFEEAA - page validity
+    uint32_t revision_counter;       // Incremented on each write
+    uint8_t  sha256_checksum[32];    // Integrity verification
+    uint32_t reserved[4];            // Future use
+    
+    // Complete shared memory structure (raw binary)
+    shared_memory_layout_t shared_memory_data;
+    
+    // Padding to flash sector boundary
+    uint8_t padding[...];
+} __attribute__((packed, aligned(4096))) flash_page_t;
+
+// Ring buffer management
+typedef struct {
+    uint8_t current_write_page;      // 0-3, next page to write
+    uint8_t last_valid_page;         // 0-3, last successfully read page
+    uint32_t total_writes;           // Lifetime write counter
+    uint32_t corruption_count;       // Detected corruption events
+} ring_buffer_state_t;
 ----
 
 ==== Whitebox Management Interface Internal Structure  

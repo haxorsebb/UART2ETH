@@ -1,0 +1,111 @@
+= ADR-006: Flash Persistence Strategy
+
+== Status
+Accepted
+
+== Date
+2024-01-15
+
+== Context
+
+The UART2ETH system requires persistent storage of configuration data to survive power cycles and system resets. The configuration includes UART channel settings, network parameters, user accounts, and system preferences stored in the `g_shared_memory` structure.
+
+Key requirements:
+* Embedded system constraints (limited flash, no external storage)
+* Power-loss safety (industrial environment)
+* Flash wear leveling (device longevity)
+* Fast startup times (minimize boot delays)
+* Simple implementation (avoid complex file systems)
+* Integrity verification (detect corruption)
+
+== Decision
+
+We will implement flash persistence using a **4-page ring buffer strategy** with the following characteristics:
+
+### Storage Format
+* **Raw binary storage**: Direct copy of `g_shared_memory` structure to flash
+* **No JSON or schema validation**: Eliminates parsing overhead and complexity
+* **Complete structure per page**: Atomic writes of entire configuration
+
+### Ring Buffer Management
+* **4 flash pages** organized as circular ring buffer
+* **Wear leveling**: Sequential writes advance through ring
+* **Page metadata**: Revision counter + SHA256 checksum per page
+* **Magic number**: Page validity marker (`0xC0FFEEAA`)
+
+### Write Strategy
+* **Deferred write-back**: Integrated into Core1 main loop
+* **Frequency limiting**: Maximum once per 30 seconds
+* **Change detection**: Write only when `revision_counter` increments
+* **Atomic operations**: Complete page written or nothing
+
+### Recovery Process
+* **Startup validation**: Read all 4 pages, verify checksums
+* **Page selection**: Use page with highest revision + valid checksum
+* **Corruption handling**: Skip invalid pages, fallback to factory defaults
+* **Error logging**: Track corruption events for diagnostics
+
+## Rationale
+
+### Advantages
+* **Power-loss safety**: Atomic page writes prevent partial corruption
+* **Wear leveling**: Ring buffer distributes writes across 4 pages
+* **Fast recovery**: Simple page validation, no complex parsing
+* **Integrity verification**: SHA256 detects any data corruption
+* **Embedded-friendly**: No file system overhead or external dependencies
+* **Deterministic behavior**: Known write patterns, predictable performance
+
+### Rejected Alternatives
+
+**File System Approach**
+* Rejected due to complexity and flash overhead
+* Would require FAT or custom file system implementation
+* Higher RAM usage for file system structures
+
+**JSON Configuration Files**
+* Rejected due to parsing overhead and complexity
+* Would require JSON parser library (code size increase)
+* Schema validation adds unnecessary complexity for embedded use
+
+**A/B Partition Strategy**
+* Rejected as insufficient for wear leveling
+* Only 2 locations would wear out faster
+* No automatic progression through multiple backup copies
+
+**EEPROM External Storage**
+* Rejected to avoid additional hardware components
+* Increases BOM cost and PCB complexity
+* RP2350 internal flash sufficient for configuration data
+
+### Trade-offs
+* **Flash usage**: 4 pages (16KB) reserved for configuration ring buffer
+* **Write frequency**: Limited to 30-second intervals (acceptable for config changes)
+* **Recovery time**: Startup requires reading/validating 4 pages (minimal impact)
+
+== Consequences
+
+### Positive
+* Reliable configuration persistence with power-loss safety
+* Automatic wear leveling extends flash lifetime
+* Simple implementation reduces bugs and maintenance
+* Fast startup with minimal validation overhead
+* Integrity verification provides corruption detection
+
+### Negative
+* Fixed 16KB flash reservation (4 × 4KB pages)
+* Write frequency limitation may delay immediate persistence
+* No incremental updates (entire structure written each time)
+
+### Implementation Requirements
+* Flash operations abstraction layer for RP2350
+* SHA256 hash implementation for integrity verification
+* Integration with Core1 main loop for deferred writes
+* Factory reset capability for complete corruption recovery
+
+== Implementation Notes
+
+The persistence system will be integrated into the existing shared memory module rather than implemented as a separate component. This maintains architectural simplicity while providing the required functionality.
+
+The `revision_counter` in `g_shared_memory` serves dual purposes:
+1. Coordination between cores for configuration changes
+2. Flash persistence trigger and page selection during recovery

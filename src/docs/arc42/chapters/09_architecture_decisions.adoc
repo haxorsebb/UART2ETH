@@ -33,6 +33,7 @@ This section references the Architecture Decision Records (ADRs) that document k
 === Implementation Strategy Decisions
 
 * link:../adrs/ADR-005-buffer-allocation-strategy.html[ADR-005: Ring Buffer Memory Allocation Strategy] - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.
+* link:../adrs/ADR-006-flash-persistence-strategy.html[ADR-006: Flash Persistence Strategy] - Documents the decision to use 4-page ring buffer for configuration persistence, providing wear leveling and power-loss safety through deferred write-back with SHA256 integrity verification.
 
 === Decision Interdependencies
 

@@ -312,26 +312,54 @@ Each error category implements specific recovery procedures:
 
 === Configuration Management
 
-==== Persistent Storage
+==== Flash Persistence Strategy
 
-Configuration data persistence uses JSON format with schema validation:
+Configuration data persistence uses raw binary storage with flash ring buffer management for wear leveling and power-loss safety:
 
+**Storage Format**
+* Raw binary copy of `g_shared_memory` structure written directly to flash
+* SHA256 checksum per flash page for integrity verification
+* Revision counter incremented on each write operation
+* No JSON parsing or schema validation overhead
+
+**Flash Ring Buffer Management**
+* 4 flash pages organized as circular ring buffer
+* Each page stores complete `g_shared_memory` snapshot + metadata
+* Write operations advance to next page in ring (wear leveling)
+* Power-loss safety through atomic page writes with checksums
+
+**Startup Recovery Process**
+* Read all 4 ring buffer pages from flash
+* Verify SHA256 checksum for each page
+* Select page with highest revision counter AND valid checksum
+* Load selected page data into `g_shared_memory`
+* Invalid pages ignored, fallback to factory defaults if no valid pages
+
+**Write-Back Strategy**
+* Deferred writes executed by Core1 main loop
+* Write frequency limited to maximum once per 30 seconds
+* Write triggered only when `g_shared_memory` revision counter changes
+* Complete shared memory structure written atomically per page
+
+==== Configuration Data Scope
+
+Persistent configuration includes:
 * System settings (network, users, security)
 * UART channel configurations (baud rate, protocol filters)
 * Performance tuning parameters
-* Historical statistics and logs
+* User account data and authentication settings
 
-==== Backup and Restore
+==== Factory Reset and Recovery
 
-**Automatic Backups**
-* Daily configuration snapshots
-* Pre-update system state capture
-* Critical setting change tracking
+**Factory Reset Process**
+* Erase all ring buffer pages
+* Initialize `g_shared_memory` with factory defaults
+* Force immediate write to establish initial page
 
-**Manual Operations**
-* Configuration export/import via web interface
-* Factory reset with selective data preservation
-* Remote backup to external storage systems
+**Error Recovery**
+* Corrupted pages detected via SHA256 mismatch
+* Fallback to previous valid page if available
+* Complete factory reset if no valid pages found
 
 === Performance Optimization
 

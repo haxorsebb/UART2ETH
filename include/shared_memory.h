@@ -98,9 +98,39 @@ typedef struct {
     log_entry_t log_entries[1];       // Flexible array member placeholder
 } __attribute__((aligned(4))) shared_memory_layout_t;
 
-// Function declarations
+// Flash persistence constants
+#define FLASH_PERSISTENCE_RING_SIZE 4                    // 4 pages in ring buffer
+#define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
+#define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
+#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
+
+// Flash page structure for ring buffer persistence
+typedef struct {
+    uint32_t magic_number;                               // Page validity marker
+    uint32_t revision_counter;                           // Write sequence number
+    uint8_t  sha256_checksum[32];                        // Page integrity verification
+    uint32_t reserved[4];                                // Future use, alignment
+    
+    // Complete shared memory structure (raw binary copy)
+    shared_memory_layout_t shared_memory_data;
+    
+    // Padding to ensure flash sector alignment
+    uint8_t padding[FLASH_PERSISTENCE_PAGE_SIZE - sizeof(uint32_t) * 8 - 32 - sizeof(shared_memory_layout_t)];
+} __attribute__((packed, aligned(4096))) flash_persistence_page_t;
+
+// Function declarations - Core shared memory
 bool shared_memory_init(void);
 uint32_t shared_memory_get_log_buffer_capacity(void);  // Returns number of entries, not bytes
 shared_memory_layout_t* shared_memory_get_layout(void);
+
+// Function declarations - Flash persistence
+bool flash_persistence_init(void);
+bool flash_persistence_load_configuration(void);
+bool flash_persistence_save_configuration_if_needed(void);
+bool flash_persistence_force_save_configuration(void);
+void flash_persistence_factory_reset(void);
+uint32_t flash_persistence_get_write_count(void);
+uint32_t flash_persistence_get_corruption_count(void);
+bool flash_persistence_verify_ring_buffer_integrity(void);
 
 #endif // SHARED_MEMORY_H
