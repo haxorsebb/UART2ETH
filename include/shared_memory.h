@@ -103,8 +103,8 @@ typedef struct {
 #define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
 #define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
 #define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
-#define FLASH_PERSISTENCE_PARTITION_ID 2                 // Configuration Data partition ID
-#define FLASH_PERSISTENCE_PARTITION_SIZE (512 * 1024)   // 512KB partition size
+#define FLASH_PERSISTENCE_CONFIG_PARTITION_ID 2          // Configuration Data partition ID
+#define FLASH_PERSISTENCE_PARTITION_SIZE (512 * 1024)   // 512KB partition size (rest of 4MB flash)
 
 // Flash page structure for ring buffer persistence
 typedef struct {
@@ -122,6 +122,7 @@ typedef struct {
 
 // Function declarations - Core shared memory
 bool shared_memory_init(void);
+bool shared_memory_force_reinit(void);  // For factory reset - forces re-initialization 
 uint32_t shared_memory_get_log_buffer_capacity(void);  // Returns number of entries, not bytes
 shared_memory_layout_t* shared_memory_get_layout(void);
 
