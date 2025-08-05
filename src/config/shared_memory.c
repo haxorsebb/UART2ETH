@@ -16,6 +16,7 @@
 #include "hardware/sync.h"
 #include <string.h>
 #include <stddef.h>  // For offsetof
+#include <stdio.h>   // For printf
 
 // Static variables for shared memory management
 static shared_memory_layout_t* g_shared_memory = NULL;
@@ -123,6 +124,32 @@ uint32_t shared_memory_get_log_buffer_capacity(void) {
 }
 
 /**
+ * Force re-initialization of shared memory (for factory reset)
+ * 
+ * This resets the initialization state and calls shared_memory_init() again
+ * to restore factory defaults. Used by factory reset functionality.
+ * 
+ * @return true if re-initialization successful, false otherwise
+ */
+bool shared_memory_force_reinit(void) {
+    printf("Forcing shared memory re-initialization to factory defaults...\n");
+    
+    // Reset initialization flag to allow re-initialization
+    g_initialized = false;
+    
+    // Call normal initialization - this will set all factory defaults
+    bool result = shared_memory_init();
+    
+    if (result) {
+        printf("Shared memory successfully re-initialized with factory defaults\n");
+    } else {
+        printf("ERROR: Failed to re-initialize shared memory\n");
+    }
+    
+    return result;
+}
+
+/**
  * Get pointer to shared memory layout
  * 
  * @return Pointer to shared memory layout, or NULL if not initialized
@@ -134,3 +161,4 @@ shared_memory_layout_t* shared_memory_get_layout(void) {
     
     return g_shared_memory;
 }
+

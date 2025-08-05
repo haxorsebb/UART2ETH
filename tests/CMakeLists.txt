@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
 
+# Project declaration
+project(uart2eth_tests C CXX ASM)
+
 include(pico_sdk_import.cmake)
+
+# Initialize the SDK
+pico_sdk_init()
 
 if (TARGET tinyusb_device)
 
@@ -57,6 +63,37 @@ pico_enable_stdio_uart(test_log_manager 1)
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_log_manager)
 
+# Test for flash persistence
+add_executable(test_flash_persistence
+    test_flash_persistence.c
+    ../src/config/shared_memory.c
+    ../src/config/flash_persistence.c
+    ../src/log/log_manager.c
+)
+
+target_include_directories(test_flash_persistence PRIVATE ../include)
+
+target_link_libraries(test_flash_persistence
+    unity
+    pico_stdlib
+    pico_sync
+    pico_multicore      # For Core1 integration testing
+    hardware_sync
+    hardware_flash      # Flash operations
+    hardware_sha256     # Hardware crypto for SHA256
+    pico_bootrom        # Bootrom APIs for partition table
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_flash_persistence 1)
+pico_enable_stdio_uart(test_flash_persistence 1)
+
+# Embed partition table for flash persistence testing
+pico_embed_pt_in_binary(test_flash_persistence "${CMAKE_CURRENT_SOURCE_DIR}/../partition_table.json")
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_flash_persistence)
+
 elseif(PICO_ON_DEVICE)
-    message("Skipping hello_usb because TinyUSB submodule is not initialized in the SDK")
+    message("Skipping EVERYTHING! because TinyUSB submodule is not initialized in the SDK")
 endif()
