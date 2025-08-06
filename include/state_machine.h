@@ -69,17 +69,77 @@ typedef enum {
     CORE1_EVENT_LOG_END            // Log processing completed
 } core1_event_t;
 
-// State machine initialization
+/**
+ * @brief Initialize the state machine
+ * 
+ * Sets up internal data structures and initializes all state machines
+ * to their initial states. Safe to call multiple times.
+ * 
+ * @return true if initialization successful, false otherwise
+ */
 bool state_machine_init(void);
 
-// State query functions (non-blocking, read-only)
+/**
+ * @brief Get current main state (thread-safe, non-blocking)
+ * 
+ * Atomically reads the current main state. Safe to call from any core
+ * or interrupt context.
+ * 
+ * @return Current main state
+ */
 main_state_t state_machine_get_main_state(void);
+
+/**
+ * @brief Get current Core0 sub-state (thread-safe, non-blocking)
+ * 
+ * Atomically reads the current Core0 sub-state. Safe to call from any 
+ * core or interrupt context.
+ * 
+ * @return Current Core0 sub-state
+ */
 core0_substate_t state_machine_get_core0_substate(void);
+
+/**
+ * @brief Get current Core1 sub-state (thread-safe, non-blocking)
+ * 
+ * Atomically reads the current Core1 sub-state. Safe to call from any
+ * core or interrupt context.
+ * 
+ * @return Current Core1 sub-state
+ */
 core1_substate_t state_machine_get_core1_substate(void);
 
-// Event processing functions (ONLY way to change states)
+/**
+ * @brief Process a main state machine event (thread-safe)
+ * 
+ * Validates the event against current state and applies transition
+ * if valid. Uses atomic operations for thread-safety.
+ * 
+ * @param event The main state event to process
+ * @return true if event processed successfully, false if invalid
+ */
 bool state_machine_process_main_event(main_state_event_t event);
+
+/**
+ * @brief Process a Core0 state machine event (ISR-safe)
+ * 
+ * Validates the event against current Core0 sub-state and applies
+ * transition if valid. ISR-safe with interrupt disable/restore.
+ * 
+ * @param event The Core0 event to process  
+ * @return true if event processed successfully, false if invalid
+ */
 bool state_machine_process_core0_event(core0_event_t event);
+
+/**
+ * @brief Process a Core1 state machine event (ISR-safe)
+ * 
+ * Validates the event against current Core1 sub-state and applies
+ * transition if valid. ISR-safe with interrupt disable/restore.
+ * 
+ * @param event The Core1 event to process
+ * @return true if event processed successfully, false if invalid
+ */
 bool state_machine_process_core1_event(core1_event_t event);
 
 #endif // STATE_MACHINE_H

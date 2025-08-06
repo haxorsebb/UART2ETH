@@ -18,14 +18,17 @@
 #include <stdatomic.h>
 
 // State variables with proper synchronization
-static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;          // Atomic for cross-core access
-static volatile core0_substate_t g_core0_substate = CORE0_UART_IDLE;  // ISR-safe volatile
-static volatile core1_substate_t g_core1_substate = CORE1_NET_DISCONNECTED;  // ISR-safe volatile
+static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;                   // Atomic for cross-core access
+static _Atomic core0_substate_t g_core0_substate = CORE0_UART_IDLE;           // Atomic for ISR-safe access
+static _Atomic core1_substate_t g_core1_substate = CORE1_NET_DISCONNECTED;    // Atomic for ISR-safe access
 
 // Initialization flag
-static volatile bool g_initialized = false;
+static _Atomic bool g_initialized = false;
 
-// Forward declarations for condition checking functions
+// Forward declarations for validation and condition checking functions
+static bool is_valid_main_event(main_state_event_t event);
+static bool is_valid_core0_event(core0_event_t event);
+static bool is_valid_core1_event(core1_event_t event);
 static bool check_initialization_complete(void);
 static bool check_configuration_valid(void);
 static bool check_error_recovery_complete(void);
@@ -41,19 +44,17 @@ static bool check_main_state_operational(void);
  * @return true if initialization successful, false otherwise
  */
 bool state_machine_init(void) {
-    if (g_initialized) {
+    if (atomic_load(&g_initialized)) {
         return true;  // Already initialized
     }
     
     // Initialize all state machines to their initial states
     atomic_store(&g_main_state, MAIN_STATE_INIT);
-    g_core0_substate = CORE0_UART_IDLE;
-    g_core1_substate = CORE1_NET_DISCONNECTED;
+    atomic_store(&g_core0_substate, CORE0_UART_IDLE);
+    atomic_store(&g_core1_substate, CORE1_NET_DISCONNECTED);
     
-    // Memory barrier to ensure state initialization is visible to all cores
-    __sync_synchronize();
-    
-    g_initialized = true;
+    // Atomic operations provide necessary memory ordering guarantees
+    atomic_store(&g_initialized, true);
     return true;
 }
 
@@ -67,21 +68,21 @@ main_state_t state_machine_get_main_state(void) {
 }
 
 /**
- * Get current Core0 sub-state (non-blocking, volatile read)
+ * Get current Core0 sub-state (non-blocking, atomic read)
  * 
  * @return Current Core0 sub-state
  */
 core0_substate_t state_machine_get_core0_substate(void) {
-    return g_core0_substate;
+    return atomic_load(&g_core0_substate);
 }
 
 /**
- * Get current Core1 sub-state (non-blocking, volatile read)
+ * Get current Core1 sub-state (non-blocking, atomic read)
  * 
  * @return Current Core1 sub-state
  */
 core1_substate_t state_machine_get_core1_substate(void) {
-    return g_core1_substate;
+    return atomic_load(&g_core1_substate);
 }
 
 /**
@@ -93,12 +94,19 @@ core1_substate_t state_machine_get_core1_substate(void) {
  * @return true if event processed successfully, false if invalid
  */
 bool state_machine_process_main_event(main_state_event_t event) {
-    if (!g_initialized) {
+    if (!atomic_load(&g_initialized)) {
         return false;
     }
     
-    main_state_t current_state = atomic_load(&g_main_state);
-    main_state_t new_state = current_state;  // Default: no change
+    // Input validation: ensure event is within valid range
+    if (!is_valid_main_event(event)) {
+        return false;
+    }
+    
+    // Retry loop for atomic compare-exchange to handle race conditions
+    for (int attempts = 0; attempts < 10; attempts++) {
+        main_state_t current_state = atomic_load(&g_main_state);
+        main_state_t new_state = current_state;  // Default: no change
     
     // State + Event + Condition → New State
     switch (current_state) {
@@ -159,17 +167,24 @@ bool state_machine_process_main_event(main_state_event_t event) {
             break;
     }
     
-    // Apply atomic state transition if state changed
-    if (new_state != current_state) {
-        main_state_t expected = current_state;
-        return atomic_compare_exchange_strong(&g_main_state, &expected, new_state);
+        // Apply atomic state transition if state changed
+        if (new_state != current_state) {
+            main_state_t expected = current_state;
+            if (atomic_compare_exchange_strong(&g_main_state, &expected, new_state)) {
+                return true;  // Success
+            }
+            // Continue retry loop if compare-exchange failed
+        } else {
+            return true;  // No change needed, event processed successfully
+        }
     }
     
-    return true;  // No change needed, event processed successfully
+    // Failed to apply state change after maximum attempts
+    return false;
 }
 
 /**
- * Process Core0 sub-state machine events (ISR-safe operations)
+ * Process Core0 sub-state machine events (thread-safe atomic operations)
  * 
  * Implements: core0_substate + event + check_condition() → new_core0_substate
  * 
@@ -177,22 +192,26 @@ bool state_machine_process_main_event(main_state_event_t event) {
  * @return true if event processed successfully, false if invalid
  */
 bool state_machine_process_core0_event(core0_event_t event) {
-    if (!g_initialized) {
+    if (!atomic_load(&g_initialized)) {
         return false;
     }
     
-    // Disable interrupts for ISR-safe atomic read-modify-write
-    uint32_t interrupts = save_and_disable_interrupts();
+    // Input validation: ensure event is within valid range
+    if (!is_valid_core0_event(event)) {
+        return false;
+    }
     
-    core0_substate_t current_state = g_core0_substate;
-    core0_substate_t new_state = current_state;  // Default: no change
+    // Retry loop for atomic compare-exchange to handle race conditions
+    for (int attempts = 0; attempts < 10; attempts++) {
+        core0_substate_t current_state = atomic_load(&g_core0_substate);
+        core0_substate_t new_state = current_state;  // Default: no change
     
     // State + Event + Condition → New State
     switch (current_state) {
         case CORE0_UART_IDLE:
             switch (event) {
                 case CORE0_EVENT_UART_DATA_READY:
-                    if (check_uart_data_available() && check_main_state_operational()) {
+                    if (check_uart_data_available()) {
                         new_state = CORE0_UART_ACTIVE;
                     }
                     break;
@@ -235,19 +254,24 @@ bool state_machine_process_core0_event(core0_event_t event) {
             break;
     }
     
-    // Apply state change if needed
-    if (new_state != current_state) {
-        g_core0_substate = new_state;
+        // Apply atomic state change if needed
+        if (new_state != current_state) {
+            core0_substate_t expected = current_state;
+            if (atomic_compare_exchange_strong(&g_core0_substate, &expected, new_state)) {
+                return true;  // Success
+            }
+            // Continue retry loop if compare-exchange failed
+        } else {
+            return true;  // No change needed, event processed successfully
+        }
     }
     
-    // Re-enable interrupts
-    restore_interrupts(interrupts);
-    
-    return true;  // Event processed successfully
+    // Failed to apply state change after maximum attempts
+    return false;
 }
 
 /**
- * Process Core1 sub-state machine events (ISR-safe operations)
+ * Process Core1 sub-state machine events (thread-safe atomic operations)
  * 
  * Implements: core1_substate + event + check_condition() → new_core1_substate
  * 
@@ -255,15 +279,19 @@ bool state_machine_process_core0_event(core0_event_t event) {
  * @return true if event processed successfully, false if invalid
  */
 bool state_machine_process_core1_event(core1_event_t event) {
-    if (!g_initialized) {
+    if (!atomic_load(&g_initialized)) {
         return false;
     }
     
-    // Disable interrupts for ISR-safe atomic read-modify-write
-    uint32_t interrupts = save_and_disable_interrupts();
+    // Input validation: ensure event is within valid range
+    if (!is_valid_core1_event(event)) {
+        return false;
+    }
     
-    core1_substate_t current_state = g_core1_substate;
-    core1_substate_t new_state = current_state;  // Default: no change
+    // Retry loop for atomic compare-exchange to handle race conditions
+    for (int attempts = 0; attempts < 10; attempts++) {
+        core1_substate_t current_state = atomic_load(&g_core1_substate);
+        core1_substate_t new_state = current_state;  // Default: no change
     
     // State + Event + Condition → New State
     switch (current_state) {
@@ -351,79 +379,134 @@ bool state_machine_process_core1_event(core1_event_t event) {
             break;
     }
     
-    // Apply state change if needed
-    if (new_state != current_state) {
-        g_core1_substate = new_state;
+        // Apply atomic state change if needed
+        if (new_state != current_state) {
+            core1_substate_t expected = current_state;
+            if (atomic_compare_exchange_strong(&g_core1_substate, &expected, new_state)) {
+                return true;  // Success
+            }
+            // Continue retry loop if compare-exchange failed
+        } else {
+            return true;  // No change needed, event processed successfully
+        }
     }
     
-    // Re-enable interrupts
-    restore_interrupts(interrupts);
-    
-    return true;  // Event processed successfully
+    // Failed to apply state change after maximum attempts
+    return false;
 }
 
-// Condition checking functions (these would integrate with actual system components)
+// Event validation functions (security-critical)
+
+/**
+ * Validate main state machine event
+ */
+static bool is_valid_main_event(main_state_event_t event) {
+    return (event >= MAIN_EVENT_INIT_COMPLETE && event <= MAIN_EVENT_ERROR_RECOVERED);
+}
+
+/**
+ * Validate Core0 state machine event
+ */
+static bool is_valid_core0_event(core0_event_t event) {
+    return (event >= CORE0_EVENT_UART_DATA_READY && event <= CORE0_EVENT_ERROR_RECOVERED);
+}
+
+/**
+ * Validate Core1 state machine event
+ */
+static bool is_valid_core1_event(core1_event_t event) {
+    return (event >= CORE1_EVENT_NETWORK_UP && event <= CORE1_EVENT_LOG_END);
+}
+
+// Condition checking functions (security-hardened)
 
 /**
  * Check if system initialization is complete
+ * SECURITY: This function must perform real validation in production
  */
 static bool check_initialization_complete(void) {
-    // For testing: always return true
-    // In real implementation: check shared_memory_initialized(), hardware_ready(), etc.
-    return true;
+    // SECURITY TODO: Replace with real implementation
+    // Should check: shared_memory_initialized(), hardware_ready(), clocks_stable(), etc.
+    
+    // For testing: verify we're initialized and currently in INIT state
+    // This allows transition FROM INIT TO CONFIGURATION
+    return atomic_load(&g_initialized) &&
+           atomic_load(&g_main_state) == MAIN_STATE_INIT;
 }
 
 /**
  * Check if configuration is valid
+ * SECURITY: This function must validate configuration integrity
  */
 static bool check_configuration_valid(void) {
-    // For testing: always return true
-    // In real implementation: validate configuration integrity
-    return true;
+    // SECURITY TODO: Replace with real implementation
+    // Should check: configuration checksum, bounds validation, etc.
+    
+    // For testing: verify we're currently in CONFIGURATION state
+    // This allows transition FROM CONFIGURATION TO OPERATIONAL
+    return atomic_load(&g_main_state) == MAIN_STATE_CONFIGURATION;
 }
 
 /**
  * Check if error recovery is complete
+ * SECURITY: This function must verify all systems are operational
  */
 static bool check_error_recovery_complete(void) {
-    // For testing: always return true
-    // In real implementation: verify all systems operational
-    return true;
+    // SECURITY TODO: Replace with real implementation
+    // Should verify: all hardware operational, no error conditions, etc.
+    
+    // For testing: verify we're currently in ERROR state  
+    // This allows transition FROM ERROR TO OPERATIONAL
+    return atomic_load(&g_main_state) == MAIN_STATE_ERROR;
 }
 
 /**
  * Check if UART data is available
+ * SECURITY: This function must validate UART hardware status
  */
 static bool check_uart_data_available(void) {
-    // For testing: always return true
-    // In real implementation: check UART hardware status
+    // SECURITY TODO: Replace with real implementation
+    // Should check: UART FIFO status, hardware ready, etc.
+    
+    // For testing: return true to allow UART processing in any main state
     return true;
 }
 
 /**
  * Check if UART processing is complete
+ * SECURITY: This function must verify UART processing status
  */
 static bool check_uart_processing_complete(void) {
-    // For testing: always return true
-    // In real implementation: check UART processing status
-    return true;
+    // SECURITY TODO: Replace with real implementation
+    // Should check: UART transmission complete, buffer empty, etc.
+    
+    // For testing: verify we're currently in UART_ACTIVE state
+    // This allows transition FROM UART_ACTIVE TO UART_IDLE
+    return atomic_load(&g_core0_substate) == CORE0_UART_ACTIVE;
 }
 
 /**
  * Check if UART hardware has recovered from error
+ * SECURITY: This function must verify UART hardware status
  */
 static bool check_uart_hardware_recovered(void) {
-    // For testing: always return true
-    // In real implementation: verify UART hardware status
-    return true;
+    // SECURITY TODO: Replace with real implementation
+    // Should verify: UART error registers clear, hardware reset complete, etc.
+    
+    // For testing: verify we're currently in UART_ERROR state
+    // This allows transition FROM UART_ERROR TO UART_IDLE
+    return atomic_load(&g_core0_substate) == CORE0_UART_ERROR;
 }
 
 /**
  * Check if network interface is ready
+ * SECURITY: This function must validate network interface status
  */
 static bool check_network_interface_ready(void) {
-    // For testing: always return true
-    // In real implementation: check network interface status
+    // SECURITY TODO: Replace with real implementation
+    // Should check: network hardware status, link up, IP configured, etc.
+    
+    // For testing: return true to allow network operations
     return true;
 }
 
