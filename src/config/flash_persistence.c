@@ -15,10 +15,8 @@
 #include "pico/stdlib.h"
 #include "pico/bootrom.h"
 #include "hardware/flash.h"
-#include "hardware/sha256.h"
 #include "hardware/sync.h"
 #include <string.h>
-#include <stdio.h>
 
 // Flash persistence state management
 typedef struct {
@@ -63,16 +61,21 @@ bool flash_persistence_init(void) {
     if (!find_partition_info(g_flash_state.active_config_partition_id, 
                             &g_flash_state.partition_start_offset, 
                             &g_flash_state.partition_size)) {
-        printf("ERROR: Failed to find configuration partition ID=%d\n", 
-               g_flash_state.active_config_partition_id);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_PARTITION_ID, 
+                  g_flash_state.active_config_partition_id);
         return false;
     }
+    
+    // Log the found partition details
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_FLASH_PARTITION_ID, 
+              g_flash_state.active_config_partition_id);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_FLASH_PARTITION_OFFSET, 
+              g_flash_state.partition_start_offset);
     
     // Verify partition size is sufficient for 4-page ring buffer
     uint32_t required_size = FLASH_PERSISTENCE_RING_SIZE * FLASH_PERSISTENCE_PAGE_SIZE;
     if (g_flash_state.partition_size < required_size) {
-        printf("ERROR: Partition too small. Required: %u, Available: %u\n", 
-               required_size, g_flash_state.partition_size);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_INIT, required_size);
         return false;
     }
     
@@ -85,9 +88,8 @@ bool flash_persistence_init(void) {
     g_flash_state.last_write_timestamp_ms = 0;
     g_flash_state.initialized = true;
     
-    printf("Flash persistence initialized: partition ID=%d, offset=0x%08x, size=%u bytes\n",
-           g_flash_state.active_config_partition_id, g_flash_state.partition_start_offset, 
-           g_flash_state.partition_size);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_FLASH_INIT, 
+              g_flash_state.active_config_partition_id);
     
     return true;
 }
@@ -99,7 +101,7 @@ bool flash_persistence_init(void) {
  */
 bool flash_persistence_load_configuration(void) {
     if (!g_flash_state.initialized) {
-        printf("ERROR: Flash persistence not initialized\n");
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_INIT, 0);
         return false;
     }
     
@@ -108,7 +110,7 @@ bool flash_persistence_load_configuration(void) {
     
     if (best_page < 0) {
         // No valid pages found - trigger factory reset
-        printf("WARN: No valid configuration pages found, performing factory reset\n");
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_WARN, LOG_EVENT_FACTORY_RESET, 0);
         flash_persistence_factory_reset();
         
         // Log factory reset event as first entry
@@ -120,7 +122,7 @@ bool flash_persistence_load_configuration(void) {
     // Load configuration from best valid page
     flash_persistence_page_t page_data;
     if (!read_flash_page(best_page, &page_data)) {
-        printf("ERROR: Failed to read best valid page %d\n", best_page);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_READ, best_page);
         flash_persistence_factory_reset();
         return true;  // Fallback to factory reset
     }
@@ -132,8 +134,8 @@ bool flash_persistence_load_configuration(void) {
         g_flash_state.last_written_revision = layout->revision_counter;
         g_flash_state.last_valid_page = best_page;
         
-        printf("Configuration loaded from flash page %d, revision %u\n", 
-               best_page, layout->revision_counter);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_LOADED, 
+                  layout->revision_counter);
     }
     
     return true;
@@ -196,13 +198,14 @@ bool flash_persistence_force_save_configuration(void) {
     
     // Calculate SHA256 checksum
     if (calculate_sha256_checksum(layout, page_data.sha256_checksum) != 0) {
-        printf("ERROR: Failed to calculate SHA256 checksum\n");
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_WRITE, 0);
         return false;
     }
     
     // Write to next page in ring buffer
     if (!write_flash_page(g_flash_state.current_write_page, &page_data)) {
-        printf("ERROR: Failed to write flash page %d\n", g_flash_state.current_write_page);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_WRITE, 
+                  g_flash_state.current_write_page);
         g_flash_state.corruption_events++;
         return false;
     }
@@ -215,8 +218,8 @@ bool flash_persistence_force_save_configuration(void) {
     // Advance to next page in ring buffer
     advance_ring_buffer_position();
     
-    printf("Configuration saved to flash page %d, revision %u\n", 
-           g_flash_state.current_write_page, layout->revision_counter);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_SAVED, 
+              layout->revision_counter);
     
     return true;
 }
@@ -230,18 +233,19 @@ bool flash_persistence_force_save_configuration(void) {
  */
 void flash_persistence_factory_reset(void) {
     if (!g_flash_state.initialized) {
-        printf("ERROR: Cannot perform factory reset - flash persistence not initialized\n");
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FACTORY_RESET, 0);
         return;
     }
     
-    printf("Performing factory reset - invalidating all flash ring buffer pages...\n");
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_WARN, LOG_EVENT_FACTORY_RESET, 
+              FLASH_PERSISTENCE_RING_SIZE);
     
     // Invalidate all 4 ring buffer pages by erasing them (sets all bytes to 0xFF)
     for (int page = 0; page < FLASH_PERSISTENCE_RING_SIZE; page++) {
         uint32_t flash_offset = g_flash_state.partition_start_offset + 
                                (page * FLASH_PERSISTENCE_PAGE_SIZE);
         
-        printf("Invalidating flash page %d at offset 0x%08x\n", page, flash_offset);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_ERASE, page);
         
         // Disable interrupts during flash operation
         uint32_t ints = save_and_disable_interrupts();
@@ -252,24 +256,21 @@ void flash_persistence_factory_reset(void) {
         // Restore interrupts
         restore_interrupts(ints);
         
-        printf("Page %d invalidated (erased to 0xFF)\n", page);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_ERASE, page + 100);
     }
     
     // Reset shared memory to factory defaults using the proper initialization function
     // This avoids code duplication and ensures consistency with shared_memory_init()
     if (!shared_memory_force_reinit()) {
-        printf("ERROR: Failed to reset shared memory to factory defaults\n");
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_SHARED_MEMORY_REINIT, 0);
         return;
     }
     
     // Verify the factory defaults were applied
     shared_memory_layout_t* layout = shared_memory_get_layout();
     if (layout) {
-        printf("In-memory factory defaults applied:\n");
-        printf("  UART0 baud rate: %u, IP: %s, TCP port 0: %u\n",
-               layout->config.uart_channels[0].baud_rate,
-               layout->config.network.ip_address,
-               layout->config.network.tcp_ports[0]);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_REINIT, 
+                  layout->config.uart_channels[0].baud_rate);
     }
     
     // Update flash state
@@ -277,8 +278,7 @@ void flash_persistence_factory_reset(void) {
     g_flash_state.corruption_events++;       // Count factory reset as corruption event
     g_flash_state.current_write_page = 0;     // Reset to first page
     
-    printf("Factory reset completed - all flash pages invalidated\n");
-    printf("Next system boot will automatically use factory defaults\n");
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_FACTORY_RESET, 1);
 }
 
 /**
@@ -326,7 +326,7 @@ bool flash_persistence_verify_ring_buffer_integrity(void) {
         }
     }
     
-    printf("Ring buffer health check: %u valid pages\n", valid_pages);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PAGE_SCAN, valid_pages);
     
     // Consider ring buffer healthy if at least 1 page is valid
     return (valid_pages > 0);
@@ -376,7 +376,7 @@ static bool read_flash_page(uint32_t page_index, flash_persistence_page_t* page_
     // Use XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE for raw flash access
     const uint8_t *flash_target_contents = (const uint8_t *)(XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE + flash_offset);
     
-    printf("Reading page %d from raw flash at 0x%08x\n", page_index, (uint32_t)flash_target_contents);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_READ, page_index);
     
     // Copy from raw flash address
     memcpy(page_data, flash_target_contents, sizeof(flash_persistence_page_t));
@@ -393,14 +393,14 @@ static bool read_flash_page(uint32_t page_index, flash_persistence_page_t* page_
  */
 static bool write_flash_page(uint32_t page_index, const flash_persistence_page_t* page_data) {
     if (page_index >= FLASH_PERSISTENCE_RING_SIZE || !page_data) {
-        printf("ERROR: Invalid page index %u or null buffer\n", page_index);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_WRITE, page_index);
         return false;
     }
     
     uint32_t flash_offset = g_flash_state.partition_start_offset + 
                            (page_index * FLASH_PERSISTENCE_PAGE_SIZE);
     
-    printf("Writing flash page %u at offset 0x%08x\n", page_index, flash_offset);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_WRITE, page_index);
     
     // Disable interrupts during flash operation
     uint32_t ints = save_and_disable_interrupts();
@@ -414,7 +414,7 @@ static bool write_flash_page(uint32_t page_index, const flash_persistence_page_t
     // Restore interrupts
     restore_interrupts(ints);
     
-    printf("Flash write completed for page %u\n", page_index);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_WRITE, page_index + 100);
     
     return true;
 }
@@ -477,37 +477,38 @@ static int find_best_valid_page(void) {
     int best_page = -1;
     uint32_t highest_revision = 0;
     
-    printf("Scanning ring buffer for valid config pages...\n");
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PAGE_SCAN, 0);
     
     // Check all 4 ring buffer pages
     for (int i = 0; i < FLASH_PERSISTENCE_RING_SIZE; i++) {
-        printf("Checking page %d...\n", i);
         flash_persistence_page_t page_data;
         
         if (!read_flash_page(i, &page_data)) {
-            printf("Page %d: read failed\n", i);
+            log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PAGE_INVALID, i);
             continue;
         }
         
         // Check for uninitialized flash (all 0xFF)
         if (page_data.magic_number == 0xFFFFFFFF) {
-            printf("Page %d: uninitialized\n", i);
+            log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PAGE_INVALID, i + 10);
             continue;
         }
         
         // Check magic number
         if (page_data.magic_number != FLASH_PERSISTENCE_MAGIC) {
-            printf("Page %d: invalid magic 0x%08x\n", i, page_data.magic_number);
+            log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PAGE_INVALID, i + 20);
             continue;
         }
         
         // Validate checksum
         if (!validate_page_integrity(&page_data)) {
-            printf("Page %d: checksum failed\n", i);
+            log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PAGE_INVALID, i + 30);
             continue;
         }
         
-        printf("Page %d: valid, revision %u\n", i, page_data.revision_counter);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PAGE_NUMBER, i);
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PAGE_REVISION, 
+                  page_data.revision_counter);
         
         // Track highest revision
         if (page_data.revision_counter > highest_revision) {
@@ -517,11 +518,12 @@ static int find_best_valid_page(void) {
     }
     
     if (highest_revision == 0) {
-        printf("No valid pages found - factory state\n");
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PAGE_SCAN, 0);
         return -1;
     }
     
-    printf("Best page: %d (revision %u)\n", best_page, highest_revision);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_BEST_PAGE_NUMBER, best_page);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_BEST_PAGE_REV, highest_revision);
     return best_page;
 }
 
