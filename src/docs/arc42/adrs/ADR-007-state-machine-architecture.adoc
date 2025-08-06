@@ -1,3 +1,11 @@
+:jbake-title: ADR-007: State Machine Architecture for UART2ETH
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 7
+:filename: /adrs/ADR-007-state-machine-architecture.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
 = ADR-007: State Machine Architecture
 
 == Status
