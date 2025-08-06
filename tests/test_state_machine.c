@@ -15,9 +15,16 @@
 #include "state_machine.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
+#include <stdatomic.h>
+
+// Access to initialization flag for proper test reinitialization
+extern _Atomic bool g_initialized;
 
 void setUp(void) {
     // Called before each test
+    // Reset initialization flag to ensure fresh state machine initialization
+    atomic_store(&g_initialized, false);
+    
     // Reinitialize state machine for clean test environment
     state_machine_init();
 }

@@ -22,8 +22,8 @@ static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;                   //
 static _Atomic core0_substate_t g_core0_substate = CORE0_UART_IDLE;           // Atomic for ISR-safe access
 static _Atomic core1_substate_t g_core1_substate = CORE1_NET_DISCONNECTED;    // Atomic for ISR-safe access
 
-// Initialization flag
-static _Atomic bool g_initialized = false;
+// Initialization flag (exposed to tests for proper reinitialization)
+_Atomic bool g_initialized = false;
 
 // Forward declarations for validation and condition checking functions
 static bool is_valid_main_event(main_state_event_t event);
@@ -112,8 +112,7 @@ bool state_machine_process_main_event(main_state_event_t event) {
                     }
                     break;
                 case MAIN_EVENT_SYSTEM_ERROR:
-                    // DEBUGGING: Temporarily prevent ERROR transitions
-                    // new_state = MAIN_STATE_ERROR;
+                    new_state = MAIN_STATE_ERROR;
                     break;
                 default:
                     // Invalid event for this state - ignore
@@ -129,8 +128,7 @@ bool state_machine_process_main_event(main_state_event_t event) {
                     }
                     break;
                 case MAIN_EVENT_SYSTEM_ERROR:
-                    // DEBUGGING: Temporarily prevent ERROR transitions
-                    // new_state = MAIN_STATE_ERROR;
+                    new_state = MAIN_STATE_ERROR;
                     break;
                 default:
                     // Invalid event for this state - ignore
@@ -141,8 +139,7 @@ bool state_machine_process_main_event(main_state_event_t event) {
         case MAIN_STATE_OPERATIONAL:
             switch (event) {
                 case MAIN_EVENT_SYSTEM_ERROR:
-                    // DEBUGGING: Temporarily prevent ERROR transitions
-                    // new_state = MAIN_STATE_ERROR;
+                    new_state = MAIN_STATE_ERROR;
                     break;
                 default:
                     // Invalid event for this state - ignore
