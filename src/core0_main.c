@@ -140,13 +140,14 @@ static bool initialize_uart_hardware(void) {
  */
 static bool uart_data_available(void) {
     // Stub implementation - simulate periodic data availability
-    static uint32_t counter = 0;
+    /*static uint32_t counter = 0;
     counter++;
     
     // Simulate data available every 50 iterations (~500ms at 10ms loop)
     if (counter % 50 == 0) {
         return true;
     }
+    */
     return false;
 }
 
@@ -156,6 +157,7 @@ static bool uart_data_available(void) {
  */
 static bool process_uart_data(void) {
     // Stub implementation - simulate processing time
+    /*
     static uint32_t processing_cycles = 0;
     
     if (processing_cycles == 0) {
@@ -173,6 +175,8 @@ static bool process_uart_data(void) {
     }
     
     return false;  // Still processing
+    */
+    return true;
 }
 
 /**

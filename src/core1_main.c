@@ -106,10 +106,7 @@ void core1_main(void) {
             
             state_machine_process_core1_event(CORE1_EVENT_LOG_END);
             
-            // Log the processing activity for debugging
-            if (formatted_count > 0) {
-                log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_LOG_PROCESSING, formatted_count);
-            }
+            
         }
         
         // Network status monitoring and event generation
@@ -162,7 +159,6 @@ void core1_main(void) {
                 
             case CORE1_LOG_ACTIVE:
                 // Log processing active - this should be very brief
-                log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_LOG_PROCESSING, 0);
                 break;
         }
         
