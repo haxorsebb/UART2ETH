@@ -162,3 +162,12 @@ shared_memory_layout_t* shared_memory_get_layout(void) {
     return g_shared_memory;
 }
 
+/**
+ * Flash persistence stub implementation
+ * TODO: Implement full flash persistence functionality
+ */
+bool flash_persistence_save_configuration_if_needed(void) {
+    // Stub implementation - always returns true for now
+    // Real implementation would check if configuration changed and save to flash
+    return true;
+}

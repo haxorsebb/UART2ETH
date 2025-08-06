@@ -98,8 +98,11 @@ start_logging() {
     
     info "Starting persistent logging from $SERIAL_PORT to $LOGFILE"
     
-    # Start background logging process
-    nohup cat "$SERIAL_PORT" >> "$LOGFILE" 2>/dev/null &
+    # Configure serial port settings
+    stty -F "$SERIAL_PORT" 115200 raw clocal min 0 -echo 2>/dev/null || true
+    
+    # Start tail -f in background and capture its PID
+    nohup tail -f "$SERIAL_PORT" >> "$LOGFILE" 2>/dev/null &
     local logger_pid=$!
     
     # Save PID

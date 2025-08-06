@@ -94,6 +94,30 @@ pico_embed_pt_in_binary(test_flash_persistence "${CMAKE_CURRENT_SOURCE_DIR}/../p
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_flash_persistence)
 
+# Test for state machine
+add_executable(test_state_machine
+    test_state_machine.c
+    ../src/state_machine/state_machine.c
+)
+
+target_include_directories(test_state_machine PRIVATE ../include)
+
+target_link_libraries(test_state_machine
+    unity
+    pico_stdlib
+    pico_sync
+    pico_multicore      # Dual core support for state machine coordination
+    hardware_sync       # Atomic operations for state transitions
+    hardware_watchdog   # Watchdog for stability
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_state_machine 1)
+pico_enable_stdio_uart(test_state_machine 1)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_state_machine)
+
 elseif(PICO_ON_DEVICE)
     message("Skipping EVERYTHING! because TinyUSB submodule is not initialized in the SDK")
 endif()

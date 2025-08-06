@@ -25,4 +25,33 @@ target_link_libraries(log_manager
     hardware_sync
 )
 
+# State machine (event-driven)
+add_library(state_machine
+    state_machine/state_machine.c
+)
+
+target_include_directories(state_machine PUBLIC ../include)
+target_link_libraries(state_machine 
+    pico_stdlib
+    pico_sync 
+    hardware_sync
+)
+
+# Core processing modules
+add_library(core_modules
+    core0_main.c
+    core1_main.c
+)
+
+target_include_directories(core_modules PUBLIC ../include)
+target_link_libraries(core_modules 
+    state_machine
+    config_manager
+    log_manager
+    pico_stdlib
+    pico_multicore
+    pico_sync
+    hardware_sync
+)
+
 # Main target will link against these libraries
