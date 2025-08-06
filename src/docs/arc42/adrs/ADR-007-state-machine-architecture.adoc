@@ -1,0 +1,249 @@
+= ADR-007: State Machine Architecture
+
+== Status
+Proposed
+
+== Date
+2024-01-16
+
+== Context
+
+The UART2ETH system requires coordinated dual-core operation with predictable behavior across system initialization, normal operation, error conditions, and configuration changes. The system needs a mechanism to synchronize Core0 (UART processing) and Core1 (network and persistence) while avoiding tight coupling between cores.
+
+Key requirements:
+* Dual-core state coordination without blocking operations
+* State-driven control logic for predictable core behavior
+* Clear separation between runtime state and persistent configuration
+* Atomic state transitions with validation
+* Support for core-specific sub-states within global system states
+* Non-persistent state information (states should not survive reboots)
+
+== Decision
+
+We will implement a **separate state machine module** with **shared global state** and **per-core sub-states** using the following architecture:
+
+### State Machine Module Structure
+* **Separate Module**: `state_machine.c/h` independent of shared memory
+* **Non-Persistent**: State variables NOT stored in `shared_memory_layout_t`
+* **Runtime Only**: States represent current system status, not configuration data
+* **Atomic Operations**: State transitions use atomic operations for inter-core safety
+
+### State Hierarchy Design
+* **Main State (16-bit)**: Global system state shared between both cores
+  - `INIT`: System initialization and hardware setup
+  - `CONFIGURATION`: Configuration loading and validation
+  - `OPERATIONAL`: Normal operation mode
+  - `ERROR`: Error state requiring recovery
+
+* **Core0 Sub-States**: UART-specific operational states
+  - `UART_IDLE`: No active UART operations
+  - `UART_ACTIVE`: Processing UART data
+  - `UART_ERROR`: UART hardware error state
+
+* **Core1 Sub-States**: Network and maintenance operational states
+  - `NET_IDLE`: No network activity
+  - `NET_CONNECTED`: Active network connections
+  - `NET_ERROR`: Network error state
+  - `PERSISTENCE_ACTIVE`: Flash persistence operation active
+  - `LOG_ACTIVE`: Log processing active
+
+### Core Main Loop Architecture
+* **Dual-Core Launch**: `main.c` modified to launch both cores
+* **Core-Specific Modules**: `core0_main.c` and `core1_main.c` with dedicated main functions
+* **State-Driven Logic**: Core main loops query states to control behavior
+* **Non-Blocking Queries**: State access never blocks core operations
+
+### Core1 Integration Requirements
+* **Core1 Persistence**: Handle configuration persistence operations
+* **Core1 Log Processing**: Process one log event per loop iteration
+* **Priority Scheduling**: High-priority network, low-priority maintenance tasks
+
+## Rationale
+
+### Advantages
+* **Clear Separation**: State machine separate from persistent configuration data
+* **Predictable Behavior**: State-driven control logic provides deterministic system behavior
+* **Inter-Core Coordination**: Atomic state variables enable safe dual-core operation
+* **Testability**: State machine logic can be unit tested independently
+* **Maintainability**: Clear state definitions make system behavior easier to understand
+* **Performance**: Non-blocking state queries don't impact real-time operations
+
+### Rejected Alternatives
+
+**Shared Memory State Storage**
+* Rejected because states are runtime information, not configuration data
+* Would persist unnecessary runtime state across reboots
+* Couples state management to configuration persistence
+
+**Message Passing Between Cores**
+* Rejected due to complexity and potential blocking behavior
+* Would require queue management and synchronization overhead
+* Atomic state variables are simpler for this use case
+
+**Single Global State Only**
+* Rejected as insufficient for core-specific operational states
+* Would require complex state encoding to represent per-core status
+* Sub-states provide cleaner separation of concerns
+
+**FreeRTOS Task-Based Architecture**
+* Rejected to maintain architectural simplicity
+* Current bare-metal dual-core approach is sufficient
+* Would add RTOS overhead and complexity
+
+### Trade-offs
+* **Memory Usage**: Additional memory for state variables (minimal impact)
+* **Code Complexity**: Additional state management logic (well-contained)
+* **Development Overhead**: Separate modules for each core main function (clear separation)
+
+== Consequences
+
+### Positive
+* **Predictable System Behavior**: State-driven logic provides clear operational modes
+* **Inter-Core Coordination**: Safe dual-core operation with atomic state synchronization
+* **Separation of Concerns**: Runtime state separate from persistent configuration
+* **Testability**: State machine and core logic can be tested independently
+* **Maintainability**: Clear state definitions make debugging and enhancement easier
+* **Performance**: Non-blocking state queries don't impact real-time processing
+
+### Negative
+* **Additional Complexity**: More modules and state management code to maintain
+* **Memory Overhead**: Additional state variables (minimal impact)
+* **Development Time**: Initial implementation of dual-core architecture
+
+### Implementation Requirements
+* State machine module with atomic operations for state transitions
+* Core0 main function with UART processing and state-driven control logic
+* Core1 main function with network, persistence, and log processing
+* State transition validation and error handling
+* Integration with existing shared memory and logging systems
+
+== Implementation Strategy
+
+### State Machine Interface Design
+```c
+// State type definitions
+typedef enum {
+    MAIN_STATE_INIT = 0,
+    MAIN_STATE_CONFIGURATION = 1,
+    MAIN_STATE_OPERATIONAL = 2,
+    MAIN_STATE_ERROR = 3
+} main_state_t;
+
+typedef enum {
+    CORE0_UART_IDLE = 0,
+    CORE0_UART_ACTIVE = 1,
+    CORE0_UART_ERROR = 2
+} core0_substate_t;
+
+typedef enum {
+    CORE1_NET_IDLE = 0,
+    CORE1_NET_CONNECTED = 1,
+    CORE1_NET_ERROR = 2,
+    CORE1_PERSISTENCE_ACTIVE = 3,
+    CORE1_LOG_ACTIVE = 4
+} core1_substate_t;
+
+// Core state machine functions
+bool state_machine_init(void);
+main_state_t state_machine_get_main_state(void);
+core0_substate_t state_machine_get_core0_substate(void);
+core1_substate_t state_machine_get_core1_substate(void);
+bool state_machine_transition_main_state(main_state_t new_state);
+bool state_machine_set_core0_substate(core0_substate_t new_substate);
+bool state_machine_set_core1_substate(core1_substate_t new_substate);
+```
+
+### Core Main Loop Pattern
+```c
+// Core0 main loop structure
+void core0_main(void) {
+    while (true) {
+        main_state_t main_state = state_machine_get_main_state();
+        core0_substate_t sub_state = state_machine_get_core0_substate();
+        
+        // State-driven control logic
+        switch (main_state) {
+            case MAIN_STATE_INIT:
+                // Hardware initialization
+                break;
+            case MAIN_STATE_OPERATIONAL:
+                switch (sub_state) {
+                    case CORE0_UART_IDLE:
+                        // Check for UART activity
+                        break;
+                    case CORE0_UART_ACTIVE:
+                        // Process UART operations
+                        break;
+                    case CORE0_UART_ERROR:
+                        // Handle UART errors
+                        break;
+                }
+                break;
+            case MAIN_STATE_ERROR:
+                // Error recovery
+                break;
+        }
+        sleep_ms(10);  // 10ms loop frequency
+    }
+}
+```
+
+### Memory Layout and Synchronization
+* **Separate Memory Region**: State variables in dedicated memory outside shared_memory_layout_t
+* **Volatile Variables**: All state variables marked volatile for inter-core visibility
+* **Atomic Operations**: State transitions use atomic compare-and-swap or similar
+* **Memory Barriers**: Proper barriers ensure cache coherency between cores
+
+### Integration Points
+* **System Initialization**: State machine initialized early in main()
+* **Error Handling**: System errors trigger state machine error transitions
+* **Configuration Events**: Configuration changes can trigger state transitions
+* **Log Integration**: State changes logged for debugging and monitoring
+
+### Implementation Phases
+
+**Phase 1: State Machine Module**
+1. Create `state_machine.c/h` with basic state variables and functions
+2. Implement atomic state transition functions with validation
+3. Add comprehensive unit tests for state management logic
+4. Document state transition rules and validation logic
+
+**Phase 2: Core Main Loop Architecture**
+1. Modify `main.c` to launch both cores with dedicated entry points
+2. Create `core0_main.c` with UART processing and state-driven logic
+3. Create `core1_main.c` with network, persistence, and log processing
+4. Integrate state queries into existing control flow logic
+
+**Phase 3: System Integration**
+1. Integrate state machine initialization into system startup
+2. Add state-driven control logic for all major system components
+3. Implement error handling and recovery state transitions
+4. Add comprehensive integration tests with both cores
+
+**Phase 4: Performance and Validation**
+1. Performance testing to ensure non-blocking state operations
+2. Stress testing with rapid state transitions under load
+3. Validation of inter-core synchronization and race condition handling
+4. Documentation and final integration with existing systems
+
+### Test Strategy
+
+**Unit Tests (TDD Approach)**
+* Test state variable initialization and default states
+* Test atomic state transition functions with concurrent access
+* Test state transition validation and error handling
+* Test state query functions for non-blocking behavior
+* Test invalid state transition rejection
+
+**Integration Tests**
+* Test dual-core launch and core main loop initialization
+* Test state-driven control logic in both core main loops
+* Test inter-core state synchronization under various conditions
+* Test error recovery and state transition during error conditions
+* Test performance impact on real-time UART and network operations
+
+**System Tests**
+* End-to-end testing of complete system with state machine integration
+* Stress testing with rapid configuration changes and error conditions
+* Validation of system behavior consistency across state transitions
+* Long-running stability testing with continuous state changes
