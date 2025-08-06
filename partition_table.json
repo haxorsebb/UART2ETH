@@ -29,7 +29,8 @@
         "secure": "rw",
         "nonsecure": "rw",
         "bootloader": "rw"
-      }
+      },
+      "link": ["a", 0]
     },
     {
       "name": "Configuration Data",
@@ -41,8 +42,8 @@
         "nonsecure": "rw",
         "bootloader": "rw"
       },
-      "link": ["owner", 0],
-      "ignored_during_arm_boot": true
+      "ignored_during_arm_boot": true,
+      "ignored_during_riscv_boot": true
     }
   ]
 }

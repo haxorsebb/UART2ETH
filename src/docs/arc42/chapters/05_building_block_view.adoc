@@ -129,7 +129,7 @@ The dual-core separation strategy from our solution approach drives this decompo
 |Manages secure firmware updates with A/B partition management, signature validation, and automatic rollback capabilities.
 
 |*Global State Machine*
-|Coordinates overall system state across both cores including boot sequence, operational modes, error handling, and update states. Provides centralized state synchronization and transition control.
+|Coordinates overall system state across both cores through shared main_state (16-bit) and per-core sub_states. Implements INIT, CONFIGURATION, OPERATIONAL, and ERROR states with atomic state transitions and validation. Provides state-driven control logic for core main loops without persisting state information.
 
 |*Log Manager*
 |Collects, formats, and stores system-wide events, errors, performance data, and diagnostic information from all components. Provides log rotation, filtering, and integration with management interface for diagnostics.
@@ -164,10 +164,12 @@ The dual-core separation strategy from our solution approach drives this decompo
 * **Configuration**: Per-channel baud rate, data bits, stop bits, parity settings
 
 ===== Global State Machine Interface
-* **States**: BOOT, INITIALIZING, OPERATIONAL, ERROR, UPDATE_MODE, RECOVERY
-* **Inter-core**: Shared state variables with atomic updates and cache coherency
-* **Transitions**: Event-driven state changes with validation and rollback capability
-* **Synchronization**: Cross-core state synchronization using FreeRTOS primitives
+* **Main States**: INIT, CONFIGURATION, OPERATIONAL, ERROR - shared 16-bit variable between cores
+* **Core0 Sub-States**: UART_IDLE, UART_ACTIVE, UART_ERROR - core-specific state machine
+* **Core1 Sub-States**: NET_IDLE, NET_CONNECTED, NET_ERROR, PERSISTENCE_ACTIVE, LOG_ACTIVE
+* **Transitions**: Atomic state changes with validation, no persistence of state information
+* **State-Driven Logic**: Core main loops query states to control their behavior and operations
+* **Synchronization**: Inter-core state coordination through volatile variables and memory barriers
 
 ===== Logging Interface
 * **Log Levels**: DEBUG, INFO, WARN, ERROR, CRITICAL with configurable filtering
@@ -1294,7 +1296,101 @@ typedef struct {
 } ring_buffer_state_t;
 ----
 
-==== Whitebox Management Interface Internal Structure  
+===== Flash Persistence Implementation
+
+The flash persistence system is implemented using **Path 2: Extension of Existing Shared Memory Framework** approach as decided in the technical requirements. This provides seamless integration with the current shared memory layout while maintaining architectural simplicity.
+
+====== Implementation Architecture
+
+**Core Implementation Components:**
+
+* **RP2350 Bootrom Integration**: Uses `get_partition_table_info()` and partition bootrom APIs to locate partition ID=2
+* **Hardware SHA256**: Leverages pico-sdk's hardware crypto for fast integrity verification
+* **Core1 Main Loop Integration**: Persistence checking as lowest priority task with 30-second intervals
+* **Real Flash Testing**: All development and testing performed on actual RP2350 flash hardware
+
+====== Implementation Strategy
+
+**Flash Operations Layer:**
+[source,c]
+----
+// Flash operations using RP2350 bootrom APIs
+typedef struct {
+    uint32_t partition_base_offset;      // Partition ID=2 flash offset
+    uint32_t partition_size;             // 512KB partition size
+    uint32_t page_size;                  // 4096 bytes per page
+    bool partition_valid;                // Partition table loaded successfully
+} flash_partition_info_t;
+
+// Ring buffer state tracking (static variables in persistence module)
+typedef struct {
+    uint8_t current_write_page;          // 0-3, next page to write
+    uint8_t last_written_page;           // 0-3, last successfully written page
+    uint32_t last_written_revision;      // Last revision_counter written to flash
+    uint32_t total_writes;               // Lifetime write counter
+    uint32_t corruption_count;           // Detected corruption events
+    absolute_time_t last_write_time;     // Timestamp of last write for 30-second interval
+} flash_ring_state_t;
+----
+
+**Core1 Integration Pattern:**
+[source,c]
+----
+// Core1 main function structure
+void core1_main(void) {
+    // Initialize Core1 subsystems
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
+    
+    while (true) {
+        // High priority tasks (network processing, TCP/IP)
+        network_process_tasks();
+        
+        // Medium priority tasks (management interface, statistics)
+        management_interface_process();
+        
+        // Low priority tasks (background maintenance)
+        log_manager_format_pending();
+        
+        // LOWEST priority task: Flash persistence (deferred write-back)
+        flash_persistence_save_configuration_if_needed();
+        
+        sleep_ms(100);  // 100ms main loop frequency
+    }
+}
+----
+
+====== Error Handling and Recovery
+
+**Factory Reset Procedure:**
+1. **Corruption Detection**: If all 4 ring buffer pages fail SHA256 verification
+2. **Factory Reset Execution**: Call `shared_memory_init()` to restore defaults
+3. **Emergency Logging**: Log factory reset event as first entry in clean log system
+4. **Force Save**: Immediately save factory defaults to establish valid flash state
+
+**Startup Recovery Process:**
+1. **Partition Discovery**: Use bootrom APIs to locate configuration data partition
+2. **Page Validation**: Read all 4 pages, verify magic numbers and SHA256 checksums
+3. **Best Page Selection**: Choose page with highest revision + valid checksum
+4. **Graceful Degradation**: Factory reset if no valid pages found, log corruption count
+
+====== Testing Strategy
+
+**Real Hardware Testing Approach:**
+- All persistence tests run on actual RP2350 flash hardware
+- Test ring buffer wraparound with real 4096-byte page operations
+- Verify SHA256 integrity checking with hardware crypto acceleration
+- Test power-loss scenarios by controlled resets during write operations
+- Validate 30-second deferred write-back timing with Core1 main loop
+
+**Test Coverage Requirements:**
+- Atomic flash page operations (read/write/erase)
+- Ring buffer advancement and wraparound
+- SHA256 integrity verification and corruption detection
+- Startup recovery with various corruption scenarios
+- Core1 integration and timing verification
+- Factory reset functionality and logging
+
+==== Whitebox Management Interface Internal Structure
 
 The Management Interface provides comprehensive web-based administration through specialized components for HTTP serving, authentication, statistics, and configuration management.
 
@@ -1487,3 +1583,312 @@ typedef struct {
     uint16_t management_port;          // Web UI port (default 80)
 } network_config_t;
 ----
+
+==== Whitebox Global State Machine
+
+The Global State Machine implements **three independent event-driven state machines** with **atomic main state** and **ISR-safe sub-states**. Each state machine follows the strict pattern `current_state + event + check_condition() → new_state` with no direct state manipulation allowed. This architecture provides predictable system coordination without persisting state information.
+
+[plantuml, level2-event-driven-state-machine, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Event-Driven State Machine Architecture (Whitebox)
+
+actor "System Events\nInitialization, Errors\nConfiguration Changes" as SYS_EVENTS
+cloud "Core 0 Main Loop\nUART Processing\nEvent Generation" as CORE0
+cloud "Core 1 Main Loop\nNetwork + Persistence\nEvent Generation" as CORE1
+cloud "Interrupt Handlers\nISR Context Events\nHardware Events" as ISR
+
+package "Event-Driven State Machine Module" {
+    component "Main State Machine\nAtonic Operations\nCross-core shared\nINIT → CONFIGURATION → OPERATIONAL ↔ ERROR" as MAIN_SM #lightgreen
+    
+    component "Core0 State Machine\nISR-safe Operations\nCore0-owned only\nUART_IDLE → UART_ACTIVE ↔ UART_ERROR" as CORE0_SM #lightblue
+    
+    component "Core1 State Machine\nISR-safe Operations\nCore1-owned only\nNET_DISCONNECTED → NET_IDLE → NET_ACTIVE" as CORE1_SM #lightcyan
+    
+    component "Main Event Processor\nEvent Validation\nCondition Checking\nAtomic State Transitions" as MAIN_PROC #lightpink
+    
+    component "Core0 Event Processor\nEvent Validation\nCondition Checking\nISR-safe Transitions" as CORE0_PROC #lightsalmon
+    
+    component "Core1 Event Processor\nEvent Validation\nCondition Checking\nISR-safe Transitions" as CORE1_PROC #lightsteelblue
+    
+    component "State Query Interface\nRead-only Access\nNon-blocking Queries\nVolatile State Variables" as QUERY_IF #lightgray
+    
+    component "Condition Checker\nTransition Validation\nSystem State Checks\nHardware Status Verification" as CONDITIONS #wheat
+}
+
+' External event connections
+SYS_EVENTS --> MAIN_PROC : System Events\nMAIN_EVENT_INIT_COMPLETE\nMAIN_EVENT_SYSTEM_ERROR
+CORE0 --> CORE0_PROC : Core0 Events\nCORE0_EVENT_UART_DATA_READY\nCORE0_EVENT_UART_ERROR  
+CORE1 --> CORE1_PROC : Core1 Events\nCORE1_EVENT_NETWORK_UP\nCORE1_EVENT_PERSISTENCE_START
+ISR --> CORE0_PROC : ISR Events\nUART Interrupts
+ISR --> CORE1_PROC : ISR Events\nNetwork Interrupts
+
+' State query connections
+CORE0 <--> QUERY_IF : State Queries\nstate_machine_get_*()
+CORE1 <--> QUERY_IF : State Queries\nstate_machine_get_*()
+
+' Internal connections - Event Processing
+MAIN_PROC <--> MAIN_SM : Event Processing\nAtomic Transitions
+CORE0_PROC <--> CORE0_SM : Event Processing\nISR-safe Transitions
+CORE1_PROC <--> CORE1_SM : Event Processing\nISR-safe Transitions
+
+' Internal connections - State Queries
+QUERY_IF <--> MAIN_SM : Read Main State\nVolatile Access
+QUERY_IF <--> CORE0_SM : Read Core0 State\nVolatile Access
+QUERY_IF <--> CORE1_SM : Read Core1 State\nVolatile Access
+
+' Internal connections - Condition Checking
+MAIN_PROC <--> CONDITIONS : Condition Checks\ncheck_initialization_complete()
+CORE0_PROC <--> CONDITIONS : Condition Checks\ncheck_uart_data_available()
+CORE1_PROC <--> CONDITIONS : Condition Checks\ncheck_network_interface_ready()
+
+@enduml
+----
+
+===== Motivation
+
+The event-driven architecture prevents invalid state transitions by eliminating direct state manipulation. Three independent state machines provide lock-free operation with atomic main state coordination and ISR-safe sub-state management. This design ensures predictable system behavior through validated state transitions while maintaining high performance for real-time operations.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*Main State Machine*
+|Implements atomic event-driven state machine for system-wide coordination. Handles INIT → CONFIGURATION → OPERATIONAL ↔ ERROR transitions through atomic compare-and-swap operations. Thread-safe for cross-core access.
+
+|*Core0 State Machine*
+|Implements ISR-safe event-driven state machine for UART processing. Manages UART_IDLE → UART_ACTIVE ↔ UART_ERROR transitions. Owned exclusively by Core0, no cross-core locking required.
+
+|*Core1 State Machine*
+|Implements ISR-safe event-driven state machine for network and maintenance operations. Manages NET_DISCONNECTED → NET_IDLE → NET_ACTIVE, PERSISTENCE_ACTIVE, and LOG_ACTIVE transitions. Owned exclusively by Core1.
+
+|*Main Event Processor*
+|Processes system-wide events for main state transitions. Implements `main_state + event + condition → new_main_state` pattern with atomic operations. Validates all transitions before applying.
+
+|*Core0 Event Processor*
+|Processes Core0-specific events for UART sub-state transitions. Implements `core0_substate + event + condition → new_core0_substate` pattern with ISR-safe operations. Called from interrupt context.
+
+|*Core1 Event Processor*
+|Processes Core1-specific events for network and maintenance sub-state transitions. Implements `core1_substate + event + condition → new_core1_substate` pattern with ISR-safe operations.
+
+|*State Query Interface*
+|Provides non-blocking read-only access to current state information. Returns volatile state variables for main loops to make control flow decisions. Never blocks operations.
+
+|*Condition Checker*
+|Implements validation functions for state transition conditions. Checks system state, hardware status, and configuration validity before allowing transitions. Prevents invalid state changes.
+|===
+
+===== Important Interfaces
+
+====== Main State Definitions
+[source,c]
+----
+typedef enum {
+    MAIN_STATE_INIT = 0,           // System initialization and hardware setup
+    MAIN_STATE_CONFIGURATION = 1,  // Configuration loading and validation
+    MAIN_STATE_OPERATIONAL = 2,    // Normal operation mode
+    MAIN_STATE_ERROR = 3           // Error state requiring recovery
+} main_state_t;
+----
+
+====== Core Sub-State Definitions  
+[source,c]
+----
+typedef enum {
+    CORE0_UART_IDLE = 0,    // No active UART operations
+    CORE0_UART_ACTIVE = 1,  // Processing UART data
+    CORE0_UART_ERROR = 2    // UART hardware error state
+} core0_substate_t;
+
+typedef enum {
+    CORE1_NET_DISCONNECTED = 0,   // Network interface down
+    CORE1_NET_IDLE = 1,           // Network interface up, no connections
+    CORE1_NET_ACTIVE = 2,         // Active network connections
+    CORE1_PERSISTENCE_ACTIVE = 3, // Flash persistence operation active
+    CORE1_LOG_ACTIVE = 4          // Log processing active
+} core1_substate_t;
+----
+
+====== Event-Driven State Machine API
+[source,c]
+----
+// State initialization
+bool state_machine_init(void);
+
+// State query functions (non-blocking, read-only)
+main_state_t state_machine_get_main_state(void);
+core0_substate_t state_machine_get_core0_substate(void);
+core1_substate_t state_machine_get_core1_substate(void);
+
+// Event processing functions (ONLY way to change states)
+bool state_machine_process_main_event(main_state_event_t event);
+bool state_machine_process_core0_event(core0_event_t event);
+bool state_machine_process_core1_event(core1_event_t event);
+
+// Event type definitions
+typedef enum {
+    MAIN_EVENT_INIT_COMPLETE,      // Initialization finished successfully
+    MAIN_EVENT_CONFIG_LOADED,      // Configuration loaded and validated
+    MAIN_EVENT_SYSTEM_ERROR,       // System error detected
+    MAIN_EVENT_ERROR_RECOVERED     // Recovery from error state complete
+} main_state_event_t;
+
+typedef enum {
+    CORE0_EVENT_UART_DATA_READY,   // UART data available for processing
+    CORE0_EVENT_UART_IDLE,         // UART processing completed
+    CORE0_EVENT_UART_ERROR,        // UART hardware error detected
+    CORE0_EVENT_ERROR_RECOVERED    // UART error recovery complete
+} core0_event_t;
+
+typedef enum {
+    CORE1_EVENT_NETWORK_UP,        // Network interface connected
+    CORE1_EVENT_NETWORK_DOWN,      // Network interface disconnected
+    CORE1_EVENT_CONNECTION_ACTIVE, // TCP connection established
+    CORE1_EVENT_CONNECTION_IDLE,   // All connections closed
+    CORE1_EVENT_PERSISTENCE_START, // Flash operation starting
+    CORE1_EVENT_PERSISTENCE_END,   // Flash operation completed
+    CORE1_EVENT_LOG_START,         // Log processing starting
+    CORE1_EVENT_LOG_END            // Log processing completed
+} core1_event_t;
+----
+
+====== Event-Driven Core Main Loop Integration
+[source,c]
+----
+// Core0 event-driven main loop structure
+void core0_main(void) {
+    while (true) {
+        main_state_t main_state = state_machine_get_main_state();
+        core0_substate_t sub_state = state_machine_get_core0_substate();
+        
+        // State-driven control logic with event generation
+        switch (main_state) {
+            case MAIN_STATE_INIT:
+                if (initialize_uart_hardware()) {
+                    // Send event to transition main state
+                    state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE);
+                }
+                break;
+                
+            case MAIN_STATE_OPERATIONAL:
+                switch (sub_state) {
+                    case CORE0_UART_IDLE:
+                        if (uart_data_available()) {
+                            // Generate event to start UART processing
+                            state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
+                        }
+                        break;
+                    case CORE0_UART_ACTIVE:
+                        if (process_uart_data()) {
+                            // Processing complete, generate idle event
+                            state_machine_process_core0_event(CORE0_EVENT_UART_IDLE);
+                        }
+                        break;
+                    case CORE0_UART_ERROR:
+                        if (attempt_uart_recovery()) {
+                            // Recovery successful, generate recovery event
+                            state_machine_process_core0_event(CORE0_EVENT_ERROR_RECOVERED);
+                        }
+                        break;
+                }
+                break;
+                
+            case MAIN_STATE_ERROR:
+                // Attempt system recovery
+                if (perform_error_recovery()) {
+                    state_machine_process_main_event(MAIN_EVENT_ERROR_RECOVERED);
+                }
+                break;
+        }
+        sleep_ms(10);
+    }
+}
+
+// Core1 main loop with log processing requirement
+void core1_main(void) {
+    while (true) {
+        // High priority: Network processing
+        process_network_operations();
+        
+        // Medium priority: Persistence operations
+        if (persistence_needed()) {
+            state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_START);
+            flash_persistence_save_configuration_if_needed();
+            state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_END);
+        }
+        
+        // Low priority: Process ONE log event per iteration
+        if (log_events_pending()) {
+            state_machine_process_core1_event(CORE1_EVENT_LOG_START);
+            log_manager_format_one_pending_event();  // Process exactly one event
+            state_machine_process_core1_event(CORE1_EVENT_LOG_END);
+        }
+        
+        sleep_ms(100);  // 100ms loop frequency
+    }
+}
+----
+
+====== Event Processing Implementation Pattern
+[source,c]
+----
+// Example: Core0 event processing with condition checking
+bool state_machine_process_core0_event(core0_event_t event) {
+    core0_substate_t current_state = state_machine_get_core0_substate();
+    core0_substate_t new_state = current_state;  // Default: no change
+    
+    // State + Event + Condition → New State
+    switch (current_state) {
+        case CORE0_UART_IDLE:
+            if (event == CORE0_EVENT_UART_DATA_READY) {
+                if (check_uart_data_available() && check_main_state_operational()) {
+                    new_state = CORE0_UART_ACTIVE;
+                }
+            }
+            break;
+            
+        case CORE0_UART_ACTIVE:
+            switch (event) {
+                case CORE0_EVENT_UART_IDLE:
+                    if (check_uart_processing_complete()) {
+                        new_state = CORE0_UART_IDLE;
+                    }
+                    break;
+                case CORE0_EVENT_UART_ERROR:
+                    new_state = CORE0_UART_ERROR;
+                    break;
+            }
+            break;
+            
+        case CORE0_UART_ERROR:
+            if (event == CORE0_EVENT_ERROR_RECOVERED) {
+                if (check_uart_hardware_recovered()) {
+                    new_state = CORE0_UART_IDLE;
+                }
+            }
+            break;
+    }
+    
+    // Apply state change if needed (ISR-safe atomic operation)
+    if (new_state != current_state) {
+        return atomic_compare_exchange_strong(&g_core0_substate, &current_state, new_state);
+    }
+    
+    return true;  // No change needed
+}
+----
+
+====== Memory Layout and Synchronization
+* **Non-Persistent**: State variables are NOT stored in shared_memory_layout_t
+* **Atomic Variables**: Main state uses atomic types for cross-core coordination
+* **Volatile Variables**: Sub-state variables marked volatile for ISR visibility
+* **ISR-Safe Operations**: Sub-state transitions safe for interrupt context
+* **Lock-Free Design**: Each core owns its sub-state, no cross-core locking
+* **Memory Barriers**: Proper barriers ensure cache coherency between cores
+* **Separate Memory Region**: State machine uses dedicated memory region outside persistent storage

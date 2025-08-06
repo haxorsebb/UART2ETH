@@ -53,6 +53,8 @@ target_link_libraries(uart2eth
     hardware_watchdog  # Watchdog for stability
     config_manager     # Our config manager library
     log_manager        # Our log manager library
+    state_machine      # Our event-driven state machine library
+    core_modules       # Core0 and Core1 main functions
 )
 
 # Enable dual stdio (USB CDC + UART0)

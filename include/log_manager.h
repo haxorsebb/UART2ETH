@@ -90,6 +90,7 @@ typedef uint16_t event_type_t;
 #define LOG_EVENT_CONFIG_CHANGED  ((event_type_t)300)
 #define LOG_EVENT_CONFIG_SAVED    ((event_type_t)301)
 #define LOG_EVENT_CONFIG_LOADED   ((event_type_t)302)
+#define LOG_EVENT_FACTORY_RESET   ((event_type_t)303)
 
 // OTA events (400-499)
 #define LOG_EVENT_OTA_START       ((event_type_t)400)

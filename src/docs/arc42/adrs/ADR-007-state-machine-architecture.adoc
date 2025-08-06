@@ -1,0 +1,358 @@
+= ADR-007: State Machine Architecture
+
+== Status
+Decided
+
+== Date
+2024-01-16 (Updated: 2025-08-06)
+
+== Context
+
+The UART2ETH system requires coordinated dual-core operation with predictable behavior across system initialization, normal operation, error conditions, and configuration changes. The system needs a mechanism to synchronize Core0 (UART processing) and Core1 (network and persistence) while avoiding tight coupling between cores.
+
+Key requirements:
+* Dual-core state coordination without blocking operations
+* State-driven control logic for predictable core behavior
+* Clear separation between runtime state and persistent configuration
+* **Event-driven state transitions** with condition validation (no direct state manipulation)
+* **ISR-safe operations** for core-specific sub-states
+* **Atomic operations** for shared main state
+* Support for core-specific sub-states within global system states
+* Non-persistent state information (states should not survive reboots)
+
+== Decision
+
+We will implement **three independent event-driven state machines** with **atomic main state** and **ISR-safe sub-states** using the following architecture:
+
+### Event-Driven State Machine Architecture
+
+**Three Independent State Machines:**
+* **Main State Machine**: Global system coordination (atomic, cross-core)
+* **Core0 Sub-State Machine**: UART-specific operations (ISR-safe, Core0-only)  
+* **Core1 Sub-State Machine**: Network and maintenance operations (ISR-safe, Core1-only)
+
+**Event-Driven Pattern Only:**
+* **No Direct State Setting**: State machines only accept events, never direct state manipulation
+* **Transition Function**: `current_state + event + check_condition() → new_state`
+* **Validation Required**: All transitions must pass condition checks
+* **Event Processing**: Single interface for each state machine
+
+### State Definitions
+
+**Main States (shared between cores):**
+* `INIT`: System initialization and hardware setup
+* `CONFIGURATION`: Configuration loading and validation  
+* `OPERATIONAL`: Normal operation mode
+* `ERROR`: Error state requiring recovery
+
+**Core0 Sub-States (UART processing):**
+* `UART_IDLE`: No active UART operations
+* `UART_ACTIVE`: Processing UART data
+* `UART_ERROR`: UART hardware error state
+
+**Core1 Sub-States (Network and maintenance):**
+* `NET_DISCONNECTED`: Network interface down
+* `NET_IDLE`: Network interface up, no active connections
+* `NET_ACTIVE`: Active network connections
+* `PERSISTENCE_ACTIVE`: Flash persistence operation active
+* `LOG_ACTIVE`: Log processing active
+
+### Event-Driven Interface Design
+
+**Core State Machine Interface:**
+```c
+// Event processing functions (the ONLY way to change states)
+bool state_machine_process_main_event(main_state_event_t event);
+bool state_machine_process_core0_event(core0_event_t event);  
+bool state_machine_process_core1_event(core1_event_t event);
+
+// State queries (read-only, non-blocking)
+main_state_t state_machine_get_main_state(void);
+core0_substate_t state_machine_get_core0_substate(void);
+core1_substate_t state_machine_get_core1_substate(void);
+
+// Event type definitions
+typedef enum {
+    MAIN_EVENT_INIT_COMPLETE,      // Initialization finished successfully
+    MAIN_EVENT_CONFIG_LOADED,      // Configuration loaded and validated
+    MAIN_EVENT_SYSTEM_ERROR,       // System error detected
+    MAIN_EVENT_ERROR_RECOVERED     // Recovery from error state complete
+} main_state_event_t;
+
+typedef enum {
+    CORE0_EVENT_UART_DATA_READY,   // UART data available for processing
+    CORE0_EVENT_UART_IDLE,         // UART processing completed
+    CORE0_EVENT_UART_ERROR,        // UART hardware error detected
+    CORE0_EVENT_ERROR_RECOVERED    // UART error recovery complete
+} core0_event_t;
+
+typedef enum {
+    CORE1_EVENT_NETWORK_UP,        // Network interface connected
+    CORE1_EVENT_NETWORK_DOWN,      // Network interface disconnected
+    CORE1_EVENT_CONNECTION_ACTIVE, // TCP connection established
+    CORE1_EVENT_CONNECTION_IDLE,   // All connections closed
+    CORE1_EVENT_PERSISTENCE_START, // Flash operation starting
+    CORE1_EVENT_PERSISTENCE_END,   // Flash operation completed
+    CORE1_EVENT_LOG_START,         // Log processing starting
+    CORE1_EVENT_LOG_END            // Log processing completed
+} core1_event_t;
+```
+
+### Concurrency and Safety Model
+
+**Main State Machine:**
+* **Atomic Operations**: Uses atomic compare-and-swap for state transitions
+* **Cross-Core Access**: Both cores can send events, both can read state
+* **Memory Barriers**: Proper barriers ensure cache coherency
+
+**Sub-State Machines:**
+* **ISR-Safe**: Compatible with interrupt service routines
+* **Single-Core Ownership**: Core0 owns Core0 sub-state, Core1 owns Core1 sub-state
+* **No Cross-Core Locking**: No mutexes required for sub-states
+* **Atomic Variables**: Use atomic variables for ISR safety
+
+### Core Main Loop Architecture
+* **Dual-Core Launch**: `main.c` modified to launch both cores
+* **Core-Specific Modules**: `core0_main.c` and `core1_main.c` with dedicated main functions
+* **State-Driven Logic**: Core main loops query states and send events to control behavior
+* **Non-Blocking Queries**: State access never blocks core operations
+
+### Core1 Integration Requirements
+* **Core1 Persistence**: Handle configuration persistence operations
+* **Core1 Log Processing**: Process **one log event per loop iteration**
+* **Priority Scheduling**: High-priority network, low-priority maintenance tasks
+
+## Rationale
+
+### Advantages
+* **Event-Driven Safety**: Impossible to set invalid states - all transitions validated
+* **ISR Compatibility**: Sub-state machines safe for interrupt context
+* **Lock-Free Design**: Each core owns its sub-state, no cross-core locking required
+* **Predictable Behavior**: State-driven control logic provides deterministic system behavior
+* **Atomic Inter-Core Coordination**: Main state provides safe dual-core synchronization
+* **Testability**: Event processing and condition functions can be unit tested independently
+* **Maintainability**: Clear event definitions make system behavior easier to understand
+* **Performance**: Non-blocking state queries and lock-free sub-states
+
+### Event-Driven Design Benefits
+* **Invalid State Prevention**: No way to directly set invalid states
+* **Condition Validation**: All transitions must pass validation checks
+* **Audit Trail**: Event processing provides clear state change history
+* **Debugging**: Events can be logged for system behavior analysis
+* **Deterministic**: Same event + same state + same conditions = same result
+
+### Rejected Alternatives
+
+**Direct State Setting Functions**
+* Rejected because they allow invalid state transitions
+* No validation of transition legality
+* Difficult to debug and audit state changes
+* Race conditions in multi-core environment
+
+**Shared Memory State Storage**
+* Rejected because states are runtime information, not configuration data
+* Would persist unnecessary runtime state across reboots
+* Couples state management to configuration persistence
+
+**Message Passing Between Cores**
+* Rejected due to complexity and potential blocking behavior
+* Would require queue management and synchronization overhead
+* Atomic state variables are simpler for this use case
+
+**Single Global State Only**
+* Rejected as insufficient for core-specific operational states
+* Would require complex state encoding to represent per-core status
+* Sub-states provide cleaner separation of concerns
+
+### Trade-offs
+* **Code Complexity**: Event-driven pattern requires more code than direct setting
+* **Memory Usage**: Event processing functions and condition checks (minimal impact)
+* **Development Overhead**: Must design proper events and conditions for each transition
+
+== Consequences
+
+### Positive
+* **Impossible Invalid States**: Event-driven pattern prevents invalid state transitions
+* **ISR-Safe Operations**: Sub-state machines work correctly in interrupt context
+* **Lock-Free Performance**: No blocking between cores for sub-state operations
+* **Predictable System Behavior**: State-driven logic provides clear operational modes
+* **Inter-Core Coordination**: Safe dual-core operation with atomic main state
+* **Separation of Concerns**: Runtime state separate from persistent configuration
+* **Testability**: Event processing and condition logic can be tested independently
+* **Maintainability**: Clear event and condition definitions aid debugging
+* **Auditability**: Event processing provides state change history
+
+### Negative
+* **Additional Complexity**: Event-driven pattern requires more implementation code
+* **Memory Overhead**: Additional event processing and condition functions
+* **Development Time**: Must design proper events and conditions for each transition
+* **Learning Curve**: Developers must understand event-driven state machine patterns
+
+### Implementation Requirements
+* Event-driven state machine module with atomic operations and ISR-safe sub-states
+* Core0 main function with UART processing and event-driven control logic
+* Core1 main function with network, persistence, and log processing
+* Event processing with condition validation for all state transitions
+* Integration with existing shared memory and logging systems
+
+== Implementation Strategy
+
+### Event Processing Pattern
+```c
+// Example: Main state machine event processing
+bool state_machine_process_main_event(main_state_event_t event) {
+    main_state_t current_state = state_machine_get_main_state();
+    main_state_t new_state = current_state;  // Default: no change
+    
+    // State + Event + Condition → New State
+    switch (current_state) {
+        case MAIN_STATE_INIT:
+            switch (event) {
+                case MAIN_EVENT_INIT_COMPLETE:
+                    if (check_initialization_complete()) {
+                        new_state = MAIN_STATE_CONFIGURATION;
+                    }
+                    break;
+            }
+            break;
+            
+        case MAIN_STATE_CONFIGURATION:
+            switch (event) {
+                case MAIN_EVENT_CONFIG_LOADED:
+                    if (check_configuration_valid()) {
+                        new_state = MAIN_STATE_OPERATIONAL;
+                    }
+                    break;
+                case MAIN_EVENT_SYSTEM_ERROR:
+                    new_state = MAIN_STATE_ERROR;
+                    break;
+            }
+            break;
+            
+        case MAIN_STATE_OPERATIONAL:
+            switch (event) {
+                case MAIN_EVENT_SYSTEM_ERROR:
+                    new_state = MAIN_STATE_ERROR;
+                    break;
+            }
+            break;
+            
+        case MAIN_STATE_ERROR:
+            switch (event) {
+                case MAIN_EVENT_ERROR_RECOVERED:
+                    if (check_error_recovery_complete()) {
+                        new_state = MAIN_STATE_OPERATIONAL;
+                    }
+                    break;
+            }
+            break;
+    }
+    
+    // Atomic state transition if changed
+    if (new_state != current_state) {
+        return atomic_compare_exchange_strong(&g_main_state, &current_state, new_state);
+    }
+    
+    return true;  // No change needed
+}
+
+// Example: Condition checking function
+static bool check_initialization_complete(void) {
+    return (shared_memory_initialized() && 
+            uart_hardware_initialized() && 
+            network_interface_ready());
+}
+```
+
+### Core Main Loop Event-Driven Pattern
+```c
+// Core0 main loop with event-driven logic
+void core0_main(void) {
+    while (true) {
+        main_state_t main_state = state_machine_get_main_state();
+        core0_substate_t sub_state = state_machine_get_core0_substate();
+        
+        // State-driven control logic with event generation
+        switch (main_state) {
+            case MAIN_STATE_OPERATIONAL:
+                switch (sub_state) {
+                    case CORE0_UART_IDLE:
+                        if (uart_data_available()) {
+                            state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
+                        }
+                        break;
+                    case CORE0_UART_ACTIVE:
+                        if (process_uart_data()) {
+                            // Processing complete
+                            state_machine_process_core0_event(CORE0_EVENT_UART_IDLE);
+                        }
+                        break;
+                    case CORE0_UART_ERROR:
+                        if (attempt_uart_recovery()) {
+                            state_machine_process_core0_event(CORE0_EVENT_ERROR_RECOVERED);
+                        }
+                        break;
+                }
+                break;
+        }
+        sleep_ms(10);  // 10ms loop frequency
+    }
+}
+```
+
+### Memory Layout and Synchronization
+* **Separate Memory Region**: State variables in dedicated memory outside shared_memory_layout_t
+* **Atomic Variables**: Main state uses atomic types for cross-core safety
+* **Volatile Variables**: Sub-state variables marked volatile for ISR visibility
+* **Memory Barriers**: Proper barriers ensure cache coherency between cores
+* **ISR-Safe Operations**: Sub-state transitions safe for interrupt context
+
+### Implementation Phases
+
+**Phase 1: Event-Driven State Machine Module**
+1. Create `state_machine.c/h` with event processing functions
+2. Implement atomic main state transitions with condition validation
+3. Implement ISR-safe sub-state transitions with condition validation
+4. Add comprehensive unit tests for event processing logic
+5. Document event types, conditions, and transition rules
+
+**Phase 2: Core Main Loop Architecture**
+1. Modify `main.c` to launch both cores with dedicated entry points
+2. Create `core0_main.c` with UART processing and event-driven logic
+3. Create `core1_main.c` with network, persistence, and log processing
+4. Integrate event generation into existing control flow logic
+
+**Phase 3: System Integration**
+1. Integrate state machine initialization into system startup
+2. Add event-driven control logic for all major system components
+3. Implement error handling and recovery event generation
+4. Add comprehensive integration tests with both cores
+
+**Phase 4: Performance and Validation**
+1. Performance testing to ensure non-blocking event processing
+2. Stress testing with rapid event generation under load
+3. Validation of ISR-safe sub-state operations
+4. Documentation and final integration with existing systems
+
+### Test Strategy
+
+**Unit Tests (TDD Approach)**
+* Test event processing functions with all valid state/event combinations
+* Test condition checking functions with various system states
+* Test invalid event rejection and no-change scenarios
+* Test atomic state transitions with concurrent access
+* Test ISR-safe sub-state operations
+* Test state query functions for non-blocking behavior
+
+**Integration Tests**
+* Test dual-core launch and event-driven main loop operation
+* Test inter-core main state synchronization during event processing
+* Test ISR context sub-state operations during interrupt handling
+* Test error recovery and event processing during error conditions
+* Test performance impact on real-time UART and network operations
+
+**System Tests**
+* End-to-end testing of complete system with event-driven state transitions
+* Stress testing with rapid event generation and state changes
+* Validation of system behavior consistency across event-driven transitions
+* Long-running stability testing with continuous event processing

@@ -122,3 +122,134 @@ The persistence system will be integrated into the existing shared memory module
 The `revision_counter` in `g_shared_memory` serves dual purposes:
 1. Coordination between cores for configuration changes
 2. Flash persistence trigger and page selection during recovery
+
+== Detailed Implementation Strategy
+
+### Partition Table Integration
+* **RP2350 Bootrom APIs**: Use `rom_get_partition_table_info()` and `rom_flash_op()` for partition access
+* **No Raw Flash Offsets**: Leverage bootrom partition table parsing instead of manual calculations
+* **Permission Checking**: Bootrom automatically validates partition permissions during flash operations
+* **Partition Discovery**: Use partition ID=2 to locate configuration data partition at runtime
+
+### Hardware Crypto Implementation
+* **SHA256 Engine**: Use pico-sdk hardware crypto APIs for integrity verification
+* **Fresh Implementation**: Start with clean integration of `pico/crypto/hash.h` interfaces
+* **Performance Optimization**: Hardware acceleration eliminates software SHA256 overhead
+* **Atomic Checksum**: Generate SHA256 for complete shared memory structure per snapshot
+
+### Core1 Integration Strategy
+* **New Core1 Main Function**: Create `core1_main()` as entry point for Core1 processing
+* **Lowest Priority Task**: Flash persistence checking runs after all other Core1 tasks
+* **Deferred Write Logic**: Check for changes every 100ms, write only if 30+ seconds elapsed
+* **Non-blocking Operation**: Persistence never blocks critical network or ring buffer operations
+
+### Change Detection and Write Control
+* **Static State Tracking**: Local static variable tracks last written `revision_counter` value
+* **Change Detection**: Compare current vs. last written revision to detect config changes
+* **Write Frequency Limiting**: Track last write timestamp, enforce 30-second minimum interval
+* **Atomic Decision**: Only proceed with write if both change detected AND time interval met
+
+### Error Handling and Recovery
+* **Factory Reset Strategy**: If all 4 ring buffer pages corrupt, load `shared_memory_init()` defaults
+* **Recovery Event Logging**: Use existing `log_event()` API to record factory reset as first entry
+* **Graceful Degradation**: System continues operation with defaults if persistence fails
+* **Corruption Detection**: SHA256 mismatch triggers recovery sequence with detailed error logging
+
+### Ring Buffer State Management
+* **4-Page Circular Buffer**: Pages 0-3 in sequential write order with wrap-around at page 3→0
+* **Page Selection Logic**: Write to next page in sequence, select highest revision during recovery
+* **Write State Persistence**: Track current write page position across power cycles
+* **Overflow Handling**: After page 3, wrap to page 0 for continuous wear leveling
+
+### Memory Layout and Data Structures
+
+```c
+// Flash persistence page structure (4096 bytes flash sector aligned)
+typedef struct {
+    uint32_t magic_number;                    // 0xC0FFEEAA page validity
+    uint32_t revision_counter;                // Write sequence tracking
+    uint8_t  sha256_checksum[32];             // Hardware crypto checksum
+    uint32_t reserved[4];                     // Future expansion
+    
+    shared_memory_layout_t shared_memory_data; // Complete config snapshot
+    
+    uint8_t padding[...];                     // Flash sector alignment
+} __attribute__((packed, aligned(4096))) flash_persistence_page_t;
+
+// Ring buffer management state (persistent across reboots)
+typedef struct {
+    uint8_t  current_write_page;              // 0-3, next page to write  
+    uint8_t  last_valid_page;                 // 0-3, last successfully read
+    uint32_t total_writes_lifetime;           // Total write operations
+    uint32_t corruption_events;               // Detected corruption count
+    uint32_t last_written_revision;           // Change detection state
+    uint32_t last_write_timestamp_ms;         // Write frequency control
+} flash_persistence_state_t;
+```
+
+### Implementation Phases
+
+**Phase 1: Core Infrastructure**
+1. Create `flash_persistence.c` implementation file
+2. Add partition table discovery using bootrom APIs
+3. Implement hardware SHA256 integration
+4. Add basic ring buffer state management
+
+**Phase 2: Core1 Integration**  
+1. Create `core1_main()` function with task scheduling
+2. Integrate persistence checking as lowest priority task
+3. Add change detection and write frequency limiting
+4. Implement atomic write operations with error handling
+
+**Phase 3: Recovery and Error Handling**
+1. Add startup recovery logic with page validation
+2. Implement factory reset fallback for total corruption
+3. Add comprehensive error logging and diagnostics  
+4. Test power-loss safety with real hardware
+
+### Function Interface Design
+
+```c
+// Core persistence management functions
+bool flash_persistence_init(void);
+bool flash_persistence_load_configuration(void);
+bool flash_persistence_save_configuration_if_needed(void);
+bool flash_persistence_force_save_configuration(void);
+void flash_persistence_factory_reset(void);
+
+// Diagnostic and monitoring functions  
+uint32_t flash_persistence_get_write_count(void);
+uint32_t flash_persistence_get_corruption_count(void);
+bool flash_persistence_verify_ring_buffer_integrity(void);
+
+// Internal implementation functions (static)
+static bool find_partition_info(uint32_t partition_id, uint32_t* start_addr, uint32_t* size);
+static bool read_flash_page(uint32_t page_index, flash_persistence_page_t* page_data);
+static bool write_flash_page(uint32_t page_index, const flash_persistence_page_t* page_data);
+static bool validate_page_integrity(const flash_persistence_page_t* page_data);
+static uint32_t calculate_sha256_checksum(const shared_memory_layout_t* data);
+static int find_best_valid_page(void);
+static void advance_ring_buffer_position(void);
+```
+
+### Test Strategy
+
+**Unit Tests (TDD Approach)**
+* Test partition discovery and validation
+* Test hardware SHA256 checksum generation
+* Test ring buffer page selection logic
+* Test change detection algorithms
+* Test write frequency limiting
+* Test corruption detection and recovery
+
+**Integration Tests**
+* Test Core1 main loop integration
+* Test persistence across simulated power cycles
+* Test factory reset under various corruption scenarios
+* Test performance impact on real-time operations
+
+**Hardware Tests**
+* Real flash write/erase/read cycles
+* Power-loss safety validation  
+* Flash wear testing with extended write cycles
+* Performance benchmarking under load
