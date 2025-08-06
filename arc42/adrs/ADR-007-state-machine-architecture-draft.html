@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-006-flash-persistence-strategy.html -->
+    <!-- sourceuri: arc42/adrs/ADR-007-state-machine-architecture.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-006: Flash Persistence Strategy</title>
+    <title>ADR-007: State Machine Architecture</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -338,11 +338,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-006-flash-persistence-strategy.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-007-state-machine-architecture.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-006-flash-persistence-strategy.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-007-state-machine-architecture.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -352,39 +352,35 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
-<li><a href="#_adr_006_flash_persistence_strategy">ADR-006: Flash Persistence Strategy</a>
+<li><a href="#_adr_007_state_machine_architecture">ADR-007: State Machine Architecture</a>
 <ul class="sectlevel2">
 <li><a href="#_status">Status</a></li>
 <li><a href="#_date">Date</a></li>
 <li><a href="#_context">Context</a></li>
 <li><a href="#_decision">Decision</a></li>
-<li><a href="#_flash_partitioning_strategy">Flash Partitioning Strategy</a></li>
-<li><a href="#_storage_format">Storage Format</a></li>
-<li><a href="#_ring_buffer_management">Ring Buffer Management</a></li>
-<li><a href="#_write_strategy">Write Strategy</a></li>
-<li><a href="#_recovery_process">Recovery Process</a></li>
+<li><a href="#_event_driven_state_machine_architecture">Event-Driven State Machine Architecture</a></li>
+<li><a href="#_state_definitions">State Definitions</a></li>
+<li><a href="#_event_driven_interface_design">Event-Driven Interface Design</a></li>
+<li><a href="#_concurrency_and_safety_model">Concurrency and Safety Model</a></li>
+<li><a href="#_core_main_loop_architecture">Core Main Loop Architecture</a></li>
+<li><a href="#_core1_integration_requirements">Core1 Integration Requirements</a></li>
 </ul>
 </li>
 <li><a href="#_rationale">Rationale</a>
 <ul class="sectlevel2">
 <li><a href="#_advantages">Advantages</a></li>
+<li><a href="#_event_driven_design_benefits">Event-Driven Design Benefits</a></li>
 <li><a href="#_rejected_alternatives">Rejected Alternatives</a></li>
 <li><a href="#_trade_offs">Trade-offs</a></li>
 <li><a href="#_consequences">Consequences</a></li>
 <li><a href="#_positive">Positive</a></li>
 <li><a href="#_negative">Negative</a></li>
 <li><a href="#_implementation_requirements">Implementation Requirements</a></li>
-<li><a href="#_implementation_notes">Implementation Notes</a></li>
-<li><a href="#_detailed_implementation_strategy">Detailed Implementation Strategy</a></li>
-<li><a href="#_partition_table_integration">Partition Table Integration</a></li>
-<li><a href="#_hardware_crypto_implementation">Hardware Crypto Implementation</a></li>
-<li><a href="#_core1_integration_strategy">Core1 Integration Strategy</a></li>
-<li><a href="#_change_detection_and_write_control">Change Detection and Write Control</a></li>
-<li><a href="#_error_handling_and_recovery">Error Handling and Recovery</a></li>
-<li><a href="#_ring_buffer_state_management">Ring Buffer State Management</a></li>
-<li><a href="#_memory_layout_and_data_structures">Memory Layout and Data Structures</a></li>
+<li><a href="#_implementation_strategy">Implementation Strategy</a></li>
+<li><a href="#_event_processing_pattern">Event Processing Pattern</a></li>
+<li><a href="#_core_main_loop_event_driven_pattern">Core Main Loop Event-Driven Pattern</a></li>
+<li><a href="#_memory_layout_and_synchronization">Memory Layout and Synchronization</a></li>
 <li><a href="#_implementation_phases">Implementation Phases</a></li>
-<li><a href="#_function_interface_design">Function Interface Design</a></li>
 <li><a href="#_test_strategy">Test Strategy</a></li>
 </ul>
 </li>
@@ -411,132 +407,175 @@
         <p>
             
 <div class="sect1">
-<h2 id="_adr_006_flash_persistence_strategy">ADR-006: Flash Persistence Strategy</h2>
+<h2 id="_adr_007_state_machine_architecture">ADR-007: State Machine Architecture</h2>
 <div class="sectionbody">
 <div class="sect2">
 <h3 id="_status">Status</h3>
 <div class="paragraph">
-<p>Accepted</p>
+<p>Decided</p>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_date">Date</h3>
 <div class="paragraph">
-<p>2024-01-15</p>
+<p>2024-01-16 (Updated: 2025-08-06)</p>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_context">Context</h3>
 <div class="paragraph">
-<p>The UART2ETH system requires persistent storage of configuration data to survive power cycles and system resets. The configuration includes UART channel settings, network parameters, user accounts, and system preferences stored in the <code>g_shared_memory</code> structure.</p>
+<p>The UART2ETH system requires coordinated dual-core operation with predictable behavior across system initialization, normal operation, error conditions, and configuration changes. The system needs a mechanism to synchronize Core0 (UART processing) and Core1 (network and persistence) while avoiding tight coupling between cores.</p>
 </div>
 <div class="paragraph">
 <p>Key requirements:
-* Embedded system constraints (limited flash, no external storage)
-* Power-loss safety (industrial environment)
-* Flash wear leveling (device longevity)
-* Fast startup times (minimize boot delays)
-* Simple implementation (avoid complex file systems)
-* Integrity verification (detect corruption)</p>
+* Dual-core state coordination without blocking operations
+* State-driven control logic for predictable core behavior
+* Clear separation between runtime state and persistent configuration
+* <strong>Event-driven state transitions</strong> with condition validation (no direct state manipulation)
+* <strong>ISR-safe operations</strong> for core-specific sub-states
+* <strong>Atomic operations</strong> for shared main state
+* Support for core-specific sub-states within global system states
+* Non-persistent state information (states should not survive reboots)</p>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_decision">Decision</h3>
 <div class="paragraph">
-<p>We will implement flash persistence using a <strong>4-page ring buffer strategy</strong> with <strong>RP2350 partition table isolation</strong> for industrial reliability:</p>
+<p>We will implement <strong>three independent event-driven state machines</strong> with <strong>atomic main state</strong> and <strong>ISR-safe sub-states</strong> using the following architecture:</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_flash_partitioning_strategy">Flash Partitioning Strategy</h3>
+<h3 id="_event_driven_state_machine_architecture">Event-Driven State Machine Architecture</h3>
+<div class="paragraph">
+<p><strong>Three Independent State Machines:</strong>
+* <strong>Main State Machine</strong>: Global system coordination (atomic, cross-core)
+* <strong>Core0 Sub-State Machine</strong>: UART-specific operations (ISR-safe, Core0-only)
+* <strong>Core1 Sub-State Machine</strong>: Network and maintenance operations (ISR-safe, Core1-only)</p>
+</div>
+<div class="paragraph">
+<p><strong>Event-Driven Pattern Only:</strong>
+* <strong>No Direct State Setting</strong>: State machines only accept events, never direct state manipulation
+* <strong>Transition Function</strong>: <code>current_state + event + check_condition() → new_state</code>
+* <strong>Validation Required</strong>: All transitions must pass condition checks
+* <strong>Event Processing</strong>: Single interface for each state machine</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_state_definitions">State Definitions</h3>
+<div class="paragraph">
+<p><strong>Main States (shared between cores):</strong>
+* <code>INIT</code>: System initialization and hardware setup
+* <code>CONFIGURATION</code>: Configuration loading and validation
+* <code>OPERATIONAL</code>: Normal operation mode
+* <code>ERROR</code>: Error state requiring recovery</p>
+</div>
+<div class="paragraph">
+<p><strong>Core0 Sub-States (UART processing):</strong>
+* <code>UART_IDLE</code>: No active UART operations
+* <code>UART_ACTIVE</code>: Processing UART data
+* <code>UART_ERROR</code>: UART hardware error state</p>
+</div>
+<div class="paragraph">
+<p><strong>Core1 Sub-States (Network and maintenance):</strong>
+* <code>NET_DISCONNECTED</code>: Network interface down
+* <code>NET_IDLE</code>: Network interface up, no active connections
+* <code>NET_ACTIVE</code>: Active network connections
+* <code>PERSISTENCE_ACTIVE</code>: Flash persistence operation active
+* <code>LOG_ACTIVE</code>: Log processing active</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_event_driven_interface_design">Event-Driven Interface Design</h3>
+<div class="paragraph">
+<p><strong>Core State Machine Interface:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Event processing functions (the ONLY way to change states)
+bool state_machine_process_main_event(main_state_event_t event);
+bool state_machine_process_core0_event(core0_event_t event);
+bool state_machine_process_core1_event(core1_event_t event);
+
+// State queries (read-only, non-blocking)
+main_state_t state_machine_get_main_state(void);
+core0_substate_t state_machine_get_core0_substate(void);
+core1_substate_t state_machine_get_core1_substate(void);
+
+// Event type definitions
+typedef enum {
+    MAIN_EVENT_INIT_COMPLETE,      // Initialization finished successfully
+    MAIN_EVENT_CONFIG_LOADED,      // Configuration loaded and validated
+    MAIN_EVENT_SYSTEM_ERROR,       // System error detected
+    MAIN_EVENT_ERROR_RECOVERED     // Recovery from error state complete
+} main_state_event_t;
+
+typedef enum {
+    CORE0_EVENT_UART_DATA_READY,   // UART data available for processing
+    CORE0_EVENT_UART_IDLE,         // UART processing completed
+    CORE0_EVENT_UART_ERROR,        // UART hardware error detected
+    CORE0_EVENT_ERROR_RECOVERED    // UART error recovery complete
+} core0_event_t;
+
+typedef enum {
+    CORE1_EVENT_NETWORK_UP,        // Network interface connected
+    CORE1_EVENT_NETWORK_DOWN,      // Network interface disconnected
+    CORE1_EVENT_CONNECTION_ACTIVE, // TCP connection established
+    CORE1_EVENT_CONNECTION_IDLE,   // All connections closed
+    CORE1_EVENT_PERSISTENCE_START, // Flash operation starting
+    CORE1_EVENT_PERSISTENCE_END,   // Flash operation completed
+    CORE1_EVENT_LOG_START,         // Log processing starting
+    CORE1_EVENT_LOG_END            // Log processing completed
+} core1_event_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_concurrency_and_safety_model">Concurrency and Safety Model</h3>
+<div class="paragraph">
+<p><strong>Main State Machine:</strong>
+* <strong>Atomic Operations</strong>: Uses atomic compare-and-swap for state transitions
+* <strong>Cross-Core Access</strong>: Both cores can send events, both can read state
+* <strong>Memory Barriers</strong>: Proper barriers ensure cache coherency</p>
+</div>
+<div class="paragraph">
+<p><strong>Sub-State Machines:</strong>
+* <strong>ISR-Safe</strong>: Compatible with interrupt service routines
+* <strong>Single-Core Ownership</strong>: Core0 owns Core0 sub-state, Core1 owns Core1 sub-state
+* <strong>No Cross-Core Locking</strong>: No mutexes required for sub-states
+* <strong>Atomic Variables</strong>: Use atomic variables for ISR safety</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_core_main_loop_architecture">Core Main Loop Architecture</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>RP2350 Partition Table</strong>: Use native partition system for true isolation</p>
+<p><strong>Dual-Core Launch</strong>: <code>main.c</code> modified to launch both cores</p>
 </li>
 <li>
-<p><strong>Configuration Data Partition</strong>: Dedicated 512KB data partition (ID=2)</p>
+<p><strong>Core-Specific Modules</strong>: <code>core0_main.c</code> and <code>core1_main.c</code> with dedicated main functions</p>
 </li>
 <li>
-<p><strong>A/B Firmware Isolation</strong>: Firmware updates never touch configuration partition</p>
+<p><strong>State-Driven Logic</strong>: Core main loops query states and send events to control behavior</p>
 </li>
 <li>
-<p><strong>Industrial Safety</strong>: <code>"ignored_during_arm_boot": true</code> prevents accidental erasure</p>
+<p><strong>Non-Blocking Queries</strong>: State access never blocks core operations</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_storage_format">Storage Format</h3>
+<h3 id="_core1_integration_requirements">Core1 Integration Requirements</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Raw binary storage</strong>: Direct copy of <code>g_shared_memory</code> structure to flash</p>
+<p><strong>Core1 Persistence</strong>: Handle configuration persistence operations</p>
 </li>
 <li>
-<p><strong>No JSON or schema validation</strong>: Eliminates parsing overhead and complexity</p>
+<p><strong>Core1 Log Processing</strong>: Process <strong>one log event per loop iteration</strong></p>
 </li>
 <li>
-<p><strong>Complete structure per snapshot</strong>: Atomic writes of entire configuration</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_ring_buffer_management">Ring Buffer Management</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>4 Configuration Snapshots</strong> organized as circular ring buffer within data partition</p>
-</li>
-<li>
-<p><strong>Wear leveling</strong>: Sequential writes advance through ring</p>
-</li>
-<li>
-<p><strong>Snapshot metadata</strong>: Revision counter + SHA256 checksum per snapshot</p>
-</li>
-<li>
-<p><strong>Magic number</strong>: Snapshot validity marker (<code>0xC0FFEEAA</code>)</p>
-</li>
-<li>
-<p><strong>Partition isolation</strong>: 512KB data partition provides 128x current needs</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_write_strategy">Write Strategy</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Deferred write-back</strong>: Integrated into Core1 main loop</p>
-</li>
-<li>
-<p><strong>Frequency limiting</strong>: Maximum once per 30 seconds</p>
-</li>
-<li>
-<p><strong>Change detection</strong>: Write only when <code>revision_counter</code> increments</p>
-</li>
-<li>
-<p><strong>Atomic operations</strong>: Complete snapshot written or nothing</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_recovery_process">Recovery Process</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Startup validation</strong>: Read all 4 snapshots, verify checksums</p>
-</li>
-<li>
-<p><strong>Snapshot selection</strong>: Use snapshot with highest revision + valid checksum</p>
-</li>
-<li>
-<p><strong>Corruption handling</strong>: Skip invalid snapshots, fallback to factory defaults</p>
-</li>
-<li>
-<p><strong>Error logging</strong>: Track corruption events for diagnostics</p>
+<p><strong>Priority Scheduling</strong>: High-priority network, low-priority maintenance tasks</p>
 </li>
 </ul>
 </div>
@@ -551,22 +590,50 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Power-loss safety</strong>: Atomic page writes prevent partial corruption</p>
+<p><strong>Event-Driven Safety</strong>: Impossible to set invalid states - all transitions validated</p>
 </li>
 <li>
-<p><strong>Wear leveling</strong>: Ring buffer distributes writes across 4 pages</p>
+<p><strong>ISR Compatibility</strong>: Sub-state machines safe for interrupt context</p>
 </li>
 <li>
-<p><strong>Fast recovery</strong>: Simple page validation, no complex parsing</p>
+<p><strong>Lock-Free Design</strong>: Each core owns its sub-state, no cross-core locking required</p>
 </li>
 <li>
-<p><strong>Integrity verification</strong>: SHA256 detects any data corruption</p>
+<p><strong>Predictable Behavior</strong>: State-driven control logic provides deterministic system behavior</p>
 </li>
 <li>
-<p><strong>Embedded-friendly</strong>: No file system overhead or external dependencies</p>
+<p><strong>Atomic Inter-Core Coordination</strong>: Main state provides safe dual-core synchronization</p>
 </li>
 <li>
-<p><strong>Deterministic behavior</strong>: Known write patterns, predictable performance</p>
+<p><strong>Testability</strong>: Event processing and condition functions can be unit tested independently</p>
+</li>
+<li>
+<p><strong>Maintainability</strong>: Clear event definitions make system behavior easier to understand</p>
+</li>
+<li>
+<p><strong>Performance</strong>: Non-blocking state queries and lock-free sub-states</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_event_driven_design_benefits">Event-Driven Design Benefits</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Invalid State Prevention</strong>: No way to directly set invalid states</p>
+</li>
+<li>
+<p><strong>Condition Validation</strong>: All transitions must pass validation checks</p>
+</li>
+<li>
+<p><strong>Audit Trail</strong>: Event processing provides clear state change history</p>
+</li>
+<li>
+<p><strong>Debugging</strong>: Events can be logged for system behavior analysis</p>
+</li>
+<li>
+<p><strong>Deterministic</strong>: Same event + same state + same conditions = same result</p>
 </li>
 </ul>
 </div>
@@ -574,28 +641,29 @@
 <div class="sect2">
 <h3 id="_rejected_alternatives">Rejected Alternatives</h3>
 <div class="paragraph">
-<p><strong>File System Approach</strong>
-* Rejected due to complexity and flash overhead
-* Would require FAT or custom file system implementation
-* Higher RAM usage for file system structures</p>
+<p><strong>Direct State Setting Functions</strong>
+* Rejected because they allow invalid state transitions
+* No validation of transition legality
+* Difficult to debug and audit state changes
+* Race conditions in multi-core environment</p>
 </div>
 <div class="paragraph">
-<p><strong>JSON Configuration Files</strong>
-* Rejected due to parsing overhead and complexity
-* Would require JSON parser library (code size increase)
-* Schema validation adds unnecessary complexity for embedded use</p>
+<p><strong>Shared Memory State Storage</strong>
+* Rejected because states are runtime information, not configuration data
+* Would persist unnecessary runtime state across reboots
+* Couples state management to configuration persistence</p>
 </div>
 <div class="paragraph">
-<p><strong>A/B Partition Strategy</strong>
-* Rejected as insufficient for wear leveling
-* Only 2 locations would wear out faster
-* No automatic progression through multiple backup copies</p>
+<p><strong>Message Passing Between Cores</strong>
+* Rejected due to complexity and potential blocking behavior
+* Would require queue management and synchronization overhead
+* Atomic state variables are simpler for this use case</p>
 </div>
 <div class="paragraph">
-<p><strong>EEPROM External Storage</strong>
-* Rejected to avoid additional hardware components
-* Increases BOM cost and PCB complexity
-* RP2350 internal flash sufficient for configuration data</p>
+<p><strong>Single Global State Only</strong>
+* Rejected as insufficient for core-specific operational states
+* Would require complex state encoding to represent per-core status
+* Sub-states provide cleaner separation of concerns</p>
 </div>
 </div>
 <div class="sect2">
@@ -603,16 +671,13 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Flash usage</strong>: 512KB data partition (32x current needs) for configuration ring buffer</p>
+<p><strong>Code Complexity</strong>: Event-driven pattern requires more code than direct setting</p>
 </li>
 <li>
-<p><strong>Write frequency</strong>: Limited to 30-second intervals (acceptable for config changes)</p>
+<p><strong>Memory Usage</strong>: Event processing functions and condition checks (minimal impact)</p>
 </li>
 <li>
-<p><strong>Recovery time</strong>: Startup requires reading/validating 4 snapshots (minimal impact)</p>
-</li>
-<li>
-<p><strong>Partition complexity</strong>: Requires RP2350 partition table support in build system</p>
+<p><strong>Development Overhead</strong>: Must design proper events and conditions for each transition</p>
 </li>
 </ul>
 </div>
@@ -626,28 +691,31 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Partition Isolation</strong>: Configuration data completely isolated from firmware updates</p>
+<p><strong>Impossible Invalid States</strong>: Event-driven pattern prevents invalid state transitions</p>
 </li>
 <li>
-<p><strong>A/B Update Safety</strong>: Software updates never risk configuration data corruption</p>
+<p><strong>ISR-Safe Operations</strong>: Sub-state machines work correctly in interrupt context</p>
 </li>
 <li>
-<p><strong>Industrial Reliability</strong>: RP2350 partition table provides true isolation guarantees</p>
+<p><strong>Lock-Free Performance</strong>: No blocking between cores for sub-state operations</p>
 </li>
 <li>
-<p><strong>Future Growth</strong>: 512KB partition allows 32x expansion for new features</p>
+<p><strong>Predictable System Behavior</strong>: State-driven logic provides clear operational modes</p>
 </li>
 <li>
-<p><strong>Automatic wear leveling</strong>: Ring buffer distributes writes across larger space</p>
+<p><strong>Inter-Core Coordination</strong>: Safe dual-core operation with atomic main state</p>
 </li>
 <li>
-<p><strong>Simple implementation</strong>: Raw binary storage reduces bugs and maintenance</p>
+<p><strong>Separation of Concerns</strong>: Runtime state separate from persistent configuration</p>
 </li>
 <li>
-<p><strong>Fast startup</strong>: Minimal validation overhead with integrity verification</p>
+<p><strong>Testability</strong>: Event processing and condition logic can be tested independently</p>
 </li>
 <li>
-<p><strong>Power-loss safety</strong>: Atomic snapshot writes prevent partial corruption</p>
+<p><strong>Maintainability</strong>: Clear event and condition definitions aid debugging</p>
+</li>
+<li>
+<p><strong>Auditability</strong>: Event processing provides state change history</p>
 </li>
 </ul>
 </div>
@@ -657,16 +725,16 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Flash usage</strong>: 512KB data partition reservation (generous allocation)</p>
+<p><strong>Additional Complexity</strong>: Event-driven pattern requires more implementation code</p>
 </li>
 <li>
-<p><strong>Write frequency</strong>: Limited to 30-second intervals (acceptable for config changes)</p>
+<p><strong>Memory Overhead</strong>: Additional event processing and condition functions</p>
 </li>
 <li>
-<p><strong>Build complexity</strong>: Requires partition table embedding in build system</p>
+<p><strong>Development Time</strong>: Must design proper events and conditions for each transition</p>
 </li>
 <li>
-<p><strong>No incremental updates</strong>: Entire structure written each time</p>
+<p><strong>Learning Curve</strong>: Developers must understand event-driven state machine patterns</p>
 </li>
 </ul>
 </div>
@@ -676,255 +744,215 @@
 <div class="ulist">
 <ul>
 <li>
-<p>Flash operations abstraction layer for RP2350 with partition awareness</p>
+<p>Event-driven state machine module with atomic operations and ISR-safe sub-states</p>
 </li>
 <li>
-<p>SHA256 hash implementation for integrity verification</p>
+<p>Core0 main function with UART processing and event-driven control logic</p>
 </li>
 <li>
-<p>Integration with Core1 main loop for deferred writes</p>
+<p>Core1 main function with network, persistence, and log processing</p>
 </li>
 <li>
-<p>Factory reset capability for complete corruption recovery</p>
+<p>Event processing with condition validation for all state transitions</p>
 </li>
 <li>
-<p>Configuration Snapshot format definition and serialization functions</p>
+<p>Integration with existing shared memory and logging systems</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_implementation_notes">Implementation Notes</h3>
-<div class="paragraph">
-<p>The persistence system will be integrated into the existing shared memory module rather than implemented as a separate component. This maintains architectural simplicity while providing the required functionality.</p>
-</div>
-<div class="paragraph">
-<p>The <code>revision_counter</code> in <code>g_shared_memory</code> serves dual purposes:
-1. Coordination between cores for configuration changes
-2. Flash persistence trigger and page selection during recovery</p>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_detailed_implementation_strategy">Detailed Implementation Strategy</h3>
+<h3 id="_implementation_strategy">Implementation Strategy</h3>
 
 </div>
 <div class="sect2">
-<h3 id="_partition_table_integration">Partition Table Integration</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>RP2350 Bootrom APIs</strong>: Use <code>rom_get_partition_table_info()</code> and <code>rom_flash_op()</code> for partition access</p>
-</li>
-<li>
-<p><strong>No Raw Flash Offsets</strong>: Leverage bootrom partition table parsing instead of manual calculations</p>
-</li>
-<li>
-<p><strong>Permission Checking</strong>: Bootrom automatically validates partition permissions during flash operations</p>
-</li>
-<li>
-<p><strong>Partition Discovery</strong>: Use partition ID=2 to locate configuration data partition at runtime</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_hardware_crypto_implementation">Hardware Crypto Implementation</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>SHA256 Engine</strong>: Use pico-sdk hardware crypto APIs for integrity verification</p>
-</li>
-<li>
-<p><strong>Fresh Implementation</strong>: Start with clean integration of <code>pico/crypto/hash.h</code> interfaces</p>
-</li>
-<li>
-<p><strong>Performance Optimization</strong>: Hardware acceleration eliminates software SHA256 overhead</p>
-</li>
-<li>
-<p><strong>Atomic Checksum</strong>: Generate SHA256 for complete shared memory structure per snapshot</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_core1_integration_strategy">Core1 Integration Strategy</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>New Core1 Main Function</strong>: Create <code>core1_main()</code> as entry point for Core1 processing</p>
-</li>
-<li>
-<p><strong>Lowest Priority Task</strong>: Flash persistence checking runs after all other Core1 tasks</p>
-</li>
-<li>
-<p><strong>Deferred Write Logic</strong>: Check for changes every 100ms, write only if 30+ seconds elapsed</p>
-</li>
-<li>
-<p><strong>Non-blocking Operation</strong>: Persistence never blocks critical network or ring buffer operations</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_change_detection_and_write_control">Change Detection and Write Control</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Static State Tracking</strong>: Local static variable tracks last written <code>revision_counter</code> value</p>
-</li>
-<li>
-<p><strong>Change Detection</strong>: Compare current vs. last written revision to detect config changes</p>
-</li>
-<li>
-<p><strong>Write Frequency Limiting</strong>: Track last write timestamp, enforce 30-second minimum interval</p>
-</li>
-<li>
-<p><strong>Atomic Decision</strong>: Only proceed with write if both change detected AND time interval met</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_error_handling_and_recovery">Error Handling and Recovery</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Factory Reset Strategy</strong>: If all 4 ring buffer pages corrupt, load <code>shared_memory_init()</code> defaults</p>
-</li>
-<li>
-<p><strong>Recovery Event Logging</strong>: Use existing <code>log_event()</code> API to record factory reset as first entry</p>
-</li>
-<li>
-<p><strong>Graceful Degradation</strong>: System continues operation with defaults if persistence fails</p>
-</li>
-<li>
-<p><strong>Corruption Detection</strong>: SHA256 mismatch triggers recovery sequence with detailed error logging</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_ring_buffer_state_management">Ring Buffer State Management</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>4-Page Circular Buffer</strong>: Pages 0-3 in sequential write order with wrap-around at page 3→0</p>
-</li>
-<li>
-<p><strong>Page Selection Logic</strong>: Write to next page in sequence, select highest revision during recovery</p>
-</li>
-<li>
-<p><strong>Write State Persistence</strong>: Track current write page position across power cycles</p>
-</li>
-<li>
-<p><strong>Overflow Handling</strong>: After page 3, wrap to page 0 for continuous wear leveling</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_memory_layout_and_data_structures">Memory Layout and Data Structures</h3>
+<h3 id="_event_processing_pattern">Event Processing Pattern</h3>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Flash persistence page structure (4096 bytes flash sector aligned)
-typedef struct {
-    uint32_t magic_number;                    // 0xC0FFEEAA page validity
-    uint32_t revision_counter;                // Write sequence tracking
-    uint8_t  sha256_checksum[32];             // Hardware crypto checksum
-    uint32_t reserved[4];                     // Future expansion
+<pre class="prettyprint highlight"><code data-lang="c">// Example: Main state machine event processing
+bool state_machine_process_main_event(main_state_event_t event) {
+    main_state_t current_state = state_machine_get_main_state();
+    main_state_t new_state = current_state;  // Default: no change
 
-    shared_memory_layout_t shared_memory_data; // Complete config snapshot
+    // State + Event + Condition → New State
+    switch (current_state) {
+        case MAIN_STATE_INIT:
+            switch (event) {
+                case MAIN_EVENT_INIT_COMPLETE:
+                    if (check_initialization_complete()) {
+                        new_state = MAIN_STATE_CONFIGURATION;
+                    }
+                    break;
+            }
+            break;
 
-    uint8_t padding[...];                     // Flash sector alignment
-} __attribute__((packed, aligned(4096))) flash_persistence_page_t;
+        case MAIN_STATE_CONFIGURATION:
+            switch (event) {
+                case MAIN_EVENT_CONFIG_LOADED:
+                    if (check_configuration_valid()) {
+                        new_state = MAIN_STATE_OPERATIONAL;
+                    }
+                    break;
+                case MAIN_EVENT_SYSTEM_ERROR:
+                    new_state = MAIN_STATE_ERROR;
+                    break;
+            }
+            break;
 
-// Ring buffer management state (persistent across reboots)
-typedef struct {
-    uint8_t  current_write_page;              // 0-3, next page to write
-    uint8_t  last_valid_page;                 // 0-3, last successfully read
-    uint32_t total_writes_lifetime;           // Total write operations
-    uint32_t corruption_events;               // Detected corruption count
-    uint32_t last_written_revision;           // Change detection state
-    uint32_t last_write_timestamp_ms;         // Write frequency control
-} flash_persistence_state_t;</code></pre>
+        case MAIN_STATE_OPERATIONAL:
+            switch (event) {
+                case MAIN_EVENT_SYSTEM_ERROR:
+                    new_state = MAIN_STATE_ERROR;
+                    break;
+            }
+            break;
+
+        case MAIN_STATE_ERROR:
+            switch (event) {
+                case MAIN_EVENT_ERROR_RECOVERED:
+                    if (check_error_recovery_complete()) {
+                        new_state = MAIN_STATE_OPERATIONAL;
+                    }
+                    break;
+            }
+            break;
+    }
+
+    // Atomic state transition if changed
+    if (new_state != current_state) {
+        return atomic_compare_exchange_strong(&amp;g_main_state, &amp;current_state, new_state);
+    }
+
+    return true;  // No change needed
+}
+
+// Example: Condition checking function
+static bool check_initialization_complete(void) {
+    return (shared_memory_initialized() &amp;&amp;
+            uart_hardware_initialized() &amp;&amp;
+            network_interface_ready());
+}</code></pre>
 </div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_core_main_loop_event_driven_pattern">Core Main Loop Event-Driven Pattern</h3>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Core0 main loop with event-driven logic
+void core0_main(void) {
+    while (true) {
+        main_state_t main_state = state_machine_get_main_state();
+        core0_substate_t sub_state = state_machine_get_core0_substate();
+
+        // State-driven control logic with event generation
+        switch (main_state) {
+            case MAIN_STATE_OPERATIONAL:
+                switch (sub_state) {
+                    case CORE0_UART_IDLE:
+                        if (uart_data_available()) {
+                            state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
+                        }
+                        break;
+                    case CORE0_UART_ACTIVE:
+                        if (process_uart_data()) {
+                            // Processing complete
+                            state_machine_process_core0_event(CORE0_EVENT_UART_IDLE);
+                        }
+                        break;
+                    case CORE0_UART_ERROR:
+                        if (attempt_uart_recovery()) {
+                            state_machine_process_core0_event(CORE0_EVENT_ERROR_RECOVERED);
+                        }
+                        break;
+                }
+                break;
+        }
+        sleep_ms(10);  // 10ms loop frequency
+    }
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_memory_layout_and_synchronization">Memory Layout and Synchronization</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Separate Memory Region</strong>: State variables in dedicated memory outside shared_memory_layout_t</p>
+</li>
+<li>
+<p><strong>Atomic Variables</strong>: Main state uses atomic types for cross-core safety</p>
+</li>
+<li>
+<p><strong>Volatile Variables</strong>: Sub-state variables marked volatile for ISR visibility</p>
+</li>
+<li>
+<p><strong>Memory Barriers</strong>: Proper barriers ensure cache coherency between cores</p>
+</li>
+<li>
+<p><strong>ISR-Safe Operations</strong>: Sub-state transitions safe for interrupt context</p>
+</li>
+</ul>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_implementation_phases">Implementation Phases</h3>
 <div class="paragraph">
-<p><strong>Phase 1: Core Infrastructure</strong>
-1. Create <code>flash_persistence.c</code> implementation file
-2. Add partition table discovery using bootrom APIs
-3. Implement hardware SHA256 integration
-4. Add basic ring buffer state management</p>
+<p><strong>Phase 1: Event-Driven State Machine Module</strong>
+1. Create <code>state_machine.c/h</code> with event processing functions
+2. Implement atomic main state transitions with condition validation
+3. Implement ISR-safe sub-state transitions with condition validation
+4. Add comprehensive unit tests for event processing logic
+5. Document event types, conditions, and transition rules</p>
 </div>
 <div class="paragraph">
-<p><strong>Phase 2: Core1 Integration</strong>
-1. Create <code>core1_main()</code> function with task scheduling
-2. Integrate persistence checking as lowest priority task
-3. Add change detection and write frequency limiting
-4. Implement atomic write operations with error handling</p>
+<p><strong>Phase 2: Core Main Loop Architecture</strong>
+1. Modify <code>main.c</code> to launch both cores with dedicated entry points
+2. Create <code>core0_main.c</code> with UART processing and event-driven logic
+3. Create <code>core1_main.c</code> with network, persistence, and log processing
+4. Integrate event generation into existing control flow logic</p>
 </div>
 <div class="paragraph">
-<p><strong>Phase 3: Recovery and Error Handling</strong>
-1. Add startup recovery logic with page validation
-2. Implement factory reset fallback for total corruption
-3. Add comprehensive error logging and diagnostics
-4. Test power-loss safety with real hardware</p>
+<p><strong>Phase 3: System Integration</strong>
+1. Integrate state machine initialization into system startup
+2. Add event-driven control logic for all major system components
+3. Implement error handling and recovery event generation
+4. Add comprehensive integration tests with both cores</p>
 </div>
-</div>
-<div class="sect2">
-<h3 id="_function_interface_design">Function Interface Design</h3>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Core persistence management functions
-bool flash_persistence_init(void);
-bool flash_persistence_load_configuration(void);
-bool flash_persistence_save_configuration_if_needed(void);
-bool flash_persistence_force_save_configuration(void);
-void flash_persistence_factory_reset(void);
-
-// Diagnostic and monitoring functions
-uint32_t flash_persistence_get_write_count(void);
-uint32_t flash_persistence_get_corruption_count(void);
-bool flash_persistence_verify_ring_buffer_integrity(void);
-
-// Internal implementation functions (static)
-static bool find_partition_info(uint32_t partition_id, uint32_t* start_addr, uint32_t* size);
-static bool read_flash_page(uint32_t page_index, flash_persistence_page_t* page_data);
-static bool write_flash_page(uint32_t page_index, const flash_persistence_page_t* page_data);
-static bool validate_page_integrity(const flash_persistence_page_t* page_data);
-static uint32_t calculate_sha256_checksum(const shared_memory_layout_t* data);
-static int find_best_valid_page(void);
-static void advance_ring_buffer_position(void);</code></pre>
-</div>
+<div class="paragraph">
+<p><strong>Phase 4: Performance and Validation</strong>
+1. Performance testing to ensure non-blocking event processing
+2. Stress testing with rapid event generation under load
+3. Validation of ISR-safe sub-state operations
+4. Documentation and final integration with existing systems</p>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_test_strategy">Test Strategy</h3>
 <div class="paragraph">
 <p><strong>Unit Tests (TDD Approach)</strong>
-* Test partition discovery and validation
-* Test hardware SHA256 checksum generation
-* Test ring buffer page selection logic
-* Test change detection algorithms
-* Test write frequency limiting
-* Test corruption detection and recovery</p>
+* Test event processing functions with all valid state/event combinations
+* Test condition checking functions with various system states
+* Test invalid event rejection and no-change scenarios
+* Test atomic state transitions with concurrent access
+* Test ISR-safe sub-state operations
+* Test state query functions for non-blocking behavior</p>
 </div>
 <div class="paragraph">
 <p><strong>Integration Tests</strong>
-* Test Core1 main loop integration
-* Test persistence across simulated power cycles
-* Test factory reset under various corruption scenarios
-* Test performance impact on real-time operations</p>
+* Test dual-core launch and event-driven main loop operation
+* Test inter-core main state synchronization during event processing
+* Test ISR context sub-state operations during interrupt handling
+* Test error recovery and event processing during error conditions
+* Test performance impact on real-time UART and network operations</p>
 </div>
 <div class="paragraph">
-<p><strong>Hardware Tests</strong>
-* Real flash write/erase/read cycles
-* Power-loss safety validation
-* Flash wear testing with extended write cycles
-* Performance benchmarking under load</p>
+<p><strong>System Tests</strong>
+* End-to-end testing of complete system with event-driven state transitions
+* Stress testing with rapid event generation and state changes
+* Validation of system behavior consistency across event-driven transitions
+* Long-running stability testing with continuous event processing</p>
 </div>
 </div>
 </div>
@@ -956,11 +984,11 @@ static void advance_ring_buffer_position(void);</code></pre>
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-006-flash-persistence-strategy.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-006-flash-persistence-strategy.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
