@@ -17,12 +17,22 @@
     </url>
 
     <url>
+    	<loc>http://jbake.org/arc42/adrs/ADR-007-state-machine-architecture.html</loc>
+    	<lastmod>2025-08-06</lastmod>
+    </url>
+
+    <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-002-ethernet-controller-selection.html</loc>
     	<lastmod>2025-08-06</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-005-buffer-allocation-strategy.html</loc>
+    	<lastmod>2025-08-06</lastmod>
+    </url>
+
+    <url>
+    	<loc>http://jbake.org/arc42/adrs/ADR-006-flash-persistence-strategy.html</loc>
     	<lastmod>2025-08-06</lastmod>
     </url>
 

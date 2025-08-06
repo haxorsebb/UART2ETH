@@ -9,7 +9,7 @@
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-006: Flash Persistence Strategy</title>
+    <title>ADR-006: Flash Persistence Strategy for UART2ETH</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -254,7 +254,7 @@
 
             <ul class="td-sidebar-nav__section">
                 <li class="td-sidebar-nav__section-title">
-                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">arc42</span>
+                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">adrs</span>
                 </li>
                 <li>
                   <ul>
@@ -263,67 +263,37 @@
                         <ul class="td-sidebar-nav__section ul-0">
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/00_architecture_communication_canvas.html" title="Architecture Communication Canvas">Architecture Communication Canvas</a>
+                                   href="../../arc42/adrs/ADR-001-microcontroller-selection.html" title="ADR-001: Microcontroller Platform Selection for UART2ETH">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/01_introduction_and_goals.html" title="Introduction and Goals">Introduction and Goals</a>
+                                   href="../../arc42/adrs/ADR-002-ethernet-controller-selection.html" title="ADR-002: Ethernet Controller Selection for UART2ETH">ADR-002: Ethernet Controller Selection for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/02_architecture_constraints.html" title="Architecture Constraints">Architecture Constraints</a>
+                                   href="../../arc42/adrs/ADR-003-programming-language-selection.html" title="ADR-003: Programming Language Selection for UART2ETH">ADR-003: Programming Language Selection for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/03_context_and_scope.html" title="Context and Scope">Context and Scope</a>
+                                   href="../../arc42/adrs/ADR-004-development-ecosystem.html" title="ADR-004: Development Ecosystem Selection for UART2ETH">ADR-004: Development Ecosystem Selection for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/04_solution_strategy.html" title="Solution Strategy">Solution Strategy</a>
+                                   href="../../arc42/adrs/ADR-005-buffer-allocation-strategy.html" title="ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                   href="../../arc42/adrs/ADR-006-flash-persistence-strategy.html" title="ADR-006: Flash Persistence Strategy for UART2ETH">ADR-006: Flash Persistence Strategy for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/05_building_block_view.html" title="Building Block View">Building Block View</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/06_runtime_view.html" title="Runtime View">Runtime View</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/07_deployment_view.html" title="Deployment View">Deployment View</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/08_concepts.html" title="Cross-cutting Concepts">Cross-cutting Concepts</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/09_architecture_decisions.html" title="Architecture Decisions">Architecture Decisions</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/10_quality_requirements.html" title="Quality Requirements">Quality Requirements</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/11_technical_risks.html" title="Risks and Technical Debts">Risks and Technical Debts</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/12_glossary.html" title="Glossary">Glossary</a>
+                                   href="../../arc42/adrs/ADR-007-state-machine-architecture.html" title="ADR-007: State Machine Architecture for UART2ETH">ADR-007: State Machine Architecture for UART2ETH</a>
                                 
                             </li>
                         </ul>
@@ -342,7 +312,7 @@
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-006-flash-persistence-strategy.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-006-flash-persistence-strategy.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -351,13 +321,14 @@
 
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
-<ul class="sectlevel1">
+<ul class="sectlevel0">
 <li><a href="#_adr_006_flash_persistence_strategy">ADR-006: Flash Persistence Strategy</a>
-<ul class="sectlevel2">
+<ul class="sectlevel1">
 <li><a href="#_status">Status</a></li>
 <li><a href="#_date">Date</a></li>
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision">Decision</a></li>
+<li><a href="#_decision">Decision</a>
+<ul class="sectlevel2">
 <li><a href="#_flash_partitioning_strategy">Flash Partitioning Strategy</a></li>
 <li><a href="#_storage_format">Storage Format</a></li>
 <li><a href="#_ring_buffer_management">Ring Buffer Management</a></li>
@@ -370,12 +341,18 @@
 <li><a href="#_advantages">Advantages</a></li>
 <li><a href="#_rejected_alternatives">Rejected Alternatives</a></li>
 <li><a href="#_trade_offs">Trade-offs</a></li>
-<li><a href="#_consequences">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#_consequences">Consequences</a>
+<ul class="sectlevel2">
 <li><a href="#_positive">Positive</a></li>
 <li><a href="#_negative">Negative</a></li>
 <li><a href="#_implementation_requirements">Implementation Requirements</a></li>
+</ul>
+</li>
 <li><a href="#_implementation_notes">Implementation Notes</a></li>
-<li><a href="#_detailed_implementation_strategy">Detailed Implementation Strategy</a></li>
+<li><a href="#_detailed_implementation_strategy">Detailed Implementation Strategy</a>
+<ul class="sectlevel2">
 <li><a href="#_partition_table_integration">Partition Table Integration</a></li>
 <li><a href="#_hardware_crypto_implementation">Hardware Crypto Implementation</a></li>
 <li><a href="#_core1_integration_strategy">Core1 Integration Strategy</a></li>
@@ -386,6 +363,8 @@
 <li><a href="#_implementation_phases">Implementation Phases</a></li>
 <li><a href="#_function_interface_design">Function Interface Design</a></li>
 <li><a href="#_test_strategy">Test Strategy</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -410,23 +389,26 @@
     <div class="td-content">
         <p>
             
+<h1 id="_adr_006_flash_persistence_strategy" class="sect0">ADR-006: Flash Persistence Strategy</h1>
 <div class="sect1">
-<h2 id="_adr_006_flash_persistence_strategy">ADR-006: Flash Persistence Strategy</h2>
+<h2 id="_status">Status</h2>
 <div class="sectionbody">
-<div class="sect2">
-<h3 id="_status">Status</h3>
 <div class="paragraph">
 <p>Accepted</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_date">Date</h3>
+</div>
+<div class="sect1">
+<h2 id="_date">Date</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>2024-01-15</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_context">Context</h3>
+</div>
+<div class="sect1">
+<h2 id="_context">Context</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>The UART2ETH system requires persistent storage of configuration data to survive power cycles and system resets. The configuration includes UART channel settings, network parameters, user accounts, and system preferences stored in the <code>g_shared_memory</code> structure.</p>
 </div>
@@ -440,11 +422,12 @@
 * Integrity verification (detect corruption)</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_decision">Decision</h3>
+</div>
+<div class="sect1">
+<h2 id="_decision">Decision</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>We will implement flash persistence using a <strong>4-page ring buffer strategy</strong> with <strong>RP2350 partition table isolation</strong> for industrial reliability:</p>
-</div>
 </div>
 <div class="sect2">
 <h3 id="_flash_partitioning_strategy">Flash Partitioning Strategy</h3>
@@ -617,10 +600,11 @@
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_consequences">Consequences</h3>
-
 </div>
+</div>
+<div class="sect1">
+<h2 id="_consequences">Consequences</h2>
+<div class="sectionbody">
 <div class="sect2">
 <h3 id="_positive">Positive</h3>
 <div class="ulist">
@@ -693,8 +677,11 @@
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_implementation_notes">Implementation Notes</h3>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_implementation_notes">Implementation Notes</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>The persistence system will be integrated into the existing shared memory module rather than implemented as a separate component. This maintains architectural simplicity while providing the required functionality.</p>
 </div>
@@ -704,10 +691,10 @@
 2. Flash persistence trigger and page selection during recovery</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_detailed_implementation_strategy">Detailed Implementation Strategy</h3>
-
 </div>
+<div class="sect1">
+<h2 id="_detailed_implementation_strategy">Detailed Implementation Strategy</h2>
+<div class="sectionbody">
 <div class="sect2">
 <h3 id="_partition_table_integration">Partition Table Integration</h3>
 <div class="ulist">
@@ -956,11 +943,11 @@ static void advance_ring_buffer_position(void);</code></pre>
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-006-flash-persistence-strategy.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-006-flash-persistence-strategy.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-006-flash-persistence-strategy.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-006%3A+Flash+Persistence+Strategy+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-006-flash-persistence-strategy.adoc">tell
     us how we can improve</a>.
     </p>
 </div>

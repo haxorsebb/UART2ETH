@@ -5234,6 +5234,9 @@ Output packets:
 <li>
 <p><a href="../adrs/ADR-006-flash-persistence-strategy.html">ADR-006: Flash Persistence Strategy</a> - Documents the decision to use 4-page ring buffer for configuration persistence, providing wear leveling and power-loss safety through deferred write-back with SHA256 integrity verification.</p>
 </li>
+<li>
+<p><a href="../adrs/ADR-007-state-machine-architecture.html">ADR-007: State Machine Architecture</a> - Documents the decision to implement event-driven state machines with atomic main state and ISR-safe sub-states for dual-core coordination and predictable system behavior.</p>
+</li>
 </ul>
 </div>
 </div>
@@ -5252,6 +5255,15 @@ Output packets:
 </li>
 <li>
 <p><strong>ADR-005 (Buffer Strategy) supports ADR-003 (C Language)</strong>: Static allocation strategy leverages C&#8217;s deterministic memory model and supports industrial reliability requirements.</p>
+</li>
+<li>
+<p><strong>ADR-007 (State Machine Architecture) enables ADR-001 (Microcontroller Platform)</strong>: Event-driven state machines with atomic operations leverage the dual-core RP2350 architecture for coordinated operation while maintaining deterministic behavior.</p>
+</li>
+<li>
+<p><strong>ADR-007 (State Machine Architecture) coordinates ADR-005 (Buffer Strategy)</strong>: State machines provide the control logic for safe inter-core buffer access, ensuring static allocation strategy works correctly across dual cores.</p>
+</li>
+<li>
+<p><strong>ADR-007 (State Machine Architecture) supports ADR-006 (Flash Persistence)</strong>: The Core1 sub-state machine provides the execution context for deferred write-back persistence operations integrated into the main loop.</p>
 </li>
 </ul>
 </div>

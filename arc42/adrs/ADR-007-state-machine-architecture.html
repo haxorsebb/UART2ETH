@@ -9,7 +9,7 @@
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-007: State Machine Architecture</title>
+    <title>ADR-007: State Machine Architecture for UART2ETH</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -254,7 +254,7 @@
 
             <ul class="td-sidebar-nav__section">
                 <li class="td-sidebar-nav__section-title">
-                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">arc42</span>
+                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">adrs</span>
                 </li>
                 <li>
                   <ul>
@@ -263,67 +263,37 @@
                         <ul class="td-sidebar-nav__section ul-0">
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/00_architecture_communication_canvas.html" title="Architecture Communication Canvas">Architecture Communication Canvas</a>
+                                   href="../../arc42/adrs/ADR-001-microcontroller-selection.html" title="ADR-001: Microcontroller Platform Selection for UART2ETH">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/01_introduction_and_goals.html" title="Introduction and Goals">Introduction and Goals</a>
+                                   href="../../arc42/adrs/ADR-002-ethernet-controller-selection.html" title="ADR-002: Ethernet Controller Selection for UART2ETH">ADR-002: Ethernet Controller Selection for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/02_architecture_constraints.html" title="Architecture Constraints">Architecture Constraints</a>
+                                   href="../../arc42/adrs/ADR-003-programming-language-selection.html" title="ADR-003: Programming Language Selection for UART2ETH">ADR-003: Programming Language Selection for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/03_context_and_scope.html" title="Context and Scope">Context and Scope</a>
+                                   href="../../arc42/adrs/ADR-004-development-ecosystem.html" title="ADR-004: Development Ecosystem Selection for UART2ETH">ADR-004: Development Ecosystem Selection for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/04_solution_strategy.html" title="Solution Strategy">Solution Strategy</a>
+                                   href="../../arc42/adrs/ADR-005-buffer-allocation-strategy.html" title="ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/05_building_block_view.html" title="Building Block View">Building Block View</a>
+                                   href="../../arc42/adrs/ADR-006-flash-persistence-strategy.html" title="ADR-006: Flash Persistence Strategy for UART2ETH">ADR-006: Flash Persistence Strategy for UART2ETH</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/06_runtime_view.html" title="Runtime View">Runtime View</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/07_deployment_view.html" title="Deployment View">Deployment View</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/08_concepts.html" title="Cross-cutting Concepts">Cross-cutting Concepts</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/09_architecture_decisions.html" title="Architecture Decisions">Architecture Decisions</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/10_quality_requirements.html" title="Quality Requirements">Quality Requirements</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/11_technical_risks.html" title="Risks and Technical Debts">Risks and Technical Debts</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/chapters/12_glossary.html" title="Glossary">Glossary</a>
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                   href="../../arc42/adrs/ADR-007-state-machine-architecture.html" title="ADR-007: State Machine Architecture for UART2ETH">ADR-007: State Machine Architecture for UART2ETH</a>
                                 
                             </li>
                         </ul>
@@ -342,7 +312,7 @@
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-007-state-machine-architecture.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-007-state-machine-architecture.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -351,13 +321,14 @@
 
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
-<ul class="sectlevel1">
+<ul class="sectlevel0">
 <li><a href="#_adr_007_state_machine_architecture">ADR-007: State Machine Architecture</a>
-<ul class="sectlevel2">
+<ul class="sectlevel1">
 <li><a href="#_status">Status</a></li>
 <li><a href="#_date">Date</a></li>
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision">Decision</a></li>
+<li><a href="#_decision">Decision</a>
+<ul class="sectlevel2">
 <li><a href="#_event_driven_state_machine_architecture">Event-Driven State Machine Architecture</a></li>
 <li><a href="#_state_definitions">State Definitions</a></li>
 <li><a href="#_event_driven_interface_design">Event-Driven Interface Design</a></li>
@@ -372,16 +343,24 @@
 <li><a href="#_event_driven_design_benefits">Event-Driven Design Benefits</a></li>
 <li><a href="#_rejected_alternatives">Rejected Alternatives</a></li>
 <li><a href="#_trade_offs">Trade-offs</a></li>
-<li><a href="#_consequences">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#_consequences">Consequences</a>
+<ul class="sectlevel2">
 <li><a href="#_positive">Positive</a></li>
 <li><a href="#_negative">Negative</a></li>
 <li><a href="#_implementation_requirements">Implementation Requirements</a></li>
-<li><a href="#_implementation_strategy">Implementation Strategy</a></li>
+</ul>
+</li>
+<li><a href="#_implementation_strategy">Implementation Strategy</a>
+<ul class="sectlevel2">
 <li><a href="#_event_processing_pattern">Event Processing Pattern</a></li>
 <li><a href="#_core_main_loop_event_driven_pattern">Core Main Loop Event-Driven Pattern</a></li>
 <li><a href="#_memory_layout_and_synchronization">Memory Layout and Synchronization</a></li>
 <li><a href="#_implementation_phases">Implementation Phases</a></li>
 <li><a href="#_test_strategy">Test Strategy</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -406,23 +385,26 @@
     <div class="td-content">
         <p>
             
+<h1 id="_adr_007_state_machine_architecture" class="sect0">ADR-007: State Machine Architecture</h1>
 <div class="sect1">
-<h2 id="_adr_007_state_machine_architecture">ADR-007: State Machine Architecture</h2>
+<h2 id="_status">Status</h2>
 <div class="sectionbody">
-<div class="sect2">
-<h3 id="_status">Status</h3>
 <div class="paragraph">
 <p>Decided</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_date">Date</h3>
+</div>
+<div class="sect1">
+<h2 id="_date">Date</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>2024-01-16 (Updated: 2025-08-06)</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_context">Context</h3>
+</div>
+<div class="sect1">
+<h2 id="_context">Context</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>The UART2ETH system requires coordinated dual-core operation with predictable behavior across system initialization, normal operation, error conditions, and configuration changes. The system needs a mechanism to synchronize Core0 (UART processing) and Core1 (network and persistence) while avoiding tight coupling between cores.</p>
 </div>
@@ -438,11 +420,12 @@
 * Non-persistent state information (states should not survive reboots)</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_decision">Decision</h3>
+</div>
+<div class="sect1">
+<h2 id="_decision">Decision</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>We will implement <strong>three independent event-driven state machines</strong> with <strong>atomic main state</strong> and <strong>ISR-safe sub-states</strong> using the following architecture:</p>
-</div>
 </div>
 <div class="sect2">
 <h3 id="_event_driven_state_machine_architecture">Event-Driven State Machine Architecture</h3>
@@ -682,10 +665,11 @@ typedef enum {
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_consequences">Consequences</h3>
-
 </div>
+</div>
+<div class="sect1">
+<h2 id="_consequences">Consequences</h2>
+<div class="sectionbody">
 <div class="sect2">
 <h3 id="_positive">Positive</h3>
 <div class="ulist">
@@ -761,10 +745,11 @@ typedef enum {
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_implementation_strategy">Implementation Strategy</h3>
-
 </div>
+</div>
+<div class="sect1">
+<h2 id="_implementation_strategy">Implementation Strategy</h2>
+<div class="sectionbody">
 <div class="sect2">
 <h3 id="_event_processing_pattern">Event Processing Pattern</h3>
 <div class="listingblock">
@@ -984,11 +969,11 @@ void core0_main(void) {
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
