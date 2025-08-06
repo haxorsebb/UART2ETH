@@ -3,8 +3,8 @@
  * @brief Core1 main function for network, persistence, and log processing
  * 
  * Implements event-driven main loop for Core1 responsible for network operations,
- * flash persistence, and log processing. Processes exactly one log event per
- * iteration as specified in requirements.
+ * flash persistence, and log processing. Uses real log manager functions for
+ * efficient batch processing of pending log events.
  * 
  * Documentation Reference:
  * - ADR-007: Event-Driven State Machine Architecture
@@ -22,25 +22,23 @@ static bool initialize_network_interface(void);
 static bool check_network_status(void);
 static void process_network_operations(void);
 static bool persistence_needed(void);
-static bool log_events_pending(void);
-static void log_manager_format_one_pending_event(void);
 
 /**
  * Core1 main function - Network, persistence, and log processing
  * 
  * Runs the main event-driven control loop for Core1 operations.
  * Handles network processing, configuration persistence, and log formatting.
- * Processes exactly ONE log event per iteration as required.
+ * Uses real log manager functions for efficient batch processing.
  */
 void core1_main(void) {
-    printf("[CORE1] Starting network and maintenance main loop\n");
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
     
     // Initialize network interface
     if (!initialize_network_interface()) {
-        printf("[CORE1] ERROR: Network interface initialization failed\n");
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
         state_machine_process_main_event(MAIN_EVENT_SYSTEM_ERROR);
     } else {
-        printf("[CORE1] Network interface initialized successfully\n");
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 0);
         // Generate network up event
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_UP);
     }
@@ -57,21 +55,20 @@ void core1_main(void) {
         switch (main_state) {
             case MAIN_STATE_INIT:
                 // Wait for Core0 to complete hardware initialization
-                printf("[CORE1] MAIN_STATE_INIT - Waiting for Core0 to complete UART init\n");
+                log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_DEBUG, LOG_EVENT_INIT_PHASE, 1);
                 break;
                 
             case MAIN_STATE_CONFIGURATION:
                 // Configuration loading phase - Core1 drives this
-                printf("[CORE1] MAIN_STATE_CONFIGURATION - Loading configuration\n");
+                log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_CONFIG_PHASE, 0);
                 
                 // Simulate configuration loading
                 static uint32_t config_loading_cycles = 0;
                 config_loading_cycles++;
                 
                 if (config_loading_cycles >= 5) {  // Simulate 5 cycles to load config
-                    printf("[CORE1] Configuration loaded successfully\n");
+                    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_LOADED, config_loading_cycles);
                     state_machine_process_main_event(MAIN_EVENT_CONFIG_LOADED);
-                    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_LOADED, 0);
                     config_loading_cycles = 0;  // Reset for next time
                 }
                 break;
@@ -82,13 +79,13 @@ void core1_main(void) {
                 
                 // MEDIUM PRIORITY: Persistence operations
                 if (persistence_needed()) {
-                    printf("[CORE1] Starting persistence operation\n");
+                    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_START, 0);
                     state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_START);
                     
                     // Perform persistence operation
                     flash_persistence_save_configuration_if_needed();
                     
-                    printf("[CORE1] Persistence operation completed\n");
+                    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_END, 0);
                     state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_END);
                     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_SAVED, 0);
                 }
@@ -96,26 +93,30 @@ void core1_main(void) {
                 
             case MAIN_STATE_ERROR:
                 // Error state - limited operations
-                printf("[CORE1] MAIN_STATE_ERROR - Limited operations mode\n");
+                log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_ERROR_RECOVERY, 0);
                 break;
         }
         
-        // LOW PRIORITY: Process exactly ONE log event per iteration (REQUIRED)
-        if (log_events_pending()) {
-            printf("[CORE1] Processing one log event\n");
+        // LOW PRIORITY: Process all pending log events (efficient batch processing)
+        if (log_manager_get_pending_count() > 0) {
             state_machine_process_core1_event(CORE1_EVENT_LOG_START);
             
-            // Process exactly one log event as specified in requirements
-            log_manager_format_one_pending_event();
+            // Process all pending log events using real log manager function
+            uint32_t formatted_count = log_manager_format_pending();
             
             state_machine_process_core1_event(CORE1_EVENT_LOG_END);
+            
+            // Log the processing activity for debugging
+            if (formatted_count > 0) {
+                log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_LOG_PROCESSING, formatted_count);
+            }
         }
         
         // Network status monitoring and event generation
         switch (sub_state) {
             case CORE1_NET_DISCONNECTED:
                 if (check_network_status()) {
-                    printf("[CORE1] Network interface is now available\n");
+                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_UP, 0);
                     state_machine_process_core1_event(CORE1_EVENT_NETWORK_UP);
                     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_TCP_CONNECT, 0);
                 }
@@ -123,7 +124,7 @@ void core1_main(void) {
                 
             case CORE1_NET_IDLE:
                 if (!check_network_status()) {
-                    printf("[CORE1] Network interface went down\n");
+                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 0);
                     state_machine_process_core1_event(CORE1_EVENT_NETWORK_DOWN);
                     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 0);
                 }
@@ -131,7 +132,7 @@ void core1_main(void) {
                 static uint32_t connection_check_counter = 0;
                 connection_check_counter++;
                 if (connection_check_counter % 30 == 0) {  // Every 3 seconds
-                    printf("[CORE1] TCP connection established\n");
+                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_CONNECTION_CHECK, 1);
                     state_machine_process_core1_event(CORE1_EVENT_CONNECTION_ACTIVE);
                     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_TCP_CONNECT, 0);
                 }
@@ -139,7 +140,7 @@ void core1_main(void) {
                 
             case CORE1_NET_ACTIVE:
                 if (!check_network_status()) {
-                    printf("[CORE1] Network interface went down\n");
+                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 0);
                     state_machine_process_core1_event(CORE1_EVENT_NETWORK_DOWN);
                     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 0);
                 }
@@ -147,7 +148,7 @@ void core1_main(void) {
                 static uint32_t active_counter = 0;
                 active_counter++;
                 if (active_counter % 100 == 0) {  // Every 10 seconds
-                    printf("[CORE1] All TCP connections closed\n");
+                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_CONNECTION_CHECK, 0);
                     state_machine_process_core1_event(CORE1_EVENT_CONNECTION_IDLE);
                     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_TCP_DISCONNECT, 0);
                     active_counter = 0;
@@ -156,12 +157,12 @@ void core1_main(void) {
                 
             case CORE1_PERSISTENCE_ACTIVE:
                 // Persistence operation active - limited other processing
-                printf("[CORE1] Persistence operation in progress\n");
+                log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_START, 1);
                 break;
                 
             case CORE1_LOG_ACTIVE:
                 // Log processing active - this should be very brief
-                printf("[CORE1] Log processing active\n");
+                log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_LOG_PROCESSING, 0);
                 break;
         }
         
@@ -183,7 +184,7 @@ static bool initialize_network_interface(void) {
     // - Configure lwIP TCP/IP stack
     // - Set up socket management
     // - Configure network parameters
-    printf("[CORE1] Initializing network interface (ENC28J60 + lwIP)\n");
+    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_INIT, 1);
     return true;
 }
 
@@ -215,7 +216,7 @@ static void process_network_operations(void) {
     net_counter++;
     
     if (net_counter % 50 == 0) {  // Every 5 seconds
-        printf("[CORE1] Processing network operations (TCP/IP, sockets)\n");
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_OPERATIONS, 0);
     }
 }
 
@@ -229,39 +230,9 @@ static bool persistence_needed(void) {
     persistence_counter++;
     
     // Need persistence every 300 iterations (~30 seconds at 100ms loop)
-    return (persistence_counter % 300 == 0);
-}
-
-/**
- * Check if log events are pending for formatting
- * @return true if events pending, false otherwise
- */
-static bool log_events_pending(void) {
-    // Stub implementation - simulate periodic log events
-    // Real implementation would check log manager for pending events
-    static uint32_t log_counter = 0;
-    log_counter++;
-    
-    // Simulate log events being available frequently
-    return (log_counter % 5 == 0);  // Every 500ms
-}
-
-/**
- * Process exactly one pending log event (REQUIRED: one event per iteration)
- */
-static void log_manager_format_one_pending_event(void) {
-    // Stub implementation - simulate formatting one log event
-    // Real implementation would:
-    // - Get one log entry from the log buffer
-    // - Format it using the string lookup table
-    // - Output to USB-serial interface
-    // - Update log read pointer by exactly one entry
-    
-    static uint32_t event_counter = 0;
-    event_counter++;
-    
-    printf("[CORE1] Formatted log event #%lu and output to USB-serial\n", event_counter);
-    
-    // Simulate processing time for one log event
-    sleep_us(100);  // 100 microseconds processing time per event
+    if (persistence_counter % 300 == 0) {
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_NEEDED, 0);
+        return true;
+    }
+    return false;
 }

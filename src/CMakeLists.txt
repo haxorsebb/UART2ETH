@@ -3,6 +3,7 @@
 # Configuration manager
 add_library(config_manager
     config/shared_memory.c
+    config/flash_persistence.c
 )
 
 target_include_directories(config_manager PUBLIC ../include)
@@ -10,6 +11,8 @@ target_link_libraries(config_manager
     pico_stdlib
     pico_sync 
     hardware_sync
+    hardware_flash
+    pico_bootrom
 )
 
 # Log manager

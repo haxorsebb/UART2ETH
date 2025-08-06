@@ -33,14 +33,14 @@ void core1_main(void);
  * Core1-specific initialization and then calls the main Core1 loop.
  */
 void core1_entry() {
-    printf("UART2ETH Core1 starting...\n");
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
     
     // Core1 runs the network, persistence, and log processing
     core1_main();
     
     // Should never reach here
     while (true) {
-        printf("ERROR: Core1 main loop exited unexpectedly\n");
+        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_CORE_EXIT_ERROR, 1);
         sleep_ms(1000);
     }
 }
@@ -58,51 +58,43 @@ int main() {
     // Wait for USB-serial connection for debugging
     sleep_ms(2000);
     
-    printf("=== UART2ETH Firmware Starting ===\n");
-    printf("Initializing dual-core event-driven architecture...\n");
-    
-    // Initialize shared memory system
-    printf("Initializing shared memory...\n");
-    if (!shared_memory_init()) {
-        printf("FATAL ERROR: Failed to initialize shared memory\n");
-        while (true) {
-            sleep_ms(1000);  // Halt system on critical error
-        }
-    }
-    printf("Shared memory initialized successfully\n");
-    
-    // Initialize event-driven state machine
-    printf("Initializing event-driven state machine...\n");
-    if (!state_machine_init()) {
-        printf("FATAL ERROR: Failed to initialize state machine\n");
-        while (true) {
-            sleep_ms(1000);  // Halt system on critical error
-        }
-    }
-    printf("Event-driven state machine initialized successfully\n");
-    
-    // Initialize log manager
-    printf("Initializing log manager...\n");
-    if (!log_manager_init()) {
-        printf("FATAL ERROR: Failed to initialize log manager\n");
-        while (true) {
-            sleep_ms(1000);  // Halt system on critical error
-        }
-    }
-    printf("Log manager initialized successfully\n");
-    
-    // Log system startup
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_BOOT, 0);
     
+    // Initialize shared memory system
+    if (!shared_memory_init()) {
+        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 1);
+        while (true) {
+            sleep_ms(1000);  // Halt system on critical error
+        }
+    }
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_INIT, 0);
+    
+    // Initialize event-driven state machine
+    if (!state_machine_init()) {
+        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 2);
+        while (true) {
+            sleep_ms(1000);  // Halt system on critical error
+        }
+    }
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_STATE_MACHINE_INIT, 0);
+    
+    // Initialize log manager
+    if (!log_manager_init()) {
+        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 3);
+        while (true) {
+            sleep_ms(1000);  // Halt system on critical error
+        }
+    }
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_LOG_MANAGER_INIT, 0);
+    
     // Launch Core1 with network and maintenance processing
-    printf("Launching Core1 for network, persistence, and log processing...\n");
     multicore_launch_core1(core1_entry);
     
     // Give Core1 a moment to initialize
     sleep_ms(100);
     
-    printf("Core1 launched successfully\n");
-    printf("Starting Core0 UART processing...\n");
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_LAUNCHED, 0);
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE0_STARTING, 0);
     
     // Log dual-core launch completion
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
@@ -112,7 +104,7 @@ int main() {
     
     // Should never reach here
     while (true) {
-        printf("ERROR: Core0 main loop exited unexpectedly\n");
+        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_CORE_EXIT_ERROR, 0);
         sleep_ms(1000);
     }
     

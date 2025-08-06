@@ -31,10 +31,7 @@ static bool perform_error_recovery(void);
  * Queries state machine and generates events based on hardware status.
  */
 void core0_main(void) {
-    printf("[CORE0] Starting UART processing main loop\n");
-    
-    // Log Core0 startup
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE0_STARTING, 0);
     
     while (true) {
         // Query current states (non-blocking)
@@ -45,22 +42,21 @@ void core0_main(void) {
         switch (main_state) {
             case MAIN_STATE_INIT:
                 // System initialization phase
-                printf("[CORE0] MAIN_STATE_INIT - Initializing UART hardware\n");
+                log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_DEBUG, LOG_EVENT_INIT_PHASE, 0);
                 if (initialize_uart_hardware()) {
-                    printf("[CORE0] UART hardware initialized successfully\n");
+                    log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_HW_INIT, 0);
                     // Send event to transition main state
                     state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE);
                     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
                 } else {
-                    printf("[CORE0] ERROR: UART hardware initialization failed\n");
+                    log_event(EVENT_SOURCE_UART0, LOG_LEVEL_ERROR, LOG_EVENT_UART0_ERROR, 1);
                     state_machine_process_main_event(MAIN_EVENT_SYSTEM_ERROR);
-                    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_UART_ERROR, 0);
                 }
                 break;
                 
             case MAIN_STATE_CONFIGURATION:
                 // Configuration loading phase - Core0 waits for Core1 to complete
-                printf("[CORE0] MAIN_STATE_CONFIGURATION - Waiting for configuration\n");
+                log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_DEBUG, LOG_EVENT_CONFIG_PHASE, 0);
                 // Core0 doesn't drive configuration loading, just waits
                 break;
                 
@@ -70,36 +66,34 @@ void core0_main(void) {
                     case CORE0_UART_IDLE:
                         // Check for incoming UART data
                         if (uart_data_available()) {
-                            printf("[CORE0] UART data available - starting processing\n");
+                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_DATA_AVAIL, 0);
                             // Generate event to start UART processing
                             state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
-                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_DATA_RX, 0);
+                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART0_DATA_RX, 0);
                         }
                         break;
                         
                     case CORE0_UART_ACTIVE:
                         // Process UART data
-                        printf("[CORE0] Processing UART data\n");
                         if (process_uart_data()) {
-                            printf("[CORE0] UART processing completed\n");
+                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 0);
                             // Processing complete, generate idle event
                             state_machine_process_core0_event(CORE0_EVENT_UART_IDLE);
-                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_DATA_TX, 1);
+                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART0_DATA_TX, 1);
                         }
                         break;
                         
                     case CORE0_UART_ERROR:
                         // Handle UART errors
-                        printf("[CORE0] UART error state - attempting recovery\n");
                         if (attempt_uart_recovery()) {
-                            printf("[CORE0] UART recovery successful\n");
+                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_RECOVERY, 1);
                             // Recovery successful, generate recovery event
                             state_machine_process_core0_event(CORE0_EVENT_ERROR_RECOVERED);
                             log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_INIT, 0);
                         } else {
-                            printf("[CORE0] UART recovery failed - escalating to system error\n");
+                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_ERROR, LOG_EVENT_UART_RECOVERY, 0);
                             state_machine_process_main_event(MAIN_EVENT_SYSTEM_ERROR);
-                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_ERROR, LOG_EVENT_UART_ERROR, 0);
+                            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_ERROR, LOG_EVENT_UART0_ERROR, 0);
                         }
                         break;
                 }
@@ -107,13 +101,12 @@ void core0_main(void) {
                 
             case MAIN_STATE_ERROR:
                 // System error recovery
-                printf("[CORE0] MAIN_STATE_ERROR - Attempting system recovery\n");
                 if (perform_error_recovery()) {
-                    printf("[CORE0] System recovery successful\n");
+                    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_ERROR_RECOVERY, 1);
                     state_machine_process_main_event(MAIN_EVENT_ERROR_RECOVERED);
                     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
                 } else {
-                    printf("[CORE0] System recovery failed - will retry\n");
+                    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_ERROR_RECOVERY, 0);
                     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_WATCHDOG_RESET, 0);
                 }
                 break;
@@ -137,7 +130,7 @@ static bool initialize_uart_hardware(void) {
     // - Configure baud rates, data bits, stop bits, parity
     // - Set up interrupt handlers
     // - Configure DMA channels
-    printf("[CORE0] Initializing 4 UART channels...\n");
+    log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_CHANNELS, 4);
     return true;
 }
 
@@ -166,16 +159,16 @@ static bool process_uart_data(void) {
     static uint32_t processing_cycles = 0;
     
     if (processing_cycles == 0) {
-        printf("[CORE0] Starting UART data processing...\n");
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_PROCESSING, 3);
         processing_cycles = 3;  // Simulate 3 cycles of processing
         return false;
     }
     
     processing_cycles--;
-    printf("[CORE0] Processing UART data... cycles remaining: %lu\n", processing_cycles);
+    log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_PROCESSING, processing_cycles);
     
     if (processing_cycles == 0) {
-        printf("[CORE0] UART data processing complete\n");
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 0);
         return true;  // Processing complete
     }
     
@@ -191,7 +184,7 @@ static bool attempt_uart_recovery(void) {
     static uint32_t recovery_attempts = 0;
     
     recovery_attempts++;
-    printf("[CORE0] UART recovery attempt %lu\n", recovery_attempts);
+    log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART_RECOVERY, recovery_attempts);
     
     // Simulate successful recovery after 3 attempts
     if (recovery_attempts >= 3) {
@@ -211,7 +204,7 @@ static bool perform_error_recovery(void) {
     static uint32_t system_recovery_attempts = 0;
     
     system_recovery_attempts++;
-    printf("[CORE0] System recovery attempt %lu\n", system_recovery_attempts);
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_ERROR_RECOVERY, system_recovery_attempts);
     
     // Simulate successful recovery after 2 attempts
     if (system_recovery_attempts >= 2) {

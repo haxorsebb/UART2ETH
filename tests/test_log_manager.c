@@ -115,7 +115,7 @@ void test_multiple_events_different_sources(void) {
     // ARRANGE: Log manager initialized
     
     // ACT: Log events from different sources
-    bool result1 = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_DATA_RX, 64);
+    bool result1 = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART0_DATA_RX, 64);
     bool result2 = log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_TCP_CONNECT, 4001);  
     bool result3 = log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_WARN, LOG_EVENT_CONFIG_CHANGED, 1);
     bool result4 = log_event(EVENT_SOURCE_OTA, LOG_LEVEL_ERROR, LOG_EVENT_OTA_ERROR, 404);
@@ -275,8 +275,8 @@ void test_log_buffer_wraparound_fixed_entries(void) {
         "Pending count should decrease after formatting entries");
     
     // ACT: Write more events after partial consumption to test continued wraparound
-    bool post_wrap_result1 = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_DATA_TX, 128);
-    bool post_wrap_result2 = log_event(EVENT_SOURCE_UART1, LOG_LEVEL_DEBUG, LOG_EVENT_UART_DATA_RX, 256);
+    bool post_wrap_result1 = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART0_DATA_TX, 128);
+    bool post_wrap_result2 = log_event(EVENT_SOURCE_UART1, LOG_LEVEL_DEBUG, LOG_EVENT_UART1_DATA_RX, 256);
     
     // ASSERT: Should be able to continue writing after wraparound and consumption
     TEST_ASSERT_TRUE_MESSAGE(post_wrap_result1 || post_wrap_result2,
@@ -410,7 +410,7 @@ static void core1_concurrent_helper(void) {
     uint32_t events_logged = 0;
     for (uint32_t i = 0; i < half_capacity; i++) {
         bool result = log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, 
-                               LOG_EVENT_TCP_DATA_RX, i);
+                               LOG_EVENT_TCP_DATA_RX_BYTES, i);
         if (result) {
             events_logged++;
         } else {
@@ -458,7 +458,7 @@ void test_core0_buffer_fill_performance(void) {
     uint32_t events_logged = 0;
     for (uint32_t i = 0; i < buffer_capacity; i++) {
         bool result = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, 
-                               LOG_EVENT_UART_DATA_TX, i);
+                               LOG_EVENT_UART0_DATA_TX, i);
         if (result) {
             events_logged++;
         } else {
@@ -625,7 +625,7 @@ void test_concurrent_buffer_fill_monotonic_event_numbers(void) {
     uint32_t core0_events_logged = 0;
     for (uint32_t i = 0; i < half_capacity; i++) {
         bool result = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, 
-                               LOG_EVENT_UART_DATA_RX, i);
+                               LOG_EVENT_UART0_DATA_RX, i);
         if (result) {
             core0_events_logged++;
         } else {
@@ -790,7 +790,7 @@ void test_concurrent_buffer_fill_performance(void) {
     uint32_t core0_events_logged = 0;
     for (uint32_t i = 0; i < half_capacity; i++) {
         bool result = log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, 
-                               LOG_EVENT_UART_DATA_RX, i);
+                               LOG_EVENT_UART0_DATA_RX, i);
         if (result) {
             core0_events_logged++;
         } else {

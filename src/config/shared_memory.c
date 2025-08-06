@@ -132,7 +132,7 @@ uint32_t shared_memory_get_log_buffer_capacity(void) {
  * @return true if re-initialization successful, false otherwise
  */
 bool shared_memory_force_reinit(void) {
-    printf("Forcing shared memory re-initialization to factory defaults...\n");
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_REINIT, 0);
     
     // Reset initialization flag to allow re-initialization
     g_initialized = false;
@@ -141,9 +141,9 @@ bool shared_memory_force_reinit(void) {
     bool result = shared_memory_init();
     
     if (result) {
-        printf("Shared memory successfully re-initialized with factory defaults\n");
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_REINIT, 1);
     } else {
-        printf("ERROR: Failed to re-initialize shared memory\n");
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_SHARED_MEMORY_REINIT, 0);
     }
     
     return result;
@@ -162,12 +162,3 @@ shared_memory_layout_t* shared_memory_get_layout(void) {
     return g_shared_memory;
 }
 
-/**
- * Flash persistence stub implementation
- * TODO: Implement full flash persistence functionality
- */
-bool flash_persistence_save_configuration_if_needed(void) {
-    // Stub implementation - always returns true for now
-    // Real implementation would check if configuration changed and save to flash
-    return true;
-}
