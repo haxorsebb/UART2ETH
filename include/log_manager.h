@@ -151,7 +151,6 @@ typedef uint16_t event_type_t;
 #define LOG_EVENT_PERSISTENCE_END        ((event_type_t)317)
 #define LOG_EVENT_PERSISTENCE_NEEDED     ((event_type_t)318)
 #define LOG_EVENT_SHARED_MEMORY_REINIT   ((event_type_t)319)
-#define LOG_EVENT_LOG_PROCESSING         ((event_type_t)320)
 
 // OTA events (400-499)
 #define LOG_EVENT_OTA_START       ((event_type_t)400)

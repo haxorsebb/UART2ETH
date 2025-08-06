@@ -132,7 +132,6 @@ static const char* const event_format_strings[] = {
     [LOG_EVENT_PERSISTENCE_END] = "Persistence operation completed",
     [LOG_EVENT_PERSISTENCE_NEEDED] = "Persistence needed - configuration changed",
     [LOG_EVENT_SHARED_MEMORY_REINIT] = "Shared memory re-initialized with factory defaults",
-    [LOG_EVENT_LOG_PROCESSING] = "Log processing - formatted event #%u",
     
     // OTA events (400-499)
     [LOG_EVENT_OTA_START] = "OTA update started - size %u bytes",
