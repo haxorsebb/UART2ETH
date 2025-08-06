@@ -1,3 +1,11 @@
+:jbake-title: ADR-006: Flash Persistence Strategy for UART2ETH
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 6
+:filename: /adrs/ADR-006-flash-persistence-strategy.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
 = ADR-006: Flash Persistence Strategy
 
 == Status
