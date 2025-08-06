@@ -34,10 +34,8 @@ This section references the Architecture Decision Records (ADRs) that document k
 
 * link:../adrs/ADR-005-buffer-allocation-strategy.html[ADR-005: Ring Buffer Memory Allocation Strategy] - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.
 * link:../adrs/ADR-006-flash-persistence-strategy.html[ADR-006: Flash Persistence Strategy] - Documents the decision to use 4-page ring buffer for configuration persistence, providing wear leveling and power-loss safety through deferred write-back with SHA256 integrity verification.
+* link:../adrs/ADR-007-state-machine-architecture.html[ADR-007: State Machine Architecture] - Documents the decision to implement event-driven state machines with atomic main state and ISR-safe sub-states for dual-core coordination and predictable system behavior.
 
-=== System Architecture Decisions
-
-* link:../adrs/ADR-007-state-machine-architecture.html[ADR-007: State Machine Architecture] - Documents the decision to use three independent event-driven state machines with atomic main state and ISR-safe sub-states for dual-core coordination without blocking operations.
 
 === Decision Interdependencies
 
@@ -49,7 +47,9 @@ The ADRs reveal important interdependencies that influence architectural coheren
 
 * *ADR-005 (Buffer Strategy) supports ADR-003 (C Language)*: Static allocation strategy leverages C's deterministic memory model and supports industrial reliability requirements.
 
-* *ADR-007 (State Machine Architecture) enables ADR-005 (Buffer Strategy)*: Event-driven state machine coordination provides the control framework for managing inter-core buffer operations safely without blocking behavior.
+* *ADR-007 (State Machine Architecture) enables ADR-001 (Microcontroller Platform)*: Event-driven state machines with atomic operations leverage the dual-core RP2350 architecture for coordinated operation while maintaining deterministic behavior.
+
+* *ADR-007 (State Machine Architecture) coordinates ADR-005 (Buffer Strategy)*: State machines provide the control logic for safe inter-core buffer access, ensuring static allocation strategy works correctly across dual cores.
 
 * *ADR-007 (State Machine Architecture) supports ADR-006 (Flash Persistence)*: The Core1 sub-state machine provides the execution context for deferred write-back persistence operations integrated into the main loop.
 
