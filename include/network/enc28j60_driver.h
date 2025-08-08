@@ -34,7 +34,13 @@ extern "C" {
 #define ENC28J60_MISO_PIN       4   // SO - Serial Output  
 #define ENC28J60_CS_PIN         5
 
-// ENC28J60 Register definitions
+// Register Bank definitions
+#define ENC28J60_BANK0          0x00
+#define ENC28J60_BANK1          0x01
+#define ENC28J60_BANK2          0x02
+#define ENC28J60_BANK3          0x03
+
+// Bank 0 registers
 #define ENC28J60_ERDPTL         0x00
 #define ENC28J60_ERDPTH         0x01
 #define ENC28J60_EWRPTL         0x02
@@ -50,7 +56,42 @@ extern "C" {
 #define ENC28J60_ERXRDPTL       0x0C
 #define ENC28J60_ERXRDPTH       0x0D
 
-// Control registers
+// Bank 1 registers
+#define ENC28J60_ERXFCON        0x18
+#define ENC28J60_EPKTCNT        0x19
+
+// ERXFCON bits (from Arduino reference)
+#define ENC28J60_ERXFCON_UCEN   0x80  // Unicast enable
+#define ENC28J60_ERXFCON_ANDOR  0x40  // AND/OR filter logic
+#define ENC28J60_ERXFCON_CRCEN  0x20  // CRC check enable  
+#define ENC28J60_ERXFCON_MCEN   0x02  // Multicast enable
+#define ENC28J60_ERXFCON_BCEN   0x01  // Broadcast enable
+
+// Bank 2 registers (MAC/MII - require dummy byte)
+#define ENC28J60_MACON1         0x00
+#define ENC28J60_MACON3         0x02
+#define ENC28J60_MACON4         0x03
+#define ENC28J60_MABBIPG        0x04
+#define ENC28J60_MAIPGL         0x06
+#define ENC28J60_MAIPGH         0x07
+#define ENC28J60_MAMXFLL        0x0A
+#define ENC28J60_MAMXFLH        0x0B
+#define ENC28J60_MICMD          0x12
+#define ENC28J60_MIREGADR       0x14
+#define ENC28J60_MIRDL          0x18
+#define ENC28J60_MIRDH          0x19
+
+// Bank 3 registers (MAC/MII - require dummy byte)
+#define ENC28J60_MAADR1         0x04  // MAADR<47:40>
+#define ENC28J60_MAADR2         0x05  // MAADR<39:32>
+#define ENC28J60_MAADR3         0x02  // MAADR<31:24>
+#define ENC28J60_MAADR4         0x03  // MAADR<23:16>
+#define ENC28J60_MAADR5         0x00  // MAADR<15:8>
+#define ENC28J60_MAADR6         0x01  // MAADR<7:0>
+#define ENC28J60_MISTAT         0x0A
+#define ENC28J60_EREVID         0x12
+
+// Control registers (available in all banks)
 #define ENC28J60_ECON1          0x1F
 #define ENC28J60_ECON2          0x1E
 #define ENC28J60_ESTAT          0x1D
@@ -63,8 +104,37 @@ extern "C" {
 #define ENC28J60_ECON1_TXRST    0x80
 #define ENC28J60_ECON1_RXRST    0x40
 
+// ECON2 bits
+#define ENC28J60_ECON2_AUTOINC  0x80
+#define ENC28J60_ECON2_PKTDEC   0x40
+
 // ESTAT bits
 #define ENC28J60_ESTAT_CLKRDY   0x01
+
+// MAC register bits
+#define ENC28J60_MACON1_MARXEN  0x01
+#define ENC28J60_MACON1_PASSALL 0x02
+#define ENC28J60_MACON1_RXPAUS  0x04
+#define ENC28J60_MACON1_TXPAUS  0x08
+
+#define ENC28J60_MACON3_FULDPX  0x01
+#define ENC28J60_MACON3_FRMLNEN 0x02
+#define ENC28J60_MACON3_TXCRCEN 0x10
+#define ENC28J60_MACON3_PADCFG0 0x20
+#define ENC28J60_MACON3_PADCFG1 0x40
+#define ENC28J60_MACON3_PADCFG2 0x80
+#define ENC28J60_MACON3_PADCFG_FULL (ENC28J60_MACON3_PADCFG2 | ENC28J60_MACON3_PADCFG1 | ENC28J60_MACON3_PADCFG0)  // Auto-pad to 60 bytes
+
+// MII/MAC additional register addresses and bits
+#define ENC28J60_MACON2         0x10
+#define ENC28J60_MACSTAT1       0x01
+#define ENC28J60_MACSTAT2       0x11
+
+// PHY register addresses
+#define ENC28J60_PHCON1         0x00
+#define ENC28J60_PHSTAT1        0x01
+#define ENC28J60_PHCON2         0x10
+#define ENC28J60_PHSTAT2        0x11
 
 // SPI command opcodes
 #define ENC28J60_READ_CTRL_REG  0x00
@@ -136,14 +206,36 @@ const enc28j60_state_t* enc28j60_get_state(void);
  */
 
 /**
- * Read control register
+ * Set register bank
+ * @param bank Bank number (0-3)
+ */
+void enc28j60_set_bank(uint8_t bank);
+
+/**
+ * Read control register (with automatic bank switching)
+ * @param reg Register address
+ * @param bank Bank number (0-3)
+ * @return Register value
+ */
+uint8_t enc28j60_read_register_bank(uint8_t reg, uint8_t bank);
+
+/**
+ * Write control register (with automatic bank switching)
+ * @param reg Register address
+ * @param bank Bank number (0-3)
+ * @param value Value to write
+ */
+void enc28j60_write_register_bank(uint8_t reg, uint8_t bank, uint8_t value);
+
+/**
+ * Read control register (current bank)
  * @param reg Register address
  * @return Register value
  */
 uint8_t enc28j60_read_register(uint8_t reg);
 
 /**
- * Write control register  
+ * Write control register (current bank)
  * @param reg Register address
  * @param value Value to write
  */
