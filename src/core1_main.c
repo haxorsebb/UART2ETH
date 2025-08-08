@@ -14,6 +14,7 @@
 #include "state_machine.h"
 #include "shared_memory.h"
 #include "log_manager.h"
+#include "network/network_manager.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
 
@@ -74,7 +75,8 @@ void core1_main(void) {
                 break;
                 
             case MAIN_STATE_OPERATIONAL:
-                // HIGH PRIORITY: Network processing
+                // HIGH PRIORITY: Network processing (using real network manager)
+                network_manager_process();
                 process_network_operations();
                 
                 // MEDIUM PRIORITY: Persistence operations
@@ -170,49 +172,52 @@ void core1_main(void) {
 // Core1 processing function implementations (stubs for now)
 
 /**
- * Initialize network interface
+ * Initialize network interface using network manager
  * @return true if successful, false otherwise
  */
 static bool initialize_network_interface(void) {
-    // Stub implementation - always succeeds for testing
-    // Real implementation would:
-    // - Initialize ENC28J60 SPI interface
-    // - Configure lwIP TCP/IP stack
-    // - Set up socket management
-    // - Configure network parameters
-    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_INIT, 1);
-    return true;
+    // Get default network configuration
+    network_config_t config;
+    network_manager_get_default_config(&config);
+    
+    // Initialize network manager with ENC28J60 driver
+    bool result = network_manager_init(&config);
+    
+    if (result) {
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 1);
+    } else {
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
+    }
+    
+    return result;
 }
 
 /**
- * Check current network status
+ * Check current network status using network manager
  * @return true if network is available, false otherwise
  */
 static bool check_network_status(void) {
-    // Stub implementation - simulate network availability
-    static uint32_t network_counter = 0;
-    network_counter++;
-    
-    // Simulate network going up/down periodically
-    return (network_counter / 200) % 2 == 0;  // Up for 20s, down for 20s
+    // Check if network manager is ready and link is up
+    return network_manager_is_ready() && network_manager_is_link_up();
 }
 
 /**
  * Process network operations (high priority)
  */
 static void process_network_operations(void) {
-    // Stub implementation - simulate network processing
-    // Real implementation would:
-    // - Process TCP/IP packets
-    // - Handle socket connections
-    // - Process ring buffer data
-    // - Manage HTTP server for management interface
+    // Additional network processing beyond the network manager
+    // For now, just log periodic status
     
     static uint32_t net_counter = 0;
     net_counter++;
     
-    if (net_counter % 50 == 0) {  // Every 5 seconds
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_OPERATIONS, 0);
+    if (net_counter % 100 == 0) {  // Every 10 seconds
+        // Log network status and basic connectivity test
+        bool connectivity = network_manager_test_connectivity();
+        network_status_t status = network_manager_get_status();
+        
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_OPERATIONS, 
+                  (uint32_t)status | (connectivity ? 0x100 : 0));
     }
 }
 

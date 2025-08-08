@@ -54,6 +54,7 @@ target_link_libraries(uart2eth
     config_manager     # Our config manager library
     log_manager        # Our log manager library
     state_machine      # Our event-driven state machine library
+    network_manager    # Our network manager library
     core_modules       # Core0 and Core1 main functions
 )
 

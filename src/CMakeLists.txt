@@ -51,10 +51,14 @@ target_link_libraries(core_modules
     state_machine
     config_manager
     log_manager
+    network_manager
     pico_stdlib
     pico_multicore
     pico_sync
     hardware_sync
 )
+
+# Add network subdirectory
+add_subdirectory(network)
 
 # Main target will link against these libraries

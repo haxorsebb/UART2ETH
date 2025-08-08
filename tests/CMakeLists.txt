@@ -118,6 +118,9 @@ pico_enable_stdio_uart(test_state_machine 1)
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_state_machine)
 
+# Add network tests subdirectory
+add_subdirectory(network)
+
 elseif(PICO_ON_DEVICE)
     message("Skipping EVERYTHING! because TinyUSB submodule is not initialized in the SDK")
 endif()
