@@ -21,6 +21,8 @@
 #include "unity.h"
 #include "network/enc28j60_driver.h"
 #include "pico/stdlib.h"
+#include "hardware/uart.h"
+#include "hardware/gpio.h"
 #include <string.h>
 
 // Test fixtures and helper data
@@ -443,8 +445,14 @@ int test_enc28j60_driver_run_tests(void) {
  * @brief Main function for running ENC28J60 driver tests
  */
 int main(void) {
-    // Initialize Pico SDK
+    // Initialize Pico SDK - USB CDC only, UART1 for hardware logging
     stdio_init_all();
+    
+    // Configure UART1 on GP12/GP13 at 115200 baud for hardware logging
+    // This avoids any conflict with SPI0 used by ENC28J60
+    uart_init(uart1, 115200);
+    gpio_set_function(12, GPIO_FUNC_UART);
+    gpio_set_function(13, GPIO_FUNC_UART);
     
     // Wait for USB-serial connection for debugging
     sleep_ms(2000);

@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/uart.h"
+#include "hardware/gpio.h"
 #include "shared_memory.h"
 #include "state_machine.h"
 #include "log_manager.h"
@@ -52,8 +54,14 @@ void core1_entry() {
  * respective main functions using the event-driven state machine.
  */
 int main() {
-    // Initialize Pico SDK
+    // Initialize Pico SDK - USB CDC only, UART1 for hardware logging
     stdio_init_all();
+    
+    // Configure UART1 on GP12/GP13 at 115200 baud for hardware logging
+    // This avoids any conflict with SPI0 used by ENC28J60
+    uart_init(uart1, 115200);
+    gpio_set_function(12, GPIO_FUNC_UART);
+    gpio_set_function(13, GPIO_FUNC_UART);
     
     // Wait for USB-serial connection for debugging
     sleep_ms(2000);

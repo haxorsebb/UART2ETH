@@ -58,9 +58,10 @@ target_link_libraries(uart2eth
     core_modules       # Core0 and Core1 main functions
 )
 
-# Enable dual stdio (USB CDC + UART0)
+# Enable stdio: USB CDC for debugging, UART0 disabled to avoid SPI0 conflict
+# UART1 is manually configured in main.c for hardware logging (GP12/GP13)
 pico_enable_stdio_usb(uart2eth 1)
-pico_enable_stdio_uart(uart2eth 1)
+pico_enable_stdio_uart(uart2eth 0)  # Disable UART0 to avoid SPI0 conflict
 
 # Set UF2 family for RP2350
 pico_set_uf2_family(uart2eth "rp2350-arm-s")

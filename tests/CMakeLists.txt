@@ -33,7 +33,7 @@ target_link_libraries(test_shared_memory
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_shared_memory 1)
-pico_enable_stdio_uart(test_shared_memory 1)
+pico_enable_stdio_uart(test_shared_memory 0)  # Disable UART0 to avoid SPI0 conflict
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_shared_memory)
@@ -58,7 +58,7 @@ target_link_libraries(test_log_manager
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_log_manager 1)
-pico_enable_stdio_uart(test_log_manager 1)
+pico_enable_stdio_uart(test_log_manager 0)  # Disable UART0 to avoid SPI0 conflict
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_log_manager)
@@ -86,7 +86,7 @@ target_link_libraries(test_flash_persistence
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_flash_persistence 1)
-pico_enable_stdio_uart(test_flash_persistence 1)
+pico_enable_stdio_uart(test_flash_persistence 0)  # Disable UART0 to avoid SPI0 conflict
 
 # Embed partition table for flash persistence testing
 pico_embed_pt_in_binary(test_flash_persistence "${CMAKE_CURRENT_SOURCE_DIR}/../partition_table.json")
@@ -113,7 +113,7 @@ target_link_libraries(test_state_machine
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_state_machine 1)
-pico_enable_stdio_uart(test_state_machine 1)
+pico_enable_stdio_uart(test_state_machine 0)  # Disable UART0 to avoid SPI0 conflict
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_state_machine)
