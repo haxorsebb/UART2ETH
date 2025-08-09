@@ -25,6 +25,10 @@
 #include "hardware/gpio.h"
 #include <string.h>
 
+// Function declarations for hardware debugging tests
+void test_enc28j60_interrupt_monitoring(void);
+void test_enc28j60_cable_detection(void);
+
 // Test fixtures and helper data
 static uint8_t test_mac_address[6] = {0x02, 0x00, 0x00, 0x12, 0x34, 0x56};
 static uint8_t test_packet_data[64] = {
@@ -249,6 +253,37 @@ void test_enc28j60_mac_address(void) {
 }
 
 /**
+ * @brief Test ENC28J60 broadcast packet reception configuration
+ */
+void test_enc28j60_broadcast_reception_config(void) {
+    // Initialize driver
+    bool init_result = enc28j60_init();
+    TEST_ASSERT_TRUE_MESSAGE(init_result, "Driver initialization required for broadcast reception test");
+    
+    // Read receive filter configuration from Bank 1
+    enc28j60_set_bank(ENC28J60_BANK1);
+    uint8_t erxfcon = enc28j60_read_register(ENC28J60_ERXFCON);
+    
+    printf("DEBUG: ERXFCON = 0x%02X\n", erxfcon);
+    printf("DEBUG: UCEN (Unicast Enable): %s\n", (erxfcon & ENC28J60_ERXFCON_UCEN) ? "YES" : "NO");
+    printf("DEBUG: CRCEN (CRC Enable): %s\n", (erxfcon & ENC28J60_ERXFCON_CRCEN) ? "YES" : "NO");
+    printf("DEBUG: MCEN (Multicast Enable): %s\n", (erxfcon & ENC28J60_ERXFCON_MCEN) ? "YES" : "NO");
+    printf("DEBUG: BCEN (Broadcast Enable): %s\n", (erxfcon & ENC28J60_ERXFCON_BCEN) ? "YES" : "NO");
+    
+    // Test that broadcast packet reception is enabled for DHCP functionality
+    TEST_ASSERT_MESSAGE((erxfcon & ENC28J60_ERXFCON_BCEN) != 0, 
+                       "Broadcast packet reception MUST be enabled for DHCP functionality");
+    
+    // Test that unicast is also enabled
+    TEST_ASSERT_MESSAGE((erxfcon & ENC28J60_ERXFCON_UCEN) != 0, 
+                       "Unicast packet reception should be enabled");
+    
+    // Test that CRC checking is enabled
+    TEST_ASSERT_MESSAGE((erxfcon & ENC28J60_ERXFCON_CRCEN) != 0, 
+                       "CRC checking should be enabled for packet integrity");
+}
+
+/**
  * @brief Test ENC28J60 link status detection
  */
 void test_enc28j60_link_status(void) {
@@ -365,6 +400,94 @@ void test_enc28j60_interrupt_status(void) {
 }
 
 /**
+ * @brief Test raw packet reception (Arduino-style, bypassing lwIP)
+ */
+void test_enc28j60_raw_packet_reception(void) {
+    printf("=== Raw Packet Reception Test (Arduino-style) ===\n");
+    
+    // Initialize driver
+    bool init_result = enc28j60_init();
+    TEST_ASSERT_TRUE_MESSAGE(init_result, "Driver initialization required for raw reception test");
+    
+    // Send an ARP packet to generate network traffic for testing
+    enc28j60_packet_t arp_packet;
+    arp_packet.data = test_packet_data;
+    arp_packet.length = sizeof(test_packet_data);
+    arp_packet.valid = true;
+    
+    printf("Raw RX: Sending ARP packet to generate traffic\n");
+    bool send_result = enc28j60_send_packet(&arp_packet);
+    TEST_ASSERT_TRUE_MESSAGE(send_result, "Should be able to send ARP packet");
+    
+    printf("Raw RX: Monitoring for ANY incoming packets (20 seconds)...\n");
+    uint32_t start_time = to_ms_since_boot(get_absolute_time());
+    uint32_t test_duration_ms = 20000;  // 20 seconds
+    uint32_t packets_detected = 0;
+    
+    while ((to_ms_since_boot(get_absolute_time()) - start_time) < test_duration_ms) {
+        // Check EPKTCNT register directly (Arduino style)
+        enc28j60_set_bank(ENC28J60_BANK1);
+        uint8_t pktcnt = enc28j60_read_register(0x19);  // EPKTCNT
+        
+        if (pktcnt > 0) {
+            packets_detected++;
+            printf("Raw RX: Detected %u packets in buffer!\n", pktcnt);
+            
+            // Try to read packet size (Arduino readFrameSize style)
+            enc28j60_set_bank(ENC28J60_BANK0);
+            
+            // Read packet header to get size info
+            uint8_t header[6];
+            enc28j60_read_buffer(header, 6);
+            
+            uint16_t next_ptr = header[0] | (header[1] << 8);
+            uint16_t packet_len = header[2] | (header[3] << 8);
+            uint8_t status_low = header[4];
+            uint8_t status_high = header[5];
+            
+            printf("Raw RX: Packet length=%u, next_ptr=0x%04X, status=0x%02X%02X\n", 
+                   packet_len, next_ptr, status_high, status_low);
+            
+            // Consume the packet to clear buffer (Arduino style)
+            if (packet_len > 0 && packet_len < 1600) {
+                uint8_t dummy_buffer[64];
+                uint16_t bytes_to_read = (packet_len > 64) ? 64 : packet_len;
+                enc28j60_read_buffer(dummy_buffer, bytes_to_read);
+                
+                printf("Raw RX: First 16 bytes: ");
+                for (int i = 0; i < 16 && i < bytes_to_read; i++) {
+                    printf("%02X ", dummy_buffer[i]);
+                }
+                printf("\n");
+                
+                // Arduino-style packet cleanup
+                uint16_t rx_read_ptr;
+                if (next_ptr == 0x0000) {
+                    rx_read_ptr = 0x0FFF;  // RX_BUF_END
+                } else {
+                    rx_read_ptr = next_ptr - 1;
+                }
+                
+                enc28j60_write_register(0x0C, rx_read_ptr & 0xFF);        // ERXRDPTL
+                enc28j60_write_register(0x0D, (rx_read_ptr >> 8) & 0xFF); // ERXRDPTH
+                
+                // Decrement packet count
+                enc28j60_set_register_bits(ENC28J60_ECON2, ENC28J60_ECON2_PKTDEC);
+            }
+        }
+        
+        // Check every 100ms (faster than our current polling)
+        sleep_ms(100);
+    }
+    
+    printf("Raw RX: Test complete. Total packets detected: %u\n", packets_detected);
+    
+    // Test passes if we can at least detect the hardware is working
+    // Even 0 packets is OK for this test - it tells us about the receive path
+    printf("Raw RX: Hardware reception path tested\n");
+}
+
+/**
  * @brief Test invalid packet transmission
  */
 void test_enc28j60_send_invalid_packet(void) {
@@ -444,6 +567,7 @@ int test_enc28j60_driver_run_tests(void) {
     
     // Configuration tests
     RUN_TEST(test_enc28j60_mac_address);
+    RUN_TEST(test_enc28j60_broadcast_reception_config);
     
     // Status and monitoring tests
     RUN_TEST(test_enc28j60_link_status);
@@ -452,6 +576,9 @@ int test_enc28j60_driver_run_tests(void) {
     // Packet transmission tests
     RUN_TEST(test_enc28j60_send_packet);
     
+    // Raw packet reception test (Arduino-style)
+    RUN_TEST(test_enc28j60_raw_packet_reception);
+    
     // Reset functionality test
     RUN_TEST(test_enc28j60_reset);
     
@@ -459,7 +586,145 @@ int test_enc28j60_driver_run_tests(void) {
     RUN_TEST(test_enc28j60_send_invalid_packet);
     RUN_TEST(test_enc28j60_operations_before_init);
     
+    // Hardware debugging tests (interactive)
+    printf("\n=== HARDWARE-LEVEL DEBUGGING TESTS ===\n");
+    RUN_TEST(test_enc28j60_interrupt_monitoring);
+    RUN_TEST(test_enc28j60_cable_detection);
+    
     return UNITY_END();
+}
+
+/**
+ * @brief Test interrupt pin monitoring and register status
+ */
+void test_enc28j60_interrupt_monitoring(void) {
+    printf("=== ENC28J60 Interrupt Monitoring Test ===\n");
+    
+    // Initialize ENC28J60
+    bool init_result = enc28j60_init();
+    TEST_ASSERT_TRUE_MESSAGE(init_result, "ENC28J60 initialization required for interrupt test");
+    
+    printf("Monitoring interrupt pin and registers for 30 seconds...\n");
+    printf("GPIO %d (INT pin): Monitoring...\n", ENC28J60_INTERRUPT_PIN);
+    
+    uint32_t start_time = to_ms_since_boot(get_absolute_time());
+    uint32_t test_duration_ms = 30000;  // 30 seconds for this test
+    int check_count = 0;
+    
+    while ((to_ms_since_boot(get_absolute_time()) - start_time) < test_duration_ms) {
+        check_count++;
+        
+        // Read interrupt pin state directly
+        bool int_pin_state = gpio_get(ENC28J60_INTERRUPT_PIN);
+        
+        // Read ENC28J60 interrupt status register
+        uint8_t eir_status = enc28j60_get_interrupt_status();
+        
+        // Read current link status
+        bool link_status = enc28j60_get_link_status();
+        
+        // Read packet count
+        bool has_packets = enc28j60_has_rx_packet();
+        
+        // Get driver statistics
+        const enc28j60_state_t* state = enc28j60_get_state();
+        
+        printf("Check %3d: INT_PIN=%d, EIR=0x%02X, LINK=%s, RX_PKTS=%s, TX=%u, RX=%u\n",
+               check_count,
+               int_pin_state ? 1 : 0,
+               eir_status,
+               link_status ? "UP  " : "DOWN",
+               has_packets ? "YES" : "NO ",
+               state ? state->packets_sent : 0,
+               state ? state->packets_received : 0);
+        
+        sleep_ms(500);  // Check every 500ms
+    }
+    
+    printf("✓ Interrupt monitoring test completed\n");
+    enc28j60_deinit();
+}
+
+/**
+ * @brief Test cable plug/unplug detection
+ */
+void test_enc28j60_cable_detection(void) {
+    printf("=== ENC28J60 Cable Detection Test ===\n");
+    
+    // Initialize ENC28J60
+    bool init_result = enc28j60_init();
+    TEST_ASSERT_TRUE_MESSAGE(init_result, "ENC28J60 initialization required for cable test");
+    
+    printf("Cable detection test - Ready for cable plug/unplug!\n");
+    printf("Instructions:\n");
+    printf("1. Please unplug the network cable now\n");
+    printf("2. Wait for 'READY FOR PLUG' message\n");
+    printf("3. Plug the cable back in\n");
+    printf("4. Test will monitor for link state changes\n\n");
+    
+    uint32_t start_time = to_ms_since_boot(get_absolute_time());
+    uint32_t test_duration_ms = 60000;  // 60 seconds
+    bool last_link_state = enc28j60_get_link_status();
+    int state_changes = 0;
+    int check_count = 0;
+    bool ready_for_plug_announced = false;
+    
+    printf("Starting cable detection - monitoring for %d seconds...\n", test_duration_ms / 1000);
+    printf("Initial link state: %s\n\n", last_link_state ? "UP" : "DOWN");
+    
+    while ((to_ms_since_boot(get_absolute_time()) - start_time) < test_duration_ms) {
+        check_count++;
+        
+        // Read current link status
+        bool current_link_state = enc28j60_get_link_status();
+        
+        // Read interrupt registers
+        uint8_t eir_status = enc28j60_get_interrupt_status();
+        bool int_pin_state = gpio_get(ENC28J60_INTERRUPT_PIN);
+        
+        // Check for link state change
+        if (current_link_state != last_link_state) {
+            state_changes++;
+            printf("\n*** LINK STATE CHANGE #%d ***\n", state_changes);
+            printf("Link changed from %s to %s\n", 
+                   last_link_state ? "UP" : "DOWN",
+                   current_link_state ? "UP" : "DOWN");
+            printf("EIR=0x%02X, INT_PIN=%d\n",
+                   eir_status, int_pin_state ? 1 : 0);
+            printf("Timestamp: %u ms\n\n", to_ms_since_boot(get_absolute_time()) - start_time);
+            
+            last_link_state = current_link_state;
+        }
+        
+        // Announce when ready for cable plug
+        if (!ready_for_plug_announced && !current_link_state && check_count > 5) {
+            printf(">>> READY FOR PLUG - Please plug in network cable now <<<\n\n");
+            ready_for_plug_announced = true;
+        }
+        
+        // Print status every 10 checks (5 seconds)
+        if (check_count % 10 == 0) {
+            printf("Status check %3d: LINK=%s, EIR=0x%02X, INT_PIN=%d\n",
+                   check_count,
+                   current_link_state ? "UP  " : "DOWN",
+                   eir_status,
+                   int_pin_state ? 1 : 0);
+        }
+        
+        sleep_ms(500);
+    }
+    
+    printf("\n=== Cable Detection Test Results ===\n");
+    printf("Total link state changes detected: %d\n", state_changes);
+    printf("Total status checks: %d\n", check_count);
+    
+    if (state_changes > 0) {
+        printf("✓ Cable detection working - link state changes detected!\n");
+    } else {
+        printf("⚠ No link state changes detected - check cable or hardware\n");
+    }
+    
+    enc28j60_deinit();
 }
 
 /**

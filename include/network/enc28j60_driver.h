@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 // Hardware pin configuration
-#define ENC28J60_INTERRUPT_PIN  8
+#define ENC28J60_INTERRUPT_PIN  14
 #define ENC28J60_SCK_PIN        2
 #define ENC28J60_MOSI_PIN       3   // SI - Serial Input
 #define ENC28J60_MISO_PIN       4   // SO - Serial Output  
@@ -111,6 +111,25 @@ extern "C" {
 // ESTAT bits
 #define ENC28J60_ESTAT_CLKRDY   0x01
 
+// EIE (Ethernet Interrupt Enable) bits
+#define ENC28J60_EIE_INTIE      0x80  // Global interrupt enable
+#define ENC28J60_EIE_PKTIE      0x40  // Receive packet pending interrupt enable
+#define ENC28J60_EIE_DMAIE      0x20  // DMA interrupt enable
+#define ENC28J60_EIE_LINKIE     0x10  // Link status change interrupt enable
+#define ENC28J60_EIE_TXIE       0x08  // Transmit interrupt enable
+#define ENC28J60_EIE_WOLIE      0x04  // Wake-on-LAN interrupt enable (Rev. B only)
+#define ENC28J60_EIE_TXERIE     0x02  // Transmit error interrupt enable
+#define ENC28J60_EIE_RXERIE     0x01  // Receive error interrupt enable
+
+// EIR (Ethernet Interrupt) flags - same bit positions as EIE
+#define ENC28J60_EIR_PKTIF      0x40  // Receive packet pending interrupt flag
+#define ENC28J60_EIR_DMAIF      0x20  // DMA interrupt flag
+#define ENC28J60_EIR_LINKIF     0x10  // Link status change interrupt flag
+#define ENC28J60_EIR_TXIF       0x08  // Transmit interrupt flag
+#define ENC28J60_EIR_WOLIF      0x04  // Wake-on-LAN interrupt flag (Rev. B only)
+#define ENC28J60_EIR_TXERIF     0x02  // Transmit error interrupt flag
+#define ENC28J60_EIR_RXERIF     0x01  // Receive error interrupt flag
+
 // MAC register bits
 #define ENC28J60_MACON1_MARXEN  0x01
 #define ENC28J60_MACON1_PASSALL 0x02
@@ -135,6 +154,16 @@ extern "C" {
 #define ENC28J60_PHSTAT1        0x01
 #define ENC28J60_PHCON2         0x10
 #define ENC28J60_PHSTAT2        0x11
+
+// MICMD (MII Command) register bits
+#define ENC28J60_MICMD_MIISCAN  0x02  // MII Scan enable
+#define ENC28J60_MICMD_MIIRD    0x01  // MII Read enable
+
+// MISTAT (MII Status) register bits  
+#define ENC28J60_MISTAT_BUSY    0x01  // MII Management Busy
+
+// PHY Status register 2 (PHSTAT2) bits
+#define ENC28J60_PHSTAT2_LSTAT  0x0400  // Link Status (bit 10)
 
 // SPI command opcodes
 #define ENC28J60_READ_CTRL_REG  0x00
@@ -319,6 +348,18 @@ uint8_t enc28j60_get_interrupt_status(void);
  * @param flags Interrupt flags to clear
  */
 void enc28j60_clear_interrupts(uint8_t flags);
+
+/**
+ * Process pending interrupts
+ * @return true if interrupts were processed, false if none pending
+ */
+bool enc28j60_process_interrupts(void);
+
+/**
+ * Check if interrupt is pending
+ * @return true if interrupt is pending, false otherwise  
+ */
+bool enc28j60_has_pending_interrupt(void);
 
 /**
  * @brief Utility and diagnostic functions

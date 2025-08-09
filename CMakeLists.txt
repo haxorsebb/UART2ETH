@@ -51,10 +51,11 @@ target_link_libraries(uart2eth
     hardware_gpio
     hardware_spi
     hardware_watchdog  # Watchdog for stability
+    pico_lwip_nosys    # lwIP NO_SYS implementation for raw API
     config_manager     # Our config manager library
     log_manager        # Our log manager library
     state_machine      # Our event-driven state machine library
-    network_manager    # Our network manager library
+    network_manager    # Our network manager library (now with lwIP)
     core_modules       # Core0 and Core1 main functions
 )
 

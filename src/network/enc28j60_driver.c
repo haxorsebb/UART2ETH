@@ -51,6 +51,10 @@ static const uint8_t* g_local_mac = NULL; // MAC address storage (Arduino patter
 #define MACONX_BANK  0x02  // Bank 2 - MAC control registers
 #define MAADRX_BANK  0x03  // Bank 3 - MAC address registers
 
+// Interrupt handling state
+static volatile bool g_interrupt_pending = false;
+static volatile uint8_t g_last_interrupt_status = 0;
+
 // Private function declarations
 static void enc28j60_spi_init(void);
 static void enc28j60_gpio_init(void);
@@ -61,10 +65,13 @@ static bool enc28j60_wait_for_osc_ready(void);
 static void enc28j60_configure_buffers(void);
 static void enc28j60_configure_mac(void);
 static void enc28j60_configure_phy(void);
+static void enc28j60_enable_interrupts(void);
+static void enc28j60_interrupt_handler(uint gpio, uint32_t events);
 static bool enc28j60_is_mac_mii_register(uint8_t reg);
 static uint8_t enc28j60_read_register_internal(uint8_t reg);
 static void enc28j60_write_register_internal(uint8_t reg, uint8_t value);
 static void enc28j60_set_register_bank_internal(uint8_t new_bank);
+static uint16_t enc28j60_read_phy_register(uint8_t phy_reg);
 
 /**
  * @brief Check if register is MAC or MII type (Arduino reference exact logic)
@@ -244,8 +251,8 @@ static void enc28j60_configure_buffers(void) {
     
     // Configure receive filters in Bank 1 (Arduino reference)
     enc28j60_set_register_bank_internal(EPKTCNT_BANK);
-    // ERXFCON: Enable unicast (UCEN), CRC check (CRCEN), and multicast (MCEN)
-    uint8_t erxfcon_value = ENC28J60_ERXFCON_UCEN | ENC28J60_ERXFCON_CRCEN | ENC28J60_ERXFCON_MCEN;
+    // ERXFCON: Enable unicast (UCEN), CRC check (CRCEN), multicast (MCEN), and broadcast (BCEN) for DHCP
+    uint8_t erxfcon_value = ENC28J60_ERXFCON_UCEN | ENC28J60_ERXFCON_CRCEN | ENC28J60_ERXFCON_MCEN | ENC28J60_ERXFCON_BCEN;
     enc28j60_write_register_internal(ENC28J60_ERXFCON, erxfcon_value);
     
     printf("ENC28J60: Buffer configuration complete\n");
@@ -349,7 +356,18 @@ bool enc28j60_init(void) {
     enc28j60_set_register_bank_internal(ERXTX_BANK);
     enc28j60_set_register_bits(ENC28J60_ECON2, ENC28J60_ECON2_AUTOINC);
     
-    // 7. Turn on reception (Arduino reference)
+    // 7. Verify chip communication by reading revision ID
+    enc28j60_set_register_bank_internal(MAADRX_BANK);
+    uint8_t revid = enc28j60_read_register_internal(ENC28J60_EREVID);
+    printf("ENC28J60: Chip revision = 0x%02X\n", revid);
+    
+    // 8. Enable interrupts BEFORE enabling reception
+    // This ensures interrupt handling is fully ready when packets arrive
+    enc28j60_enable_interrupts();
+    
+    // 9. Turn on reception (FINAL STEP - all infrastructure ready)
+    // Once RXEN is set, packets can start arriving and triggering interrupts
+    enc28j60_set_register_bank_internal(ERXTX_BANK);
     enc28j60_write_register_internal(ENC28J60_ECON1, ENC28J60_ECON1_RXEN);
     
     // Verify initialization by checking ECON1
@@ -359,11 +377,6 @@ bool enc28j60_init(void) {
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 2);
         return false;
     }
-    
-    // Verify chip communication by reading revision ID
-    enc28j60_set_register_bank_internal(MAADRX_BANK);
-    uint8_t revid = enc28j60_read_register_internal(ENC28J60_EREVID);
-    printf("ENC28J60: Chip revision = 0x%02X\n", revid);
     
     // Initialize driver state
     memset(&g_enc28j60_state, 0, sizeof(g_enc28j60_state));
@@ -386,6 +399,10 @@ void enc28j60_deinit(void) {
     }
     
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, 0);
+    
+    // Disable interrupts
+    gpio_set_irq_enabled(ENC28J60_INTERRUPT_PIN, GPIO_IRQ_EDGE_FALL, false);
+    printf("ENC28J60: GPIO interrupts disabled\n");
     
     // Disable packet reception
     enc28j60_set_register_bank_internal(ERXTX_BANK);
@@ -579,6 +596,19 @@ static void enc28j60_spi_init(void) {
 }
 
 /**
+ * @brief ENC28J60 interrupt handler
+ */
+static void enc28j60_interrupt_handler(uint gpio, uint32_t events) {
+    if (gpio == ENC28J60_INTERRUPT_PIN) {
+        // Read interrupt status to clear the interrupt
+        g_last_interrupt_status = enc28j60_read_register_internal(ENC28J60_EIR);
+        g_interrupt_pending = true;
+        
+        printf("INT: ENC28J60 interrupt triggered, EIR=0x%02X\n", g_last_interrupt_status);
+    }
+}
+
+/**
  * @brief Initialize GPIO pins (RP2350-specific)
  */
 static void enc28j60_gpio_init(void) {
@@ -591,6 +621,26 @@ static void enc28j60_gpio_init(void) {
     gpio_init(ENC28J60_INTERRUPT_PIN);
     gpio_set_dir(ENC28J60_INTERRUPT_PIN, GPIO_IN);
     gpio_pull_up(ENC28J60_INTERRUPT_PIN);
+    
+    // Set up interrupt handler for falling edge (active low interrupt)
+    gpio_set_irq_enabled_with_callback(ENC28J60_INTERRUPT_PIN, GPIO_IRQ_EDGE_FALL, 
+                                       true, &enc28j60_interrupt_handler);
+    
+    printf("ENC28J60: GPIO interrupt handler configured for pin %d\n", ENC28J60_INTERRUPT_PIN);
+}
+
+/**
+ * @brief Enable ENC28J60 interrupts
+ */
+static void enc28j60_enable_interrupts(void) {
+    // Clear any pending interrupts first
+    enc28j60_clear_register_bits(ENC28J60_EIR, 0xFF);
+    
+    // Enable global interrupts and specific interrupt sources
+    uint8_t eie = ENC28J60_EIE_INTIE | ENC28J60_EIE_PKTIE | ENC28J60_EIE_LINKIE;
+    enc28j60_write_register_internal(ENC28J60_EIE, eie);
+    
+    printf("ENC28J60: Interrupts enabled (EIE=0x%02X)\n", eie);
 }
 
 // Remaining packet and buffer functions to be implemented with Arduino patterns...
@@ -672,7 +722,7 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
     enc28j60_write_register_internal(ENC28J60_ETXNDH, (tx_end >> 8) & 0xFF);
     
     // Clear any previous TX interrupt
-    enc28j60_clear_register_bits(ENC28J60_EIR, 0x08); // EIR.TXIF
+    enc28j60_clear_register_bits(ENC28J60_EIR, ENC28J60_EIR_TXIF);
     
     // Start transmission (Arduino reference)
     enc28j60_set_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRTS);
@@ -799,14 +849,97 @@ void enc28j60_clear_interrupts(uint8_t flags) {
 }
 
 /**
- * @brief Get link status
+ * @brief Check if interrupt is pending
+ */
+bool enc28j60_has_pending_interrupt(void) {
+    return g_interrupt_pending;
+}
+
+/**
+ * @brief Process pending interrupts
+ */
+bool enc28j60_process_interrupts(void) {
+    if (!g_interrupt_pending || !g_driver_initialized) {
+        return false;
+    }
+    
+    printf("INT: Processing interrupt, status=0x%02X\n", g_last_interrupt_status);
+    
+    // Process packet receive interrupt
+    if (g_last_interrupt_status & ENC28J60_EIR_PKTIF) {
+        printf("INT: Packet received interrupt\n");
+    }
+    
+    // Process link status change interrupt
+    if (g_last_interrupt_status & ENC28J60_EIR_LINKIF) {
+        printf("INT: Link status change interrupt\n");
+        bool link_up = enc28j60_get_link_status();
+        printf("INT: New link status = %s\n", link_up ? "UP" : "DOWN");
+    }
+    
+    // Clear the interrupt pending flag
+    g_interrupt_pending = false;
+    
+    return true;
+}
+
+/**
+ * @brief Read PHY register via MII interface (Arduino reference implementation)
+ */
+static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
+    if (!g_driver_initialized) {
+        return 0xFFFF;
+    }
+    
+    // Set bank 2 for MII access (Arduino reference)
+    enc28j60_set_register_bank_internal(MACONX_BANK);
+    
+    // Set the PHY register address to read
+    enc28j60_write_register_internal(ENC28J60_MIREGADR, phy_reg);
+    
+    // Start the PHY read operation
+    enc28j60_write_register_internal(ENC28J60_MICMD, ENC28J60_MICMD_MIIRD);
+    
+    // Wait for the PHY read to complete (Arduino reference)
+    // MISTAT is in Bank 3
+    uint32_t timeout = 1000;  // 1ms timeout
+    while (timeout > 0) {
+        enc28j60_set_register_bank_internal(MAADRX_BANK);  // Bank 3 for MISTAT
+        uint8_t mistat = enc28j60_read_register_internal(ENC28J60_MISTAT);
+        if ((mistat & ENC28J60_MISTAT_BUSY) == 0) {
+            break;  // Read complete
+        }
+        sleep_us(1);
+        timeout--;
+    }
+    
+    // Return to Bank 2 for reading result
+    enc28j60_set_register_bank_internal(MACONX_BANK);
+    
+    // Clear the read command
+    enc28j60_write_register_internal(ENC28J60_MICMD, 0x00);
+    
+    // Read the result from MIRDL and MIRDH registers
+    uint8_t low_byte = enc28j60_read_register_internal(ENC28J60_MIRDL);
+    uint8_t high_byte = enc28j60_read_register_internal(ENC28J60_MIRDH);
+    
+    return (high_byte << 8) | low_byte;
+}
+
+/**
+ * @brief Get link status by reading PHY register (Arduino reference implementation)
  */
 bool enc28j60_get_link_status(void) {
     if (!g_driver_initialized) {
         return false;
     }
     
-    // For basic implementation, return true if initialized and ready
-    // Real implementation would read PHY status register
-    return enc28j60_is_ready();
+    // Read PHY Status Register 2 (PHSTAT2) and check link status bit
+    // Arduino reference: phyread(MACSTAT2) & 0x400
+    uint16_t phstat2 = enc28j60_read_phy_register(ENC28J60_PHSTAT2);
+    
+    // Check bit 10 (0x0400) - Link Status bit
+    bool link_up = (phstat2 & ENC28J60_PHSTAT2_LSTAT) != 0;
+    
+    return link_up;
 }
