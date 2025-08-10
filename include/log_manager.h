@@ -129,6 +129,11 @@ typedef uint16_t event_type_t;
 #define LOG_EVENT_NETWORK_STATUS     ((event_type_t)211)
 #define LOG_EVENT_NETWORK_OPERATIONS ((event_type_t)212)
 #define LOG_EVENT_CONNECTION_CHECK   ((event_type_t)213)
+#define LOG_EVENT_NETWORK_DEINIT     ((event_type_t)214)
+#define LOG_EVENT_NETWORK_TX         ((event_type_t)215)
+#define LOG_EVENT_NETWORK_RX         ((event_type_t)216)
+#define LOG_EVENT_NETWORK_RESET      ((event_type_t)217)
+#define LOG_EVENT_NETWORK_CONFIG     ((event_type_t)218)
 
 // Configuration events (300-399)
 #define LOG_EVENT_CONFIG_CHANGED         ((event_type_t)300)
