@@ -1,9 +1,15 @@
 /**
  * @file test_network_integration.c
- * @brief Network Integration Tests for Complete TCP/IP Stack
+ * @brief Network Integration Tests for Complete TCP/IP Stack (Performance Optimized)
  * 
  * Tests the complete network stack integration: ENC28J60 + lwIP + DHCP + ping.
  * Each test is independent and reinitializes the complete network stack.
+ * 
+ * Performance Optimizations for <5ms ping target:
+ * - Debug output redirected to UART1 (/dev/ttyUSB0) instead of USB-CDC
+ * - Network processing at 10kHz (100μs sleep) instead of 100Hz (10ms sleep) 
+ * - Reduced debug output frequency during network processing
+ * - Optimized polling intervals for faster response times
  * 
  * Test Strategy:
  * - Step 1: Basic network stack initialization (ENC28J60 + lwIP + network manager)
@@ -46,13 +52,13 @@ static void print_network_diagnostics(void);
 void setUp(void) {
     // Each test starts with clean network stack
     cleanup_network_stack();
-    printf("\n=== Test Setup Complete ===\n");
+    // Reduced debug output for performance
 }
 
 void tearDown(void) {
     // Clean up after each test
     cleanup_network_stack();
-    printf("=== Test Cleanup Complete ===\n\n");
+    // Reduced debug output for performance
 }
 
 /**
@@ -234,38 +240,42 @@ void test_network_connectivity(void) {
     printf("✓ Target IP Address: %s\n", ip_str);
     printf("✓ Network stack ready for ping response\n");
     
-    // Test 3.3: Network processing loop for ping response
-    printf("\n=== PING TEST INSTRUCTIONS ===\n");
-    printf("The target is now ready to respond to ping requests.\n");
-    printf("From another machine on the network, run:\n");
-    printf("  ping %s\n", ip_str);
-    printf("\nTarget will process network traffic for 30 seconds...\n");
-    printf("You should see ping responses if connectivity is working.\n");
-    printf("========================================\n\n");
+    // Test 3.3: High-performance network processing loop for ping response
+    printf("\n=== PING TEST READY ===\n");
+    printf("Target IP: %s | Ready for ping requests\n", ip_str);
+    printf("From another machine: ping %s\n", ip_str);
+    printf("Processing network traffic for 30 seconds (high-performance mode)...\n");
     
     // Process network traffic for 30 seconds to handle ping requests
     uint32_t start_time = to_ms_since_boot(get_absolute_time());
     uint32_t test_duration_ms = 30000;  // 30 seconds
     uint32_t last_status_time = start_time;
+    uint32_t loop_count = 0;
     
     network_stats_t initial_stats, current_stats;
     network_manager_get_stats(&initial_stats);
     
-    printf("Processing network traffic");
+    printf("Network processing active");
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < test_duration_ms) {
-        // Process network stack
+        // PERFORMANCE CRITICAL: Process network stack with minimal delay
         network_manager_process();
         
-        // Print status every 5 seconds
+        // Process lwIP timeouts (less frequently)
+        if (++loop_count % 1000 == 0) {
+            sys_check_timeouts();
+        }
+        
+        // Print status every 5 seconds (much less frequently)
         uint32_t current_time = to_ms_since_boot(get_absolute_time());
         if (current_time - last_status_time >= 5000) {
             network_manager_get_stats(&current_stats);
-            printf(" [RX: %u packets, TX: %u packets]", 
+            printf(" [RX:%u TX:%u]", 
                    current_stats.packets_rx, current_stats.packets_tx);
             last_status_time = current_time;
         }
         
-        sleep_ms(10);  // Process at 100Hz
+        // CRITICAL: Minimal delay for maximum responsiveness (<5ms ping target)
+        sleep_us(100);  // Process at 10kHz instead of 100Hz for sub-5ms ping
     }
     printf("\n");
     
@@ -337,11 +347,11 @@ static void cleanup_network_stack(void) {
 }
 
 /**
- * @brief Wait for physical link to come up with progress indication
+ * @brief Wait for physical link to come up with minimal debug output
  */
 static bool wait_for_link_up(uint32_t timeout_ms) {
     uint32_t start_time = to_ms_since_boot(get_absolute_time());
-    uint32_t dots_printed = 0;
+    uint32_t last_dot_time = start_time;
     
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < timeout_ms) {
         // Process network manager to update link status
@@ -352,13 +362,15 @@ static bool wait_for_link_up(uint32_t timeout_ms) {
             return true;
         }
         
-        // Print progress dots
-        if ((to_ms_since_boot(get_absolute_time()) - start_time) / 1000 > dots_printed) {
+        // Print progress dots less frequently (every 2 seconds)
+        uint32_t current_time = to_ms_since_boot(get_absolute_time());
+        if (current_time - last_dot_time >= 2000) {
             printf(".");
-            dots_printed++;
+            last_dot_time = current_time;
         }
         
-        sleep_ms(POLLING_INTERVAL_MS);
+        // Faster polling for quicker link detection
+        sleep_ms(100);  // 100ms instead of 500ms
     }
     
     printf("\n");
@@ -366,7 +378,7 @@ static bool wait_for_link_up(uint32_t timeout_ms) {
 }
 
 /**
- * @brief Wait for DHCP completion with progress indication
+ * @brief Wait for DHCP completion with minimal debug output
  */
 static bool wait_for_dhcp_completion(uint32_t timeout_ms) {
     uint32_t start_time = to_ms_since_boot(get_absolute_time());
@@ -383,18 +395,16 @@ static bool wait_for_dhcp_completion(uint32_t timeout_ms) {
             return true;
         }
         
-        // Print status every 2 seconds
+        // Print status every 5 seconds (less frequent)
         uint32_t current_time = to_ms_since_boot(get_absolute_time());
-        if (current_time - last_status_time >= 2000) {
+        if (current_time - last_status_time >= 5000) {
             network_status_t status = network_manager_get_status();
             printf(" [%s]", network_manager_status_to_string(status));
             last_status_time = current_time;
-        } else {
-            // Print dots for progress
-            printf(".");
         }
         
-        sleep_ms(POLLING_INTERVAL_MS);
+        // Reduced polling interval for faster response
+        sleep_ms(100);  // 100ms instead of 500ms
     }
     
     printf("\n");
@@ -441,43 +451,36 @@ static void print_network_diagnostics(void) {
  */
 int main(void) {
     stdio_usb_init();
-    // Init UART1 for debug output (UART0 conflicts with SPI0)
+    // Initialize UART1 for debug output (UART0 conflicts with SPI0)
+    // This ensures debug output goes to /dev/ttyUSB0 as mentioned
     stdio_uart_init_full(uart1, 115200, 20, 21);
     
-    // Wait for USB-serial connection
-    sleep_ms(2000);
+    // Wait for UART connection
+    sleep_ms(1000);
     
-    printf("\n");
-    printf("================================================\n");
-    printf("=== UART2ETH Network Integration Test Suite ===\n");
-    printf("================================================\n");
-    printf("Testing: ENC28J60 + lwIP + DHCP + ping response\n");
-    printf("Hardware Configuration:\n");
-    printf("  Ethernet Controller: ENC28J60\n");
-    printf("  SPI Interface: SPI0\n");
-    printf("  Network Stack: lwIP with DHCP client\n");
-    printf("  Expected: DHCP server available on network\n");
-    printf("================================================\n");
+    printf("\n=== UART2ETH Network Integration Test (Performance Optimized) ===\n");
+    printf("Hardware: ENC28J60 + lwIP + DHCP + ping | Debug: UART1 (/dev/ttyUSB0)\n");
     
     // Run the integration tests
     int result = test_network_integration_run_tests();
     
-    // Keep running forever for embedded system
+    // Keep running forever for embedded system with optimized network processing
+    printf("\nNetwork Integration Tests completed: %s\n", (result == 0) ? "PASSED" : "FAILED");
+    printf("Continuing high-performance network processing...\n");
+    
     while (true) {
-        printf("\nNetwork Integration Tests completed with result: %d\n", result);
-        printf("Tests %s\n", (result == 0) ? "PASSED" : "FAILED");
-        printf("Device will continue processing network traffic...\n");
-        
         // Continue processing network if initialized
         if (network_manager_is_ready()) {
-            printf("Network still active - processing traffic for diagnostics\n");
-            for (int i = 0; i < 100; i++) {  // 10 seconds of processing
+            // High-performance continuous network processing
+            for (int i = 0; i < 50000; i++) {  // 5 seconds at 10kHz
                 network_manager_process();
-                sleep_ms(100);
+                sleep_us(100);
             }
+            // Brief status update every 5 seconds
+            printf("Network active - continuous processing\n");
+        } else {
+            sleep_ms(1000);
         }
-        
-        sleep_ms(5000);
     }
     
     return result;  // Never reached

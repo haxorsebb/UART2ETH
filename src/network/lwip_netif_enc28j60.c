@@ -110,7 +110,9 @@ void lwip_netif_enc28j60_process(void) {
         return;
     }
     
-    // Debug: Check packet statistics every 5 seconds
+    // PERFORMANCE: Periodic debug stats disabled for <5ms ping target
+    // This reduces printf overhead during high-frequency packet processing
+    /*
     static uint32_t last_debug_time = 0;
     uint32_t current_time = to_ms_since_boot(get_absolute_time());
     
@@ -128,6 +130,7 @@ void lwip_netif_enc28j60_process(void) {
         
         last_debug_time = current_time;
     }
+    */
     
     // Check for incoming packets and process them
     int packets_processed = 0;
@@ -140,14 +143,8 @@ void lwip_netif_enc28j60_process(void) {
         // Receive packet from ENC28J60
         if (enc28j60_receive_packet(&packet, sizeof(g_rx_buffer))) {
             if (packet.valid && packet.length > 0) {
-                printf("RX: Received packet, length=%u bytes\n", packet.length);
-                
-                // Print first few bytes for debugging
-                printf("RX: First 16 bytes: ");
-                for (int i = 0; i < 16 && i < packet.length; i++) {
-                    printf("%02X ", packet.data[i]);
-                }
-                printf("\n");
+                // PERFORMANCE: Debug logs disabled for <5ms ping target
+                // printf("RX: Received packet, length=%u bytes\n", packet.length);
                 
                 // Allocate pbuf for lwIP
                 struct pbuf *p = pbuf_alloc(PBUF_RAW, packet.length, PBUF_POOL);
@@ -159,9 +156,9 @@ void lwip_netif_enc28j60_process(void) {
                     if (g_enc28j60_netif.input(p, &g_enc28j60_netif) != ERR_OK) {
                         printf("lwIP netif: Failed to input packet to lwIP\n");
                         pbuf_free(p);
-                    } else {
-                        printf("RX: Packet successfully fed to lwIP\n");
                     }
+                    // PERFORMANCE: Success message disabled for speed
+                    // else { printf("RX: Packet successfully fed to lwIP\n"); }
                 } else {
                     printf("lwIP netif: Failed to allocate pbuf for incoming packet (length=%u)\n", packet.length);
                 }
@@ -246,7 +243,8 @@ static err_t enc28j60_netif_init(struct netif *netif) {
 static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
     // Allocate buffer for the complete packet
     uint16_t total_len = p->tot_len;
-    printf("TX: Sending packet, length=%u bytes\n", total_len);
+    // PERFORMANCE: Debug log disabled for <5ms ping target
+    // printf("TX: Sending packet, length=%u bytes\n", total_len);
     
     if (total_len > 1518) {  // Maximum Ethernet frame size
         printf("lwIP netif: Packet too large (%u bytes)\n", total_len);
@@ -260,12 +258,12 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
         return ERR_BUF;
     }
     
-    // Print first few bytes for debugging
-    printf("TX: First 16 bytes: ");
-    for (int i = 0; i < 16 && i < total_len; i++) {
-        printf("%02X ", tx_buffer[i]);
-    }
-    printf("\n");
+    // PERFORMANCE: Hex dump disabled for speed
+    // printf("TX: First 16 bytes: ");
+    // for (int i = 0; i < 16 && i < total_len; i++) {
+    //     printf("%02X ", tx_buffer[i]);
+    // }
+    // printf("\n");
     
     // Create packet structure for ENC28J60
     enc28j60_packet_t packet;
@@ -275,7 +273,8 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
     
     // Send packet via ENC28J60
     if (enc28j60_send_packet(&packet)) {
-        printf("TX: Packet successfully sent to ENC28J60\n");
+        // PERFORMANCE: Success message disabled for speed
+        // printf("TX: Packet successfully sent to ENC28J60\n");
         return ERR_OK;
     } else {
         printf("lwIP netif: Failed to send packet via ENC28J60\n");
