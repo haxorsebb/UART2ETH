@@ -24,7 +24,12 @@
 #include "state_machine.h"
 #include "log_manager.h"
 
+// Define doorbell variables for cross-core synchronization
+int doorbell_core0_wakes_core1;
+int doorbell_core1_wakes_core0;
+
 // Forward declarations for core main functions
+
 void core0_main(void);
 void core1_main(void);
 
@@ -54,19 +59,17 @@ void core1_entry() {
  * respective main functions using the event-driven state machine.
  */
 int main() {
-    // Initialize Pico SDK - USB CDC only, UART1 for hardware logging
-    stdio_init_all();
+    // Initialize dual stdio like production system
+    stdio_usb_init();
     
-    // Configure UART1 on GP12/GP13 at 115200 baud for hardware logging
-    // This avoids any conflict with SPI0 used by ENC28J60
-    uart_init(uart1, 115200);
-    gpio_set_function(12, GPIO_FUNC_UART);
-    gpio_set_function(13, GPIO_FUNC_UART);
+    // Initialize UART1 for debug output (UART0 conflicts with SPI0)
+    // This ensures debug output goes to /dev/ttyUSB0 as mentioned
+    stdio_uart_init_full(uart1, 115200, 20, 21);
     
     // Wait for USB-serial connection for debugging
     sleep_ms(2000);
     
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_BOOT, 0);
+    printf("UART2ETH COPYRIGHT 2025 CASSEL MESSTECHNIK GMBH\n--------SOFTWARE START--------\n");
     
     // Initialize shared memory system
     if (!shared_memory_init()) {
@@ -75,6 +78,7 @@ int main() {
             sleep_ms(1000);  // Halt system on critical error
         }
     }
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_BOOT, 0);
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_INIT, 0);
     
     // Initialize event-driven state machine

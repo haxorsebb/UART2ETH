@@ -136,10 +136,37 @@ void network_manager_deinit(void) {
 }
 
 /**
+ * @brief Helper function to schedule work
+ */
+bool network_manager_receive_packets_pending(void) {
+
+    if (!g_netif) {
+        return false;
+    }
+    return (enc28j60_has_rx_packet() || (g_network_status!=NETWORK_STATUS_READY));
+}
+
+/**
+ * @brief Helper function to schedule work
+ */
+bool network_manager_send_packets_pending(void) {
+    return false; //TBD: have a flag for packets that need to be sent
+}
+
+
+/**
  * @brief Process network manager tasks (call from Core1 main loop)
  */
 void network_manager_process(void) {
+    static uint32_t debug_counter = 0;
+    debug_counter++;
+    
+    if (debug_counter % 10000 == 0) {  // Print every 10000 calls
+        printf("DEBUG: network_manager_process() call #%u, status=%d\n", debug_counter, g_network_status);
+    }
+    
     if (!g_network_initialized) {
+        printf("DEBUG: network_manager_process() - not initialized!\n");
         return;
     }
     
@@ -161,15 +188,23 @@ void network_manager_process(void) {
     switch (g_network_status) {
         case NETWORK_STATUS_INITIALIZING:
             // Check if hardware is ready
-            if (enc28j60_is_ready()) {
-                if (enc28j60_get_link_status()) {
+            bool hw_ready = enc28j60_is_ready();
+            bool link_up = enc28j60_get_link_status();
+            
+            printf("DEBUG: INITIALIZING state - hw_ready=%d, link_up=%d\n", hw_ready, link_up);
+            
+            if (hw_ready) {
+                if (link_up) {
                     g_network_status = NETWORK_STATUS_LINK_UP;
                     g_network_stats.link_up_events++;
                     printf("Network Manager: Physical link up\n");
                     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_UP, 0);
                 } else {
+                    printf("DEBUG: Hardware ready but link down, transitioning to LINK_DOWN\n");
                     g_network_status = NETWORK_STATUS_LINK_DOWN;
                 }
+            } else {
+                printf("DEBUG: Hardware not ready, staying in INITIALIZING\n");
             }
             break;
             
@@ -238,6 +273,8 @@ void network_manager_process(void) {
             g_network_status = NETWORK_STATUS_ERROR;
             break;
     }
+
+    
 }
 
 /**
@@ -353,6 +390,29 @@ void network_manager_get_default_config(network_config_t* config) {
     config->mac_address[3] = 0x12;
     config->mac_address[4] = 0x34;
     config->mac_address[5] = 0x56;
+
+    IP4_ADDR(&config->static_ip, 192, 168, 1, 100);
+    IP4_ADDR(&config->static_gateway, 192, 168, 1, 100);
+    IP4_ADDR(&config->static_netmask, 255, 255, 255, 0);
+/*    
+    // Initialize network defaults (using safe string copy)
+    strncpy(config->static_ip, "192.168.1.100", 
+            sizeof(config->static_ip) - 1);
+    config->static_ip[sizeof(config->static_ip) - 1] = '\0';
+
+    strncpy(config->.subnet_mask, "255.255.255.0", 
+            sizeof(config->static_netmask) - 1);
+    config->static_netmask[sizeof(config->static_netmask) - 1] = '\0';
+    
+    strncpy(config->static_gateway, "192.168.1.1", 
+            sizeof(config->static_gateway) - 1);
+    config->static_gateway[sizeof(config->static_gateway) - 1] = '\0';
+ */   
+    config->tcp_ports[0] = 4001;
+    config->tcp_ports[1] = 4002;
+    config->tcp_ports[2] = 4003;
+    config->tcp_ports[3] = 4004;
+    config->management_port = 80;
 }
 
 /**

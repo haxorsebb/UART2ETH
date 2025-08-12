@@ -21,6 +21,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,7 +32,7 @@ extern "C" {
  */
 typedef struct {
     uint32_t addr;  // IP address in network byte order
-} simple_ip_addr_t;
+} __attribute__((aligned(4))) simple_ip_addr_t;
 
 /**
  * @brief Network manager status enumeration
@@ -50,13 +51,16 @@ typedef enum {
  * @brief Network configuration structure (simplified for testing)
  */
 typedef struct {
-    bool use_dhcp;                      // Enable DHCP client (for future use)
     simple_ip_addr_t static_ip;         // Static IP (if DHCP disabled)
     simple_ip_addr_t static_netmask;    // Static netmask (if DHCP disabled)
     simple_ip_addr_t static_gateway;    // Static gateway (if DHCP disabled)
-    uint8_t mac_address[6];             // MAC address (auto-generated if all zeros)
     uint32_t dhcp_timeout_ms;           // DHCP timeout in milliseconds
-} network_config_t;
+    uint8_t mac_address[6];             // MAC address (auto-generated if all zeros)
+    uint16_t tcp_ports[4];              // 4001-4004 default
+    uint16_t management_port;           // 80 default
+    bool use_dhcp;                      // Enable DHCP client 
+    
+} __attribute__((aligned(4))) network_config_t;
 
 /**
  * @brief Network statistics structure (simplified for testing)
@@ -75,7 +79,7 @@ typedef struct {
     uint32_t packets_rx;                // Packets received
     uint32_t bytes_tx;                  // Bytes transmitted
     uint32_t bytes_rx;                  // Bytes received
-} network_stats_t;
+} __attribute__((aligned(4))) network_stats_t;
 
 /**
  * @brief Network manager initialization and control
@@ -92,6 +96,16 @@ bool network_manager_init(const network_config_t* config);
  * Deinitialize network manager
  */
 void network_manager_deinit(void);
+
+/**
+ * @brief Helper function to schedule work
+ */
+bool network_manager_receive_packets_pending(void);
+
+/**
+ * @brief Helper function to schedule work
+ */
+bool network_manager_send_packets_pending(void);
 
 /**
  * Process network manager tasks (call from Core1 main loop)

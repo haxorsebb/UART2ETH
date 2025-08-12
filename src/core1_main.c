@@ -1,21 +1,23 @@
 /**
  * @file core1_main.c
- * @brief Core1 main function for high-performance network processing
+ * @brief Core1 main function with clean state machine architecture
  * 
- * Implements interrupt-driven main loop for Core1 responsible for network operations,
- * flash persistence, and log processing. Uses WFI (Wait For Interrupt) for optimal
- * performance and responsiveness. Only wakes up when actual work is needed.
+ * Implements a clean state machine pattern for Core1:
+ * - One main while(true) loop
+ * - State update function + big switch statement
+ * - Each sub-state calls exactly one function
+ * - Network processing happens continuously in OPERATIONAL state
+ * - WFI in idle state for power efficiency
  * 
- * Performance Optimizations:
- * - WFI-based event loop instead of polling with sleep
- * - Immediate interrupt processing for minimal packet latency
- * - 1Hz timer for periodic tasks (DHCP, statistics, persistence)
- * - Batch processing of multiple packets per interrupt
+ * Architecture:
+ * 1. core1_update_states() - determines next state transitions
+ * 2. switch(main_state) - handles each main state
+ * 3. switch(sub_state) - handles each sub-state within main state
+ * 4. Single function call per sub-state - clean separation of concerns
  * 
  * Documentation Reference:
  * - ADR-007: Event-Driven State Machine Architecture
  * - arc42 Chapter 5 - Core 1 Network Subsystem
- * - Performance Optimization Plan: Phase 1 Critical Fixes
  */
 
 #include "state_machine.h"
@@ -24,307 +26,441 @@
 #include "network/network_manager.h"
 #include "network/enc28j60_driver.h"
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
 #include "hardware/timer.h"
 #include "hardware/irq.h"
 #include <stdio.h>
 
-// Performance-optimized configuration
-#define PERIODIC_TIMER_INTERVAL_US  1000000  // 1Hz = 1,000,000 microseconds
-#define MAX_PACKETS_PER_INTERRUPT   32       // Process up to 32 packets per interrupt
-#define NETWORK_PRIORITY_PROCESSING true     // High priority for network processing
+// Forward declarations for Core1 state functions
+static void core1_initialize(void);
+static void core1_update_states(void);
 
-// Forward declarations for Core1 processing functions
-static bool initialize_network_interface(void);
-static bool check_network_status(void);
-static void process_network_operations_fast(void);
-static bool persistence_needed(void);
-static void setup_periodic_timer(void);
-static bool periodic_timer_callback(struct repeating_timer *t);
+// MAIN_STATE_INIT functions
+static void core1_init_persistence(void);
+static void core1_init_logging(void);
+static void core1_init_hardware(void);
+static void core1_init_network(void);
+static void core1_init_complete(void);
 
-// Timer state for periodic tasks
-static struct repeating_timer g_periodic_timer;
-static volatile bool g_periodic_task_pending = false;
-static volatile uint32_t g_periodic_counter = 0;
+// MAIN_STATE_CONFIGURATION functions
+static void core1_load_configuration(void);
+static void core1_validate_configuration(void);
+static void core1_configuration_complete(void);
+
+// MAIN_STATE_OPERATIONAL functions
+static bool check_for_pending_work(void);
+static void core1_work_or_idle_wait(void);
+static void core1_idle_wait(void);
+static void core1_process_network(void);
+static void core1_process_persistence(void);
+static void core1_process_logs(void);
+
+// MAIN_STATE_ERROR functions
+static void core1_handle_error(void);
+
+// State tracking for transitions
+
+static bool g_network_initialized = false;
+static bool g_persistence_initialized = false;
+static bool g_logging_initialized = false;
+static bool g_configuration_loaded = false;
+static uint32_t g_config_loading_cycles = 0;
 
 /**
- * @brief High-performance Core1 main function
+ * @brief Clean Core1 main function with simple state machine
  * 
- * Runs an interrupt-driven control loop optimized for minimal latency.
- * Uses WFI to stall the core until interrupts occur, providing maximum
- * responsiveness while minimizing power consumption.
- * 
- * Key Performance Features:
- * - Immediate wake-up on ENC28J60 interrupts
- * - Batch processing of multiple packets
- * - Periodic tasks only run when actually needed
- * - No unnecessary polling or fixed delays
+ * Single while loop with state update + switch statement architecture.
+ * Each sub-state calls exactly one function for clean separation.
  */
 void core1_main(void) {
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
+    // One-time initialization
+    core1_initialize();
     
-    // Initialize network interface
-    if (!initialize_network_interface()) {
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
-        state_machine_process_main_event(MAIN_EVENT_SYSTEM_ERROR);
-    } else {
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 0);
-        // Generate network up event
-        state_machine_process_core1_event(CORE1_EVENT_NETWORK_UP);
-    }
+    // Get current states once 
+    main_state_t main_state = state_machine_get_main_state();
+    core1_substate_t sub_state = state_machine_get_core1_substate();
     
-    // Set up 1Hz timer for periodic tasks
-    setup_periodic_timer();
-    
-    // Log Core1 startup - ready for high-performance operation
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
-    printf("Core1: Entering high-performance interrupt-driven loop\n");
-    printf("Core1: Network processing optimized for minimal latency\n");
-    
-    while (true) {
-        // Query current states (non-blocking, very fast)
-        main_state_t main_state = state_machine_get_main_state();
-        core1_substate_t sub_state = state_machine_get_core1_substate();
+
+    while (sub_state != CORE1_SHUTDOWN) {
         
-        // CRITICAL PATH: Process network interrupts immediately
-        if (enc28j60_has_pending_interrupt()) {
-            // Process network interrupt with high priority
-            enc28j60_process_interrupts();
-            
-            // Process all available packets in batch for efficiency
-            if (main_state == MAIN_STATE_OPERATIONAL) {
-                uint32_t packets_processed = 0;
-                
-                // Batch process up to MAX_PACKETS_PER_INTERRUPT packets
-                while (enc28j60_has_rx_packet() && packets_processed < MAX_PACKETS_PER_INTERRUPT) {
-                    // Process lwIP network stack (handles incoming packets)
-                    network_manager_process();
-                    packets_processed++;
-                }
-                
-                // Process lwIP timeouts after packet batch
-                sys_check_timeouts();
-                
-                // Additional network operations if needed
-                process_network_operations_fast();
-                
-                if (packets_processed > 0) {
-                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_RX, packets_processed);
-                }
-            }
+        // Get current states
+        main_state = state_machine_get_main_state();
+        sub_state = state_machine_get_core1_substate();
+        /*
+        // DEBUG: Print states periodically
+        static uint32_t debug_counter = 0;
+        debug_counter++;
+        if (true || debug_counter % 50000 == 0) {  // Every 50k loops
+            printf("DEBUG: Core1 main_state=%d, sub_state=%d\n", main_state, sub_state);
         }
-        
-        // PERIODIC TASKS: Only process when timer fires (1Hz)
-        if (g_periodic_task_pending) {
-            g_periodic_task_pending = false;  // Clear flag immediately
-            
-            // State-driven control logic for periodic tasks
-            switch (main_state) {
-                case MAIN_STATE_INIT:
-                    // Wait for Core0 to complete hardware initialization
-                    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_DEBUG, LOG_EVENT_INIT_PHASE, 1);
-                    break;
-                    
-                case MAIN_STATE_CONFIGURATION:
-                    // Configuration loading phase - Core1 drives this
-                    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_CONFIG_PHASE, 0);
-                    
-                    // Simulate configuration loading (periodic processing)
-                    static uint32_t config_loading_cycles = 0;
-                    config_loading_cycles++;
-                    
-                    if (config_loading_cycles >= 5) {  // 5 seconds to load config
-                        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_LOADED, config_loading_cycles);
-                        state_machine_process_main_event(MAIN_EVENT_CONFIG_LOADED);
-                        config_loading_cycles = 0;  // Reset for next time
-                    }
-                    break;
-                    
-                case MAIN_STATE_OPERATIONAL:
-                    // Process lwIP timeouts for DHCP, TCP timers, etc. (only needed periodically)
-                    sys_check_timeouts();
-                    
-                    // MEDIUM PRIORITY: Persistence operations (only when needed)
-                    if (persistence_needed()) {
-                        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_START, 0);
-                        state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_START);
-                        
-                        // Perform persistence operation
-                        flash_persistence_save_configuration_if_needed();
-                        
-                        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_END, 0);
-                        state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_END);
-                        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_SAVED, 0);
-                    }
-                    break;
-                    
-                case MAIN_STATE_ERROR:
-                    // Error state - limited operations
-                    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_ERROR_RECOVERY, 0);
-                    break;
-            }
-            
-            // LOW PRIORITY: Process pending log events (batch processing for efficiency)
-            if (log_manager_get_pending_count() > 0) {
-                state_machine_process_core1_event(CORE1_EVENT_LOG_START);
+        */
+        // Big switch statement for main states
+        switch (main_state) {
+            case MAIN_STATE_INIT:
+                // Initialization phase - set up hardware and network
+                switch (sub_state) {
+                    case CORE1_INIT_PERISTENCE:
+                        core1_init_persistence();
+                        break;
+                    case CORE1_INIT_LOGGING:
+                        core1_init_logging();
+                        break;
+                    case CORE1_INIT_NET:
+                        core1_init_hardware();
+                        break;
+                    case CORE1_INIT_COMPLETE:
+                        core1_init_complete();
+                        break;
+                    case CORE1_INIT_IDLE:
+                        core1_idle_wait();  // WFI - wait for interrupts, until main state changes
+                        break;
+                    case CORE1_INIT_ERROR:
+                        state_machine_process_main_event(MAIN_EVENT_SYSTEM_ERROR);
+                        break;
+                    default:
+                        break;
+                }
+                break;
                 
-                // Process all pending log events in batch
-                uint32_t formatted_count = log_manager_format_pending();
+            case MAIN_STATE_CONFIGURATION:
+                // Configuration loading phase
+                switch (sub_state) {
+                    case CORE1_CONFIG_NET:
+                        core1_load_configuration();
+                        break;
+                    case CORE1_CONFIG_COMPLETE:
+                        core1_configuration_complete();
+                        break;
+                    case CORE1_CONFIG_IDLE:
+                        core1_idle_wait();  // WFI - wait for interrupts, until main state changes
+                        break;   
+                    case CORE1_CONFIG_ERROR:
+                        core1_idle_wait();  // wait for config changes
+                        break;
+                     
+                    default:
+                        break;
+                }
+                break;
                 
-                state_machine_process_core1_event(CORE1_EVENT_LOG_END);
-            }
-            
-            // Network status monitoring and event generation (periodic)
-            switch (sub_state) {
-                case CORE1_NET_DISCONNECTED:
-                    if (check_network_status()) {
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_UP, 0);
-                        state_machine_process_core1_event(CORE1_EVENT_NETWORK_UP);
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_TCP_CONNECT, 0);
-                    }
-                    break;
-                    
-                case CORE1_NET_IDLE:
-                    if (!check_network_status()) {
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 0);
-                        state_machine_process_core1_event(CORE1_EVENT_NETWORK_DOWN);
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 0);
-                    }
-                    // Check for new connections (every 30 seconds)
-                    if (g_periodic_counter % 30 == 0) {
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_CONNECTION_CHECK, 1);
-                        state_machine_process_core1_event(CORE1_EVENT_CONNECTION_ACTIVE);
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_TCP_CONNECT, 0);
-                    }
-                    break;
-                    
-                case CORE1_NET_ACTIVE:
-                    if (!check_network_status()) {
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 0);
-                        state_machine_process_core1_event(CORE1_EVENT_NETWORK_DOWN);
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 0);
-                    }
-                    // Simulate connection idle after some time (every 100 seconds)
-                    if (g_periodic_counter % 100 == 0) {
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_CONNECTION_CHECK, 0);
-                        state_machine_process_core1_event(CORE1_EVENT_CONNECTION_IDLE);
-                        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_TCP_DISCONNECT, 0);
-                    }
-                    break;
-                    
-                case CORE1_PERSISTENCE_ACTIVE:
-                    // Persistence operation active - limited other processing
-                    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_START, 1);
-                    break;
-                    
-                case CORE1_LOG_ACTIVE:
-                    // Log processing active - this should be very brief
-                    break;
-            }
+            case MAIN_STATE_OPERATIONAL:
+                // Normal operation - process based on sub-state
+                switch (sub_state) {
+                    case CORE1_NET_DISCONNECTED:
+                        core1_process_network();  // Try to bring network up                        
+                        break;
+                    case CORE1_NET_IDLE:
+                        core1_process_network();  // Try to bring network up                        
+                        break;
+                    case CORE1_NET_ACTIVE_RECEIVE:
+                        core1_process_network();  // Active network processing
+                        break;
+                    case CORE1_NET_ACTIVE_SEND:
+                        core1_process_network();  // Active network processing
+                        break;
+                    case CORE1_PERSISTENCE_ACTIVE:
+                        core1_process_persistence();                        
+                        break;
+                    case CORE1_LOG_ACTIVE:
+                        core1_process_logs();                        
+                        break;
+
+                    case CORE1_IDLE: //check for work or sleep
+                        core1_work_or_idle_wait();
+                        break;
+
+                    default:
+                        break;
+                }
+                break;
+                
+            case MAIN_STATE_ERROR:
+                // Error handling
+                core1_handle_error();
+                break;
         }
-        
-        // PERFORMANCE CRITICAL: Use WFI to wait for next interrupt
-        // This minimizes latency while keeping power consumption low
-        // Core will wake up immediately on:
-        // - ENC28J60 packet reception interrupt
-        // - Timer interrupt for periodic tasks
-        // - Any other system interrupt
-        __wfi();
     }
 }
 
-// Core1 processing function implementations
+// MAIN_STATE_OPERATIONAL function implementations
 
 /**
- * @brief Initialize network interface using network manager
- * @return true if successful, false otherwise
+ * @brief check if we need to do anything and fire a corresponding event
  */
-static bool initialize_network_interface(void) {
-    // Get default network configuration
-    network_config_t config;
-    network_manager_get_default_config(&config);
-    
-    // Initialize network manager with ENC28J60 driver
-    bool result = network_manager_init(&config);
-    
-    if (result) {
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 1);
-    } else {
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
+static bool check_for_pending_work(void) {
+
+    if(network_manager_receive_packets_pending()) {
+        //printf("network has pending receive packets\n");
+        state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
+        return true; 
     }
-    
-    return result;
-}
-
-/**
- * @brief Check current network status using network manager
- * @return true if network is available, false otherwise
- */
-static bool check_network_status(void) {
-    // Check if network manager is ready and link is up
-    return network_manager_is_ready() && network_manager_is_link_up();
-}
-
-/**
- * @brief Process network operations (optimized for speed)
- */
-static void process_network_operations_fast(void) {
-    // Minimal network processing beyond the network manager
-    // This function is optimized for speed and called frequently
-    
-    // Only log network status every 100 periodic cycles (100 seconds)
-    if (g_periodic_counter % 100 == 0) {
-        // Log network status and basic connectivity test (minimal overhead)
-        bool connectivity = network_manager_test_connectivity();
-        network_status_t status = network_manager_get_status();
-        
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_OPERATIONS, 
-                  (uint32_t)status | (connectivity ? 0x100 : 0));
-    }
-}
-
-/**
- * @brief Check if persistence operation is needed
- * @return true if persistence needed, false otherwise
- */
-static bool persistence_needed(void) {
-    // Check if persistence is needed every 300 seconds (5 minutes)
-    if (g_periodic_counter % 300 == 0 && g_periodic_counter > 0) {
-        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_NEEDED, 0);
+    if(log_manager_get_pending_count()) {
+        printf("Logmanager has pending count %d\n",log_manager_get_pending_count());
+        state_machine_process_core1_event(CORE1_EVENT_LOG_START);
         return true;
     }
+    if(false && flash_persistence_save_needed()) {
+        printf("persistence needed\n");
+        state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_START);
+        return false;
+    }
+
     return false;
 }
 
 /**
- * @brief Set up 1Hz periodic timer for non-critical tasks
+ * @brief Idle state - wait for interrupts
+ * 
+ * Uses WFI (Wait For Interrupt) for power efficiency while waiting
+ * for network packets or other events.
  */
-static void setup_periodic_timer(void) {
-    // Set up repeating timer that fires every 1 second
-    bool timer_added = add_repeating_timer_us(PERIODIC_TIMER_INTERVAL_US, 
-                                              periodic_timer_callback, 
-                                              NULL, 
-                                              &g_periodic_timer);
+static void core1_work_or_idle_wait(void) {
     
-    if (timer_added) {
-        printf("Core1: 1Hz periodic timer configured successfully\n");
-        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 2);
+    //check if we need to do something
+    if(check_for_pending_work())    
+    {
+        return;
+    }
+    
+    core1_idle_wait();
+    
+    return;
+}
+
+/**
+ * @brief Idle state - wait for interrupts
+ * 
+ * Uses WFI (Wait For Interrupt) for power efficiency while waiting
+ * for network packets or other events.
+ */
+static void core1_idle_wait(void) {
+
+    // Wait for interrupt - power efficient
+    __wfi();
+}
+
+
+
+
+// Core1 initialization and state management functions
+
+/**
+ * @brief One-time Core1 initialization
+ */
+static void core1_initialize(void) {
+    
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
+    
+    // Reset state tracking
+    g_persistence_initialized = false;
+    g_logging_initialized = false;
+    g_network_initialized = false;
+    g_configuration_loaded = false;
+    g_config_loading_cycles = 0;
+    
+    // Make sure the doorbell_on_mainstate_change doorbell is not set for this core
+    multicore_doorbell_clear_current_core(doorbell_core1_wakes_core0);
+
+    //set up doorbell irq - all doorbells have the same irq anyway. it is shared
+    uint32_t irq = multicore_doorbell_irq_num(doorbell_core1_wakes_core0);
+    printf("Core1: Setting up doorbell IRQ %u for doorbell %d\n", irq, doorbell_core1_wakes_core0);
+    irq_add_shared_handler(irq, shared_doorbell_irq,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY-1);
+    irq_set_enabled(irq, true);
+
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
+}
+
+
+// MAIN_STATE_INIT function implementations
+
+/**
+ * @brief Initialize peristence management system
+ */
+static void core1_init_persistence(void) {
+    if (g_persistence_initialized) {
+        return;  // Already done
+    }
+    
+    flash_persistence_init();
+    bool result = flash_persistence_load_configuration(); 
+    printf("RESULT OF flash_persistence_load_configuration on init: %d\n", result);
+    
+    if (result) {
+        g_persistence_initialized = true;
+        log_event(EVENT_SOURCE_PERSITENCE, LOG_LEVEL_INFO, LOG_EVENT_PERSISTENCE_INIT_SUCCESS, 1);
+        // Generate network up event to move to next phase
+        state_machine_process_core1_event(CORE1_EVENT_INIT_PERSISTENCE_COMPLETE);
     } else {
-        printf("Core1: Failed to configure periodic timer\n");
-        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 4);
+        log_event(EVENT_SOURCE_PERSITENCE, LOG_LEVEL_ERROR, LOG_EVENT_PERSISTENCE_INIT_FAIL, 1);
+        state_machine_process_core1_event(CORE1_EVENT_INIT_PERSISTENCE_FAILED);
+        // Retry after a delay
+        sleep_ms(1000);
     }
 }
 
 /**
- * @brief Periodic timer callback (1Hz)
- * 
- * This callback runs in interrupt context and should be very fast.
- * It only sets a flag to indicate that periodic processing is needed.
+ * @brief Initialize log management system
  */
-static bool periodic_timer_callback(struct repeating_timer *t) {
-    // Set flag for main loop to process periodic tasks
-    g_periodic_task_pending = true;
-    g_periodic_counter++;
+static void core1_init_logging(void) {
+    if (g_logging_initialized) {
+        return;  // Already done
+    }
     
-    // Return true to keep the timer running
-    return true;
+    bool result = true; //TBD: 
+
+    if (result) {
+        g_logging_initialized = true;
+        log_event(EVENT_SOURCE_LOGGING, LOG_LEVEL_INFO, LOG_EVENT_LOGGING_INIT_SUCCESS, 1);
+        // Generate network up event to move to next phase
+        state_machine_process_core1_event(CORE1_EVENT_INIT_LOGGING_COMPLETE);
+    } else {
+        log_event(EVENT_SOURCE_LOGGING, LOG_LEVEL_ERROR, LOG_EVENT_LOGGING_INIT_FAIL, 1);
+        state_machine_process_core1_event(CORE1_EVENT_INIT_LOGGING_FAILED);
+        // Retry after a delay
+        sleep_ms(1000);
+    }
 }
+
+/**
+ * @brief Initialize hardware and network stack
+ */
+static void core1_init_hardware(void) {
+    bool result = false;
+    if (g_network_initialized) {
+        result = true;  // Already done
+    }
+    else {
+        // Get default network configuration
+        network_config_t config;
+        network_manager_get_default_config(&config);
+        
+        // Initialize network manager with ENC28J60 driver to check hardware status
+        result = network_manager_init(&config);
+        printf("RESULT OF network_manager_init on init: %d\n", result);
+    
+    }
+
+    if (result) {
+        g_network_initialized = true;
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 1);
+        // Generate network up event to move to next phase
+        state_machine_process_core1_event(CORE1_EVENT_INIT_NET_COMPLETE);
+    } else {
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
+        state_machine_process_core1_event(CORE1_EVENT_INIT_NET_FAILED);                                        
+    }
+}
+
+/**
+ * @brief Complete initialization phase
+ */
+static void core1_init_complete(void) {
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 2);
+    // Transition to configuration phase
+    state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE1);
+    //sleep if other core not yet ready (any event will do)
+    state_machine_process_core1_event(CORE1_EVENT_INIT_NET_COMPLETE);
+}
+
+// MAIN_STATE_CONFIGURATION function implementations
+
+/**
+ * @brief Load and validate configuration
+ */
+static void core1_load_configuration(void) {
+
+    // Copy loaded configuration to shared memory
+    shared_memory_layout_t* layout = shared_memory_get_layout();
+
+    bool result = network_manager_init(&layout->config.network); //config gets copied inside
+    printf("RESULT OF network_manager_init on load: %d\n", result);
+    if (result) {
+        // Generate to move to next phase
+        state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
+    } else {
+        //signalize failure
+        state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_FAILED);
+    }
+}
+
+/**
+ * @brief Complete configuration phase
+ */
+static void core1_configuration_complete(void) {
+    
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 3);
+    // Transition to operational phase
+    // Transition to configuration phase
+    state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE1);
+    //sleep if other core not yet ready (any event will do)
+    state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
+}
+
+
+
+/**
+ * @brief Process network operations
+ * 
+ * Handles all network processing including packet RX/TX, DHCP, TCP/IP stack.
+ * This is the core function that makes network traffic work.
+ */
+static void core1_process_network(void) {
+    static uint32_t call_counter = 0;
+    call_counter++;
+    
+    if (call_counter % 10000 == 0) {  // Print every 10k calls
+        printf("DEBUG: core1_process_network() call #%u\n", call_counter);
+    }
+    network_manager_process();
+    if(!network_manager_receive_packets_pending())
+    {
+        state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_FINISHED);
+    }
+}
+
+/**
+ * @brief Process flash persistence operations
+ */
+static void core1_process_persistence(void) {
+    // Placeholder for persistence operations
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_START, 1);
+    
+    // Complete persistence
+    state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_END);
+    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_END, 0);
+}
+
+/**
+ * @brief Process log formatting and output
+ */
+static void core1_process_logs(void) {
+    // Process pending log events
+    log_manager_format_pending();
+    
+    // Complete log processing after 1 log format to run higher priorities tasks
+    state_machine_process_core1_event(CORE1_EVENT_LOG_END);
+}
+
+
+
+// MAIN_STATE_ERROR function implementation
+
+/**
+ * @brief Handle error state and recovery
+ */
+static void core1_handle_error(void) {
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_ERROR_RECOVERY, 0);
+    printf("Core1: Error state - attempting recovery\n");
+    
+    // Simple recovery: reset network and try again
+    if (g_network_initialized) {
+        network_manager_restart_interface();
+    }
+    
+    // Attempt recovery after delay
+    sleep_ms(2000);
+    
+    // Signal recovery attempt
+    state_machine_process_main_event(MAIN_EVENT_ERROR_RECOVERED);
+}
+

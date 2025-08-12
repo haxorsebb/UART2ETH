@@ -39,8 +39,8 @@ static const uint8_t* g_local_mac = NULL; // MAC address storage (Arduino patter
 
 // Buffer addresses (exact Arduino reference values)
 #define RX_BUF_START 0x0000
-#define RX_BUF_END   0x0FFF  // 4KB RX buffer (Arduino reference)
-#define TX_BUF_START 0x1200  // TX buffer start (Arduino reference)
+#define RX_BUF_END   0x0FFF  // 4KB RX buffer 
+#define TX_BUF_START 0x1040  // TX buffer start (some buffer inbetween)
 
 // Maximum frame length (Arduino reference)
 #define MAX_MAC_LENGTH 1518
@@ -268,13 +268,17 @@ static void enc28j60_configure_mac(void) {
     enc28j60_set_register_bank_internal(MACONX_BANK);
     
     // Arduino step 1: Turn on reception and flow control
-    enc28j60_set_register_bits(ENC28J60_MACON1, 
-        ENC28J60_MACON1_MARXEN | ENC28J60_MACON1_TXPAUS | ENC28J60_MACON1_RXPAUS);
+    // CRITICAL FIX: Use direct register write instead of bit field operations for MAC registers
+    uint8_t macon1_value = ENC28J60_MACON1_MARXEN | ENC28J60_MACON1_TXPAUS | ENC28J60_MACON1_RXPAUS;
+    enc28j60_write_register_internal(ENC28J60_MACON1, macon1_value);
+    printf("ENC28J60: MACON1 = 0x%02X (should be 0x0D)\n", macon1_value);
     
     // Arduino step 2: Set padding, crc, full duplex
-    enc28j60_set_register_bits(ENC28J60_MACON3, 
-        ENC28J60_MACON3_PADCFG_FULL | ENC28J60_MACON3_TXCRCEN | 
-        ENC28J60_MACON3_FULDPX | ENC28J60_MACON3_FRMLNEN);
+    // CRITICAL FIX: Use direct register write instead of bit field operations for MAC registers
+    uint8_t macon3_value = ENC28J60_MACON3_PADCFG_FULL | ENC28J60_MACON3_TXCRCEN | 
+                           ENC28J60_MACON3_FULDPX | ENC28J60_MACON3_FRMLNEN;
+    enc28j60_write_register_internal(ENC28J60_MACON3, macon3_value);
+    printf("ENC28J60: MACON3 = 0x%02X (should be 0xF3)\n", macon3_value);
     
     // Arduino step 3: Set maximum frame length
     enc28j60_write_register_internal(ENC28J60_MAMXFLL, MAX_MAC_LENGTH & 0xFF);
@@ -285,6 +289,21 @@ static void enc28j60_configure_mac(void) {
     
     // Arduino step 5: Set non-back-to-back inter packet gap
     enc28j60_write_register_internal(ENC28J60_MAIPGL, 0x12);
+    
+    // Verify MAC register configuration by reading back the values
+    enc28j60_set_register_bank_internal(MACONX_BANK);
+    uint8_t macon1_verify = enc28j60_read_register_internal(ENC28J60_MACON1);
+    uint8_t macon3_verify = enc28j60_read_register_internal(ENC28J60_MACON3);
+    printf("ENC28J60: MAC Verification - MACON1=0x%02X, MACON3=0x%02X\n", macon1_verify, macon3_verify);
+    
+    if (macon1_verify != macon1_value) {
+        printf("ENC28J60: WARNING! MACON1 verification failed (expected 0x%02X, got 0x%02X)\n", 
+               macon1_value, macon1_verify);
+    }
+    if (macon3_verify != macon3_value) {
+        printf("ENC28J60: WARNING! MACON3 verification failed (expected 0x%02X, got 0x%02X)\n", 
+               macon3_value, macon3_verify);
+    }
     
     // Set MAC address if available
     if (g_local_mac != NULL) {
@@ -365,7 +384,14 @@ bool enc28j60_init(void) {
     // This ensures interrupt handling is fully ready when packets arrive
     enc28j60_enable_interrupts();
     
-    // 9. Turn on reception (FINAL STEP - all infrastructure ready)
+    // Initialize driver state
+    memset(&g_enc28j60_state, 0, sizeof(g_enc28j60_state));
+    g_enc28j60_state.initialized = true;
+    g_enc28j60_state.next_packet_ptr = RX_BUF_START;
+    
+    g_driver_initialized = true;
+    
+    //    9. Turn on reception (FINAL STEP - all infrastructure ready)
     // Once RXEN is set, packets can start arriving and triggering interrupts
     enc28j60_set_register_bank_internal(ERXTX_BANK);
     enc28j60_write_register_internal(ENC28J60_ECON1, ENC28J60_ECON1_RXEN);
@@ -377,14 +403,8 @@ bool enc28j60_init(void) {
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 2);
         return false;
     }
-    
-    // Initialize driver state
-    memset(&g_enc28j60_state, 0, sizeof(g_enc28j60_state));
-    g_enc28j60_state.initialized = true;
-    g_enc28j60_state.next_packet_ptr = RX_BUF_START;
-    
-    g_driver_initialized = true;
-    
+
+
     printf("ENC28J60: Initialization complete\n");
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 2);
     return true;
@@ -604,7 +624,7 @@ static void enc28j60_interrupt_handler(uint gpio, uint32_t events) {
         g_last_interrupt_status = enc28j60_read_register_internal(ENC28J60_EIR);
         g_interrupt_pending = true;
         
-        printf("INT: ENC28J60 interrupt triggered, EIR=0x%02X\n", g_last_interrupt_status);
+        //printf("INT: ENC28J60 interrupt triggered, EIR=0x%02X\n", g_last_interrupt_status);
     }
 }
 
@@ -701,6 +721,10 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
         return false;
     }
     
+    // CRITICAL: Disable interrupts during transmission (Arduino reference)
+    // This prevents receive interrupts from corrupting the transmission
+    gpio_set_irq_enabled(ENC28J60_INTERRUPT_PIN, GPIO_IRQ_EDGE_FALL, false);
+    
     enc28j60_set_register_bank_internal(ERXTX_BANK);
     
     // Set up the transmit buffer pointer (Arduino reference)
@@ -716,8 +740,8 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
     // Write packet data
     enc28j60_write_buffer(packet->data, packet->length);
     
-    // Set TX end pointer
-    uint16_t tx_end = TX_BUF_START + packet->length;
+    // Set TX end pointer (Arduino reference - points to last byte of DATA PAYLOAD)
+    uint16_t tx_end = TX_BUF_START + packet->length; // Arduino: dataend = TX_BUF_START + datalen
     enc28j60_write_register_internal(ENC28J60_ETXNDL, tx_end & 0xFF);
     enc28j60_write_register_internal(ENC28J60_ETXNDH, (tx_end >> 8) & 0xFF);
     
@@ -727,11 +751,33 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
     // Start transmission (Arduino reference)
     enc28j60_set_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRTS);
     
-    g_enc28j60_state.packets_sent++;
+    // Wait for transmission to complete (Arduino reference - synchronous!)
+    uint32_t timeout = 10000; // 10ms timeout
+    while (timeout > 0) {
+        uint8_t econ1 = enc28j60_read_register_internal(ENC28J60_ECON1);
+        if ((econ1 & ENC28J60_ECON1_TXRTS) == 0) {
+            break; // Transmission complete
+        }
+        sleep_us(1);
+        timeout--;
+    }
     
-    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, packet->length);
+    // Check for transmission errors (Arduino reference)
+    uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
+    bool tx_success = (estat & ENC28J60_ESTAT_TXABRT) == 0;
     
-    return true;
+    // CRITICAL: Re-enable interrupts after transmission (Arduino reference)
+    gpio_set_irq_enabled(ENC28J60_INTERRUPT_PIN, GPIO_IRQ_EDGE_FALL, true);
+    
+    if (tx_success) {
+        g_enc28j60_state.packets_sent++;
+        //log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, packet->length);
+        return true;
+    } else {
+        g_enc28j60_state.tx_errors++;
+        printf("ENC28J60: TX error - packet aborted\n");
+        return false;
+    }
 }
 
 /**

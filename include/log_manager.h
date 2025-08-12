@@ -22,16 +22,20 @@
 #define LOG_MAX_FORMAT_LENGTH 200
 
 // Event type ranges for better code organization and validation
-#define SYSTEM_EVENT_BASE    0
-#define SYSTEM_EVENT_MAX     99
-#define UART_EVENT_BASE      100
-#define UART_EVENT_MAX       199
-#define NETWORK_EVENT_BASE   200
-#define NETWORK_EVENT_MAX    299
-#define CONFIG_EVENT_BASE    300
-#define CONFIG_EVENT_MAX     399
-#define OTA_EVENT_BASE       400
-#define OTA_EVENT_MAX        499
+#define SYSTEM_EVENT_BASE       0
+#define SYSTEM_EVENT_MAX        99
+#define UART_EVENT_BASE         100
+#define UART_EVENT_MAX          199
+#define NETWORK_EVENT_BASE      200
+#define NETWORK_EVENT_MAX       299
+#define CONFIG_EVENT_BASE       300
+#define CONFIG_EVENT_MAX        399
+#define OTA_EVENT_BASE          400
+#define OTA_EVENT_MAX           499
+#define PERSISTENCE_EVENT_BASE  500
+#define PERSISTENCE_EVENT_MAX   599
+#define LOGGING_EVENT_BASE      600
+#define LOGGING_EVENT_MAX       699
 
 // Error codes for detailed error reporting
 typedef enum {
@@ -53,15 +57,17 @@ typedef uint16_t log_level_t;
 
 // Event source definitions with uint16_t base for alignment
 typedef uint16_t event_source_t;
-#define EVENT_SOURCE_SYSTEM    ((event_source_t)0)
-#define EVENT_SOURCE_UART0     ((event_source_t)1)
-#define EVENT_SOURCE_UART1     ((event_source_t)2)
-#define EVENT_SOURCE_UART2     ((event_source_t)3)
-#define EVENT_SOURCE_UART3     ((event_source_t)4)
-#define EVENT_SOURCE_NETWORK   ((event_source_t)5)
-#define EVENT_SOURCE_CONFIG    ((event_source_t)6)
-#define EVENT_SOURCE_OTA       ((event_source_t)7)
-#define EVENT_SOURCE_WATCHDOG  ((event_source_t)8)
+#define EVENT_SOURCE_SYSTEM     ((event_source_t)0)
+#define EVENT_SOURCE_UART0      ((event_source_t)1)
+#define EVENT_SOURCE_UART1      ((event_source_t)2)
+#define EVENT_SOURCE_UART2      ((event_source_t)3)
+#define EVENT_SOURCE_UART3      ((event_source_t)4)
+#define EVENT_SOURCE_NETWORK    ((event_source_t)5)
+#define EVENT_SOURCE_CONFIG     ((event_source_t)6)
+#define EVENT_SOURCE_OTA        ((event_source_t)7)
+#define EVENT_SOURCE_WATCHDOG   ((event_source_t)8)
+#define EVENT_SOURCE_PERSITENCE ((event_source_t)9)
+#define EVENT_SOURCE_LOGGING    ((event_source_t)10)
 
 // Event type definitions with uint16_t base and explicit numbering for version compatibility
 typedef uint16_t event_type_t;
@@ -158,9 +164,18 @@ typedef uint16_t event_type_t;
 #define LOG_EVENT_SHARED_MEMORY_REINIT   ((event_type_t)319)
 
 // OTA events (400-499)
-#define LOG_EVENT_OTA_START       ((event_type_t)400)
+#define LOG_EVENT_OTA_START      ((event_type_t)400)
 #define LOG_EVENT_OTA_COMPLETE    ((event_type_t)401)
 #define LOG_EVENT_OTA_ERROR       ((event_type_t)402)
+
+// PERSISTENCE events (500-599)
+#define LOG_EVENT_PERSISTENCE_INIT_SUCCESS  ((event_type_t)500)
+#define LOG_EVENT_PERSISTENCE_INIT_FAIL     ((event_type_t)501)
+
+// LOGGING events (600-699)
+#define LOG_EVENT_LOGGING_INIT_SUCCESS  ((event_type_t)600)
+#define LOG_EVENT_LOGGING_INIT_FAIL     ((event_type_t)601)
+
 
 // Fixed-size log entry structure (16 bytes total, 32-bit aligned)
 typedef struct {
