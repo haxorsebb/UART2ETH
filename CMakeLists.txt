@@ -62,7 +62,7 @@ target_link_libraries(uart2eth
 # Enable stdio: USB CDC for debugging, UART0 disabled to avoid SPI0 conflict
 # UART1 is manually configured in main.c for hardware logging (GP12/GP13)
 pico_enable_stdio_usb(uart2eth 1)
-pico_enable_stdio_uart(uart2eth 0)  # Disable UART0 to avoid SPI0 conflict
+pico_enable_stdio_uart(uart2eth 1)  # Disable UART0 to avoid SPI0 conflict
 
 # Set UF2 family for RP2350
 pico_set_uf2_family(uart2eth "rp2350-arm-s")
@@ -72,3 +72,26 @@ pico_embed_pt_in_binary(uart2eth "${CMAKE_CURRENT_SOURCE_DIR}/partition_table.js
 
 # Create UF2 output
 pico_add_extra_outputs(uart2eth)
+
+# Standalone ping test target for debugging network issues
+add_executable(ping_test_standalone
+    ping_test_standalone.c
+)
+
+target_link_libraries(ping_test_standalone 
+    pico_stdlib
+    network_manager
+    pico_lwip
+    hardware_spi
+    hardware_uart
+)
+
+target_include_directories(ping_test_standalone PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+pico_enable_stdio_usb(ping_test_standalone 1)
+pico_enable_stdio_uart(ping_test_standalone 1)
+pico_set_uf2_family(ping_test_standalone "rp2350-arm-s")
+pico_add_extra_outputs(ping_test_standalone)

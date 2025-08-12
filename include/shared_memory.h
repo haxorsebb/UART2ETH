@@ -23,6 +23,8 @@
 #include "pico/sync.h"
 #include "hardware/regs/addressmap.h"
 #include "log_manager.h"  // For log_entry_t definition
+#include "network/network_manager.h"  // For log_entry_t definition
+
 
 // SRAM Bank 4 base address and size (RP2350)
 // Note: RP2350 has non-contiguous SRAM banks: SRAM0, SRAM4, SRAM8, SRAM9
@@ -41,12 +43,7 @@ typedef struct {
         bool     enabled;          // Channel enabled
     } uart_channels[4];
     
-    struct {
-        char ip_address[16];       // "192.168.1.100"
-        char subnet_mask[16];      // "255.255.255.0" 
-        uint16_t tcp_ports[4];     // 4001-4004 default
-        bool use_dhcp;
-    } network;
+    network_config_t network;
     
     uint8_t log_level;             // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
     uint32_t watchdog_timeout_ms;  // Default 200ms
@@ -131,6 +128,7 @@ bool flash_persistence_init(void);
 bool flash_persistence_load_configuration(void);
 bool flash_persistence_save_configuration_if_needed(void);
 bool flash_persistence_force_save_configuration(void);
+bool flash_persistence_save_needed(void);
 void flash_persistence_factory_reset(void);
 uint32_t flash_persistence_get_write_count(void);
 uint32_t flash_persistence_get_corruption_count(void);

@@ -178,6 +178,34 @@ bool flash_persistence_save_configuration_if_needed(void) {
  * 
  * @return true if save successful, false on error
  */
+bool flash_persistence_save_needed(void) {
+    if (!g_flash_state.initialized) {
+        return false;
+    }
+    
+    shared_memory_layout_t* layout = shared_memory_get_layout();
+    if (!layout) {
+        return false;
+    }
+    
+    // Check if configuration has changed
+    if (layout->revision_counter == g_flash_state.last_written_revision) {
+        return false;  // No changes to save
+    }
+    
+    // Check write frequency limiting (30 seconds minimum interval)
+    uint32_t current_time_ms = to_ms_since_boot(get_absolute_time());
+    uint32_t elapsed_ms = current_time_ms - g_flash_state.last_write_timestamp_ms;
+    
+    if (elapsed_ms < FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS) {
+        return true;  // Write deferred due to frequency limiting
+    }
+}
+/**
+ * Force save configuration to flash immediately
+ * 
+ * @return true if save successful, false on error
+ */
 bool flash_persistence_force_save_configuration(void) {
     if (!g_flash_state.initialized) {
         return false;

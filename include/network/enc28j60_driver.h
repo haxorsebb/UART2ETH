@@ -109,7 +109,8 @@ extern "C" {
 #define ENC28J60_ECON2_PKTDEC   0x40
 
 // ESTAT bits
-#define ENC28J60_ESTAT_CLKRDY   0x01
+#define ENC28J60_ESTAT_CLKRDY   0x01  // Clock ready
+#define ENC28J60_ESTAT_TXABRT   0x02  // Transmit abort
 
 // EIE (Ethernet Interrupt Enable) bits
 #define ENC28J60_EIE_INTIE      0x80  // Global interrupt enable
@@ -176,8 +177,8 @@ extern "C" {
 
 // Buffer size configuration
 #define ENC28J60_BUFFER_SIZE    8192    // 8KB total buffer
-#define ENC28J60_RX_BUFFER_SIZE 6144    // 6KB for RX
-#define ENC28J60_TX_BUFFER_SIZE 2048    // 2KB for TX
+#define ENC28J60_RX_BUFFER_SIZE 4096    // 6KB for RX
+#define ENC28J60_TX_BUFFER_SIZE 4096    // 2KB for TX
 
 // Maximum Ethernet frame size
 #define ENC28J60_MAX_FRAME_SIZE 1518

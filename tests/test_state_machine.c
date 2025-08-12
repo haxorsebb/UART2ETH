@@ -68,13 +68,13 @@ void test_state_machine_initial_states(void) {
     TEST_ASSERT_EQUAL_MESSAGE(MAIN_STATE_INIT, main_state, 
         "Main state should initialize to INIT");
     
-    // ASSERT: Core0 sub-state should be UART_IDLE
-    TEST_ASSERT_EQUAL_MESSAGE(CORE0_UART_IDLE, core0_state,
-        "Core0 sub-state should initialize to UART_IDLE");
+    // ASSERT: Core0 sub-state should be INIT_UART
+    TEST_ASSERT_EQUAL_MESSAGE(CORE0_INIT_UART, core0_state,
+        "Core0 sub-state should initialize to INIT_UART");
     
-    // ASSERT: Core1 sub-state should be NET_DISCONNECTED
-    TEST_ASSERT_EQUAL_MESSAGE(CORE1_NET_DISCONNECTED, core1_state,
-        "Core1 sub-state should initialize to NET_DISCONNECTED");
+    // ASSERT: Core1 sub-state should be INIT_PERISTENCE
+    TEST_ASSERT_EQUAL_MESSAGE(CORE1_INIT_PERISTENCE, core1_state,
+        "Core1 sub-state should initialize to INIT_PERISTENCE");
 }
 
 /**

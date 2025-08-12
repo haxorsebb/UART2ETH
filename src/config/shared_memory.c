@@ -87,20 +87,7 @@ bool shared_memory_init(void) {
         g_shared_memory->config.uart_channels[i].enabled = false;
     }
     
-    // Initialize network defaults (using safe string copy)
-    strncpy(g_shared_memory->config.network.ip_address, "192.168.1.100", 
-            sizeof(g_shared_memory->config.network.ip_address) - 1);
-    g_shared_memory->config.network.ip_address[sizeof(g_shared_memory->config.network.ip_address) - 1] = '\0';
-    
-    strncpy(g_shared_memory->config.network.subnet_mask, "255.255.255.0", 
-            sizeof(g_shared_memory->config.network.subnet_mask) - 1);
-    g_shared_memory->config.network.subnet_mask[sizeof(g_shared_memory->config.network.subnet_mask) - 1] = '\0';
-    g_shared_memory->config.network.tcp_ports[0] = 4001;
-    g_shared_memory->config.network.tcp_ports[1] = 4002;
-    g_shared_memory->config.network.tcp_ports[2] = 4003;
-    g_shared_memory->config.network.tcp_ports[3] = 4004;
-    g_shared_memory->config.network.use_dhcp = false;
-    
+    network_manager_get_default_config(&g_shared_memory->config.network);
     // Initialize system settings
     g_shared_memory->config.log_level = 1;  // INFO
     g_shared_memory->config.watchdog_timeout_ms = 200;

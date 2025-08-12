@@ -137,6 +137,14 @@ static const char* const event_format_strings[] = {
     [LOG_EVENT_OTA_START] = "OTA update started - size %u bytes",
     [LOG_EVENT_OTA_COMPLETE] = "OTA update completed - version %u",
     [LOG_EVENT_OTA_ERROR] = "OTA update failed - error code %u",
+
+    // PERSISTENCE events (500-599)
+    [LOG_EVENT_PERSISTENCE_INIT_SUCCESS] = "Persistence management system initialized.",
+    [LOG_EVENT_PERSISTENCE_INIT_FAIL] = "Persistence management system init FAILED!",
+
+    // LOGGING events (600-699)
+    [LOG_EVENT_LOGGING_INIT_SUCCESS] = "Log management system initialized.",
+    [LOG_EVENT_LOGGING_INIT_FAIL] = "Log management system init FAILED!",
 };
 
 /**
@@ -173,7 +181,9 @@ static bool validate_event_type(event_type_t event_type) {
         (event_type >= UART_EVENT_BASE && event_type <= UART_EVENT_MAX) ||
         (event_type >= NETWORK_EVENT_BASE && event_type <= NETWORK_EVENT_MAX) ||
         (event_type >= CONFIG_EVENT_BASE && event_type <= CONFIG_EVENT_MAX) ||
-        (event_type >= OTA_EVENT_BASE && event_type <= OTA_EVENT_MAX)) {
+        (event_type >= OTA_EVENT_BASE && event_type <= OTA_EVENT_MAX)||
+        (event_type >= PERSISTENCE_EVENT_BASE && event_type <= PERSISTENCE_EVENT_MAX)||
+        (event_type >= LOGGING_EVENT_BASE && event_type <= LOGGING_EVENT_MAX)) {
         
         // Additional check: ensure we have a format string for this type
         if (event_type < EVENT_FORMAT_ARRAY_SIZE && event_format_strings[event_type] != NULL) {
@@ -458,8 +468,8 @@ uint32_t log_manager_format_pending(void) {
     uint32_t formatted_count = 0;
     log_entry_t entry;
     
-    // Process all pending entries
-    while (read_log_entry(&entry)) {
+    // Process one pending entries
+    if (read_log_entry(&entry)) {
         char formatted_msg[LOG_MAX_MESSAGE_LENGTH];
         
         if (format_single_log_entry(&entry, formatted_msg, sizeof(formatted_msg))) {

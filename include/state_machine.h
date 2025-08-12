@@ -17,6 +17,18 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// Doorbell numbers for cross-core synchronization - extern for global access
+extern int doorbell_core0_wakes_core1;
+extern int doorbell_core1_wakes_core0;
+
+extern void shared_doorbell_irq();
+
+typedef enum {
+    WAKE_MAIN_STATE_CHANGED = 1,
+    WAKE_CONFIG_UPDATE = 2,
+    WAKE_ERROR_CONDITION = 3
+} wake_reason_t;
+
 // Main system states (shared between cores, atomic access)
 typedef enum {
     MAIN_STATE_INIT = 0,           // System initialization and hardware setup
@@ -27,38 +39,78 @@ typedef enum {
 
 // Core0 sub-states (UART processing, ISR-safe)
 typedef enum {
-    CORE0_UART_IDLE = 0,    // No active UART operations
-    CORE0_UART_ACTIVE = 1,  // Processing UART data
-    CORE0_UART_ERROR = 2    // UART hardware error state
+    CORE0_INIT_UART,        // Initializing UART hardware
+    CORE0_INIT_COMPLETE,    // UART init complete, signaling main state
+    CORE0_INIT_IDLE,        // Waiting for other core during init  
+    CORE0_INIT_ERROR,       // UART initialization failed
+    CORE0_CONFIG_UART,      // configure UARTS 
+    CORE0_CONFIG_COMPLETE,      // reconfiguration successful
+    CORE0_CONFIG_IDLE,      // reconfiguration successful
+    CORE0_CONFIG_ERROR,      // reconfiguration NOT successful
+    CORE0_UART_IDLE,        // No active UART operations  
+    CORE0_UART_ACTIVE,      // Processing UART data
+    CORE0_UART_ERROR        // UART hardware error state
 } core0_substate_t;
 
 // Core1 sub-states (Network and maintenance, ISR-safe)
 typedef enum {
-    CORE1_NET_DISCONNECTED = 0,   // Network interface down
-    CORE1_NET_IDLE = 1,           // Network interface up, no connections
-    CORE1_NET_ACTIVE = 2,         // Active network connections
-    CORE1_PERSISTENCE_ACTIVE = 3, // Flash persistence operation active
-    CORE1_LOG_ACTIVE = 4          // Log processing active
+    CORE1_INIT_PERISTENCE,      // Init persistence
+    CORE1_INIT_LOGGING,         // init logging
+    CORE1_INIT_NET,             // init net
+    CORE1_INIT_COMPLETE,        // init complete
+    CORE1_INIT_IDLE,            // init complete, sleep until other core finishes init
+    CORE1_CONFIG_NET,           // (re)-configure net 
+    CORE1_CONFIG_COMPLETE,      // (re)-configuration of net successfull
+    CORE1_CONFIG_IDLE,          // (re)-configuration of net successfull
+    CORE1_CONFIG_ERROR,         // (re)-configuration of net NOT successfull
+    CORE1_NET_DISCONNECTED,     // Network interface down
+    CORE1_NET_IDLE,             // Network interface up, no connections
+    CORE1_NET_ACTIVE_RECEIVE,   // Active network connections
+    CORE1_NET_ACTIVE_SEND,      // Active network connections
+    CORE1_PERSISTENCE_ACTIVE,   // Flash persistence operation active
+    CORE1_LOG_ACTIVE,           // Log processing active
+    CORE1_IDLE,                 // we might sleep here or schedule new work
+    CORE1_INIT_ERROR,           // unrecoverable init error
+    CORE1_SHUTDOWN              // stop main loop
 } core1_substate_t;
 
 // Main state machine events
 typedef enum {
-    MAIN_EVENT_INIT_COMPLETE,      // System initialization finished successfully
-    MAIN_EVENT_CONFIG_LOADED,      // Configuration loaded and validated
+    MAIN_EVENT_INIT_COMPLETE_CORE0,     // UART initialized
+    MAIN_EVENT_INIT_COMPLETE_CORE1,     // Network interface initialized 
+    MAIN_EVENT_CONFIG_COMPLETE_CORE0,      // Configuration loaded and validated
+    MAIN_EVENT_CONFIG_COMPLETE_CORE1,      // Configuration loaded and validated
     MAIN_EVENT_SYSTEM_ERROR,       // System error detected
     MAIN_EVENT_ERROR_RECOVERED     // Recovery from error state complete
+    
 } main_state_event_t;
 
 // Core0 state machine events
 typedef enum {
-    CORE0_EVENT_UART_DATA_READY,   // UART data available for processing
-    CORE0_EVENT_UART_IDLE,         // UART processing completed
-    CORE0_EVENT_UART_ERROR,        // UART hardware error detected
-    CORE0_EVENT_ERROR_RECOVERED    // UART error recovery complete
+    CORE0_EVENT_INIT_UART_COMPLETE,     // UART initialized
+    CORE0_EVENT_INIT_UART_FAILED,       // UART could not be initialized
+    CORE0_EVENT_CONFIG_UART_COMPLETE,       // UART could not be initialized
+    CORE0_EVENT_CONFIG_UART_FAILED,       // UART could not be initialized
+    CORE0_EVENT_UART_DATA_READY,        // UART data available for processing
+    CORE0_EVENT_UART_IDLE,              // UART processing completed
+    CORE0_EVENT_UART_ERROR,             // UART hardware error detected
+    CORE0_EVENT_ERROR_RECOVERED         // UART error recovery complete
 } core0_event_t;
 
 // Core1 state machine events
 typedef enum {
+    CORE1_EVENT_INIT_PERSISTENCE_COMPLETE, // Peristence initialized 
+    CORE1_EVENT_INIT_PERSISTENCE_FAILED, // Peristence initialized 
+    CORE1_EVENT_INIT_LOGGING_COMPLETE,     // Logging initialized 
+    CORE1_EVENT_INIT_LOGGING_FAILED,     // Logging initialized 
+    CORE1_EVENT_INIT_NET_COMPLETE,     // Network initialized 
+    CORE1_EVENT_INIT_NET_FAILED,     // Network initialized 
+    CORE1_EVENT_CONFIG_NET_COMPLETE,     // Network configured
+    CORE1_EVENT_CONFIG_NET_FAILED,     // Network configuration
+    CORE1_EVENT_NETWORK_RECEIVE_ACTIVE,        // Network interface has packets
+    CORE1_EVENT_NETWORK_RECEIVE_FINISHED,        // Network interface has no more packets
+    CORE1_EVENT_NETWORK_SENDING_ACTIVE,        // Network interface has packets
+    CORE1_EVENT_NETWORK_SENDING_FINISHED,        // Network interface has no more packets
     CORE1_EVENT_NETWORK_UP,        // Network interface connected
     CORE1_EVENT_NETWORK_DOWN,      // Network interface disconnected
     CORE1_EVENT_CONNECTION_ACTIVE, // TCP connection established

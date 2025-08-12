@@ -243,9 +243,10 @@ static err_t enc28j60_netif_init(struct netif *netif) {
 static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
     // Allocate buffer for the complete packet
     uint16_t total_len = p->tot_len;
-    // PERFORMANCE: Debug log disabled for <5ms ping target
-    // printf("TX: Sending packet, length=%u bytes\n", total_len);
     
+    //printf("TX: Packet length=%u bytes\n", total_len);
+    
+
     if (total_len > 1518) {  // Maximum Ethernet frame size
         printf("lwIP netif: Packet too large (%u bytes)\n", total_len);
         return ERR_BUF;
@@ -257,14 +258,33 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
         printf("lwIP netif: Failed to copy pbuf data\n");
         return ERR_BUF;
     }
+    /*
+    // DEBUG: Enable detailed packet inspection for ping corruption analysis
+    printf("TX: Packet length=%u bytes, first 64 bytes:\n", total_len);
+    for (int i = 0; i < 64 && i < total_len; i++) {
+        if (i % 16 == 0) printf("  %02X: ", i);
+        printf("%02X ", tx_buffer[i]);
+        if (i % 16 == 15) printf("\n");
+    }
+    if (total_len % 16 != 0) printf("\n");
     
-    // PERFORMANCE: Hex dump disabled for speed
-    // printf("TX: First 16 bytes: ");
-    // for (int i = 0; i < 16 && i < total_len; i++) {
-    //     printf("%02X ", tx_buffer[i]);
-    // }
-    // printf("\n");
+    // Decode Ethernet header for debugging
+    if (total_len >= 14) {
+        printf("  ETH: dst=%02X:%02X:%02X:%02X:%02X:%02X src=%02X:%02X:%02X:%02X:%02X:%02X type=0x%04X\n",
+               tx_buffer[0], tx_buffer[1], tx_buffer[2], tx_buffer[3], tx_buffer[4], tx_buffer[5],
+               tx_buffer[6], tx_buffer[7], tx_buffer[8], tx_buffer[9], tx_buffer[10], tx_buffer[11],
+               (tx_buffer[12] << 8) | tx_buffer[13]);
+    }
     
+    // Decode IP header if it's IP packet
+    if (total_len >= 34 && tx_buffer[12] == 0x08 && tx_buffer[13] == 0x00) {
+        printf("  IP: ver_ihl=0x%02X tos=0x%02X len=%u src=%u.%u.%u.%u dst=%u.%u.%u.%u\n",
+               tx_buffer[14], tx_buffer[15], 
+               (tx_buffer[16] << 8) | tx_buffer[17],
+               tx_buffer[26], tx_buffer[27], tx_buffer[28], tx_buffer[29],
+               tx_buffer[30], tx_buffer[31], tx_buffer[32], tx_buffer[33]);
+    }
+    */
     // Create packet structure for ENC28J60
     enc28j60_packet_t packet;
     packet.data = tx_buffer;
@@ -273,8 +293,6 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
     
     // Send packet via ENC28J60
     if (enc28j60_send_packet(&packet)) {
-        // PERFORMANCE: Success message disabled for speed
-        // printf("TX: Packet successfully sent to ENC28J60\n");
         return ERR_OK;
     } else {
         printf("lwIP netif: Failed to send packet via ENC28J60\n");
