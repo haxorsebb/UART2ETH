@@ -70,7 +70,7 @@ struct netif* lwip_netif_enc28j60_init(ip4_addr_t* ip_addr, ip4_addr_t* netmask,
     // Set as default interface
     netif_set_default(netif);
     
-    // Bring interface up
+    // Bring interface up   ->later, after link up
     //netif_set_up(netif);
     
     g_netif_initialized = true;

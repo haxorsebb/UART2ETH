@@ -12,6 +12,7 @@
  * - lwIP Documentation for TCP/IP stack integration
  */
 
+#include "core1_timer.h"
 #include "network/network_manager.h"
 #include "network/enc28j60_driver.h"
 #include "network/lwip_netif_enc28j60.h"
@@ -559,7 +560,9 @@ bool network_manager_reconfigure(const network_config_t* config) {
     }
     //stop dhcp if running
     dhcp_stop(g_netif);
-    
+    //put if down for reconfig
+    netif_set_down(g_netif);
+
     // Initialize lwIP network interface for ENC28J60
     ip4_addr_t ip_addr, netmask, gateway;
     //prepare ip's
@@ -581,6 +584,10 @@ bool network_manager_reconfigure(const network_config_t* config) {
     netif_set_netmask(g_netif, &netmask); 
     netif_set_gw(g_netif, &gateway);
     
+    //put if up after reconfig
+    netif_set_up(g_netif);
+
+
     if(g_network_config.use_dhcp) {
         //start dhcp by sending a request
         network_manager_process_dhcp();
@@ -615,7 +622,8 @@ static void network_manager_process_dhcp(void) {
             return;
         }
         
-        g_dhcp_start_time = to_ms_since_boot(get_absolute_time());
+        //g_dhcp_start_time = to_ms_since_boot(get_absolute_time());
+
         g_network_stats.dhcp_requests++;
         printf("Network Manager: DHCP request sent\n");
     }

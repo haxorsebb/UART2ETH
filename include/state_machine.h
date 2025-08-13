@@ -62,7 +62,8 @@ typedef enum {
     CORE1_INIT_IDLE,            // init complete, sleep until other core finishes init
     CORE1_CONFIG_NET,           // (re)-configure net 
     CORE1_CONFIG_COMPLETE,      // (re)-configuration of net successfull
-    CORE1_CONFIG_NET_WAIT_FOR_DHCP, // (re)-configuration of net successfull, got dhcp
+    CORE1_CONFIG_NET_WAIT_FOR_DHCP, // (re)-configuration of net successfull, get dhcp
+    CORE1_CONFIG_NET_CHECK_DHCP, // (re)-configuration of net successfull, check if we got dhcp   
     CORE1_CONFIG_IDLE,          // (re)-configuration of net successfull
     CORE1_CONFIG_ERROR,         // (re)-configuration of net NOT successfull
     CORE1_NET_LINK_CHANGE,      // Network interface changing
@@ -114,6 +115,7 @@ typedef enum {
     CORE1_EVENT_INIT_NET_COMPLETE,     // Network initialized 
     CORE1_EVENT_INIT_NET_FAILED,     // Network initialized 
     CORE1_EVENT_CONFIG_NET_DHCP_REQUEST,     // Network sent dhcp request
+    CORE1_EVENT_CONFIG_NET_GOT_DHCP,        // Network dhcp request was aswered
     CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT,     // Network dhcp request timed out
     CORE1_EVENT_CONFIG_NET_COMPLETE,     // Network configured
     CORE1_EVENT_CONFIG_NET_FAILED,     // Network configuration

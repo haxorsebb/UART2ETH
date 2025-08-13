@@ -452,6 +452,29 @@ bool state_machine_process_core1_event(core1_event_t event) {
         
         case CORE1_CONFIG_NET_WAIT_FOR_DHCP:
             switch (event) {
+                case CORE1_EVENT_NETWORK_RECEIVE_ACTIVE:
+                    {
+                        new_state = CORE1_CONFIG_NET_CHECK_DHCP;
+                    }
+                    break;
+                case CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT:
+                    {
+                        new_state = CORE1_CONFIG_NET;
+                    }
+                    break;
+                case CORE1_EVENT_CONFIG_NET_FAILED:
+                    {
+                        new_state = CORE1_CONFIG_ERROR;
+                    }
+                    break;
+                default:
+                    // Invalid event for this state - ignore
+                    break;
+            }
+            break;
+
+        case CORE1_CONFIG_NET_CHECK_DHCP:
+            switch (event) {
                 case CORE1_EVENT_CONFIG_NET_GOT_DHCP:
                     {
                         new_state = CORE1_CONFIG_COMPLETE;
@@ -477,11 +500,6 @@ bool state_machine_process_core1_event(core1_event_t event) {
             // This state sends main state event and transitions to WAIT
             new_state = CORE1_CONFIG_IDLE;
         break;
-        
-        case CORE1_CONFIG_COMPLETE:
-            // This state sends main state event and transitions to WAIT
-            new_state = CORE1_CONFIG_IDLE;
-            break;
             
         case CORE1_CONFIG_IDLE:
             // Waiting for main state transition to CONFIGURATION

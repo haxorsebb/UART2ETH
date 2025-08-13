@@ -135,6 +135,9 @@ void core1_main(void) {
                         core1_load_configuration();
                         break;
                     case CORE1_CONFIG_NET_WAIT_FOR_DHCP:
+                        core1_work_or_idle_wait();
+                        break;
+                    case CORE1_CONFIG_NET_CHECK_DHCP:
                         core1_wait_for_dhcp();
                         break;
                     case CORE1_CONFIG_COMPLETE:
@@ -421,11 +424,11 @@ static void core1_load_configuration(void) {
     
     if (result) {
         // Generate to move to next phase
-        if(&layout->config.network.use_dhcp) {
-            state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
+        if(layout->config.network.use_dhcp) {
+            state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_DHCP_REQUEST);
         }
         else {
-            state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_DHCP_REQUEST);
+            state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
         }
     } else {
         //signalize failure
@@ -437,41 +440,20 @@ static void core1_load_configuration(void) {
 /**
  * @brief Wait for DHCP to complete and get IP address
  */
-static void core1_wait_for_dhcp(void) {
+static void network_manager_check_dhcp_status(void) {
     
     DEBUG_ONLY({
-        printf("WAITING FOR DHCP TO COMPLETE!\n");
+        printf("CHECK IF DHCP IS COMPLETE!\n");
     });
-    
+ 
     // Check if DHCP has successfully bound an IP address
-    if (network_manager_is_dhcp_bound()) {
+    if (network_manager_check_dhcp_timeout()) {
         printf("DHCP successfully bound IP address\n");
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 1);
-        state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
+        state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_GOT_DHCP);
         return;
     }
-    
-    // Check current network status for errors or timeouts
-    network_status_t status = network_manager_get_status();
-    
-    if (status == NETWORK_STATUS_ERROR) {
-        printf("DHCP failed with network error\n");
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 4);
-        state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_FAILED);
-        return;
-    }
-    
-    if (status == NETWORK_STATUS_LINK_DOWN) {
-        printf("DHCP failed - link down\n");
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 1);
-        state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_FAILED);
-        return;
-    }
-    
-    // Still waiting for DHCP - check for timeout based on DHCP processing
-    // The network manager handles DHCP timeouts internally, so we just wait
-    printf("Still waiting for DHCP to complete...\n");
-    sleep_ms(100);  // Brief delay before next check
+
 }
 
 /**
