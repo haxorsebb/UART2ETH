@@ -105,6 +105,11 @@ bool network_manager_receive_packets_pending(void);
 /**
  * @brief Helper function to schedule work
  */
+bool network_manager_interrupts_pending(void);
+
+/**
+ * @brief Helper function to schedule work
+ */
 bool network_manager_send_packets_pending(void);
 
 /**

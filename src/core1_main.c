@@ -189,7 +189,8 @@ void core1_main(void) {
  */
 static bool check_for_pending_work(void) {
 
-    if(network_manager_receive_packets_pending()) {
+
+    if(network_manager_interrupts_pending()) {
         //printf("network has pending receive packets\n");
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
         return true; 

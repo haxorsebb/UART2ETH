@@ -135,6 +135,18 @@ void network_manager_deinit(void) {
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, 1);
 }
 
+
+/**
+ * @brief Helper function to schedule work
+ */
+bool network_manager_interrupts_pending(void) {
+
+    if (!g_network_initialized) { //no network interrupts without network driver
+        return false;
+    }
+    return (enc28j60_get_interrupt_status() != 0);
+}
+
 /**
  * @brief Helper function to schedule work
  */
@@ -143,7 +155,7 @@ bool network_manager_receive_packets_pending(void) {
     if (!g_netif) {
         return false;
     }
-    return (enc28j60_has_rx_packet() || (g_network_status!=NETWORK_STATUS_READY));
+    return (enc28j60_has_rx_packet());
 }
 
 /**
@@ -693,3 +705,4 @@ char* network_manager_ip_to_string(const simple_ip_addr_t* ip_addr, char* buffer
              
     return buffer;
 }
+
