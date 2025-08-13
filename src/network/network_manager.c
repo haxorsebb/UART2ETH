@@ -568,7 +568,7 @@ static void network_manager_process_dhcp(void) {
  * @brief Check DHCP status and handle timeouts
  */
 static void network_manager_check_dhcp_status(void) {
-    if (!g_netif || g_network_status != NETWORK_STATUS_DHCP_REQUESTING) {
+    if (!g_netif ) {
         return;
     }
     
@@ -596,8 +596,6 @@ static void network_manager_check_dhcp_status(void) {
         
         // Stop DHCP and try again
         dhcp_stop(g_netif);
-        g_network_status = NETWORK_STATUS_LINK_UP;  // Will retry DHCP
-        
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 3);
     }
 }
