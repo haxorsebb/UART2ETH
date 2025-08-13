@@ -10,7 +10,7 @@
  * - arc42 Chapter 5 - Core 1 Network Subsystem
  * - lwIP Documentation: Network Interface API
  */
-
+#include "debug.h"
 #include "network/lwip_netif_enc28j60.h"
 #include "network/enc28j60_driver.h"
 #include "lwip/netif.h"
@@ -71,7 +71,7 @@ struct netif* lwip_netif_enc28j60_init(ip4_addr_t* ip_addr, ip4_addr_t* netmask,
     netif_set_default(netif);
     
     // Bring interface up
-    netif_set_up(netif);
+    //netif_set_up(netif);
     
     g_netif_initialized = true;
     
@@ -102,12 +102,19 @@ void lwip_netif_enc28j60_deinit(void) {
     printf("lwIP netif: Network interface deinitialized\n");
 }
 
+
 /**
  * @brief Process network interface - handle incoming packets
  */
 void lwip_netif_enc28j60_process(void) {
-    if (!g_netif_initialized || !netif_is_up(&g_enc28j60_netif)) {
+    if (!g_netif_initialized) {
         return;
+    }
+
+    if( !netif_is_up(&g_enc28j60_netif)  ) {
+        DEBUG_ONLY( {
+            printf("lwIP: process, but not up!\n");
+        });
     }
     
     // PERFORMANCE: Periodic debug stats disabled for <5ms ping target
@@ -157,8 +164,12 @@ void lwip_netif_enc28j60_process(void) {
                         printf("lwIP netif: Failed to input packet to lwIP\n");
                         pbuf_free(p);
                     }
-                    // PERFORMANCE: Success message disabled for speed
-                    // else { printf("RX: Packet successfully fed to lwIP\n"); }
+                    else { 
+                        // PERFORMANCE: Success message disabled for speed
+                        DEBUG_ONLY( {
+                            printf("lwIP: Packet successfully fed to lwIP!\n");
+                        });
+                    }
                 } else {
                     printf("lwIP netif: Failed to allocate pbuf for incoming packet (length=%u)\n", packet.length);
                 }
@@ -166,16 +177,6 @@ void lwip_netif_enc28j60_process(void) {
                 packets_processed++;
             }
         }
-    }
-    
-    // Update link status
-    bool link_up = enc28j60_get_link_status();
-    if (link_up && !netif_is_link_up(&g_enc28j60_netif)) {
-        printf("lwIP netif: Link up detected\n");
-        netif_set_link_up(&g_enc28j60_netif);
-    } else if (!link_up && netif_is_link_up(&g_enc28j60_netif)) {
-        printf("lwIP netif: Link down detected\n");
-        netif_set_link_down(&g_enc28j60_netif);
     }
 }
 
@@ -228,9 +229,10 @@ static err_t enc28j60_netif_init(struct netif *netif) {
     if (enc28j60_get_link_status()) {
         printf("lwIP netif: Initial link status: UP\n");
         netif_set_link_up(netif);
+        
     } else {
         printf("lwIP netif: Initial link status: DOWN\n");
-        netif_set_link_down(netif);
+        netif_set_link_down(netif);        
     }
     
     printf("lwIP netif: Netif initialization complete\n");

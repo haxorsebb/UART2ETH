@@ -24,6 +24,23 @@ set(CMAKE_CXX_STANDARD 17)
 # Initialize the SDK
 pico_sdk_init()
 
+# Debug build option (can be set with -DDEBUG=ON)
+option(DEBUG "Enable debug mode" OFF)
+
+# Configure compiler flags based on debug mode
+if(DEBUG)
+    message(STATUS "UART2ETH: Debug mode enabled")
+    add_compile_definitions(DEBUG=1)
+    add_compile_definitions(LOG_MINIMUM_LEVEL=LOG_LEVEL_DEBUG)
+    add_compile_options(-g -O0)  # Debug symbols, no optimization
+    set(CMAKE_BUILD_TYPE Debug)
+else()
+    message(STATUS "UART2ETH: Release mode")
+    add_compile_definitions(DEBUG=0)
+    add_compile_definitions(LOG_MINIMUM_LEVEL=LOG_LEVEL_INFO)
+    add_compile_options(-O2)     # Optimization for release
+    set(CMAKE_BUILD_TYPE Release)
+endif()
 
 add_compile_options(-Wall
         -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
@@ -95,3 +112,33 @@ pico_enable_stdio_usb(ping_test_standalone 1)
 pico_enable_stdio_uart(ping_test_standalone 1)
 pico_set_uf2_family(ping_test_standalone "rp2350-arm-s")
 pico_add_extra_outputs(ping_test_standalone)
+
+# Debug example target (only built in debug mode) - COMMENTED OUT: missing debug_example.c
+# if(DEBUG)
+#     add_executable(debug_example
+#         debug_example.c
+#     )
+#     
+#     target_link_libraries(debug_example 
+#         pico_stdlib
+#         pico_multicore
+#         pico_sync
+#         hardware_uart
+#         hardware_gpio
+#         log_manager
+#         config_manager
+#         network_manager
+#     )
+#     
+#     target_include_directories(debug_example PRIVATE
+#         ${CMAKE_CURRENT_SOURCE_DIR}/include
+#         ${CMAKE_CURRENT_SOURCE_DIR}/src
+#     )
+#     
+#     pico_enable_stdio_usb(debug_example 1)
+#     pico_enable_stdio_uart(debug_example 1)
+#     pico_set_uf2_family(debug_example "rp2350-arm-s")
+#     pico_add_extra_outputs(debug_example)
+#     
+#     message(STATUS "UART2ETH: Debug example target enabled")
+# endif()

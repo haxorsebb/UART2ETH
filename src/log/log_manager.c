@@ -17,6 +17,11 @@
 #include <stdio.h>
 #include <string.h>
 
+// Import minimum log level from debug configuration
+#ifndef LOG_MINIMUM_LEVEL
+#define LOG_MINIMUM_LEVEL LOG_LEVEL_INFO  // Default to INFO if not set
+#endif
+
 // Constants for better maintainability
 #define LOG_MAX_MESSAGE_LENGTH 256
 #define LOG_MAX_FORMAT_LENGTH 200
@@ -347,6 +352,12 @@ bool log_event(event_source_t event_source, log_level_t log_level,
     if (!g_log_initialized) {
         g_last_error = LOG_ERROR_NOT_INITIALIZED;
         return false;
+    }
+    
+    // Check if this log level meets the minimum threshold
+    if (log_level < LOG_MINIMUM_LEVEL) {
+        // Silently drop logs below minimum level (not an error)
+        return true;
     }
     
     // Validate shared memory structure

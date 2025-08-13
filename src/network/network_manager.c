@@ -143,7 +143,18 @@ bool network_manager_receive_packets_pending(void) {
     if (!g_netif) {
         return false;
     }
-    return (enc28j60_has_rx_packet() || (g_network_status!=NETWORK_STATUS_READY));
+    return (enc28j60_has_rx_packet() /*TBD: this should not be needed|| (g_network_status!=NETWORK_STATUS_READY)*/);
+}
+
+/**
+ * @brief Helper function to schedule work
+ */
+bool network_manager_link_change_pending(void) {
+
+    if (!g_netif) {
+        return false;
+    }
+    return (enc28j60_has_link_change_pending() /*TBD: this should not be needed|| (g_network_status!=NETWORK_STATUS_READY)*/);
 }
 
 /**
@@ -336,8 +347,7 @@ bool network_manager_is_link_up(void) {
     if (!g_network_initialized) {
         return false;
     }
-    
-    return enc28j60_get_link_status();
+    return enc28j60_get_link_status(); 
 }
 
 /**
@@ -449,6 +459,16 @@ bool network_manager_test_connectivity(void) {
     return hardware_ready && link_up;
 }
 
+void network_manager_link_change(void) {
+
+    bool link_up = enc28j60_process_linkif_interrupt();
+    if (link_up) {
+        netif_set_link_up(g_netif);
+    } else {
+        netif_set_link_down(g_netif);
+    }
+}
+
 /**
  * @brief Get detailed network interface information for diagnostics
  */
@@ -530,17 +550,55 @@ static bool network_manager_init_lwip(void) {
 }
 
 /**
+ * @brief Reconfigure the network interface after a config change
+ */
+bool network_manager_reconfigure(const network_config_t* config) {
+
+    if(!g_netif) {
+        return false;
+    }
+    //stop dhcp if running
+    dhcp_stop(g_netif);
+    
+    // Initialize lwIP network interface for ENC28J60
+    ip4_addr_t ip_addr, netmask, gateway;
+    //prepare ip's
+    if (g_network_config.use_dhcp) {
+        // Use zero addresses for DHCP
+        IP4_ADDR(&ip_addr, 0, 0, 0, 0);
+        IP4_ADDR(&netmask, 0, 0, 0, 0);
+        IP4_ADDR(&gateway, 0, 0, 0, 0);
+        printf("Network Manager: (Re)Configured for DHCP\n");
+    } else {
+        // Use static IP configuration
+        ip_addr.addr = g_network_config.static_ip.addr;
+        netmask.addr = g_network_config.static_netmask.addr;
+        gateway.addr = g_network_config.static_gateway.addr;
+        printf("Network Manager: (Re)Configured for static IP\n");
+    }
+
+    netif_set_ipaddr(g_netif, &ip_addr);
+    netif_set_netmask(g_netif, &netmask); 
+    netif_set_gw(g_netif, &gateway);
+    
+    if(g_network_config.use_dhcp) {
+        //start dhcp by sending a request
+        network_manager_process_dhcp();
+    }
+
+    return true;
+}
+
+/**
  * @brief Process DHCP client operations
  */
 static void network_manager_process_dhcp(void) {
-    if (!g_netif || g_network_status != NETWORK_STATUS_LINK_UP) {
+    if (!g_netif) {
         return;
     }
     
     // Check if DHCP is already running
     if (dhcp_supplied_address(g_netif)) {
-        // Already have DHCP address - we're ready
-        g_network_status = NETWORK_STATUS_READY;
         printf("Network Manager: DHCP bound, network ready\n");
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 0);
         return;
@@ -557,7 +615,6 @@ static void network_manager_process_dhcp(void) {
             return;
         }
         
-        g_network_status = NETWORK_STATUS_DHCP_REQUESTING;
         g_dhcp_start_time = to_ms_since_boot(get_absolute_time());
         g_network_stats.dhcp_requests++;
         printf("Network Manager: DHCP request sent\n");
@@ -596,8 +653,6 @@ static void network_manager_check_dhcp_status(void) {
         
         // Stop DHCP and try again
         dhcp_stop(g_netif);
-        g_network_status = NETWORK_STATUS_LINK_UP;  // Will retry DHCP
-        
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 3);
     }
 }

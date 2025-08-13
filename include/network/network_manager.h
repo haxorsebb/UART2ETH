@@ -98,6 +98,13 @@ bool network_manager_init(const network_config_t* config);
 void network_manager_deinit(void);
 
 /**
+ * Reconfigure network manager with new configuration
+ * @param config New network configuration parameters
+ * @return true if reconfiguration successful, false otherwise
+ */
+bool network_manager_reconfigure(const network_config_t* config);
+
+/**
  * @brief Helper function to schedule work
  */
 bool network_manager_receive_packets_pending(void);
@@ -209,6 +216,17 @@ char* network_manager_ip_to_string(const simple_ip_addr_t* ip_addr, char* buffer
  * @return true if basic stack functionality works, false otherwise
  */
 bool network_manager_test_connectivity(void);
+
+/**
+ * handle network network connectivity changes, link up/down 
+ */
+void network_manager_link_change(void);
+
+/**
+ * check if the link status inerrupt is pending
+ * @return true if the LINKIF flag is set
+ */
+bool network_manager_link_change_pending(void);
 
 /**
  * Get detailed network interface information for diagnostics

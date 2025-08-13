@@ -180,6 +180,8 @@ static void core0_initialize(void) {
     //set up doorbell irq - all doorbells have the same irq anyway. it is shared
     uint32_t irq = multicore_doorbell_irq_num(doorbell_core1_wakes_core0);
     printf("Core0: Setting up doorbell IRQ %u for doorbell %d\n", irq, doorbell_core0_wakes_core1);
+
+    //unnecessary to add another handler, enabling IRQ is good enough
     //irq_add_shared_handler(irq, shared_doorbell_irq,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
     irq_set_enabled(irq, true);
 
@@ -216,7 +218,7 @@ static void core0_init_complete(void) {
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
     // Signal that Core0 is ready (this may trigger main state transition)
     state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE0);
-    //sleep if other core not yet ready
+    //this will sleep if other core not yet ready
     state_machine_process_core0_event(CORE0_EVENT_INIT_UART_COMPLETE);
 }
 
@@ -273,7 +275,7 @@ static void core0_load_configuration(void) {
 static void core0_configuration_complete(void) {
     // Signal that Core0 is ready (this may trigger main state transition)
     state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE0);
-    //sleep if other core not yet ready
+    //this will sleep if other core not yet ready
     state_machine_process_core0_event(CORE0_EVENT_CONFIG_UART_COMPLETE);
 }
 
