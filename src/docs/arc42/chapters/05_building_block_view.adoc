@@ -142,6 +142,12 @@ The dual-core separation strategy from our solution approach drives this decompo
 
 |*Watchdog System*
 |Monitors system health through heartbeat signals from all major components. Detects failures, logs recovery events, and triggers automatic system recovery or reset when necessary.
+
+|*Core 0 Timer Subsystem*
+|Provides hardware timer alarm-based timing services for Core0 operations. Manages 8 static timers for UART timeouts, protocol delays, and retransmission timing using RP2350 Timer Alarm 0.
+
+|*Core 1 Timer Subsystem*
+|Provides hardware timer alarm-based timing services for Core1 operations. Manages 16 static timers for network timeouts, DHCP renewal, persistence intervals, and maintenance scheduling using RP2350 Timer Alarm 1.
 |===
 
 ==== Important Interfaces
@@ -196,6 +202,14 @@ The dual-core separation strategy from our solution approach drives this decompo
 * **Thresholds**: Configurable timeout values per monitored component
 * **Recovery Actions**: Graduated response from warnings to system reset
 * **Hardware Integration**: RP2350 hardware watchdog timer as final safety net
+
+===== Timer Subsystem Interface
+* **Per-Core Independence**: Core0 uses Timer Alarm 0, Core1 uses Timer Alarm 1 with no cross-core coordination
+* **Static Allocation**: Core0 manages 8 timers, Core1 manages 16 timers using fixed-size arrays
+* **Hardware Precision**: Microsecond-accurate timing through RP2350 hardware timer alarms
+* **API Pattern**: `coreX_timer_set(timer_id, interval_ms)`, `coreX_timer_is_expired(timer_id)`
+* **Interrupt Driven**: Each core handles its own timer alarm interrupts independently
+* **Power Efficient**: Hardware alarms scheduled only for next expiration time, CPU can sleep between events
 
 === Level 2
 
@@ -770,6 +784,138 @@ The modular management interface design separates concerns between web serving, 
 
 |*TCP/IP Configuration UI*
 |Offers web interface for network settings, TCP port mapping, connection limits, and security configurations.
+|===
+
+==== Whitebox Core 0 Timer Subsystem
+
+The Core 0 Timer Subsystem provides hardware timer alarm-based timing services for UART and protocol operations. Uses RP2350 Timer Alarm 0 for independent, interrupt-driven timer management with no cross-core coordination.
+
+[plantuml, level2-core0-timer, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Core 0 Timer Subsystem (Whitebox)
+
+cloud "Core 0 Main Loop\nUART Processing\nProtocol Handling" as CORE0
+cloud "UART Interrupt Handlers\nProtocol State Machines\nError Recovery" as UART_HANDLERS
+cloud "RP2350 Timer Alarm 0\nHardware Timer\nMicrosecond Precision" as HW_TIMER
+
+package "Core 0 Timer Subsystem" {
+    component "Timer API Interface\ncoreX_timer_set()\ncoreX_timer_is_expired()\ncoreX_timer_cancel()" as API #lightgreen
+    
+    component "Timer State Array\nStatic 8-timer array\nUART timeout timers\nProtocol delay timers" as STATE #lightyellow
+    
+    component "Timer Alarm ISR\nExpiration Detection\nNext Alarm Scheduling\nAlarm 0 Handler" as ISR #lightcyan
+    
+    component "Expiration Calculator\nFind Next Expiration\nMinimum Time Calculation\nHardware Alarm Setting" as CALC #lightblue
+}
+
+' External connections
+CORE0 --> API : Timer Operations\nSet/Check/Cancel
+UART_HANDLERS --> API : Timeout Management\nError Recovery
+HW_TIMER --> ISR : Timer Alarm 0 IRQ\nHardware Interrupt
+
+' Internal connections
+API --> STATE : Timer Management\nArray Operations
+ISR --> STATE : Expiration Check\nTimer Updates
+ISR --> CALC : Next Alarm Request\nScheduling Calculation
+CALC --> HW_TIMER : Hardware Alarm\nNext Expiration Time
+STATE --> CALC : Active Timer Data\nExpiration Times
+
+@enduml
+----
+
+===== Motivation
+
+Core 0 requires precise timing for UART operations including transmission timeouts, protocol delays, retransmission timing, and error recovery. Hardware timer alarm provides microsecond accuracy with minimal CPU overhead while maintaining independence from Core 1 operations.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*Timer API Interface*
+|Provides thread-safe timer operations for Core 0 components. Implements set, check expiration, and cancel operations for all Core 0 timer IDs.
+
+|*Timer State Array*
+|Manages static array of 8 timers optimized for UART and protocol operations. Tracks timer intervals, expiration times, and active/expired status.
+
+|*Timer Alarm ISR*
+|Handles RP2350 Timer Alarm 0 interrupts. Scans timer array for expired timers, marks expiration flags, and schedules next hardware alarm.
+
+|*Expiration Calculator*
+|Finds minimum expiration time among active timers and programs hardware Timer Alarm 0 for next required interrupt. Optimizes power consumption by avoiding unnecessary interrupts.
+|===
+
+==== Whitebox Core 1 Timer Subsystem  
+
+The Core 1 Timer Subsystem provides hardware timer alarm-based timing services for network and maintenance operations. Uses RP2350 Timer Alarm 1 for independent, interrupt-driven timer management supporting larger timer arrays for diverse network operations.
+
+[plantuml, level2-core1-timer, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Core 1 Timer Subsystem (Whitebox)
+
+cloud "Core 1 Main Loop\nNetwork Processing\nMaintenance Tasks" as CORE1
+cloud "Network Stack\nDHCP Client\nTCP Connection Manager" as NETWORK
+cloud "Persistence Manager\nLog Processing\nBackground Tasks" as MAINTENANCE
+cloud "RP2350 Timer Alarm 1\nHardware Timer\nMicrosecond Precision" as HW_TIMER
+
+package "Core 1 Timer Subsystem" {
+    component "Timer API Interface\ncoreX_timer_set()\ncoreX_timer_is_expired()\ncoreX_timer_cancel()" as API #lightgreen
+    
+    component "Timer State Array\nStatic 16-timer array\nDHCP renewal timers\nTCP keepalive timers" as STATE #lightyellow
+    
+    component "Timer Alarm ISR\nExpiration Detection\nNext Alarm Scheduling\nAlarm 1 Handler" as ISR #lightcyan
+    
+    component "Expiration Calculator\nFind Next Expiration\nMinimum Time Calculation\nHardware Alarm Setting" as CALC #lightblue
+}
+
+' External connections
+CORE1 --> API : Timer Operations\nMaintenance Scheduling
+NETWORK --> API : Network Timeouts\nDHCP/TCP Timers
+MAINTENANCE --> API : Periodic Tasks\nPersistence Intervals
+HW_TIMER --> ISR : Timer Alarm 1 IRQ\nHardware Interrupt
+
+' Internal connections
+API --> STATE : Timer Management\nArray Operations
+ISR --> STATE : Expiration Check\nTimer Updates
+ISR --> CALC : Next Alarm Request\nScheduling Calculation
+CALC --> HW_TIMER : Hardware Alarm\nNext Expiration Time
+STATE --> CALC : Active Timer Data\nExpiration Times
+
+@enduml
+----
+
+===== Motivation
+
+Core 1 manages diverse network and maintenance operations requiring various timing intervals from DHCP renewal (hours) to TCP keepalive (seconds) to maintenance cycles (minutes). Larger timer array accommodates multiple concurrent network connections and background processes.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*Timer API Interface*
+|Provides thread-safe timer operations for Core 1 components. Implements set, check expiration, and cancel operations for all Core 1 timer IDs including network and maintenance timers.
+
+|*Timer State Array*
+|Manages static array of 16 timers optimized for network and maintenance operations. Supports DHCP timers, TCP connection timers, persistence intervals, and background task scheduling.
+
+|*Timer Alarm ISR*
+|Handles RP2350 Timer Alarm 1 interrupts. Scans timer array for expired timers, marks expiration flags, and schedules next hardware alarm independently from Core 0.
+
+|*Expiration Calculator*
+|Finds minimum expiration time among active timers and programs hardware Timer Alarm 1 for next required interrupt. Handles varied timing scales from seconds to hours efficiently.
 |===
 
 === Level 3

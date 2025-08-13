@@ -1,0 +1,40 @@
+# Standalone ping test CMakeLists.txt
+cmake_minimum_required(VERSION 3.13)
+
+# Set the project name
+set(PROJECT_NAME ping_test_standalone)
+
+# Initialize the SDK
+include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
+
+project(${PROJECT_NAME})
+
+# Initialize the Pico SDK
+pico_sdk_init()
+
+# Add executable
+add_executable(${PROJECT_NAME}
+    ping_test_standalone.c
+)
+
+# Add the network manager library
+target_link_libraries(${PROJECT_NAME} 
+    pico_stdlib
+    network_manager
+    pico_lwip
+    hardware_spi
+    hardware_uart
+)
+
+# Add include directories
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# Enable USB and UART output for debugging
+pico_enable_stdio_usb(${PROJECT_NAME} 1)
+pico_enable_stdio_uart(${PROJECT_NAME} 1)
+
+# Create map/bin/hex/uf2 files in addition to ELF
+pico_add_extra_outputs(${PROJECT_NAME})

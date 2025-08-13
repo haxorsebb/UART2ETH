@@ -1,0 +1,173 @@
+= ADR-009: Per-Core Timer Subsystem Architecture
+
+== Status
+Accepted
+
+== Context
+The UART2ETH system requires timer functionality for various timeout operations including UART protocol timeouts, DHCP renewal timers, TCP keep-alive timers, and periodic maintenance tasks. The dual-core RP2350 architecture provides independent hardware timer alarms that can be leveraged for efficient, low-latency timer management.
+
+=== Requirements
+* Support multiple concurrent timers per core
+* Millisecond precision timing
+* Hardware interrupt-driven operation for minimal CPU overhead
+* Thread-safe timer operations within each core
+* Real-time guarantees for Core0 UART processing
+* Power-efficient operation (interrupt only when needed)
+
+=== Use Cases by Core
+
+*Core0 Timer Requirements:*
+* UART transmission timeouts
+* Protocol-specific timing delays  
+* Retransmission timers
+* Serial frame timeout detection
+
+*Core1 Timer Requirements:*
+* DHCP lease renewal timers
+* TCP connection keep-alive timers
+* Network timeout detection
+* Flash persistence intervals
+* Log processing scheduling
+
+== Decision
+Implement **separate timer subsystems for each core** using dedicated RP2350 hardware timer alarms with static memory allocation.
+
+=== Architecture Overview
+* **Core0 Timer Subsystem**: Uses Timer Alarm 0, manages 8 static timers for UART/protocol operations
+* **Core1 Timer Subsystem**: Uses Timer Alarm 1, manages 16 static timers for network/maintenance operations  
+* **No cross-core coordination**: Each core manages its own timers independently
+* **Hardware interrupt driven**: Each core handles its own timer alarm interrupts
+* **Static allocation**: Fixed-size timer arrays, no dynamic memory management
+
+=== Timer API Design
+```c
+// Per-core timer APIs
+void core0_timer_set(core0_timer_id_t timer_id, uint32_t interval_ms);
+bool core0_timer_is_expired(core0_timer_id_t timer_id);
+void core0_timer_cancel(core0_timer_id_t timer_id);
+
+void core1_timer_set(core1_timer_id_t timer_id, uint32_t interval_ms);  
+bool core1_timer_is_expired(core1_timer_id_t timer_id);
+void core1_timer_cancel(core1_timer_id_t timer_id);
+```
+
+=== Timer ID Definitions
+```c
+// Core0 timer identifiers (UART/Protocol focus)
+typedef enum {
+    CORE0_TIMER_UART0_TIMEOUT = 0,
+    CORE0_TIMER_UART1_TIMEOUT,
+    CORE0_TIMER_UART2_TIMEOUT,
+    CORE0_TIMER_UART3_TIMEOUT,
+    CORE0_TIMER_PROTOCOL_DELAY,
+    CORE0_TIMER_RETRANSMIT,
+    CORE0_TIMER_FRAME_TIMEOUT,
+    CORE0_TIMER_RESERVED,
+    CORE0_MAX_TIMERS = 8
+} core0_timer_id_t;
+
+// Core1 timer identifiers (Network/Maintenance focus)  
+typedef enum {
+    CORE1_TIMER_DHCP_RENEWAL = 0,
+    CORE1_TIMER_TCP_KEEPALIVE,
+    CORE1_TIMER_NETWORK_TIMEOUT,
+    CORE1_TIMER_PERSISTENCE_INTERVAL,
+    CORE1_TIMER_LOG_FLUSH,
+    CORE1_TIMER_CONNECTION_TIMEOUT,
+    CORE1_TIMER_DHCP_DISCOVER,
+    CORE1_TIMER_ARP_TIMEOUT,
+    CORE1_TIMER_MAINTENANCE_CYCLE,
+    CORE1_TIMER_STATISTICS_UPDATE,
+    CORE1_TIMER_CONFIG_BACKUP,
+    CORE1_TIMER_WATCHDOG_FEED,
+    CORE1_TIMER_RESERVED_1,
+    CORE1_TIMER_RESERVED_2,
+    CORE1_TIMER_RESERVED_3,
+    CORE1_TIMER_RESERVED_4,
+    CORE1_MAX_TIMERS = 16
+} core1_timer_id_t;
+```
+
+== Rationale
+
+=== Why Per-Core Separation?
+* **Zero synchronization overhead**: No mutexes, shared memory, or cross-core coordination required
+* **Real-time guarantees**: Core0 UART processing never blocked by Core1 timer operations
+* **Natural responsibility alignment**: Each core manages timers for its own functional domain
+* **Simplified interrupt handling**: Each core's timer ISR only manages its own timer array
+* **Independent scaling**: Different timer array sizes based on each core's requirements
+
+=== Why Hardware Timer Alarms?
+* **Precise timing**: Hardware-based timing with microsecond accuracy
+* **Low CPU overhead**: Interrupt-driven operation, no polling required
+* **Power efficiency**: CPU can sleep until timer expiration
+* **RP2350 native support**: Leverages built-in timer peripherals
+
+=== Why Static Allocation?
+* **Deterministic memory usage**: No heap fragmentation or allocation failures
+* **Real-time compliance**: Bounded memory access patterns
+* **Simplified implementation**: No dynamic memory management complexity
+* **Embedded systems best practice**: Predictable resource usage
+
+== Implementation Details
+
+=== Timer State Structure
+```c
+typedef struct {
+    uint32_t interval_ms;        // Timer interval in milliseconds
+    uint64_t expiration_time_us; // Absolute expiration time in microseconds
+    bool active;                 // Timer is currently running
+    bool expired;                // Timer has expired (sticky flag)
+} timer_entry_t;
+
+typedef struct {
+    timer_entry_t timers[MAX_TIMERS];  // Static timer array
+    uint32_t next_alarm_timer_id;      // Timer ID for next hardware alarm
+    uint64_t next_alarm_time_us;       // Next hardware alarm time
+    uint32_t active_timer_count;       // Number of active timers
+} timer_subsystem_t;
+```
+
+=== Hardware Timer Integration
+* **Timer Alarm 0**: Dedicated to Core0 timer subsystem
+* **Timer Alarm 1**: Dedicated to Core1 timer subsystem  
+* **Interrupt handling**: Each core registers its own timer alarm ISR
+* **Next alarm calculation**: ISR finds minimum expiration time among active timers
+* **Automatic rescheduling**: Hardware alarm set to next expiration time
+
+=== Timer Update Algorithm
+1. **Timer expiration check**: ISR scans all active timers, marks expired timers
+2. **Find next expiration**: Calculate minimum expiration time among remaining active timers
+3. **Schedule hardware alarm**: Set timer alarm to next expiration time
+4. **Power optimization**: No alarm scheduled if no active timers
+
+== Consequences
+
+=== Positive
+* **Zero cross-core contention**: Each core operates independently
+* **Minimal latency impact**: Hardware-driven timing with microsecond precision
+* **Predictable behavior**: Static allocation provides deterministic resource usage
+* **Simple API**: Clean separation of concerns with per-core timer namespaces
+* **Power efficient**: Hardware alarms allow CPU sleep between timer events
+* **Scalable**: Different timer array sizes optimized for each core's requirements
+
+=== Negative  
+* **Hardware resource usage**: Consumes 2 of 4 available RP2350 timer alarms
+* **Slightly duplicated code**: Similar timer management logic implemented twice
+* **Fixed timer limits**: Maximum 8 timers for Core0, 16 timers for Core1
+
+=== Risks
+* **Timer exhaustion**: Applications must manage timer usage within static limits
+* **ISR execution time**: Timer update algorithm must complete within ISR time constraints
+
+=== Mitigation Strategies
+* **Timer usage monitoring**: Log warnings when approaching timer limits
+* **Efficient ISR implementation**: Optimize timer scanning algorithm for minimal ISR duration
+* **Timer reuse patterns**: Encourage timer cancellation and reuse in application code
+
+== Compliance
+This decision supports the following quality goals:
+* **Reliability**: Hardware-based timing with deterministic behavior
+* **Performance**: Minimal CPU overhead through hardware timer alarms  
+* **Real-time compliance**: No cross-core blocking for Core0 UART operations
+* **Power efficiency**: Interrupt-driven operation allows CPU sleep states
