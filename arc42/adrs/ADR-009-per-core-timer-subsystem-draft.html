@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-002-ethernet-controller-selection.html -->
+    <!-- sourceuri: arc42/adrs/ADR-009-per-core-timer-subsystem.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-002: Ethernet Controller Selection for UART2ETH</title>
+    <title>ADR-009: Per-Core Timer Subsystem Architecture</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -254,48 +254,89 @@
 
             <ul class="td-sidebar-nav__section">
                 <li class="td-sidebar-nav__section-title">
-                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">adrs</span>
+                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">arc42</span>
                 </li>
                 <li>
                   <ul>
                       <li class="collapse show" id="docs">
                           
                         <ul class="td-sidebar-nav__section ul-0">
+<details id="d8b6e4f467a2500cfc57e1e4bb7bb7114"><summary><span class="label">adrs</span></summary>
+                        <ul class="ul-1">
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-001-microcontroller-selection.html" title="ADR-001: Microcontroller Platform Selection for UART2ETH">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
+                                   href="../../arc42/adrs/ADR-008-hardware-pin-configuration.html" title="ADR-008: Hardware Pin Configuration Update">ADR-008: Hardware Pin Configuration Update</a>
                                 
                             </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
-                                   href="../../arc42/adrs/ADR-002-ethernet-controller-selection.html" title="ADR-002: Ethernet Controller Selection for UART2ETH">ADR-002: Ethernet Controller Selection for UART2ETH</a>
-                                
-                            </li>
+                        </ul></details>
+<details id="d378c2e65b576318b7f785b537c424464"><summary><span class="label"><a style="margin-left: 0px;" class="" href="../../arc42/chapters/00_architecture_communication_canvas.html" title="Architecture Communication Canvas">Architecture Communication Canvas</a></span></summary>
+                        <ul class="ul-1">
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-003-programming-language-selection.html" title="ADR-003: Programming Language Selection for UART2ETH">ADR-003: Programming Language Selection for UART2ETH</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-004-development-ecosystem.html" title="ADR-004: Development Ecosystem Selection for UART2ETH">ADR-004: Development Ecosystem Selection for UART2ETH</a>
+                                   href="../../arc42/chapters/00_architecture_communication_canvas.html" title="Architecture Communication Canvas">Architecture Communication Canvas</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-005-buffer-allocation-strategy.html" title="ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</a>
+                                   href="../../arc42/chapters/01_introduction_and_goals.html" title="Introduction and Goals">Introduction and Goals</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-006-flash-persistence-strategy.html" title="ADR-006: Flash Persistence Strategy for UART2ETH">ADR-006: Flash Persistence Strategy for UART2ETH</a>
+                                   href="../../arc42/chapters/02_architecture_constraints.html" title="Architecture Constraints">Architecture Constraints</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-007-state-machine-architecture.html" title="ADR-007: State Machine Architecture for UART2ETH">ADR-007: State Machine Architecture for UART2ETH</a>
+                                   href="../../arc42/chapters/03_context_and_scope.html" title="Context and Scope">Context and Scope</a>
                                 
                             </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/04_solution_strategy.html" title="Solution Strategy">Solution Strategy</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/05_building_block_view.html" title="Building Block View">Building Block View</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/06_runtime_view.html" title="Runtime View">Runtime View</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/07_deployment_view.html" title="Deployment View">Deployment View</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/08_concepts.html" title="Cross-cutting Concepts">Cross-cutting Concepts</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/09_architecture_decisions.html" title="Architecture Decisions">Architecture Decisions</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/10_quality_requirements.html" title="Quality Requirements">Quality Requirements</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/11_technical_risks.html" title="Risks and Technical Debts">Risks and Technical Debts</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/12_glossary.html" title="Glossary">Glossary</a>
+                                
+                            </li>
+                        </ul></details>
                         </ul>
                       </li>
                   </ul>
@@ -308,11 +349,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-002-ethernet-controller-selection.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-009-per-core-timer-subsystem.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-002%3A+Ethernet+Controller+Selection+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-002-ethernet-controller-selection.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-009%3A+Per-Core+Timer+Subsystem+Architecture%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-009-per-core-timer-subsystem.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -321,43 +362,16 @@
 
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
-<ul class="sectlevel0">
-<li><a href="#_adr_002_ethernet_controller_selection_for_uart2eth">ADR-002: Ethernet Controller Selection for UART2ETH</a>
 <ul class="sectlevel1">
+<li><a href="#_adr_009_per_core_timer_subsystem_architecture">ADR-009: Per-Core Timer Subsystem Architecture</a>
+<ul class="sectlevel2">
+<li><a href="#_status">Status</a></li>
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision_drivers">Decision Drivers</a>
-<ul class="sectlevel2">
-<li><a href="#_primary_requirements">Primary Requirements</a></li>
-<li><a href="#_constraints">Constraints</a></li>
-</ul>
-</li>
-<li><a href="#_options_considered">Options Considered</a>
-<ul class="sectlevel2">
-<li><a href="#_option_a_wiznet_w5500">Option A: WIZnet W5500</a></li>
-<li><a href="#_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</a></li>
-</ul>
-</li>
-<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
 <li><a href="#_decision">Decision</a></li>
-<li><a href="#_rationale">Rationale</a>
-<ul class="sectlevel2">
-<li><a href="#_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</a></li>
-<li><a href="#_trade_offs_accepted">Trade-offs Accepted</a></li>
-</ul>
-</li>
-<li><a href="#_consequences">Consequences</a>
-<ul class="sectlevel2">
-<li><a href="#_positive">Positive</a></li>
-<li><a href="#_negative">Negative</a></li>
-<li><a href="#_risks_and_mitigation">Risks and Mitigation</a></li>
-</ul>
-</li>
-<li><a href="#_implementation_notes">Implementation Notes</a>
-<ul class="sectlevel2">
-<li><a href="#_performance_optimization">Performance Optimization</a></li>
-</ul>
-</li>
-<li><a href="#_follow_up_actions">Follow-up Actions</a></li>
+<li><a href="#_rationale">Rationale</a></li>
+<li><a href="#_implementation_details">Implementation Details</a></li>
+<li><a href="#_consequences">Consequences</a></li>
+<li><a href="#_compliance">Compliance</a></li>
 </ul>
 </li>
 </ul>
@@ -382,461 +396,356 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_002_ethernet_controller_selection_for_uart2eth" class="sect0">ADR-002: Ethernet Controller Selection for UART2ETH</h1>
-<div class="paragraph">
-<p><strong>Status:</strong> ACCEPTED<br>
-<strong>Date:</strong> 2025-07-26<br>
-<strong>Deciders:</strong> Architecture Team<br>
-<strong>Consulted:</strong> Senior Developer<br>
-<strong>Informed:</strong> Development Team</p>
-</div>
 <div class="sect1">
-<h2 id="_context">Context</h2>
-<div class="sectionbody">
-<div class="paragraph">
-<p>The UART2ETH system requires an Ethernet controller that interfaces with the RP2350 microcontroller via SPI to provide reliable TCP/IP connectivity. This component is critical for the core networking functionality of our product.</p>
-</div>
-<div class="paragraph">
-<p>Based on our microcontroller selection (ADR-001), we need to determine the most appropriate Ethernet controller solution that can:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Support at least 10 Mbps Ethernet connectivity</p>
-</li>
-<li>
-<p>Interface with the RP2350 via SPI</p>
-</li>
-<li>
-<p>Handle the networking requirements of up to 4 concurrent UART-to-TCP bridges</p>
-</li>
-<li>
-<p>Operate reliably in industrial environments (-40°C to +85°C)</p>
-</li>
-<li>
-<p>Maintain low latency while supporting our 500 kbps per port requirement</p>
-</li>
-<li>
-<p>Simplify firmware development with minimal microcontroller overhead</p>
-</li>
-<li>
-<p>Meet our cost target for volume production</p>
-</li>
-<li>
-<p>Does not contain firmware on its own</p>
-</li>
-<li>
-<p>Comes from a 'western' supplier</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<p>The Ethernet controller selection impacts system performance, reliability, development complexity, and overall BOM cost.</p>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_decision_drivers">Decision Drivers</h2>
+<h2 id="_adr_009_per_core_timer_subsystem_architecture">ADR-009: Per-Core Timer Subsystem Architecture</h2>
 <div class="sectionbody">
 <div class="sect2">
-<h3 id="_primary_requirements">Primary Requirements</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Network Performance</strong>: Support for full 100 Mbps Ethernet with sufficient throughput for our use case</p>
-</li>
-<li>
-<p><strong>Memory Buffer Size</strong>: Sufficient buffer for packet handling and multiple connections</p>
-</li>
-<li>
-<p><strong>SPI Interface Speed</strong>: Fast and efficient communication with the microcontroller</p>
-</li>
-<li>
-<p><strong>Industrial Reliability</strong>: Operating temperature range and robustness for industrial use</p>
-</li>
-<li>
-<p><strong>Cost Effectiveness</strong>: Component cost for volume production</p>
-</li>
-<li>
-<p><strong>Development Complexity</strong>: Readily available OpenSource library for integration</p>
-</li>
-</ul>
+<h3 id="_status">Status</h3>
+<div class="paragraph">
+<p>Accepted</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_constraints">Constraints</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Must use SPI interface to connect with the RP2350 microcontroller</p>
-</li>
-<li>
-<p>Must operate reliably in industrial environments (-40°C to +85°C)</p>
-</li>
-<li>
-<p>Must fit within the overall $10 system cost target for volume production</p>
-</li>
-<li>
-<p>Must use open-source compatible software stacks (GPL license compatible)</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_options_considered">Options Considered</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_option_a_wiznet_w5500">Option A: WIZnet W5500</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Interface</strong>: SPI (up to 80 MHz)</p>
-</li>
-<li>
-<p><strong>Network Speed</strong>: 10/100 Mbps Ethernet</p>
-</li>
-<li>
-<p><strong>TCP/IP Stack</strong>: Hardwired TCP/IP stack (integrated)</p>
-</li>
-<li>
-<p><strong>Buffer Memory</strong>: 32 KB internal buffer</p>
-</li>
-<li>
-<p><strong>Concurrent Connections</strong>: 8 independent hardware sockets</p>
-</li>
-<li>
-<p><strong>Protocols Support</strong>: TCP, UDP, IPv4, ICMP, ARP, IGMP, PPPoE</p>
-</li>
-<li>
-<p><strong>Temperature Range</strong>: -40°C to +85°C</p>
-</li>
-<li>
-<p><strong>Voltage Supply</strong>: 2.97V to 3.63V</p>
-</li>
-<li>
-<p><strong>Power Consumption</strong>: 132mA typical</p>
-</li>
-<li>
-<p><strong>Package Options</strong>: 48-LQFP (7x7mm)</p>
-</li>
-<li>
-<p><strong>Cost (Volume)</strong>: ~$2.00 per unit</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Extensive documentation, libraries for multiple platforms</p>
-</li>
-<li>
-<p><strong>Manufacturer</strong>: WIZnet.io (South Korea)</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Interface</strong>: SPI (up to 20 MHz)</p>
-</li>
-<li>
-<p><strong>Network Speed</strong>: 10 Mbps Ethernet only</p>
-</li>
-<li>
-<p><strong>TCP/IP Stack</strong>: Software stack required (on microcontroller)</p>
-</li>
-<li>
-<p><strong>Buffer Memory</strong>: 8 KB internal buffer</p>
-</li>
-<li>
-<p><strong>Concurrent Connections</strong>: Limited by microcontroller implementation</p>
-</li>
-<li>
-<p><strong>Protocols Support</strong>: Requires microcontroller implementation (typically lwIP)</p>
-</li>
-<li>
-<p><strong>Temperature Range</strong>: 0°C to +70°C (commercial), -40°C to +85°C (industrial version)</p>
-</li>
-<li>
-<p><strong>Voltage Supply</strong>: 3.1V to 3.6V</p>
-</li>
-<li>
-<p><strong>Power Consumption</strong>: 160mA typical</p>
-</li>
-<li>
-<p><strong>Package Options</strong>: 28-pin SPDIP, SOIC, SSOP, QFN</p>
-</li>
-<li>
-<p><strong>Cost (Volume)</strong>: ~$2.50 per unit</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Mature, widely used in Arduino and other platforms</p>
-</li>
-<li>
-<p><strong>Manufacturer</strong>: Microchip Technology (USA)</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h2>
-<div class="sectionbody">
+<h3 id="_context">Context</h3>
 <div class="paragraph">
-<p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
-<em>Baseline: ENC28J60 (all scores = 0)</em></p>
+<p>The UART2ETH system requires timer functionality for various timeout operations including UART protocol timeouts, DHCP renewal timers, TCP keep-alive timers, and periodic maintenance tasks. The dual-core RP2350 architecture provides independent hardware timer alarms that can be leveraged for efficient, low-latency timer management.</p>
 </div>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 38.4615%;">
-<col style="width: 15.3846%;">
-<col style="width: 23.0769%;">
-<col style="width: 23.077%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
-<th class="tableblock halign-left valign-top"><strong>ENC28J60</strong></th>
-<th class="tableblock halign-left valign-top"><strong>W5500</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Speed</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (100 Mbps vs 10 Mbps)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>TCP/IP Implementation</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (hardwired vs software)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Microcontroller Overhead</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (minimal vs significant)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Buffer Size</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (32KB vs 8KB)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>SPI Interface Performance</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (80MHz vs 20MHz)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Temperature Range</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (standard -40°C to +85°C)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Ecosystem</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (both well-supported)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Firmware Complexity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (simple socket programming)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Open Internal Firmware</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (Complex, Closed Source)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Western Manufacturer</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (South Korea)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Auditable Sourcecode</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (Closed Source)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total PUGH Score</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-6</p></td>
-</tr>
-</tbody>
-</table>
+<div class="sect3">
+<h4 id="_requirements">Requirements</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Support multiple concurrent timers per core</p>
+</li>
+<li>
+<p>Millisecond precision timing</p>
+</li>
+<li>
+<p>Hardware interrupt-driven operation for minimal CPU overhead</p>
+</li>
+<li>
+<p>Thread-safe timer operations within each core</p>
+</li>
+<li>
+<p>Real-time guarantees for Core0 UART processing</p>
+</li>
+<li>
+<p>Power-efficient operation (interrupt only when needed)</p>
+</li>
+</ul>
 </div>
 </div>
-<div class="sect1">
-<h2 id="_decision">Decision</h2>
-<div class="sectionbody">
+<div class="sect3">
+<h4 id="_use_cases_by_core">Use Cases by Core</h4>
 <div class="paragraph">
-<p><strong>Selected: ENC28J60</strong></p>
+<p><strong>Core0 Timer Requirements:</strong>
+* UART transmission timeouts
+* Protocol-specific timing delays
+* Retransmission timers
+* Serial frame timeout detection</p>
 </div>
 <div class="paragraph">
-<p>While the W5500 is technically superior in every aspect and more easy to integrate, the ENC28J60 is a <strong>dumb</strong> device, which is, given to goal of maximum control, auditable software and upgradeable software, exactly what we want. And additionally it is from a 'western' manufacturer.</p>
+<p><strong>Core1 Timer Requirements:</strong>
+* DHCP lease renewal timers
+* TCP connection keep-alive timers
+* Network timeout detection
+* Flash persistence intervals
+* Log processing scheduling</p>
 </div>
 </div>
 </div>
-<div class="sect1">
-<h2 id="_rationale">Rationale</h2>
-<div class="sectionbody">
 <div class="sect2">
-<h3 id="_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</h3>
+<h3 id="_decision">Decision</h3>
+<div class="paragraph">
+<p>Implement <strong>separate timer subsystems for each core</strong> using dedicated RP2350 hardware timer alarms with static memory allocation.</p>
+</div>
+<div class="sect3">
+<h4 id="_architecture_overview">Architecture Overview</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Dumb</strong>: The ENC28J60 has no complex firmware.</p>
+<p><strong>Core0 Timer Subsystem</strong>: Uses Timer Alarm 0, manages 8 static timers for UART/protocol operations</p>
 </li>
 <li>
-<p><strong>Auditable Sourcecode</strong>: The main network code is in the microcontrollers firmware, which we have total control over. This allows us to show <strong>all</strong> relevant code for audits.</p>
+<p><strong>Core1 Timer Subsystem</strong>: Uses Timer Alarm 1, manages 16 static timers for network/maintenance operations</p>
 </li>
 <li>
-<p><strong>Western Manufacturer</strong>: Because of supply chain considerations we want this project to contain only 'western' manufacturers. While technically South Korea is a western ally, it is still in the east.</p>
+<p><strong>No cross-core coordination</strong>: Each core manages its own timers independently</p>
+</li>
+<li>
+<p><strong>Hardware interrupt driven</strong>: Each core handles its own timer alarm interrupts</p>
+</li>
+<li>
+<p><strong>Static allocation</strong>: Fixed-size timer arrays, no dynamic memory management</p>
 </li>
 </ul>
 </div>
 </div>
+<div class="sect3">
+<h4 id="_timer_api_design">Timer API Design</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Per-core timer APIs
+void core0_timer_set(core0_timer_id_t timer_id, uint32_t interval_ms);
+bool core0_timer_is_expired(core0_timer_id_t timer_id);
+void core0_timer_cancel(core0_timer_id_t timer_id);
+
+void core1_timer_set(core1_timer_id_t timer_id, uint32_t interval_ms);
+bool core1_timer_is_expired(core1_timer_id_t timer_id);
+void core1_timer_cancel(core1_timer_id_t timer_id);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_timer_id_definitions">Timer ID Definitions</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Core0 timer identifiers (UART/Protocol focus)
+typedef enum {
+    CORE0_TIMER_UART0_TIMEOUT = 0,
+    CORE0_TIMER_UART1_TIMEOUT,
+    CORE0_TIMER_UART2_TIMEOUT,
+    CORE0_TIMER_UART3_TIMEOUT,
+    CORE0_TIMER_PROTOCOL_DELAY,
+    CORE0_TIMER_RETRANSMIT,
+    CORE0_TIMER_FRAME_TIMEOUT,
+    CORE0_TIMER_RESERVED,
+    CORE0_MAX_TIMERS = 8
+} core0_timer_id_t;
+
+// Core1 timer identifiers (Network/Maintenance focus)
+typedef enum {
+    CORE1_TIMER_DHCP_RENEWAL = 0,
+    CORE1_TIMER_TCP_KEEPALIVE,
+    CORE1_TIMER_NETWORK_TIMEOUT,
+    CORE1_TIMER_PERSISTENCE_INTERVAL,
+    CORE1_TIMER_LOG_FLUSH,
+    CORE1_TIMER_CONNECTION_TIMEOUT,
+    CORE1_TIMER_DHCP_DISCOVER,
+    CORE1_TIMER_ARP_TIMEOUT,
+    CORE1_TIMER_MAINTENANCE_CYCLE,
+    CORE1_TIMER_STATISTICS_UPDATE,
+    CORE1_TIMER_CONFIG_BACKUP,
+    CORE1_TIMER_WATCHDOG_FEED,
+    CORE1_TIMER_RESERVED_1,
+    CORE1_TIMER_RESERVED_2,
+    CORE1_TIMER_RESERVED_3,
+    CORE1_TIMER_RESERVED_4,
+    CORE1_MAX_TIMERS = 16
+} core1_timer_id_t;</code></pre>
+</div>
+</div>
+</div>
+</div>
 <div class="sect2">
-<h3 id="_trade_offs_accepted">Trade-offs Accepted</h3>
+<h3 id="_rationale">Rationale</h3>
+<div class="sect3">
+<h4 id="_why_per_core_separation">Why Per-Core Separation?</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Cost Premium</strong>: The $0.50 additional cost per unit for the W5500 is justified by the significant performance advantages, reduced development complexity, and system resource savings.</p>
+<p><strong>Zero synchronization overhead</strong>: No mutexes, shared memory, or cross-core coordination required</p>
 </li>
 <li>
-<p><strong>Lower Performance</strong>: The W5500 is superior in all aspects of performance. But the ENC28J60 is <strong>good enough</strong> to match the performance criteria.</p>
+<p><strong>Real-time guarantees</strong>: Core0 UART processing never blocked by Core1 timer operations</p>
+</li>
+<li>
+<p><strong>Natural responsibility alignment</strong>: Each core manages timers for its own functional domain</p>
+</li>
+<li>
+<p><strong>Simplified interrupt handling</strong>: Each core&#8217;s timer ISR only manages its own timer array</p>
+</li>
+<li>
+<p><strong>Independent scaling</strong>: Different timer array sizes based on each core&#8217;s requirements</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_why_hardware_timer_alarms">Why Hardware Timer Alarms?</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Precise timing</strong>: Hardware-based timing with microsecond accuracy</p>
+</li>
+<li>
+<p><strong>Low CPU overhead</strong>: Interrupt-driven operation, no polling required</p>
+</li>
+<li>
+<p><strong>Power efficiency</strong>: CPU can sleep until timer expiration</p>
+</li>
+<li>
+<p><strong>RP2350 native support</strong>: Leverages built-in timer peripherals</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_why_static_allocation">Why Static Allocation?</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Deterministic memory usage</strong>: No heap fragmentation or allocation failures</p>
+</li>
+<li>
+<p><strong>Real-time compliance</strong>: Bounded memory access patterns</p>
+</li>
+<li>
+<p><strong>Simplified implementation</strong>: No dynamic memory management complexity</p>
+</li>
+<li>
+<p><strong>Embedded systems best practice</strong>: Predictable resource usage</p>
 </li>
 </ul>
 </div>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_consequences">Consequences</h2>
-<div class="sectionbody">
 <div class="sect2">
-<h3 id="_positive">Positive</h3>
+<h3 id="_implementation_details">Implementation Details</h3>
+<div class="sect3">
+<h4 id="_timer_state_structure">Timer State Structure</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    uint32_t interval_ms;        // Timer interval in milliseconds
+    uint64_t expiration_time_us; // Absolute expiration time in microseconds
+    bool active;                 // Timer is currently running
+    bool expired;                // Timer has expired (sticky flag)
+} timer_entry_t;
+
+typedef struct {
+    timer_entry_t timers[MAX_TIMERS];  // Static timer array
+    uint32_t next_alarm_timer_id;      // Timer ID for next hardware alarm
+    uint64_t next_alarm_time_us;       // Next hardware alarm time
+    uint32_t active_timer_count;       // Number of active timers
+} timer_subsystem_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_hardware_timer_integration">Hardware Timer Integration</h4>
 <div class="ulist">
 <ul>
 <li>
-<p>✅ <strong>Minimal Performance</strong>: ENC28J60 provides enough network bandwidth for current needs</p>
+<p><strong>Timer Alarm 0</strong>: Dedicated to Core0 timer subsystem</p>
 </li>
 <li>
-<p>✅ <strong>Physical Size</strong>: 28SSOP package requires slightly less PCB space</p>
+<p><strong>Timer Alarm 1</strong>: Dedicated to Core1 timer subsystem</p>
 </li>
 <li>
-<p>✅ <strong>Industrial Reliability</strong>: Full industrial temperature range support</p>
+<p><strong>Interrupt handling</strong>: Each core registers its own timer alarm ISR</p>
 </li>
 <li>
-<p>✅ <strong>External Dependency</strong>: Reliance on a more generic controller with more alternatives</p>
+<p><strong>Next alarm calculation</strong>: ISR finds minimum expiration time among active timers</p>
+</li>
+<li>
+<p><strong>Automatic rescheduling</strong>: Hardware alarm set to next expiration time</p>
 </li>
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_negative">Negative</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>⚠️ <strong>Resource Spending</strong>: More microcontroller overhead diminishes resources for other features</p>
-</li>
-<li>
-<p>⚠️ <strong>Slightly Higher Cost</strong>: $0.50 cost premium per unit compared to W5500</p>
-</li>
-<li>
-<p>⚠️ <strong>More Complex Development</strong>: Software TCP/IP stack incraeses code complexity and development time</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_risks_and_mitigation">Risks and Mitigation</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Supply Chain Risk</strong>: Establish multiple supplier relationships, consider inventory strategy</p>
-</li>
-<li>
-<p><strong>Single-Source Component</strong>: Document adaptation path to alternative controllers if necessary</p>
-</li>
-<li>
-<p><strong>Integration Complexity</strong>: Thoroughly validate the ENC28J60-RP2350 integration early in development</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_implementation_notes">Implementation Notes</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_performance_optimization">Performance Optimization</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Use burst SPI mode for maximum throughput (up to 25 MHz)</p>
-</li>
-<li>
-<p>Optimize buffer management for latency-sensitive applications)</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_follow_up_actions">Follow-up Actions</h2>
-<div class="sectionbody">
+<div class="sect3">
+<h4 id="_timer_update_algorithm">Timer Update Algorithm</h4>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><strong>Procurement</strong>: Source ENC28J60 components from multiple suppliers to validate availability</p>
+<p><strong>Timer expiration check</strong>: ISR scans all active timers, marks expired timers</p>
 </li>
 <li>
-<p><strong>Prototyping</strong>: Develop initial integration test for RP2350 + ENC28J60 communication</p>
+<p><strong>Find next expiration</strong>: Calculate minimum expiration time among remaining active timers</p>
 </li>
 <li>
-<p><strong>Performance Testing</strong>: Benchmark SPI communication speeds and TCP throughput</p>
+<p><strong>Schedule hardware alarm</strong>: Set timer alarm to next expiration time</p>
 </li>
 <li>
-<p><strong>Industrial Validation</strong>: Test operation across full temperature range</p>
+<p><strong>Power optimization</strong>: No alarm scheduled if no active timers</p>
 </li>
 </ol>
 </div>
-<hr>
-<div class="paragraph">
-<p><strong>Review Notes:</strong></p>
 </div>
-<div class="ulist checklist">
-<ul class="checklist">
+</div>
+<div class="sect2">
+<h3 id="_consequences">Consequences</h3>
+<div class="sect3">
+<h4 id="_positive">Positive</h4>
+<div class="ulist">
+<ul>
 <li>
-<p>&#10063; Validate pricing from multiple suppliers</p>
+<p><strong>Zero cross-core contention</strong>: Each core operates independently</p>
 </li>
 <li>
-<p>&#10063; Confirm SPI bus configuration with other peripherals</p>
+<p><strong>Minimal latency impact</strong>: Hardware-driven timing with microsecond precision</p>
 </li>
 <li>
-<p>&#10063; Verify EMI/EMC considerations with ENC28J60 placement</p>
+<p><strong>Predictable behavior</strong>: Static allocation provides deterministic resource usage</p>
 </li>
 <li>
-<p>&#10063; Test actual power consumption under various load scenarios</p>
+<p><strong>Simple API</strong>: Clean separation of concerns with per-core timer namespaces</p>
+</li>
+<li>
+<p><strong>Power efficient</strong>: Hardware alarms allow CPU sleep between timer events</p>
+</li>
+<li>
+<p><strong>Scalable</strong>: Different timer array sizes optimized for each core&#8217;s requirements</p>
 </li>
 </ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_negative">Negative</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Hardware resource usage</strong>: Consumes 2 of 4 available RP2350 timer alarms</p>
+</li>
+<li>
+<p><strong>Slightly duplicated code</strong>: Similar timer management logic implemented twice</p>
+</li>
+<li>
+<p><strong>Fixed timer limits</strong>: Maximum 8 timers for Core0, 16 timers for Core1</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_risks">Risks</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Timer exhaustion</strong>: Applications must manage timer usage within static limits</p>
+</li>
+<li>
+<p><strong>ISR execution time</strong>: Timer update algorithm must complete within ISR time constraints</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_mitigation_strategies">Mitigation Strategies</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Timer usage monitoring</strong>: Log warnings when approaching timer limits</p>
+</li>
+<li>
+<p><strong>Efficient ISR implementation</strong>: Optimize timer scanning algorithm for minimal ISR duration</p>
+</li>
+<li>
+<p><strong>Timer reuse patterns</strong>: Encourage timer cancellation and reuse in application code</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_compliance">Compliance</h3>
+<div class="paragraph">
+<p>This decision supports the following quality goals:
+* <strong>Reliability</strong>: Hardware-based timing with deterministic behavior
+* <strong>Performance</strong>: Minimal CPU overhead through hardware timer alarms
+* <strong>Real-time compliance</strong>: No cross-core blocking for Core0 UART operations
+* <strong>Power efficiency</strong>: Interrupt-driven operation allows CPU sleep states</p>
+</div>
 </div>
 </div>
 </div>
@@ -867,11 +776,11 @@
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-002%3A+Ethernet+Controller+Selection+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-002-ethernet-controller-selection.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-009%3A+Per-Core+Timer+Subsystem+Architecture%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-009-per-core-timer-subsystem.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-002%3A+Ethernet+Controller+Selection+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-002-ethernet-controller-selection.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-009%3A+Per-Core+Timer+Subsystem+Architecture%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-009-per-core-timer-subsystem.adoc">tell
     us how we can improve</a>.
     </p>
 </div>

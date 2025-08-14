@@ -213,7 +213,7 @@
     <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link active" href="../../arc42/chapters/00_architecture_communication_canvas.html"><span>arc42</span></a>
+                <a class="nav-link " href="../../arc42/adrs/ADR-008-hardware-pin-configuration.html"><span>arc42</span></a>
             </li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
@@ -261,6 +261,16 @@
                       <li class="collapse show" id="docs">
                           
                         <ul class="td-sidebar-nav__section ul-0">
+<details id="d8b6e4f467a2500cfc57e1e4bb7bb7114"><summary><span class="label">adrs</span></summary>
+                        <ul class="ul-1">
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/adrs/ADR-008-hardware-pin-configuration.html" title="ADR-008: Hardware Pin Configuration Update">ADR-008: Hardware Pin Configuration Update</a>
+                                
+                            </li>
+                        </ul></details>
+<details id="d378c2e65b576318b7f785b537c424464"><summary><span class="label"><a style="margin-left: 0px;" class="" href="../../arc42/chapters/00_architecture_communication_canvas.html" title="Architecture Communication Canvas">Architecture Communication Canvas</a></span></summary>
+                        <ul class="ul-1">
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/chapters/00_architecture_communication_canvas.html" title="Architecture Communication Canvas">Architecture Communication Canvas</a>
@@ -326,6 +336,7 @@
                                    href="../../arc42/chapters/12_glossary.html" title="Glossary">Glossary</a>
                                 
                             </li>
+                        </ul></details>
                         </ul>
                       </li>
                   </ul>
@@ -484,6 +495,14 @@
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Watchdog System</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Monitors system health through heartbeat signals from all major components. Detects failures, logs recovery events, and triggers automatic system recovery or reset when necessary.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core 0 Timer Subsystem</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides hardware timer alarm-based timing services for Core0 operations. Manages 8 static timers for UART timeouts, protocol delays, and retransmission timing using RP2350 Timer Alarm 0.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core 1 Timer Subsystem</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides hardware timer alarm-based timing services for Core1 operations. Manages 16 static timers for network timeouts, DHCP renewal, persistence intervals, and maintenance scheduling using RP2350 Timer Alarm 1.</p></td>
 </tr>
 </tbody>
 </table>
@@ -647,6 +666,31 @@
 </li>
 <li>
 <p><strong>Hardware Integration</strong>: RP2350 hardware watchdog timer as final safety net</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_timer_subsystem_interface">Timer Subsystem Interface</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Per-Core Independence</strong>: Core0 uses Timer Alarm 0, Core1 uses Timer Alarm 1 with no cross-core coordination</p>
+</li>
+<li>
+<p><strong>Static Allocation</strong>: Core0 manages 8 timers, Core1 manages 16 timers using fixed-size arrays</p>
+</li>
+<li>
+<p><strong>Hardware Precision</strong>: Microsecond-accurate timing through RP2350 hardware timer alarms</p>
+</li>
+<li>
+<p><strong>API Pattern</strong>: <code>coreX_timer_set(timer_id, interval_ms)</code>, <code>coreX_timer_is_expired(timer_id)</code></p>
+</li>
+<li>
+<p><strong>Interrupt Driven</strong>: Each core handles its own timer alarm interrupts independently</p>
+</li>
+<li>
+<p><strong>Power Efficient</strong>: Hardware alarms scheduled only for next expiration time, CPU can sleep between events</p>
 </li>
 </ul>
 </div>
@@ -1163,6 +1207,106 @@
 </table>
 </div>
 </div>
+<div class="sect3">
+<h4 id="_whitebox_core_0_timer_subsystem">Whitebox Core 0 Timer Subsystem</h4>
+<div class="paragraph">
+<p>The Core 0 Timer Subsystem provides hardware timer alarm-based timing services for UART and protocol operations. Uses RP2350 Timer Alarm 0 for independent, interrupt-driven timer management with no cross-core coordination.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level2-core0-timer.svg" alt="level2 core0 timer" width="694" height="878">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_8">Motivation</h5>
+<div class="paragraph">
+<p>Core 0 requires precise timing for UART operations including transmission timeouts, protocol delays, retransmission timing, and error recovery. Hardware timer alarm provides microsecond accuracy with minimal CPU overhead while maintaining independence from Core 1 operations.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_8">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timer API Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides thread-safe timer operations for Core 0 components. Implements set, check expiration, and cancel operations for all Core 0 timer IDs.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timer State Array</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages static array of 8 timers optimized for UART and protocol operations. Tracks timer intervals, expiration times, and active/expired status.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timer Alarm ISR</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles RP2350 Timer Alarm 0 interrupts. Scans timer array for expired timers, marks expiration flags, and schedules next hardware alarm.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Expiration Calculator</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Finds minimum expiration time among active timers and programs hardware Timer Alarm 0 for next required interrupt. Optimizes power consumption by avoiding unnecessary interrupts.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_whitebox_core_1_timer_subsystem">Whitebox Core 1 Timer Subsystem</h4>
+<div class="paragraph">
+<p>The Core 1 Timer Subsystem provides hardware timer alarm-based timing services for network and maintenance operations. Uses RP2350 Timer Alarm 1 for independent, interrupt-driven timer management supporting larger timer arrays for diverse network operations.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/level2-core1-timer.svg" alt="level2 core1 timer" width="822" height="879">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_9">Motivation</h5>
+<div class="paragraph">
+<p>Core 1 manages diverse network and maintenance operations requiring various timing intervals from DHCP renewal (hours) to TCP keepalive (seconds) to maintenance cycles (minutes). Larger timer array accommodates multiple concurrent network connections and background processes.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_9">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timer API Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides thread-safe timer operations for Core 1 components. Implements set, check expiration, and cancel operations for all Core 1 timer IDs including network and maintenance timers.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timer State Array</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages static array of 16 timers optimized for network and maintenance operations. Supports DHCP timers, TCP connection timers, persistence intervals, and background task scheduling.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timer Alarm ISR</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles RP2350 Timer Alarm 1 interrupts. Scans timer array for expired timers, marks expiration flags, and schedules next hardware alarm independently from Core 0.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Expiration Calculator</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Finds minimum expiration time among active timers and programs hardware Timer Alarm 1 for next required interrupt. Handles varied timing scales from seconds to hours efficiently.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_level_3">Level 3</h3>
@@ -1177,13 +1321,13 @@
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_8">Motivation</h5>
+<h5 id="_motivation_10">Motivation</h5>
 <div class="paragraph">
 <p>UART processing utilizing UART specific ISR and DMA transfers for maximum troughput.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_8">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_10">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -1435,13 +1579,13 @@ uint32_t uart_channel_get_status(uint8_t channel);</code></pre>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_9">Motivation</h5>
+<h5 id="_motivation_11">Motivation</h5>
 <div class="paragraph">
 <p>Flash persistence ensures configuration survival across power cycles while preventing flash wear-out and corruption. The ring buffer approach provides automatic wear leveling and power-loss safety without complex file systems.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_9">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_11">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -1847,13 +1991,13 @@ bool validate_session_token(const char* token);</code></pre>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_10">Motivation</h5>
+<h5 id="_motivation_12">Motivation</h5>
 <div class="paragraph">
 <p>The event-driven architecture prevents invalid state transitions by eliminating direct state manipulation. Three independent state machines provide lock-free operation with atomic main state coordination and ISR-safe sub-state management. This design ensures predictable system behavior through validated state transitions while maintaining high performance for real-time operations.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_10">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_12">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
