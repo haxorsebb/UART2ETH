@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 // Hardware pin configuration
-#define ENC28J60_RESET_PIN      14
+#define ENC28J60_RESET_PIN      3 //14
 #define ENC28J60_INTERRUPT_PIN  8
 #define ENC28J60_SCK_PIN        10 //2
 #define ENC28J60_MOSI_PIN       11 //3   // SI - Serial Input

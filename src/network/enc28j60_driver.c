@@ -209,7 +209,7 @@ void enc28j60_reset(void) {
     gpio_put(ENC28J60_RESET_PIN, 0);
 
      //pull enc from reset
-    sleep_us(10);
+    sleep_us(20);
     gpio_put(ENC28J60_RESET_PIN, 1);
     
     // Reset bank tracking - after reset, we're in bank 0 (Arduino reference)
@@ -655,6 +655,9 @@ static void enc28j60_gpio_init(void) {
     gpio_init(ENC28J60_CS_PIN);
     gpio_set_function(ENC28J60_CS_PIN, GPIO_FUNC_SIO);
     gpio_set_dir(ENC28J60_CS_PIN, GPIO_OUT);
+    gpio_pull_up(ENC28J60_CS_PIN);
+    gpio_set_slew_rate(ENC28J60_CS_PIN, GPIO_SLEW_RATE_FAST);
+    
     gpio_put(ENC28J60_CS_PIN, 1);
 
     // Initialize interrupt pin as input with pull-up
@@ -663,11 +666,17 @@ static void enc28j60_gpio_init(void) {
     gpio_set_dir(ENC28J60_INTERRUPT_PIN, GPIO_IN);
     gpio_pull_up(ENC28J60_INTERRUPT_PIN);
     
+    
     // Initialize RESET pin as output (low = reset)
     gpio_init(ENC28J60_RESET_PIN);
     gpio_set_function(ENC28J60_RESET_PIN, GPIO_FUNC_SIO);
     gpio_set_dir(ENC28J60_RESET_PIN, GPIO_OUT);
-    gpio_set_drive_strength(ENC28J60_RESET_PIN,GPIO_DRIVE_STRENGTH_12MA);
+    gpio_set_input_enabled(ENC28J60_RESET_PIN, false);
+
+    gpio_put(ENC28J60_RESET_PIN, 0);    //active low reset, keep in reset until software is ready
+    
+    //gpio_pull_up(ENC28J60_RESET_PIN);
+    //gpio_set_drive_strength(ENC28J60_RESET_PIN,GPIO_DRIVE_STRENGTH_12MA);
     
     
     
