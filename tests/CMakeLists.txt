@@ -118,6 +118,50 @@ pico_enable_stdio_uart(test_state_machine 0)  # Disable UART0 to avoid SPI0 conf
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_state_machine)
 
+# Test for Core0 timer subsystem
+add_executable(test_core0_timer
+    test_core0_timer.c
+    ../src/core0_timer.c
+)
+
+target_include_directories(test_core0_timer PRIVATE ../include)
+
+target_link_libraries(test_core0_timer
+    unity
+    pico_stdlib
+    hardware_timer
+    hardware_irq
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_core0_timer 1)
+pico_enable_stdio_uart(test_core0_timer 0)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_core0_timer)
+
+# Test for Core1 timer subsystem
+add_executable(test_core1_timer
+    test_core1_timer.c
+    ../src/core1_timer.c
+)
+
+target_include_directories(test_core1_timer PRIVATE ../include)
+
+target_link_libraries(test_core1_timer
+    unity
+    pico_stdlib
+    hardware_timer
+    hardware_irq
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_core1_timer 1)
+pico_enable_stdio_uart(test_core1_timer 0)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_core1_timer)
+
 # Add network tests subdirectory
 add_subdirectory(network)
 

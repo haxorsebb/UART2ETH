@@ -394,8 +394,25 @@ bool state_machine_process_core1_event(core1_event_t event) {
             
         case CORE1_INIT_NET:
             switch (event) {
-                case CORE1_EVENT_INIT_NET_COMPLETE:
+                case CORE1_EVENT_INIT_NET_WAIT_FOR_LINK_UP:
+                    new_state = CORE1_INIT_WAIT_FOR_LINK;
+                    break;
+                case CORE1_EVENT_INIT_NET_FAILED:
+                    new_state = CORE1_INIT_ERROR;
+                    break;
+                default:
+                    // Invalid event for this state - ignore
+                    break;
+            }
+            break;
+
+        case CORE1_INIT_WAIT_FOR_LINK:
+            switch (event) {
+                case CORE1_EVENT_INIT_NET_LINK_UP:
                     new_state = CORE1_INIT_COMPLETE;
+                    break;
+                case CORE1_EVENT_INIT_NET_LINK_DOWN:
+                    new_state = CORE1_INIT_WAIT_FOR_LINK;
                     break;
                 case CORE1_EVENT_INIT_NET_FAILED:
                     new_state = CORE1_INIT_ERROR;
@@ -417,9 +434,9 @@ bool state_machine_process_core1_event(core1_event_t event) {
             
         case CORE1_CONFIG_NET:
             switch (event) {
-                case CORE1_EVENT_CONFIG_NET_COMPLETE:
+                case CORE1_EVENT_CONFIG_NET_DHCP_REQUEST:
                     {
-                        new_state = CORE1_CONFIG_COMPLETE;
+                        new_state = CORE1_CONFIG_NET_WAIT_FOR_DHCP;
                     }
                     break;
                 case CORE1_EVENT_CONFIG_NET_FAILED:
@@ -433,11 +450,89 @@ bool state_machine_process_core1_event(core1_event_t event) {
             }
             break;
         
-            case CORE1_CONFIG_COMPLETE:
+        case CORE1_CONFIG_NET_WAIT_FOR_DHCP:
+            switch (event) {
+                case CORE1_EVENT_NETWORK_RECEIVE_ACTIVE:
+                    {
+                        new_state = CORE1_CONFIG_NET_CHECK_DHCP;
+                    }
+                    break;
+                case CORE1_EVENT_NETWORK_SENDING_ACTIVE:
+                    {
+                        new_state = CORE1_CONFIG_NET_CHECK_DHCP;
+                    }
+                    break;
+                case CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT:
+                    {
+                        new_state = CORE1_CONFIG_NET;
+                    }
+                    break;
+                case CORE1_EVENT_CONFIG_NET_FAILED:
+                    {
+                        new_state = CORE1_CONFIG_ERROR;
+                    }
+                    break;
+                case CORE1_EVENT_LOG_START:
+                    {
+                        new_state = CORE1_CONFIG_LOG_ACTIVE;
+                    }
+                    break;
+                default:
+                    // Invalid event for this state - ignore
+                    break;
+            }
+            break;
+
+        case CORE1_CONFIG_NET_CHECK_DHCP:
+            switch (event) {
+                case CORE1_EVENT_NETWORK_SENDING_FINISHED:
+                    {
+                        new_state = CORE1_CONFIG_NET_WAIT_FOR_DHCP;
+                    }
+                    break;                
+                case CORE1_EVENT_CONFIG_NET_GOT_DHCP:
+                    {
+                        new_state = CORE1_CONFIG_COMPLETE;
+                    }
+                    break;
+                case CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT:
+                    {
+                        new_state = CORE1_CONFIG_NET;
+                    }
+                    break;
+                case CORE1_EVENT_CONFIG_NET_WAIT_DHCP:
+                    {
+                        new_state = CORE1_CONFIG_NET_WAIT_FOR_DHCP;
+                    }
+                    break;
+                case CORE1_EVENT_CONFIG_NET_FAILED:
+                    {
+                        new_state = CORE1_CONFIG_ERROR;
+                    }
+                    break;
+                default:
+                    // Invalid event for this state - ignore
+                    break;
+            }
+            break;
+        
+        case CORE1_CONFIG_COMPLETE:
             // This state sends main state event and transitions to WAIT
             new_state = CORE1_CONFIG_IDLE;
+        break;
+        
+        case CORE1_CONFIG_LOG_ACTIVE:
+            switch (event) {
+                case CORE1_EVENT_LOG_END:
+                    // Return to CORE1_CONFIG_NET_WAIT_FOR_DHCP, will check for more work or sleep
+                    new_state = CORE1_CONFIG_NET_WAIT_FOR_DHCP;
+                    break;
+                default:
+                    // Invalid event for this state - ignore
+                    break;
+            }
             break;
-            
+
         case CORE1_CONFIG_IDLE:
             // Waiting for main state transition to CONFIGURATION
             break;
@@ -446,8 +541,23 @@ bool state_machine_process_core1_event(core1_event_t event) {
             // revcoverable config error (invalid config)
             break;
         
-
         case CORE1_NET_DISCONNECTED:
+            new_state = CORE1_IDLE; //nothing to do here
+            break;
+        
+        case CORE1_NET_LINK_CHANGE:
+            switch (event) {
+                case CORE1_EVENT_NETWORK_LINK_DOWN:
+                    // Return to idle, will check for more work or sleep
+                    new_state = CORE1_NET_DISCONNECTED;
+                    break;
+                default:
+                    // Invalid event for this state - ignore
+                    break;
+            }
+            break;
+            
+        case CORE1_NET_CONNECTED:
             new_state = CORE1_IDLE; //nothing to do here
             break;
             
@@ -505,6 +615,9 @@ bool state_machine_process_core1_event(core1_event_t event) {
         
         case CORE1_IDLE:    //we really were idling around in this state
             switch (event) {
+                case CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE:
+                    new_state = CORE1_NET_LINK_CHANGE;
+                    break;
                 case CORE1_EVENT_NETWORK_RECEIVE_ACTIVE:
                     //ready to receive
                     new_state = CORE1_NET_ACTIVE_RECEIVE;
@@ -699,31 +812,26 @@ static void wake_other_core_after_main_state_change(main_state_t new_state) {
 }
 
 /**
- * Handle the doorbell set from core0
+ * Handle the doorbell set from core0 or core 1
  */
 extern void shared_doorbell_irq() {
+    // The main purpose is to wake from wfi - printf() causes panic!
 
-    //we are not really doing anything here. the main purpose is to wake from wfi
-    printf("THIS IS DOORBELL ON CORE%d\n", get_core_num());
-
-    // Increment counter
+    // Clear doorbell flags without blocking calls
     if (multicore_doorbell_is_set_current_core(doorbell_core0_wakes_core1)) {
-        printf("DING DONG from the other core on core 1\n");
         multicore_doorbell_clear_current_core(doorbell_core0_wakes_core1);
     }
     if (multicore_doorbell_is_set_current_core(doorbell_core1_wakes_core0)) {
-        printf("DING DONG from the other core on core 0\n");
         multicore_doorbell_clear_current_core(doorbell_core1_wakes_core0);
     }
-    //clear own dorrbell, too
+    //clear own doorbell, too
     if (multicore_doorbell_is_set_current_core(doorbell_core1_wakes_core0)) {
         multicore_doorbell_clear_current_core(doorbell_core1_wakes_core0);
     }
-    //clear own dorrbell, too
+    //clear own doorbell, too
     if (multicore_doorbell_is_set_current_core(doorbell_core0_wakes_core1)) {
         multicore_doorbell_clear_current_core(doorbell_core0_wakes_core1);
     }
 
     irq_clear(multicore_doorbell_irq_num(doorbell_core1_wakes_core0));
-
 }

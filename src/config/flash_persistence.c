@@ -200,6 +200,7 @@ bool flash_persistence_save_needed(void) {
     if (elapsed_ms < FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS) {
         return true;  // Write deferred due to frequency limiting
     }
+    return false;
 }
 /**
  * Force save configuration to flash immediately

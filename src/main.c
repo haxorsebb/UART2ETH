@@ -64,7 +64,7 @@ int main() {
     
     // Initialize UART1 for debug output (UART0 conflicts with SPI0)
     // This ensures debug output goes to /dev/ttyUSB0 as mentioned
-    stdio_uart_init_full(uart1, 115200, 20, 21);
+    stdio_uart_init_full(uart0, 115200, 0, 1);
     
     // Wait for USB-serial connection for debugging
     sleep_ms(2000);

@@ -17,6 +17,11 @@
 #include <stdio.h>
 #include <string.h>
 
+// Import minimum log level from debug configuration
+#ifndef LOG_MINIMUM_LEVEL
+#define LOG_MINIMUM_LEVEL LOG_LEVEL_INFO  // Default to INFO if not set
+#endif
+
 // Constants for better maintainability
 #define LOG_MAX_MESSAGE_LENGTH 256
 #define LOG_MAX_FORMAT_LENGTH 200
@@ -222,19 +227,17 @@ static uint32_t get_next_event_sequence(event_source_t event_source) {
     if (!g_shared_layout) return 0;
     
     // Thread-safe access to sequence counters
-    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     uint32_t sequence;
     
     // For testing compatibility: Simulate core assignment based on event source
     // In production, this logic would use get_core_num() or actual hardware assignment
     // Network events = Core 1, all others = Core 0 (maintains test compatibility)
-    if (event_source == EVENT_SOURCE_NETWORK) {
+    if (get_core_num()==1) {
         sequence = ++g_shared_layout->log_mgmt.core1_sequence;
     } else {
         sequence = ++g_shared_layout->log_mgmt.core0_sequence;
     }
     
-    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     return sequence;
 }
 
@@ -264,22 +267,39 @@ static bool write_log_entry(const log_entry_t* entry) {
             g_shared_layout->log_mgmt.read_index = 0;
         }
     }
-    
-    // Write entry to buffer
-    g_shared_layout->log_entries[g_shared_layout->log_mgmt.write_index] = *entry;
-    
+
     // Update write index with fast ring buffer advance
     g_shared_layout->log_mgmt.write_index = next_write_index;
-    
     // Update total count
     g_shared_layout->log_mgmt.total_events_logged++;
-    
     spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
+    
+    /*
+
+    uint32_t current_write, next_write;
+    do {
+        current_write = atomic_load(&g_shared_layout->log_mgmt.write_index);
+        next_write = (current_write + 1) % g_shared_layout->log_mgmt.max_entries;
+        
+        // Check if buffer would be full
+        if (next_write == atomic_load(&g_shared_layout->log_mgmt.read_index)) {
+            return false;  // Buffer full
+        }
+    } while (!atomic_compare_exchange_weak(&g_shared_layout->log_mgmt.write_index, 
+                                          &current_write, next_write));
+
+    */
+
+    // Write entry to buffer
+    g_shared_layout->log_entries[next_write_index] = *entry;
+    
+    
+    
     return true;
 }
 
 /**
- * Read next log entry from circular buffer (atomic operation with spinlock)
+ * Read next log entry from circular buffer (eventually consistent)
  * Uses fast conditional check instead of expensive modulo operation
  */
 static bool read_log_entry(log_entry_t* entry) {
@@ -287,12 +307,9 @@ static bool read_log_entry(log_entry_t* entry) {
         return false;
     }
     
-    // Critical section: protect shared buffer state
-    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     
     // Check if buffer is empty
     if (g_shared_layout->log_mgmt.read_index == g_shared_layout->log_mgmt.write_index) {
-        spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
         return false;  // No entries to read
     }
     
@@ -305,7 +322,6 @@ static bool read_log_entry(log_entry_t* entry) {
         g_shared_layout->log_mgmt.read_index = 0;
     }
     
-    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     return true;
 }
 
@@ -344,9 +360,18 @@ bool log_event(event_source_t event_source, log_level_t log_level,
     // Reset error state
     g_last_error = LOG_ERROR_NONE;
     
+    return true;
+
+
     if (!g_log_initialized) {
         g_last_error = LOG_ERROR_NOT_INITIALIZED;
         return false;
+    }
+    
+    // Check if this log level meets the minimum threshold
+    if (log_level < LOG_MINIMUM_LEVEL) {
+        // Silently drop logs below minimum level (not an error)
+        return true;
     }
     
     // Validate shared memory structure
@@ -499,12 +524,10 @@ uint32_t log_manager_get_utilization(void) {
         return 0;
     }
     
-    // Read buffer state atomically
-    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
+    // Read buffer state eventually consistent
     uint32_t write_idx = g_shared_layout->log_mgmt.write_index;
     uint32_t read_idx = g_shared_layout->log_mgmt.read_index;
     uint32_t max_entries = g_shared_layout->log_mgmt.max_entries;
-    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     
     if (max_entries == 0) return 0;
     
@@ -530,11 +553,9 @@ uint32_t log_manager_get_pending_count(void) {
     }
     
     // Read buffer state atomically  
-    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     uint32_t write_idx = g_shared_layout->log_mgmt.write_index;
     uint32_t read_idx = g_shared_layout->log_mgmt.read_index;
     uint32_t max_entries = g_shared_layout->log_mgmt.max_entries;
-    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     
     // Fast ring buffer count calculation without modulo
     if (write_idx >= read_idx) {
@@ -554,10 +575,8 @@ uint32_t log_manager_get_total_count(void) {
         return 0;
     }
     
-    // Read total count atomically
-    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
+    // Read total count without block, eventually consistent
     uint32_t total = g_shared_layout->log_mgmt.total_events_logged;
-    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     
     return total;
 }
@@ -574,8 +593,6 @@ uint32_t log_manager_get_core_sequence(uint8_t core_id) {
         return 0;
     }
     
-    // Read sequence atomically
-    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     uint32_t sequence = 0;
     
     if (core_id == 0) {
@@ -583,8 +600,6 @@ uint32_t log_manager_get_core_sequence(uint8_t core_id) {
     } else if (core_id == 1) {
         sequence = g_shared_layout->log_mgmt.core1_sequence;
     }
-    
-    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     return sequence;
 }
 

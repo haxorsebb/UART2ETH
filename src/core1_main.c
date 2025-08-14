@@ -19,7 +19,8 @@
  * - ADR-007: Event-Driven State Machine Architecture
  * - arc42 Chapter 5 - Core 1 Network Subsystem
  */
-
+#include "debug.h"
+#include "core1_timer.h"
 #include "state_machine.h"
 #include "shared_memory.h"
 #include "log_manager.h"
@@ -40,10 +41,12 @@ static void core1_init_persistence(void);
 static void core1_init_logging(void);
 static void core1_init_hardware(void);
 static void core1_init_network(void);
+static void core1_wait_for_link_up(void);
 static void core1_init_complete(void);
 
 // MAIN_STATE_CONFIGURATION functions
 static void core1_load_configuration(void);
+static void core1_check_dhcp_status(void);
 static void core1_validate_configuration(void);
 static void core1_configuration_complete(void);
 
@@ -51,6 +54,8 @@ static void core1_configuration_complete(void);
 static bool check_for_pending_work(void);
 static void core1_work_or_idle_wait(void);
 static void core1_idle_wait(void);
+static void core1_process_network_link_change(void);
+static void core1_process_packet_tx(void);
 static void core1_process_network(void);
 static void core1_process_persistence(void);
 static void core1_process_logs(void);
@@ -86,14 +91,15 @@ void core1_main(void) {
         // Get current states
         main_state = state_machine_get_main_state();
         sub_state = state_machine_get_core1_substate();
-        /*
+        
         // DEBUG: Print states periodically
+        
         static uint32_t debug_counter = 0;
         debug_counter++;
-        if (true || debug_counter % 50000 == 0) {  // Every 50k loops
+        if (debug_counter % 500 == 0) {  // Every 50k loops
             printf("DEBUG: Core1 main_state=%d, sub_state=%d\n", main_state, sub_state);
         }
-        */
+        
         // Big switch statement for main states
         switch (main_state) {
             case MAIN_STATE_INIT:
@@ -107,6 +113,9 @@ void core1_main(void) {
                         break;
                     case CORE1_INIT_NET:
                         core1_init_hardware();
+                        break;
+                    case CORE1_INIT_WAIT_FOR_LINK:
+                        core1_wait_for_link_up();
                         break;
                     case CORE1_INIT_COMPLETE:
                         core1_init_complete();
@@ -128,6 +137,12 @@ void core1_main(void) {
                     case CORE1_CONFIG_NET:
                         core1_load_configuration();
                         break;
+                    case CORE1_CONFIG_NET_WAIT_FOR_DHCP:
+                        core1_work_or_idle_wait();
+                        break;
+                    case CORE1_CONFIG_NET_CHECK_DHCP:
+                        core1_check_dhcp_status();
+                        break;
                     case CORE1_CONFIG_COMPLETE:
                         core1_configuration_complete();
                         break;
@@ -137,7 +152,9 @@ void core1_main(void) {
                     case CORE1_CONFIG_ERROR:
                         core1_idle_wait();  // wait for config changes
                         break;
-                     
+                    case CORE1_CONFIG_LOG_ACTIVE:
+                        core1_process_logs();                        
+                        break; 
                     default:
                         break;
                 }
@@ -146,11 +163,17 @@ void core1_main(void) {
             case MAIN_STATE_OPERATIONAL:
                 // Normal operation - process based on sub-state
                 switch (sub_state) {
+                    case CORE1_NET_CONNECTED:
+                        core1_process_network();  // look for work                       
+                        break;
                     case CORE1_NET_DISCONNECTED:
                         core1_process_network();  // Try to bring network up                        
                         break;
                     case CORE1_NET_IDLE:
                         core1_process_network();  // Try to bring network up                        
+                        break;
+                    case CORE1_NET_LINK_CHANGE:
+                        core1_process_network_link_change();  // process link change
                         break;
                     case CORE1_NET_ACTIVE_RECEIVE:
                         core1_process_network();  // Active network processing
@@ -189,18 +212,41 @@ void core1_main(void) {
  */
 static bool check_for_pending_work(void) {
 
-    if(network_manager_receive_packets_pending()) {
-        //printf("network has pending receive packets\n");
-        state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
+    enc28j60_process_interrupts();
+
+    if(network_manager_link_change_pending()) {
+        DEBUG_ONLY({ printf("network has link change pending\n"); });
+        state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE);
         return true; 
     }
-    if(log_manager_get_pending_count()) {
-        printf("Logmanager has pending count %d\n",log_manager_get_pending_count());
+    if(network_manager_receive_packets_pending()) {
+        DEBUG_ONLY({ printf("network has pending receive packets\n"); });
+        state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
+        network_manager_check_timeouts();
+    
+        return true; 
+    }
+
+    if(network_manager_transmit_packets_pending()) {
+        DEBUG_ONLY({ printf("network has pending transmit packets\n"); });
+        //state_machine_process_core1_event(CORE1_EVENT_NETWORK_SENDING_ACTIVE);
+        core1_process_packet_tx();
+        return true; 
+    }
+
+    if(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT))
+    {
+        network_manager_check_timeouts();
+        return true;
+    }
+
+    if(false && log_manager_get_pending_count()) {
+        DEBUG_ONLY({ printf("Logmanager has pending count %d\n",log_manager_get_pending_count()); });
         state_machine_process_core1_event(CORE1_EVENT_LOG_START);
         return true;
     }
     if(false && flash_persistence_save_needed()) {
-        printf("persistence needed\n");
+        DEBUG_ONLY({ printf("persistence needed\n"); });
         state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_START);
         return false;
     }
@@ -237,6 +283,8 @@ static void core1_idle_wait(void) {
 
     // Wait for interrupt - power efficient
     __wfi();
+    DEBUG_ONLY({printf("wfi elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - get_interrupt_ms());});
+
 }
 
 
@@ -266,6 +314,9 @@ static void core1_initialize(void) {
     printf("Core1: Setting up doorbell IRQ %u for doorbell %d\n", irq, doorbell_core1_wakes_core0);
     irq_add_shared_handler(irq, shared_doorbell_irq,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY-1);
     irq_set_enabled(irq, true);
+
+    //init timers
+    core1_timer_init();
 
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
 }
@@ -344,12 +395,34 @@ static void core1_init_hardware(void) {
         g_network_initialized = true;
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 1);
         // Generate network up event to move to next phase
-        state_machine_process_core1_event(CORE1_EVENT_INIT_NET_COMPLETE);
+        state_machine_process_core1_event(CORE1_EVENT_INIT_NET_WAIT_FOR_LINK_UP);
     } else {
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
         state_machine_process_core1_event(CORE1_EVENT_INIT_NET_FAILED);                                        
     }
 }
+
+/**
+ * @brief wait for the link to become available
+ */
+static void core1_wait_for_link_up(void) {
+
+    DEBUG_ONLY({
+        printf("WAINTING FOR LINK UP!");
+    });
+    bool result = network_manager_is_link_up();
+    
+    if (result) {
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_UP, 1);
+        // Generate network up event to move to next phase
+        state_machine_process_core1_event(CORE1_EVENT_INIT_NET_LINK_UP);
+    } else {
+        sleep_ms(200); //wait for link up
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DOWN, 1);
+        state_machine_process_core1_event(CORE1_EVENT_INIT_NET_LINK_DOWN);                                        
+    }
+}
+
 
 /**
  * @brief Complete initialization phase
@@ -372,15 +445,51 @@ static void core1_load_configuration(void) {
     // Copy loaded configuration to shared memory
     shared_memory_layout_t* layout = shared_memory_get_layout();
 
-    bool result = network_manager_init(&layout->config.network); //config gets copied inside
-    printf("RESULT OF network_manager_init on load: %d\n", result);
+    bool result = network_manager_reconfigure(&layout->config.network); //config gets copied inside
+    printf("RESULT OF network_manager_reconfigure on load: %d\n", result);
+    
     if (result) {
         // Generate to move to next phase
-        state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
+        if(layout->config.network.use_dhcp) {
+            state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_DHCP_REQUEST);
+        }
+        else {
+            state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
+        }
     } else {
         //signalize failure
         state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_FAILED);
     }
+    
+}
+
+/**
+ * @brief Wait for DHCP to complete and get IP address
+ */
+static void core1_check_dhcp_status(void) {
+    
+    DEBUG_ONLY({
+        printf("CHECK IF DHCP IS COMPLETE!\n");
+    });
+    network_manager_check_timeouts();
+
+    // Check if DHCP has successfully bound an IP address
+    if (network_manager_check_dhcp_status()) {
+        printf("DHCP successfully bound IP address\n");
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 1);
+        state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_GOT_DHCP);
+        return;
+    }
+
+    if(core1_timer_is_expired(CORE1_TIMER_DHCP_DISCOVER)) {
+        printf("DHCP TIMEOUT, retry\n");
+        state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT);
+        return;
+    }
+    //not expired, not ready, keep waiting
+    printf("DHCP WAIT\n");
+    state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_WAIT_DHCP);
+    return;
 }
 
 /**
@@ -394,9 +503,56 @@ static void core1_configuration_complete(void) {
     state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE1);
     //sleep if other core not yet ready (any event will do)
     state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
+
 }
 
 
+/**
+ * @brief Process connectivity change as a result of LINKIF interrupt flag
+ * 
+ */
+static void core1_process_network_link_change(void) {
+
+    network_manager_link_change();
+    if(network_manager_is_link_up()) {
+        state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_UP);
+    }
+    else {
+        state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_DOWN);
+    }
+}
+
+/**
+ * @brief Process TXIF interrupt flag
+ * 
+ */
+static void core1_process_packet_tx(void) {
+
+    network_manager_process_tx();
+    //TBD: this is wrong here: state_machine_process_core1_event(CORE1_EVENT_NETWORK_SENDING_FINISHED);
+}
+
+/**
+ * @brief Process connectivity change as a result of LINKIF interrupt flag
+ * 
+ */
+static void core1_process_network_connectivity_up(void) {
+
+    //exit from CORE1_NET_CONNECTED, any event will do currently
+    state_machine_process_core1_event(CORE1_EVENT_AUTO_TRANSITION);
+    
+}
+
+/**
+ * @brief Process connectivity change as a result of LINKIF interrupt flag
+ * 
+ */
+static void core1_process_network_connectivity_down(void) {
+
+    //exit from CORE1_NET_DISCONNECTED, any event will do currently
+    state_machine_process_core1_event(CORE1_EVENT_AUTO_TRANSITION);
+    
+}
 
 /**
  * @brief Process network operations

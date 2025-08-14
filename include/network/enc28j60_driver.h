@@ -28,11 +28,12 @@ extern "C" {
 #endif
 
 // Hardware pin configuration
-#define ENC28J60_INTERRUPT_PIN  14
-#define ENC28J60_SCK_PIN        2
-#define ENC28J60_MOSI_PIN       3   // SI - Serial Input
-#define ENC28J60_MISO_PIN       4   // SO - Serial Output  
-#define ENC28J60_CS_PIN         5
+#define ENC28J60_RESET_PIN      14
+#define ENC28J60_INTERRUPT_PIN  8
+#define ENC28J60_SCK_PIN        10 //2
+#define ENC28J60_MOSI_PIN       11 //3   // SI - Serial Input
+#define ENC28J60_MISO_PIN       12 //4   // SO - Serial Output  
+#define ENC28J60_CS_PIN         13 //5
 
 // Register Bank definitions
 #define ENC28J60_BANK0          0x00
@@ -322,9 +323,21 @@ bool enc28j60_is_tx_complete(void);
 
 /**
  * Check if received packet is available
- * @return true if packet available, false otherwise
+ * @return number of rx packet available
  */
-bool enc28j60_has_rx_packet(void);
+uint8_t enc28j60_has_rx_packet(void);
+
+/**
+ * Check if the LINKIF flag is set
+ * @return 
+ */
+bool enc28j60_has_link_change_pending(void);
+
+/**
+ * Check if the TXIF flag is set
+ * @return 
+ */
+bool enc28j60_has_txif_pending(void);
 
 /**
  * Receive Ethernet packet
@@ -371,11 +384,25 @@ bool enc28j60_has_pending_interrupt(void);
  */
 void enc28j60_reset(void);
 
+uint32_t get_interrupt_ms(void);
+
 /**
  * Get link status
  * @return true if link is up, false if link is down
  */
 bool enc28j60_get_link_status(void);
+
+/**
+ * Gets link status , clears pending interrupt bit
+ * @return true if link is up, false if link is down
+ */
+bool enc28j60_process_linkif_interrupt(void);
+
+/**
+ * Gets txif status , clears pending interrupt bit
+ * @return true 
+ */
+bool enc28j60_process_txif_interrupt(void);
 
 /**
  * Set MAC address

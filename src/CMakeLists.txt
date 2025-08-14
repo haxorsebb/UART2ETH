@@ -40,6 +40,19 @@ target_link_libraries(state_machine
     hardware_sync
 )
 
+# Timer subsystems (per-core hardware timer alarms)
+add_library(timer_subsystems
+    core0_timer.c
+    core1_timer.c
+)
+
+target_include_directories(timer_subsystems PUBLIC ../include)
+target_link_libraries(timer_subsystems 
+    pico_stdlib
+    hardware_timer
+    hardware_irq
+)
+
 # Core processing modules
 add_library(core_modules
     core0_main.c
@@ -52,6 +65,7 @@ target_link_libraries(core_modules
     config_manager
     log_manager
     network_manager
+    timer_subsystems
     pico_stdlib
     pico_multicore
     pico_sync

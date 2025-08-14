@@ -98,6 +98,13 @@ bool network_manager_init(const network_config_t* config);
 void network_manager_deinit(void);
 
 /**
+ * Reconfigure network manager with new configuration
+ * @param config New network configuration parameters
+ * @return true if reconfiguration successful, false otherwise
+ */
+bool network_manager_reconfigure(const network_config_t* config);
+
+/**
  * @brief Helper function to schedule work
  */
 bool network_manager_receive_packets_pending(void);
@@ -105,13 +112,20 @@ bool network_manager_receive_packets_pending(void);
 /**
  * @brief Helper function to schedule work
  */
-bool network_manager_send_packets_pending(void);
+bool network_manager_interrupts_pending(void);
+
+/**
+ * @brief Helper function to schedule work
+ */
+bool network_manager_transmit_packets_pending(void);
 
 /**
  * Process network manager tasks (call from Core1 main loop)
  * This function handles link monitoring, DHCP processing, and driver polling
  */
 void network_manager_process(void);
+
+void network_manager_check_timeouts(void);
 
 /**
  * Check if network is ready for use
@@ -124,6 +138,12 @@ bool network_manager_is_ready(void);
  * @return Current network status enumeration
  */
 network_status_t network_manager_get_status(void);
+
+/**
+ * Get current network status
+ * @return Current dhcp status enumeration
+ */
+bool network_manager_check_dhcp_status(void);
 
 /**
  * @brief Network configuration and status functions
@@ -209,6 +229,24 @@ char* network_manager_ip_to_string(const simple_ip_addr_t* ip_addr, char* buffer
  * @return true if basic stack functionality works, false otherwise
  */
 bool network_manager_test_connectivity(void);
+
+/**
+ * handle network network connectivity changes, link up/down 
+ */
+void network_manager_link_change(void);
+
+/**
+ * check if the link status inerrupt is pending
+ * @return true if the LINKIF flag is set
+ */
+bool network_manager_link_change_pending(void);
+
+
+/**
+ * check what to do after a packet was sucessfully sent
+ */
+void network_manager_process_tx(void);
+
 
 /**
  * Get detailed network interface information for diagnostics

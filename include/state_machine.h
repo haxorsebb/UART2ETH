@@ -57,12 +57,18 @@ typedef enum {
     CORE1_INIT_PERISTENCE,      // Init persistence
     CORE1_INIT_LOGGING,         // init logging
     CORE1_INIT_NET,             // init net
+    CORE1_INIT_WAIT_FOR_LINK,   // init is not complete without link
     CORE1_INIT_COMPLETE,        // init complete
     CORE1_INIT_IDLE,            // init complete, sleep until other core finishes init
     CORE1_CONFIG_NET,           // (re)-configure net 
     CORE1_CONFIG_COMPLETE,      // (re)-configuration of net successfull
+    CORE1_CONFIG_NET_WAIT_FOR_DHCP, // (re)-configuration of net successfull, get dhcp
+    CORE1_CONFIG_NET_CHECK_DHCP, // (re)-configuration of net successfull, check if we got dhcp   
     CORE1_CONFIG_IDLE,          // (re)-configuration of net successfull
+    CORE1_CONFIG_LOG_ACTIVE,    //there are logs queued
     CORE1_CONFIG_ERROR,         // (re)-configuration of net NOT successfull
+    CORE1_NET_LINK_CHANGE,      // Network interface changing
+    CORE1_NET_CONNECTED,        // Network interface up
     CORE1_NET_DISCONNECTED,     // Network interface down
     CORE1_NET_IDLE,             // Network interface up, no connections
     CORE1_NET_ACTIVE_RECEIVE,   // Active network connections
@@ -94,7 +100,8 @@ typedef enum {
     CORE0_EVENT_UART_DATA_READY,        // UART data available for processing
     CORE0_EVENT_UART_IDLE,              // UART processing completed
     CORE0_EVENT_UART_ERROR,             // UART hardware error detected
-    CORE0_EVENT_ERROR_RECOVERED         // UART error recovery complete
+    CORE0_EVENT_ERROR_RECOVERED,         // UART error recovery complete
+    CORE0_EVENT_AUTO_TRANSITION            // DUMMY EVENT FOR auto-state transition
 } core0_event_t;
 
 // Core1 state machine events
@@ -103,10 +110,20 @@ typedef enum {
     CORE1_EVENT_INIT_PERSISTENCE_FAILED, // Peristence initialized 
     CORE1_EVENT_INIT_LOGGING_COMPLETE,     // Logging initialized 
     CORE1_EVENT_INIT_LOGGING_FAILED,     // Logging initialized 
+    CORE1_EVENT_INIT_NET_WAIT_FOR_LINK_UP,  // Network interface processed LINK_CHANGE
+    CORE1_EVENT_INIT_NET_LINK_UP,        // Network interface processed LINK_CHANGE
+    CORE1_EVENT_INIT_NET_LINK_DOWN,        // Network interface processed LINK_CHANGE
     CORE1_EVENT_INIT_NET_COMPLETE,     // Network initialized 
     CORE1_EVENT_INIT_NET_FAILED,     // Network initialized 
+    CORE1_EVENT_CONFIG_NET_DHCP_REQUEST,     // Network sent dhcp request
+    CORE1_EVENT_CONFIG_NET_GOT_DHCP,        // Network dhcp request was aswered
+    CORE1_EVENT_CONFIG_NET_WAIT_DHCP,       // we were interrupted, but dhcp is not yet complete
+    CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT,     // Network dhcp request timed out
     CORE1_EVENT_CONFIG_NET_COMPLETE,     // Network configured
     CORE1_EVENT_CONFIG_NET_FAILED,     // Network configuration
+    CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE,        // Network interface LINK_CHANGE
+    CORE1_EVENT_NETWORK_LINK_UP,          // should never happen here, but in init
+    CORE1_EVENT_NETWORK_LINK_DOWN,          // link was lost
     CORE1_EVENT_NETWORK_RECEIVE_ACTIVE,        // Network interface has packets
     CORE1_EVENT_NETWORK_RECEIVE_FINISHED,        // Network interface has no more packets
     CORE1_EVENT_NETWORK_SENDING_ACTIVE,        // Network interface has packets
@@ -118,7 +135,8 @@ typedef enum {
     CORE1_EVENT_PERSISTENCE_START, // Flash operation starting
     CORE1_EVENT_PERSISTENCE_END,   // Flash operation completed
     CORE1_EVENT_LOG_START,         // Log processing starting
-    CORE1_EVENT_LOG_END            // Log processing completed
+    CORE1_EVENT_LOG_END,            // Log processing completed
+    CORE1_EVENT_AUTO_TRANSITION            // DUMMY EVENT FOR auto-state transition
 } core1_event_t;
 
 /**
