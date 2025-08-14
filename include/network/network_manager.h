@@ -117,13 +117,15 @@ bool network_manager_interrupts_pending(void);
 /**
  * @brief Helper function to schedule work
  */
-bool network_manager_send_packets_pending(void);
+bool network_manager_transmit_packets_pending(void);
 
 /**
  * Process network manager tasks (call from Core1 main loop)
  * This function handles link monitoring, DHCP processing, and driver polling
  */
 void network_manager_process(void);
+
+void network_manager_check_timeouts(void);
 
 /**
  * Check if network is ready for use
@@ -136,6 +138,12 @@ bool network_manager_is_ready(void);
  * @return Current network status enumeration
  */
 network_status_t network_manager_get_status(void);
+
+/**
+ * Get current network status
+ * @return Current dhcp status enumeration
+ */
+bool network_manager_check_dhcp_status(void);
 
 /**
  * @brief Network configuration and status functions
@@ -232,6 +240,13 @@ void network_manager_link_change(void);
  * @return true if the LINKIF flag is set
  */
 bool network_manager_link_change_pending(void);
+
+
+/**
+ * check what to do after a packet was sucessfully sent
+ */
+void network_manager_process_tx(void);
+
 
 /**
  * Get detailed network interface information for diagnostics

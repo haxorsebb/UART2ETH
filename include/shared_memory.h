@@ -18,6 +18,7 @@
 #ifndef SHARED_MEMORY_H
 #define SHARED_MEMORY_H
 
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "pico/sync.h"

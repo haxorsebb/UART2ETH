@@ -55,6 +55,8 @@ static const uint8_t* g_local_mac = NULL; // MAC address storage (Arduino patter
 
 // Interrupt handling state
 static volatile bool g_interrupt_pending = false;
+static volatile uint32_t g_interrupt_time = 0 ;
+        
 static volatile uint8_t g_last_interrupt_status = 0;
 static volatile bool g_is_ready = false;
 
@@ -633,11 +635,14 @@ static void enc28j60_spi_init(void) {
  * @brief ENC28J60 interrupt handler
  */
 static void enc28j60_interrupt_handler(uint gpio, uint32_t events) {
-    
     if (gpio == ENC28J60_INTERRUPT_PIN) {
         //TBD: to not read SPI in interrupt (might interrupt send/receive) Read interrupt status to clear the interrupt
         //g_last_interrupt_status = enc28j60_read_register_internal(ENC28J60_EIR);
+        g_interrupt_time = to_ms_since_boot(get_absolute_time());
         g_interrupt_pending = true;
+        DEBUG_ONLY({printf("INTERRUPT! %d\n", g_interrupt_time);});
+        
+        enc28j60_clear_interrupts(0xFF);    //clear all, we have a copy
     }
     return;
 }
@@ -685,17 +690,36 @@ static void enc28j60_enable_interrupts(void) {
     enc28j60_clear_register_bits(ENC28J60_EIR, 0xFF);
     
     // Enable global interrupts and specific interrupt sources
-    uint8_t eie = ENC28J60_EIE_INTIE | ENC28J60_EIE_PKTIE | ENC28J60_EIE_LINKIE;
+    uint8_t eie = ENC28J60_EIE_INTIE | ENC28J60_EIE_PKTIE | ENC28J60_EIE_LINKIE ;
     enc28j60_write_register_internal(ENC28J60_EIE, eie);
     
     printf("ENC28J60: Interrupts enabled (EIE=0x%02X)\n", eie);
 }
 
+/**
+ * @brief Enable ENC28J60 interrupts
+ */
+static void enc28j60_get_enabled_interrupts(void) {
+
+    enc28j60_set_register_bank_internal(ERXTX_BANK);
+    
+    
+    // Enable global interrupts and specific interrupt sources
+    uint8_t eie=0; // = ENC28J60_EIE_INTIE | ENC28J60_EIE_PKTIE | ENC28J60_EIE_LINKIE ;
+    eie = enc28j60_read_register_internal(ENC28J60_EIE);
+    
+    DEBUG_ONLY({printf("ENC28J60: Interrupts currently enabled (EIE=0x%02X)\n", eie);});
+}
+
 static void enc28j60_unblock_interrupt(void) {
+    DEBUG_ONLY({printf("ENC28J60: UNBLOCKING IRQ!\n");});
     gpio_set_irq_enabled(ENC28J60_INTERRUPT_PIN, GPIO_IRQ_EDGE_FALL, true);
+    //enc28j60_enable_interrupts();
+    enc28j60_get_enabled_interrupts();
 }
 
 static void enc28j60_block_interrupt(void) {
+    DEBUG_ONLY({printf("ENC28J60: BLOCKING IRQ!\n");});
     gpio_set_irq_enabled(ENC28J60_INTERRUPT_PIN, GPIO_IRQ_EDGE_FALL, false);
 }
 
@@ -744,17 +768,25 @@ void enc28j60_write_buffer(const uint8_t* buffer, uint16_t length) {
     enc28j60_arch_spi_deselect();
 }
 
+uint32_t get_interrupt_ms()
+{
+    return g_interrupt_time;
+}
+
 /**
  * @brief Send Ethernet packet (Arduino reference implementation)
  */
 bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
     if (!g_driver_initialized || !packet || !packet->data || 
         packet->length == 0 || !packet->valid) {
+        printf("ENC28J60: can not send. NOT INITIALIZED\n" );
+    
         return false;
     }
     
     if (packet->length > ENC28J60_MAX_FRAME_SIZE) {
         g_enc28j60_state.tx_errors++;
+        printf("ENC28J60: can not send. TOO LONG\n" );
         return false;
     }
     
@@ -796,11 +828,16 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
         sleep_us(1);
         timeout--;
     }
+    DEBUG_ONLY( {printf("ENC28J60: send took: %d us\n", 10000- timeout ); });
+        
     
     // Check for transmission errors (Arduino reference)
     uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
     bool tx_success = (estat & ENC28J60_ESTAT_TXABRT) == 0;
     
+
+    DEBUG_ONLY( {printf("total elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - g_interrupt_time);});
+
     enc28j60_unblock_interrupt();
 
     if (tx_success) {
@@ -976,6 +1013,7 @@ void enc28j60_clear_interrupts(uint8_t flags) {
     });
     enc28j60_set_register_bank_internal(ERXTX_BANK);
     enc28j60_clear_register_bits(ENC28J60_EIR, flags);
+
 }
 
 /**
@@ -992,8 +1030,6 @@ bool enc28j60_process_interrupts(void) {
     if (!g_interrupt_pending || !g_driver_initialized) {
         return false;
     }
-    enc28j60_block_interrupt();
-
     //we keep the bits around in g_last_interrupt_status as we might need several rounds to handle everything
     g_last_interrupt_status |= enc28j60_get_interrupt_status();    
     
@@ -1005,8 +1041,6 @@ bool enc28j60_process_interrupts(void) {
             g_last_interrupt_status & ENC28J60_EIR_TXERIF,
             g_last_interrupt_status & ENC28J60_EIR_TXIF);
     });
-    
-    enc28j60_unblock_interrupt();
     return true;
 }
 /**
@@ -1014,7 +1048,18 @@ bool enc28j60_process_interrupts(void) {
  */
  void enc28j60_clear_interrupt_pending(void)
  {
-    DEBUG_ONLY({
+    // no interrupt unhandled?
+    if(0 == ( g_last_interrupt_status & (ENC28J60_EIR_LINKIF 
+                                        |ENC28J60_EIR_PKTIF
+                                        |ENC28J60_EIR_RXERIF
+                                        |ENC28J60_EIR_TXERIF
+                                        |ENC28J60_EIR_TXIF                                        
+                                         ))) {
+        // Clear the interrupt pending flag
+        g_interrupt_pending = false;
+    }
+    else {
+        DEBUG_ONLY({
         printf("Checking remaining interrupt flags:\n ENC28J60_EIR_LINKIF: %d\n ENC28J60_EIR_PKTIF: %d\n ENC28J60_EIR_RXERIF: %d\n ENC28J60_EIR_TXERIF: %d\n ENC28J60_EIR_TXIF: %d\n",
             g_last_interrupt_status & ENC28J60_EIR_LINKIF,
             g_last_interrupt_status & ENC28J60_EIR_PKTIF,
@@ -1022,17 +1067,7 @@ bool enc28j60_process_interrupts(void) {
             g_last_interrupt_status & ENC28J60_EIR_TXERIF,
             g_last_interrupt_status & ENC28J60_EIR_TXIF);
     });
-    // no interrupt unhandled?
-    if(0 == ( g_last_interrupt_status & (ENC28J60_EIR_LINKIF 
-                                        ^ENC28J60_EIR_PKTIF
-                                        ^ENC28J60_EIR_RXERIF
-                                        ^ENC28J60_EIR_TXERIF
-                                        ^ENC28J60_EIR_TXIF                                        
-                                         ))) {
-        // Clear the interrupt pending flag
-        g_interrupt_pending = false;
     }
-    
  }
 
 
@@ -1042,7 +1077,7 @@ bool enc28j60_process_interrupts(void) {
  */
 bool enc28j60_has_link_change_pending(void)
 {
-    return (g_last_interrupt_status &= ~ENC28J60_EIR_LINKIF);
+    return (g_last_interrupt_status & ENC28J60_EIR_LINKIF);
 }
 
 /**
@@ -1061,6 +1096,31 @@ bool enc28j60_process_linkif_interrupt(void)
     }
     return link_up;
 }
+
+/**
+ * @brief check if TXIF is set
+ */
+bool enc28j60_has_txif_pending(void)
+{
+    return (g_last_interrupt_status & ENC28J60_EIR_TXIF);
+}
+
+/**
+ * @brief Process TXIF interrupts
+ */
+bool enc28j60_process_txif_interrupt(void)
+{
+    // Process packet transmitted interrupt
+    if (g_last_interrupt_status & ENC28J60_EIR_TXIF) {
+        
+        //clear the bit 
+        g_last_interrupt_status &= ~ENC28J60_EIR_TXIF;
+        enc28j60_clear_interrupt_pending();
+    }
+    return true;
+}
+
+
 
 /**
  * @brief Read PHY register via MII interface (Arduino reference implementation)

@@ -334,6 +334,12 @@ uint8_t enc28j60_has_rx_packet(void);
 bool enc28j60_has_link_change_pending(void);
 
 /**
+ * Check if the TXIF flag is set
+ * @return 
+ */
+bool enc28j60_has_txif_pending(void);
+
+/**
  * Receive Ethernet packet
  * @param packet Output packet structure (data buffer must be allocated)
  * @param max_length Maximum buffer size
@@ -378,6 +384,8 @@ bool enc28j60_has_pending_interrupt(void);
  */
 void enc28j60_reset(void);
 
+uint32_t get_interrupt_ms(void);
+
 /**
  * Get link status
  * @return true if link is up, false if link is down
@@ -389,6 +397,12 @@ bool enc28j60_get_link_status(void);
  * @return true if link is up, false if link is down
  */
 bool enc28j60_process_linkif_interrupt(void);
+
+/**
+ * Gets txif status , clears pending interrupt bit
+ * @return true 
+ */
+bool enc28j60_process_txif_interrupt(void);
 
 /**
  * Set MAC address

@@ -20,13 +20,11 @@
 // Core1 timer identifiers (Network/Maintenance focus)  
 typedef enum {
     CORE1_TIMER_DHCP_RENEWAL = 0,       // DHCP lease renewal timer
-    CORE1_TIMER_TCP_KEEPALIVE,          // TCP connection keep-alive timer
     CORE1_TIMER_NETWORK_TIMEOUT,        // Network operation timeout
     CORE1_TIMER_PERSISTENCE_INTERVAL,   // Flash persistence interval
     CORE1_TIMER_LOG_FLUSH,              // Log processing/flush timer
     CORE1_TIMER_CONNECTION_TIMEOUT,     // TCP connection timeout
     CORE1_TIMER_DHCP_DISCOVER,          // DHCP discover retry timer
-    CORE1_TIMER_ARP_TIMEOUT,            // ARP request timeout
     CORE1_TIMER_MAINTENANCE_CYCLE,      // Periodic maintenance cycle
     CORE1_TIMER_STATISTICS_UPDATE,      // Statistics collection timer
     CORE1_TIMER_CONFIG_BACKUP,          // Configuration backup timer

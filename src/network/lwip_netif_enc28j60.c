@@ -111,12 +111,6 @@ void lwip_netif_enc28j60_process(void) {
         return;
     }
 
-    if( !netif_is_up(&g_enc28j60_netif)  ) {
-        DEBUG_ONLY( {
-            printf("lwIP: process, but not up!\n");
-        });
-    }
-    
     // PERFORMANCE: Periodic debug stats disabled for <5ms ping target
     // This reduces printf overhead during high-frequency packet processing
     /*
@@ -141,7 +135,7 @@ void lwip_netif_enc28j60_process(void) {
     
     // Check for incoming packets and process them
     int packets_processed = 0;
-    while (enc28j60_has_rx_packet() && packets_processed < 10) {  // Limit to prevent infinite loop
+    while (enc28j60_has_rx_packet() && packets_processed < 20) {  // Limit to prevent infinite loop
         enc28j60_packet_t packet;
         packet.data = g_rx_buffer;
         packet.length = 0;
@@ -178,6 +172,9 @@ void lwip_netif_enc28j60_process(void) {
             }
         }
     }
+    DEBUG_ONLY( {printf("ENC28J60: read %d packets\n",packets_processed );});
+    
+        
 }
 
 /**
@@ -246,9 +243,6 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
     // Allocate buffer for the complete packet
     uint16_t total_len = p->tot_len;
     
-    //printf("TX: Packet length=%u bytes\n", total_len);
-    
-
     if (total_len > 1518) {  // Maximum Ethernet frame size
         printf("lwIP netif: Packet too large (%u bytes)\n", total_len);
         return ERR_BUF;

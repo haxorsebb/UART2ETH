@@ -86,6 +86,9 @@ void core1_timer_set(core1_timer_id_t timer_id, uint32_t interval_ms) {
     if (!core1_timer_id_valid(timer_id) || !g_core1_timers.initialized) {
         return;
     }
+
+    // Update hardware alarm for next expiration
+    core1_timer_update_next_alarm();
     
     timer_entry_t* timer = &g_core1_timers.timers[timer_id];
     

@@ -232,20 +232,7 @@ static void core0_init_complete(void) {
  * interrupt handlers that change the substate before WFI returns.
  */
 static void core0_idle_wait(void) {
-   /*
-    // Check for wake-up messages from other core before WFI
-    if (multicore_fifo_rvalid()) {
-        uint32_t message = multicore_fifo_pop_blocking();
-        uint32_t reason = message >> 16;
-        uint32_t data = message & 0xFFFF;
-        // Handle wake-up reason - main state may have changed
-        (void)reason;  // Suppress unused warning
-        (void)data;    // Suppress unused warning
 
-        printf("A MESSAGE WAS RECEIVED BY OTHER CORE: %d DATA: %d ON CORE%d\n",reason, data,get_core_num() );
-        return;  // Don't go to WFI, continue main loop
-    }
-    */
     // Wait for interrupt - power efficient
     // NOTE: UART data availability must be handled by UART interrupt 
     // handler that changes substate from UART_IDLE to UART_ACTIVE
