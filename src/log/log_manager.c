@@ -17,31 +17,8 @@
 #include <stdio.h>
 #include <string.h>
 
-// Import minimum log level from debug configuration
-#ifndef LOG_MINIMUM_LEVEL
-#define LOG_MINIMUM_LEVEL LOG_LEVEL_INFO  // Default to INFO if not set
-#endif
 
-// Constants for better maintainability
-#define LOG_MAX_MESSAGE_LENGTH 256
-#define LOG_MAX_FORMAT_LENGTH 200
-#define EVENT_FORMAT_ARRAY_SIZE (sizeof(event_format_strings) / sizeof(event_format_strings[0]))
 
-// Event type ranges for better code organization and validation
-#define SYSTEM_EVENT_BASE    0
-#define SYSTEM_EVENT_MAX     99
-#define UART_EVENT_BASE      100
-#define UART_EVENT_MAX       199
-#define NETWORK_EVENT_BASE   200
-#define NETWORK_EVENT_MAX    299
-#define CONFIG_EVENT_BASE    300
-#define CONFIG_EVENT_MAX     399
-#define OTA_EVENT_BASE       400
-#define OTA_EVENT_MAX        499
-
-// Valid event source ranges
-#define EVENT_SOURCE_MIN     EVENT_SOURCE_SYSTEM
-#define EVENT_SOURCE_MAX     EVENT_SOURCE_WATCHDOG
 
 // Global error state
 static log_error_t g_last_error = LOG_ERROR_NONE;
@@ -115,6 +92,11 @@ static const char* const event_format_strings[] = {
     [LOG_EVENT_NETWORK_STATUS] = "Network status check - available: %u",
     [LOG_EVENT_NETWORK_OPERATIONS] = "Processing network operations (TCP/IP, sockets)",
     [LOG_EVENT_CONNECTION_CHECK] = "Connection check - active connections: %u",
+    [LOG_EVENT_NETWORK_DEINIT] = "Network interface deinitialized",
+    [LOG_EVENT_NETWORK_TX] = "Network transmit operation",
+    [LOG_EVENT_NETWORK_RX] = "Network receive operation", 
+    [LOG_EVENT_NETWORK_RESET] = "Network interface reset - reason code %u",
+    [LOG_EVENT_NETWORK_CONFIG] = "Network configuration updated - parameter %u",
     
     // Configuration events (300-399)
     [LOG_EVENT_CONFIG_CHANGED] = "Configuration parameter %u changed",
@@ -150,7 +132,90 @@ static const char* const event_format_strings[] = {
     // LOGGING events (600-699)
     [LOG_EVENT_LOGGING_INIT_SUCCESS] = "Log management system initialized.",
     [LOG_EVENT_LOGGING_INIT_FAIL] = "Log management system init FAILED!",
+
+    // Main state change events (700-703)
+    // IMPORTANT: These MUST match main_state_t enum order exactly and be complete
+    [LOG_MAIN_STATE_INIT] = "Main state changed to MAIN_STATE_INIT",
+    [LOG_MAIN_STATE_CONFIGURATION] = "Main state changed to MAIN_STATE_CONFIGURATION",
+    [LOG_MAIN_STATE_OPERATIONAL] = "Main state changed to MAIN_STATE_OPERATIONAL",
+    [LOG_MAIN_STATE_ERROR] = "Main state changed to MAIN_STATE_ERROR",
+
+    // Core0 substate change events (720-730)
+    // IMPORTANT: These MUST match core0_substate_t enum order exactly and be complete
+    [LOG_CORE0_INIT_UART] = "Core0 substate changed to CORE0_INIT_UART",
+    [LOG_CORE0_INIT_COMPLETE] = "Core0 substate changed to CORE0_INIT_COMPLETE",
+    [LOG_CORE0_INIT_IDLE] = "Core0 substate changed to CORE0_INIT_IDLE",
+    [LOG_CORE0_INIT_ERROR] = "Core0 substate changed to CORE0_INIT_ERROR",
+    [LOG_CORE0_CONFIG_UART] = "Core0 substate changed to CORE0_CONFIG_UART",
+    [LOG_CORE0_CONFIG_COMPLETE] = "Core0 substate changed to CORE0_CONFIG_COMPLETE",
+    [LOG_CORE0_CONFIG_IDLE] = "Core0 substate changed to CORE0_CONFIG_IDLE",
+    [LOG_CORE0_CONFIG_ERROR] = "Core0 substate changed to CORE0_CONFIG_ERROR",
+    [LOG_CORE0_UART_IDLE] = "Core0 substate changed to CORE0_UART_IDLE",
+    [LOG_CORE0_UART_ACTIVE] = "Core0 substate changed to CORE0_UART_ACTIVE",
+    [LOG_CORE0_UART_ERROR] = "Core0 substate changed to CORE0_UART_ERROR",
+
+    // Core1 substate change events (750-773)
+    // IMPORTANT: These MUST match core1_substate_t enum order exactly and be complete
+    [LOG_CORE1_INIT_PERISTENCE] = "Core1 substate changed to CORE1_INIT_PERISTENCE",
+    [LOG_CORE1_INIT_LOGGING] = "Core1 substate changed to CORE1_INIT_LOGGING",
+    [LOG_CORE1_INIT_NET] = "Core1 substate changed to CORE1_INIT_NET",
+    [LOG_CORE1_INIT_WAIT_FOR_LINK] = "Core1 substate changed to CORE1_INIT_WAIT_FOR_LINK",
+    [LOG_CORE1_INIT_COMPLETE] = "Core1 substate changed to CORE1_INIT_COMPLETE",
+    [LOG_CORE1_INIT_IDLE] = "Core1 substate changed to CORE1_INIT_IDLE",
+    [LOG_CORE1_CONFIG_NET] = "Core1 substate changed to CORE1_CONFIG_NET",
+    [LOG_CORE1_CONFIG_COMPLETE] = "Core1 substate changed to CORE1_CONFIG_COMPLETE",
+    [LOG_CORE1_CONFIG_NET_WAIT_FOR_DHCP] = "Core1 substate changed to CORE1_CONFIG_NET_WAIT_FOR_DHCP",
+    [LOG_CORE1_CONFIG_NET_CHECK_DHCP] = "Core1 substate changed to CORE1_CONFIG_NET_CHECK_DHCP",
+    [LOG_CORE1_CONFIG_IDLE] = "Core1 substate changed to CORE1_CONFIG_IDLE",
+    [LOG_CORE1_CONFIG_LOG_ACTIVE] = "Core1 substate changed to CORE1_CONFIG_LOG_ACTIVE",
+    [LOG_CORE1_CONFIG_ERROR] = "Core1 substate changed to CORE1_CONFIG_ERROR",
+    [LOG_CORE1_NET_LINK_CHANGE] = "Core1 substate changed to CORE1_NET_LINK_CHANGE",
+    [LOG_CORE1_NET_CONNECTED] = "Core1 substate changed to CORE1_NET_CONNECTED",
+    [LOG_CORE1_NET_DISCONNECTED] = "Core1 substate changed to CORE1_NET_DISCONNECTED",
+    [LOG_CORE1_NET_IDLE] = "Core1 substate changed to CORE1_NET_IDLE",
+    [LOG_CORE1_NET_ACTIVE_RECEIVE] = "Core1 substate changed to CORE1_NET_ACTIVE_RECEIVE",
+    [LOG_CORE1_NET_ACTIVE_SEND] = "Core1 substate changed to CORE1_NET_ACTIVE_SEND",
+    [LOG_CORE1_PERSISTENCE_ACTIVE] = "Core1 substate changed to CORE1_PERSISTENCE_ACTIVE",
+    [LOG_CORE1_LOG_ACTIVE] = "Core1 substate changed to CORE1_LOG_ACTIVE",
+    [LOG_CORE1_IDLE] = "Core1 substate changed to CORE1_IDLE",
+    [LOG_CORE1_INIT_ERROR] = "Core1 substate changed to CORE1_INIT_ERROR",
+    [LOG_CORE1_SHUTDOWN] = "Core1 substate changed to CORE1_SHUTDOWN",
 };
+
+// Static lookup table for event source names - fixed width, pre-centered
+// 14 characters wide to accommodate longest source name "CORE0 SUBSTATE"
+static const char* const event_source_strings[] = {
+    "    SYSTEM    ",  // 0 - EVENT_SOURCE_SYSTEM 
+    "    UART0     ",  // 1 - EVENT_SOURCE_UART0
+    "    UART1     ",  // 2 - EVENT_SOURCE_UART1  
+    "    UART2     ",  // 3 - EVENT_SOURCE_UART2
+    "    UART3     ",  // 4 - EVENT_SOURCE_UART3
+    "   NETWORK    ",  // 5 - EVENT_SOURCE_NETWORK
+    "   CONFIG     ",  // 6 - EVENT_SOURCE_CONFIG
+    "     OTA      ",  // 7 - EVENT_SOURCE_OTA
+    "   WATCHDOG   ",  // 8 - EVENT_SOURCE_WATCHDOG
+    " PERSISTENCE  ",  // 9 - EVENT_SOURCE_PERSISTENCE
+    "   LOGGING    ",  // 10 - EVENT_SOURCE_LOGGING
+    "     UI       ",  // 11 - EVENT_SOURCE_UI
+    "     ANE      ",  // 12 - EVENT_SOURCE_ANE
+    "    IMOUTO    ",  // 13 - EVENT_SOURCE_IMOUTO
+    "  MAIN STATE  ",  // 14 - EVENT_SOURCE_MAIN_STATE
+    "CORE0 SUBSTATE",  // 15 - EVENT_SOURCE_CORE0_SUBSTATE
+    "CORE1 SUBSTATE"   // 16 - EVENT_SOURCE_CORE1_SUBSTATE
+};
+
+// Human-readable log level strings - fixed width
+static const char* const log_level_strings[] = {
+    "TRACE",  // 0 - LOG_LEVEL_TRACE
+    "DEBUG",  // 1 - LOG_LEVEL_DEBUG
+    "INFO ",  // 2 - LOG_LEVEL_INFO  
+    "WARN ",  // 3 - LOG_LEVEL_WARN
+    "ERROR"   // 4 - LOG_LEVEL_ERROR
+};
+
+// Array bounds checking constants
+#define EVENT_SOURCE_STRINGS_COUNT (sizeof(event_source_strings) / sizeof(event_source_strings[0]))
+#define LOG_LEVEL_STRINGS_COUNT (sizeof(log_level_strings) / sizeof(log_level_strings[0]))
 
 /**
  * Validate that shared memory structure is properly initialized
@@ -188,12 +253,21 @@ static bool validate_event_type(event_type_t event_type) {
         (event_type >= CONFIG_EVENT_BASE && event_type <= CONFIG_EVENT_MAX) ||
         (event_type >= OTA_EVENT_BASE && event_type <= OTA_EVENT_MAX)||
         (event_type >= PERSISTENCE_EVENT_BASE && event_type <= PERSISTENCE_EVENT_MAX)||
-        (event_type >= LOGGING_EVENT_BASE && event_type <= LOGGING_EVENT_MAX)) {
+        (event_type >= LOGGING_EVENT_BASE && event_type <= LOGGING_EVENT_MAX)||
+        (event_type >= STATE_CHANGE_EVENT_BASE && event_type <= STATE_CHANGE_EVENT_MAX)) {
         
         // Additional check: ensure we have a format string for this type
         if (event_type < EVENT_FORMAT_ARRAY_SIZE && event_format_strings[event_type] != NULL) {
             return true;
+        } else {
+            // Safety debugging output: in-range but missing format string
+            printf("[DEBUG] Event type %u in valid range but format string missing or null\n", event_type);
+            fflush(stdout);
         }
+    } else {
+        // Safety debugging output: completely out of range
+        printf("[DEBUG] Event type %u out of all valid ranges (SYSTEM:0-99, UART:100-199, NET:200-299, CONFIG:300-399, OTA:400-499, PERSIST:500-599, LOG:600-699, STATE:700-799)\n", event_type);
+        fflush(stdout);
     }
     
     g_last_error = LOG_ERROR_INVALID_EVENT_TYPE;
@@ -207,6 +281,11 @@ static bool validate_event_source(event_source_t event_source) {
     if (event_source >= EVENT_SOURCE_MIN && event_source <= EVENT_SOURCE_MAX) {
         return true;
     }
+    
+    // Safety debugging output: show what source was invalid
+    printf("[DEBUG] Event source %u out of valid range (min:%u, max:%u)\n", 
+           event_source, EVENT_SOURCE_MIN, EVENT_SOURCE_MAX);
+    fflush(stdout);
     
     g_last_error = LOG_ERROR_INVALID_EVENT_SOURCE;
     return false;
@@ -385,8 +464,11 @@ bool log_event(event_source_t event_source, log_level_t log_level,
         return false;  // Error already set by validate_event_type
     }
     
-    // Validate log level (0-3)
+    // Validate log level (0-4) - enhanced safety debugging
     if (log_level > LOG_LEVEL_ERROR) {
+        // Safety debugging output: show invalid log level
+        printf("[DEBUG] Log level %u out of valid range (max:%u)\n", log_level, LOG_LEVEL_ERROR);
+        fflush(stdout);
         g_last_error = LOG_ERROR_INVALID_EVENT_TYPE;  // Reuse for simplicity
         return false;
     }
@@ -416,38 +498,65 @@ bool log_event(event_source_t event_source, log_level_t log_level,
  */
 static bool format_single_log_entry(const log_entry_t* entry, char* output_buffer, size_t buffer_size) {
     if (!entry || !output_buffer || buffer_size == 0) {
+        // Safety debugging output: invalid parameters
+        if (output_buffer && buffer_size > 0) {
+            snprintf(output_buffer, buffer_size, "[SAFETY] format_single_log_entry: invalid parameters (entry=%p, buffer=%p, size=%zu)", 
+                     entry, output_buffer, buffer_size);
+        }
         return false;
     }
     
-    // Validate event type bounds
+    // Validate event type bounds - enhanced safety output
     if (entry->event_type >= EVENT_FORMAT_ARRAY_SIZE) {
-        snprintf(output_buffer, buffer_size, "[%08u][%u][%u] UNKNOWN_EVENT_TYPE_%u",
-                entry->timestamp, entry->event_source, entry->event_number, entry->event_type);
+        snprintf(output_buffer, buffer_size, "[%08u][%u][%u] EVENT_TYPE_OUT_OF_BOUNDS_%u (max_allowed:%u)",
+                entry->timestamp, entry->event_source, entry->event_number, 
+                entry->event_type, (unsigned)(EVENT_FORMAT_ARRAY_SIZE - 1));
         return true;
     }
     
     const char* format = event_format_strings[entry->event_type];
     if (!format) {
-        snprintf(output_buffer, buffer_size, "[%08u][%u][%u] NULL_FORMAT_STRING",
-                entry->timestamp, entry->event_source, entry->event_number);
+        snprintf(output_buffer, buffer_size, "[%08u][%u][%u] FORMAT_STRING_NULL_FOR_EVENT_TYPE_%u",
+                entry->timestamp, entry->event_source, entry->event_number, entry->event_type);
         return true;
     }
     
-    // Create the prefix first
+    // Create the prefix first - enhanced safety checks
     char prefix[64];
-    int prefix_len = snprintf(prefix, sizeof(prefix), "[%08u][%u][%u] ",
-            entry->timestamp, entry->event_source, entry->event_number);
+    const char* source_name;
+    const char* level_name;
+    
+    // Safety check for event source with detailed debugging
+    if (entry->event_source < EVENT_SOURCE_STRINGS_COUNT) {
+        source_name = event_source_strings[entry->event_source];
+    } else {
+        source_name = "   UNKNOWN   ";
+        // Note: We can't printf here as we're in formatting, but the error will be visible in the log line
+    }
+    
+    // Safety check for log level with detailed debugging
+    if (entry->log_level < LOG_LEVEL_STRINGS_COUNT) {
+        level_name = log_level_strings[entry->log_level];
+    } else {
+        level_name = "UNKNW";
+        // Note: We can't printf here as we're in formatting, but the error will be visible in the log line
+    }
+    
+    int prefix_len = snprintf(prefix, sizeof(prefix), "[%08u][%s][%s][%04u] ",
+            entry->timestamp, source_name, level_name, entry->event_number);
     
     if (prefix_len < 0 || prefix_len >= sizeof(prefix)) {
-        // Prefix creation failed
-        return false;
+        // Enhanced safety debugging: prefix creation failed
+        snprintf(output_buffer, buffer_size, "[%08u][ERR][ERR][%04u] PREFIX_FORMAT_FAILED (src:%u,lvl:%u)",
+                entry->timestamp, entry->event_number, entry->event_source, entry->log_level);
+        return true;
     }
     
     // For security, we'll create a safe version of format strings that only allows %u
     // and validates the parameter count
     char safe_message[LOG_MAX_FORMAT_LENGTH];
     
-    // Check if format string contains exactly one %u and no other format specifiers
+    // Enhanced format string validation with detailed debugging
     const char* first_percent = strchr(format, '%');
     if (first_percent && first_percent[1] == 'u' && strchr(first_percent + 2, '%') == NULL) {
         // Safe: exactly one %u parameter
@@ -457,16 +566,29 @@ static bool format_single_log_entry(const log_entry_t* entry, char* output_buffe
         strncpy(safe_message, format, sizeof(safe_message) - 1);
         safe_message[sizeof(safe_message) - 1] = '\0';
     } else {
-        // Unsafe: multiple format specifiers or unknown format - sanitize
+        // Enhanced safety: Unsafe format specifiers detected
         strncpy(safe_message, format, sizeof(safe_message) - 1);
         safe_message[sizeof(safe_message) - 1] = '\0';
         
+        // Count dangerous format specifiers for debugging
+        int percent_count = 0;
+        for (const char* p = format; *p; p++) {
+            if (*p == '%') percent_count++;
+        }
+        
         // Replace any % characters with # to prevent format string attacks
+        // and add debugging info about what was sanitized
         for (char* p = safe_message; *p; p++) {
             if (*p == '%') {
                 *p = '#';
             }
         }
+        
+        // Append safety warning to the message
+        char temp_buffer[sizeof(safe_message)];
+        snprintf(temp_buffer, sizeof(temp_buffer), "%s [SANITIZED:%d_percent_chars]", safe_message, percent_count);
+        strncpy(safe_message, temp_buffer, sizeof(safe_message) - 1);
+        safe_message[sizeof(safe_message) - 1] = '\0';
     }
     
     // Combine prefix and safe message
@@ -490,8 +612,10 @@ uint32_t log_manager_format_pending(void) {
     uint32_t formatted_count = 0;
     log_entry_t entry;
     
-    // Process one pending entries
-    if (read_log_entry(&entry)) {
+    // Process up to 10 pending entries per call to prevent backlog
+    const uint32_t max_entries_per_call = LOG_MAX_FORMATTED_ENTRIES_PER_CALL;
+    
+    while (formatted_count < max_entries_per_call && read_log_entry(&entry)) {
         char formatted_msg[LOG_MAX_MESSAGE_LENGTH];
         
         if (format_single_log_entry(&entry, formatted_msg, sizeof(formatted_msg))) {
@@ -499,9 +623,10 @@ uint32_t log_manager_format_pending(void) {
             printf("%s\n", formatted_msg);
             fflush(stdout);
         } else {
-            // Fallback output for formatting errors
-            printf("[%08u][%u][%u] FORMAT_ERROR\n", 
-                   entry.timestamp, entry.event_source, entry.event_number);
+            // Enhanced fallback output for formatting errors with more context
+            printf("[%08u][%u][%u] FORMAT_ERROR (event_type:%u, log_level:%u, extra_value:%u)\n", 
+                   entry.timestamp, entry.event_source, entry.event_number,
+                   entry.event_type, entry.log_level, entry.event_extra_value);
             fflush(stdout);
         }
         
