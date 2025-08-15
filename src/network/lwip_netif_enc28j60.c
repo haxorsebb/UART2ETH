@@ -42,11 +42,11 @@ static void enc28j60_netif_link_callback(struct netif *netif);
  */
 struct netif* lwip_netif_enc28j60_init(ip4_addr_t* ip_addr, ip4_addr_t* netmask, ip4_addr_t* gateway) {
     if (g_netif_initialized) {
-        printf("lwIP netif: Already initialized\n");
+        DEBUG_ONLY({ printf("lwIP netif: Already initialized\n"); });
         return &g_enc28j60_netif;
     }
     
-    printf("lwIP netif: Initializing network interface\n");
+    DEBUG_ONLY({ printf("lwIP netif: Initializing network interface\n"); });
     
     // Initialize the netif structure
     memset(&g_enc28j60_netif, 0, sizeof(g_enc28j60_netif));
@@ -59,7 +59,7 @@ struct netif* lwip_netif_enc28j60_init(ip4_addr_t* ip_addr, ip4_addr_t* netmask,
                                    ethernet_input);         // input function
     
     if (netif == NULL) {
-        printf("lwIP netif: Failed to add network interface\n");
+        DEBUG_ONLY({ printf("lwIP netif: Failed to add network interface\n"); });
         return NULL;
     }
     
@@ -70,12 +70,9 @@ struct netif* lwip_netif_enc28j60_init(ip4_addr_t* ip_addr, ip4_addr_t* netmask,
     // Set as default interface
     netif_set_default(netif);
     
-    // Bring interface up   ->later, after link up
-    //netif_set_up(netif);
-    
     g_netif_initialized = true;
     
-    printf("lwIP netif: Network interface initialized successfully\n");
+    DEBUG_ONLY({ printf("lwIP netif: Network interface initialized successfully\n"); });
     return netif;
 }
 
@@ -87,7 +84,7 @@ void lwip_netif_enc28j60_deinit(void) {
         return;
     }
     
-    printf("lwIP netif: Deinitializing network interface\n");
+    DEBUG_ONLY({ printf("lwIP netif: Deinitializing network interface\n"); });
     
     // Stop DHCP if running
     if (netif_is_up(&g_enc28j60_netif)) {
@@ -96,10 +93,9 @@ void lwip_netif_enc28j60_deinit(void) {
     
     // Remove from lwIP
     netif_remove(&g_enc28j60_netif);
-    
     g_netif_initialized = false;
     
-    printf("lwIP netif: Network interface deinitialized\n");
+    DEBUG_ONLY({ printf("lwIP netif: Network interface deinitialized\n"); });
 }
 
 
@@ -111,27 +107,24 @@ void lwip_netif_enc28j60_process(void) {
         return;
     }
 
-    // PERFORMANCE: Periodic debug stats disabled for <5ms ping target
-    // This reduces printf overhead during high-frequency packet processing
-    /*
-    static uint32_t last_debug_time = 0;
-    uint32_t current_time = to_ms_since_boot(get_absolute_time());
-    
-    if (current_time - last_debug_time >= 5000) {  // Debug every 5 seconds
-        const enc28j60_state_t* enc_state = enc28j60_get_state();
-        if (enc_state) {
-            printf("ENC28J60 Debug: TX=%u, RX=%u, TX_ERR=%u, RX_ERR=%u\n", 
-                   enc_state->packets_sent, enc_state->packets_received,
-                   enc_state->tx_errors, enc_state->rx_errors);
+    DEBUG_ONLY({ 
+        static uint32_t last_debug_time = 0;
+        uint32_t current_time = to_ms_since_boot(get_absolute_time());
+        
+        if (current_time - last_debug_time >= 5000) {  // Debug every 5 seconds
+            const enc28j60_state_t* enc_state = enc28j60_get_state();
+            if (enc_state) {
+                printf("ENC28J60 Debug: TX=%u, RX=%u, TX_ERR=%u, RX_ERR=%u\n", 
+                        enc_state->packets_sent, enc_state->packets_received,
+                        enc_state->tx_errors, enc_state->rx_errors);
+            }
+            
+            // Check if there are packets waiting
+            bool has_packets = enc28j60_has_rx_packet();
+            printf("ENC28J60 Debug: Has RX packets = %s\n", has_packets ? "YES" : "NO");
+            last_debug_time = current_time;
         }
-        
-        // Check if there are packets waiting
-        bool has_packets = enc28j60_has_rx_packet();
-        printf("ENC28J60 Debug: Has RX packets = %s\n", has_packets ? "YES" : "NO");
-        
-        last_debug_time = current_time;
-    }
-    */
+    });
     
     // Check for incoming packets and process them
     int packets_processed = 0;
@@ -144,8 +137,6 @@ void lwip_netif_enc28j60_process(void) {
         // Receive packet from ENC28J60
         if (enc28j60_receive_packet(&packet, sizeof(g_rx_buffer))) {
             if (packet.valid && packet.length > 0) {
-                // PERFORMANCE: Debug logs disabled for <5ms ping target
-                // printf("RX: Received packet, length=%u bytes\n", packet.length);
                 
                 // Allocate pbuf for lwIP
                 struct pbuf *p = pbuf_alloc(PBUF_RAW, packet.length, PBUF_POOL);
@@ -155,26 +146,20 @@ void lwip_netif_enc28j60_process(void) {
                     
                     // Feed packet to lwIP
                     if (g_enc28j60_netif.input(p, &g_enc28j60_netif) != ERR_OK) {
-                        printf("lwIP netif: Failed to input packet to lwIP\n");
+                        DEBUG_ONLY({ printf("lwIP netif: Failed to input packet to lwIP\n"); });
                         pbuf_free(p);
                     }
                     else { 
-                        // PERFORMANCE: Success message disabled for speed
-                        DEBUG_ONLY( {
-                            printf("lwIP: Packet successfully fed to lwIP!\n");
-                        });
+                        DEBUG_ONLY( { printf("lwIP: Packet successfully fed to lwIP!\n"); });
                     }
                 } else {
-                    printf("lwIP netif: Failed to allocate pbuf for incoming packet (length=%u)\n", packet.length);
+                    DEBUG_ONLY({ printf("lwIP netif: Failed to allocate pbuf for incoming packet (length=%u)\n", packet.length); });
                 }
-                
                 packets_processed++;
             }
         }
     }
     DEBUG_ONLY( {printf("ENC28J60: read %d packets\n",packets_processed );});
-    
-        
 }
 
 /**
@@ -200,7 +185,7 @@ bool lwip_netif_enc28j60_is_initialized(void) {
  * @brief lwIP netif initialization callback
  */
 static err_t enc28j60_netif_init(struct netif *netif) {
-    printf("lwIP netif: Initializing netif callbacks\n");
+    DEBUG_ONLY({ printf("lwIP netif: Initializing netif callbacks\n"); });
     
     // Set MAC address from ENC28J60
     uint8_t mac_addr[6];
@@ -209,8 +194,7 @@ static err_t enc28j60_netif_init(struct netif *netif) {
     netif->hwaddr_len = 6;
     memcpy(netif->hwaddr, mac_addr, 6);
     
-    printf("lwIP netif: MAC address %02X:%02X:%02X:%02X:%02X:%02X\n",
-           mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+    DEBUG_ONLY({ printf("lwIP netif: MAC address %02X:%02X:%02X:%02X:%02X:%02X\n", mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]); });
     
     // Set netif properties
     netif->name[0] = 'e';
@@ -224,15 +208,15 @@ static err_t enc28j60_netif_init(struct netif *netif) {
     
     // Set initial link status
     if (enc28j60_get_link_status()) {
-        printf("lwIP netif: Initial link status: UP\n");
+        DEBUG_ONLY({ printf("lwIP netif: Initial link status: UP\n"); });
         netif_set_link_up(netif);
         
     } else {
-        printf("lwIP netif: Initial link status: DOWN\n");
+        DEBUG_ONLY({ printf("lwIP netif: Initial link status: DOWN\n"); });
         netif_set_link_down(netif);        
     }
     
-    printf("lwIP netif: Netif initialization complete\n");
+    DEBUG_ONLY({ printf("lwIP netif: Netif initialization complete\n"); });
     return ERR_OK;
 }
 
@@ -244,44 +228,43 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
     uint16_t total_len = p->tot_len;
     
     if (total_len > 1518) {  // Maximum Ethernet frame size
-        printf("lwIP netif: Packet too large (%u bytes)\n", total_len);
+        DEBUG_ONLY({ printf("lwIP netif: Packet too large (%u bytes)\n", total_len); });
         return ERR_BUF;
     }
     
     // Copy pbuf chain to contiguous buffer
     static uint8_t tx_buffer[1600];
     if (pbuf_copy_partial(p, tx_buffer, total_len, 0) != total_len) {
-        printf("lwIP netif: Failed to copy pbuf data\n");
+        DEBUG_ONLY({ printf("lwIP netif: Failed to copy pbuf data\n"); });
         return ERR_BUF;
     }
 
     DEBUG_ONLY({
-    // DEBUG: Enable detailed packet inspection for ping corruption analysis
-    printf("TX: Packet length=%u bytes, first 64 bytes:\n", total_len);
-    for (int i = 0; i < 64 && i < total_len; i++) {
-        if (i % 16 == 0) printf("  %02X: ", i);
-        printf("%02X ", tx_buffer[i]);
-        if (i % 16 == 15) printf("\n");
-    }
-    if (total_len % 16 != 0) printf("\n");
-    
-    // Decode Ethernet header for debugging
-    if (total_len >= 14) {
-        printf("  ETH: dst=%02X:%02X:%02X:%02X:%02X:%02X src=%02X:%02X:%02X:%02X:%02X:%02X type=0x%04X\n",
-               tx_buffer[0], tx_buffer[1], tx_buffer[2], tx_buffer[3], tx_buffer[4], tx_buffer[5],
-               tx_buffer[6], tx_buffer[7], tx_buffer[8], tx_buffer[9], tx_buffer[10], tx_buffer[11],
-               (tx_buffer[12] << 8) | tx_buffer[13]);
-    }
-    
-    // Decode IP header if it's IP packet
-    if (total_len >= 34 && tx_buffer[12] == 0x08 && tx_buffer[13] == 0x00) {
-        printf("  IP: ver_ihl=0x%02X tos=0x%02X len=%u src=%u.%u.%u.%u dst=%u.%u.%u.%u\n",
-               tx_buffer[14], tx_buffer[15], 
-               (tx_buffer[16] << 8) | tx_buffer[17],
-               tx_buffer[26], tx_buffer[27], tx_buffer[28], tx_buffer[29],
-               tx_buffer[30], tx_buffer[31], tx_buffer[32], tx_buffer[33]);
-    }
-    
+        // DEBUG: Enable detailed packet inspection for ping corruption analysis
+        printf("TX: Packet length=%u bytes, first 64 bytes:\n", total_len);
+        for (int i = 0; i < 64 && i < total_len; i++) {
+            if (i % 16 == 0) printf("  %02X: ", i);
+            printf("%02X ", tx_buffer[i]);
+            if (i % 16 == 15) printf("\n");
+        }
+        if (total_len % 16 != 0) printf("\n");
+        
+        // Decode Ethernet header for debugging
+        if (total_len >= 14) {
+            printf("  ETH: dst=%02X:%02X:%02X:%02X:%02X:%02X src=%02X:%02X:%02X:%02X:%02X:%02X type=0x%04X\n",
+                tx_buffer[0], tx_buffer[1], tx_buffer[2], tx_buffer[3], tx_buffer[4], tx_buffer[5],
+                tx_buffer[6], tx_buffer[7], tx_buffer[8], tx_buffer[9], tx_buffer[10], tx_buffer[11],
+                (tx_buffer[12] << 8) | tx_buffer[13]);
+        }
+        
+        // Decode IP header if it's IP packet
+        if (total_len >= 34 && tx_buffer[12] == 0x08 && tx_buffer[13] == 0x00) {
+            printf("  IP: ver_ihl=0x%02X tos=0x%02X len=%u src=%u.%u.%u.%u dst=%u.%u.%u.%u\n",
+                tx_buffer[14], tx_buffer[15], 
+                (tx_buffer[16] << 8) | tx_buffer[17],
+                tx_buffer[26], tx_buffer[27], tx_buffer[28], tx_buffer[29],
+                tx_buffer[30], tx_buffer[31], tx_buffer[32], tx_buffer[33]);
+        }
     });
 
     // Create packet structure for ENC28J60
@@ -294,7 +277,7 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
     if (enc28j60_send_packet(&packet)) {
         return ERR_OK;
     } else {
-        printf("lwIP netif: Failed to send packet via ENC28J60\n");
+        DEBUG_ONLY({ printf("lwIP netif: Failed to send packet via ENC28J60\n"); });
         return ERR_IF;
     }
 }
@@ -303,29 +286,33 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
  * @brief lwIP netif status change callback
  */
 static void enc28j60_netif_status_callback(struct netif *netif) {
-    if (netif_is_up(netif)) {
-        printf("lwIP netif: Interface UP\n");
-        if (!ip4_addr_isany(netif_ip4_addr(netif))) {
-            char ip_str[16];
-            sprintf(ip_str, "%u.%u.%u.%u",
-                    (unsigned)ip4_addr1_16(netif_ip4_addr(netif)),
-                    (unsigned)ip4_addr2_16(netif_ip4_addr(netif)),
-                    (unsigned)ip4_addr3_16(netif_ip4_addr(netif)),
-                    (unsigned)ip4_addr4_16(netif_ip4_addr(netif)));
-            printf("lwIP netif: IP address assigned: %s\n", ip_str);
+    DEBUG_ONLY({ 
+        if (netif_is_up(netif)) {
+            printf("lwIP netif: Interface UP\n"); 
+            if (!ip4_addr_isany(netif_ip4_addr(netif))) {
+                char ip_str[16];
+                sprintf(ip_str, "%u.%u.%u.%u",
+                        (unsigned)ip4_addr1_16(netif_ip4_addr(netif)),
+                        (unsigned)ip4_addr2_16(netif_ip4_addr(netif)),
+                        (unsigned)ip4_addr3_16(netif_ip4_addr(netif)),
+                        (unsigned)ip4_addr4_16(netif_ip4_addr(netif)));
+                printf("lwIP netif: IP address assigned: %s\n", ip_str);
+            }
+        } else {
+            printf("lwIP netif: Interface DOWN\n");
         }
-    } else {
-        printf("lwIP netif: Interface DOWN\n");
-    }
+    });
 }
 
 /**
  * @brief lwIP netif link change callback
  */
 static void enc28j60_netif_link_callback(struct netif *netif) {
-    if (netif_is_link_up(netif)) {
-        printf("lwIP netif: Link UP\n");
-    } else {
-        printf("lwIP netif: Link DOWN\n");
-    }
+    DEBUG_ONLY({ 
+        if (netif_is_link_up(netif)) {
+            printf("lwIP netif: Link UP\n");
+        } else {
+            printf("lwIP netif: Link DOWN\n");
+        }
+    });
 }

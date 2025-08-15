@@ -18,6 +18,7 @@
 #include "hardware/sync.h"
 #include <stdatomic.h>
 #include <stdio.h>
+#include "debug.h"
 
 // State variables with proper synchronization
 static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;                   // Atomic for cross-core access
@@ -71,8 +72,10 @@ bool state_machine_init(void) {
     doorbell_core0_wakes_core1 = multicore_doorbell_claim_unused(0b11, true);
     doorbell_core1_wakes_core0 = multicore_doorbell_claim_unused(0b11, true);
     
-    printf("Claimed doorbells: core0_wakes_core1=%d, core1_wakes_core0=%d\n", 
-           doorbell_core0_wakes_core1, doorbell_core1_wakes_core0);
+    DEBUG_ONLY({
+        printf("Claimed doorbells: core0_wakes_core1=%d, core1_wakes_core0=%d\n", 
+               doorbell_core0_wakes_core1, doorbell_core1_wakes_core0);
+    });
     
     
 
@@ -686,7 +689,9 @@ static bool is_valid_core1_event(core1_event_t event) {
  */
 static bool check_core0_initialization_complete(void) {
     // This allows transition FROM INIT TO CONFIGURATION from core0 code (core1 must be CORE1_INIT_IDLE)
-    printf("check_core0_initialization_complete: \ng_core0_substate: %d\ng_core1_substate: %d\n", atomic_load(&g_core0_substate),atomic_load(&g_core1_substate));
+    DEBUG_ONLY({
+        printf("check_core0_initialization_complete: \ng_core0_substate: %d\ng_core1_substate: %d\n", atomic_load(&g_core0_substate),atomic_load(&g_core1_substate));
+    });
     return atomic_load(&g_initialized) &&
            atomic_load(&g_main_state) == MAIN_STATE_INIT &&
            (atomic_load(&g_core1_substate) == CORE1_INIT_IDLE) &&
@@ -698,7 +703,9 @@ static bool check_core0_initialization_complete(void) {
  */
 static bool check_core1_initialization_complete(void) {
     // This allows transition FROM INIT TO CONFIGURATION from core1 code (core1 must be CORE0_INIT_IDLE)
-    printf("check_core1_initialization_complete: \ng_core0_substate: %d\ng_core1_substate: %d\n", atomic_load(&g_core0_substate),atomic_load(&g_core1_substate));
+    DEBUG_ONLY({
+        printf("check_core1_initialization_complete: \ng_core0_substate: %d\ng_core1_substate: %d\n", atomic_load(&g_core0_substate),atomic_load(&g_core1_substate));
+    });
     return atomic_load(&g_initialized) &&
            atomic_load(&g_main_state) == MAIN_STATE_INIT &&
            (atomic_load(&g_core1_substate) == CORE1_INIT_COMPLETE || atomic_load(&g_core1_substate) == CORE1_INIT_IDLE) &&
@@ -710,7 +717,9 @@ static bool check_core1_initialization_complete(void) {
  */
 static bool check_core0_configuration_complete(void) {
     // This allows transition FROM CONFIGURATION TO OPERATIONAL from core0 code (core1 must be CORE1_INIT_IDLE)
-    printf("check_core0_configuration_complete: \ng_core0_substate: %d\ng_core1_substate: %d\n", atomic_load(&g_core0_substate),atomic_load(&g_core1_substate));
+    DEBUG_ONLY({
+        printf("check_core0_configuration_complete: \ng_core0_substate: %d\ng_core1_substate: %d\n", atomic_load(&g_core0_substate),atomic_load(&g_core1_substate));
+    });
     return atomic_load(&g_initialized) &&
            atomic_load(&g_main_state) == MAIN_STATE_CONFIGURATION &&
            (atomic_load(&g_core1_substate) == CORE1_CONFIG_IDLE) &&
@@ -722,7 +731,9 @@ static bool check_core0_configuration_complete(void) {
  */
 static bool check_core1_configuration_complete(void) {
     // This allows transition FROM CONFIGURATION TO OPERATIONAL from core1 code (core1 must be CORE0_INIT_IDLE)
-    printf("check_core1_configuration_complete: \ng_core0_substate: %d\ng_core1_substate: %d\n", atomic_load(&g_core0_substate),atomic_load(&g_core1_substate));
+    DEBUG_ONLY({
+        printf("check_core1_configuration_complete: \ng_core0_substate: %d\ng_core1_substate: %d\n", atomic_load(&g_core0_substate),atomic_load(&g_core1_substate));
+    });
     return atomic_load(&g_initialized) &&
            atomic_load(&g_main_state) == MAIN_STATE_CONFIGURATION &&
            (atomic_load(&g_core1_substate) == CORE1_CONFIG_COMPLETE || atomic_load(&g_core1_substate) == CORE1_CONFIG_IDLE) &&

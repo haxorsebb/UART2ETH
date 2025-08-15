@@ -241,7 +241,7 @@ static bool check_for_pending_work(void) {
         return true;
     }
 
-    if(false && log_manager_get_pending_count()) {
+    if(log_manager_get_pending_count()) {
         DEBUG_ONLY({ printf("Logmanager has pending count %d\n",log_manager_get_pending_count()); });
         state_machine_process_core1_event(CORE1_EVENT_LOG_START);
         return true;
@@ -312,7 +312,9 @@ static void core1_initialize(void) {
 
     //set up doorbell irq - all doorbells have the same irq anyway. it is shared
     uint32_t irq = multicore_doorbell_irq_num(doorbell_core1_wakes_core0);
-    printf("Core1: Setting up doorbell IRQ %u for doorbell %d\n", irq, doorbell_core1_wakes_core0);
+    DEBUG_ONLY({
+        printf("Core1: Setting up doorbell IRQ %u for doorbell %d\n", irq, doorbell_core1_wakes_core0);
+    });
     irq_add_shared_handler(irq, shared_doorbell_irq,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY-1);
     irq_set_enabled(irq, true);
 
@@ -335,7 +337,9 @@ static void core1_init_persistence(void) {
     
     flash_persistence_init();
     bool result = flash_persistence_load_configuration(); 
-    printf("RESULT OF flash_persistence_load_configuration on init: %d\n", result);
+    DEBUG_ONLY({
+        printf("RESULT OF flash_persistence_load_configuration on init: %d\n", result);
+    });
     
     if (result) {
         g_persistence_initialized = true;
@@ -388,7 +392,9 @@ static void core1_init_hardware(void) {
         
         // Initialize network manager with ENC28J60 driver to check hardware status
         result = network_manager_init(&config);
-        printf("RESULT OF network_manager_init on init: %d\n", result);
+        DEBUG_ONLY({
+            printf("RESULT OF network_manager_init on init: %d\n", result);
+        });
     
     }
 
@@ -447,7 +453,9 @@ static void core1_load_configuration(void) {
     shared_memory_layout_t* layout = shared_memory_get_layout();
 
     bool result = network_manager_reconfigure(&layout->config.network); //config gets copied inside
-    printf("RESULT OF network_manager_reconfigure on load: %d\n", result);
+    DEBUG_ONLY({
+        printf("RESULT OF network_manager_reconfigure on load: %d\n", result);
+    });
     
     if (result) {
         // Generate to move to next phase
@@ -476,19 +484,25 @@ static void core1_check_dhcp_status(void) {
 
     // Check if DHCP has successfully bound an IP address
     if (network_manager_check_dhcp_status()) {
-        printf("DHCP successfully bound IP address\n");
+        DEBUG_ONLY({
+            printf("DHCP successfully bound IP address\n");
+        });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 1);
         state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_GOT_DHCP);
         return;
     }
 
     if(core1_timer_is_expired(CORE1_TIMER_DHCP_DISCOVER)) {
-        printf("DHCP TIMEOUT, retry\n");
+        DEBUG_ONLY({
+            printf("DHCP TIMEOUT, retry\n");
+        });
         state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT);
         return;
     }
     //not expired, not ready, keep waiting
-    printf("DHCP WAIT\n");
+    DEBUG_ONLY({
+        printf("DHCP WAIT\n");
+    });
     state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_WAIT_DHCP);
     return;
 }
@@ -565,9 +579,11 @@ static void core1_process_network(void) {
     static uint32_t call_counter = 0;
     call_counter++;
     
-    if (call_counter % 10000 == 0) {  // Print every 10k calls
-        printf("DEBUG: core1_process_network() call #%u\n", call_counter);
-    }
+    DEBUG_ONLY({
+        if (call_counter % 10000 == 0) {  // Print every 10k calls
+            printf("DEBUG: core1_process_network() call #%u\n", call_counter);
+        }
+    });
     network_manager_process();
     if(!network_manager_receive_packets_pending())
     {
@@ -607,7 +623,9 @@ static void core1_process_logs(void) {
  */
 static void core1_handle_error(void) {
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_ERROR_RECOVERY, 0);
-    printf("Core1: Error state - attempting recovery\n");
+    DEBUG_ONLY({
+        printf("Core1: Error state - attempting recovery\n");
+    });
     
     // Simple recovery: reset network and try again
     if (g_network_initialized) {

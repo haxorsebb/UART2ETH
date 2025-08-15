@@ -28,6 +28,7 @@
 #include "pico/multicore.h"
 #include "hardware/irq.h"
 #include <stdio.h>
+#include "debug.h"
 
 // Forward declarations for Core0 state functions
 static void core0_initialize(void);
@@ -72,7 +73,9 @@ static uint32_t g_system_recovery_attempts = 0;
 void core0_main(void) {
     // One-time initialization
 
-    printf("ENTERING CORE0 MAIN\n");
+    DEBUG_ONLY({
+        printf("ENTERING CORE0 MAIN\n");
+    });
 
     core0_initialize();
     
@@ -88,9 +91,11 @@ void core0_main(void) {
         // DEBUG: Print states periodically
         static uint32_t debug_counter = 0;
         debug_counter++;
-        if (true || debug_counter % 50000 == 0) {  // Every 50k loops
-            printf("DEBUG: Core0 main_state=%d, sub_state=%d\n", main_state, sub_state);
-        }
+        DEBUG_ONLY({
+            if (debug_counter % 50000 == 0) {  // Every 50k loops
+                printf("DEBUG: Core0 main_state=%d, sub_state=%d\n", main_state, sub_state);
+            }
+        });
         
         // Big switch statement for main states
         switch (main_state) {
@@ -179,7 +184,9 @@ static void core0_initialize(void) {
 
     //set up doorbell irq - all doorbells have the same irq anyway. it is shared
     uint32_t irq = multicore_doorbell_irq_num(doorbell_core1_wakes_core0);
-    printf("Core0: Setting up doorbell IRQ %u for doorbell %d\n", irq, doorbell_core0_wakes_core1);
+    DEBUG_ONLY({
+        printf("Core0: Setting up doorbell IRQ %u for doorbell %d\n", irq, doorbell_core0_wakes_core1);
+    });
 
     //unnecessary to add another handler, enabling IRQ is good enough
     //irq_add_shared_handler(irq, shared_doorbell_irq,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
@@ -278,9 +285,11 @@ static void core0_process_uart(void) {
     static uint32_t call_counter = 0;
     call_counter++;
     
-    if (call_counter % 1000 == 0) {  // Print every 1k calls
-        printf("DEBUG: core0_process_uart() call #%u\n", call_counter);
-    }
+    DEBUG_ONLY({
+        if (call_counter % 1000 == 0) {  // Print every 1k calls
+            printf("DEBUG: core0_process_uart() call #%u\n", call_counter);
+        }
+    });
     
     // Process UART data
     if (process_uart_data()) {
@@ -324,7 +333,9 @@ static void core0_handle_uart_error(void) {
  */
 static void core0_handle_error(void) {
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_ERROR_RECOVERY, g_system_recovery_attempts);
-    printf("Core0: Error state - attempting recovery\n");
+    DEBUG_ONLY({
+        printf("Core0: Error state - attempting recovery\n");
+    });
     
     if (perform_error_recovery()) {
         log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_ERROR_RECOVERY, 1);

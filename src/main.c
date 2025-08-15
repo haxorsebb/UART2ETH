@@ -24,6 +24,7 @@
 #include "state_machine.h"
 #include "log_manager.h"
 #include "network/enc28j60_driver.h"
+#include "debug.h"
 
 // Define doorbell variables for cross-core synchronization
 int doorbell_core0_wakes_core1;
@@ -70,7 +71,9 @@ int main() {
     // Wait for USB-serial connection for debugging
     sleep_ms(2000);
     
-    printf("UART2ETH COPYRIGHT 2025 CASSEL MESSTECHNIK GMBH\n--------SOFTWARE START--------\n");
+    DEBUG_ONLY({
+        printf("UART2ETH COPYRIGHT 2025 CASSEL MESSTECHNIK GMBH\n--------SOFTWARE START--------\n");
+    });
     
     // Initialize shared memory system
     if (!shared_memory_init()) {
