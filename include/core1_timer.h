@@ -21,6 +21,7 @@
 typedef enum {
     CORE1_TIMER_DHCP_RENEWAL = 0,       // DHCP lease renewal timer
     CORE1_TIMER_NETWORK_TIMEOUT,        // Network operation timeout
+    CORE1_TIMER_NETWORK_TX_TIMEOUT,        // Network operation timeout
     CORE1_TIMER_PERSISTENCE_INTERVAL,   // Flash persistence interval
     CORE1_TIMER_LOG_FLUSH,              // Log processing/flush timer
     CORE1_TIMER_CONNECTION_TIMEOUT,     // TCP connection timeout

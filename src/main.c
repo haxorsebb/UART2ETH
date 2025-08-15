@@ -23,6 +23,7 @@
 #include "shared_memory.h"
 #include "state_machine.h"
 #include "log_manager.h"
+#include "network/enc28j60_driver.h"
 
 // Define doorbell variables for cross-core synchronization
 int doorbell_core0_wakes_core1;
@@ -59,11 +60,11 @@ void core1_entry() {
  * respective main functions using the event-driven state machine.
  */
 int main() {
+
     // Initialize dual stdio like production system
     stdio_usb_init();
     
-    // Initialize UART1 for debug output (UART0 conflicts with SPI0)
-    // This ensures debug output goes to /dev/ttyUSB0 as mentioned
+    // Initialize UART0 for debug output
     stdio_uart_init_full(uart0, 115200, 0, 1);
     
     // Wait for USB-serial connection for debugging

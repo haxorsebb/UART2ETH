@@ -254,7 +254,8 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
         printf("lwIP netif: Failed to copy pbuf data\n");
         return ERR_BUF;
     }
-    /*
+
+    DEBUG_ONLY({
     // DEBUG: Enable detailed packet inspection for ping corruption analysis
     printf("TX: Packet length=%u bytes, first 64 bytes:\n", total_len);
     for (int i = 0; i < 64 && i < total_len; i++) {
@@ -280,7 +281,9 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
                tx_buffer[26], tx_buffer[27], tx_buffer[28], tx_buffer[29],
                tx_buffer[30], tx_buffer[31], tx_buffer[32], tx_buffer[33]);
     }
-    */
+    
+    });
+
     // Create packet structure for ENC28J60
     enc28j60_packet_t packet;
     packet.data = tx_buffer;

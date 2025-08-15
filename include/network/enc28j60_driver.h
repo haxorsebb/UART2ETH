@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 // Hardware pin configuration
-#define ENC28J60_RESET_PIN      14
+#define ENC28J60_RESET_PIN      3 //14
 #define ENC28J60_INTERRUPT_PIN  8
 #define ENC28J60_SCK_PIN        10 //2
 #define ENC28J60_MOSI_PIN       11 //3   // SI - Serial Input
@@ -178,8 +178,8 @@ extern "C" {
 
 // Buffer size configuration
 #define ENC28J60_BUFFER_SIZE    8192    // 8KB total buffer
-#define ENC28J60_RX_BUFFER_SIZE 4096    // 6KB for RX
-#define ENC28J60_TX_BUFFER_SIZE 4096    // 2KB for TX
+#define ENC28J60_RX_BUFFER_SIZE 4096    // 4KB for RX
+#define ENC28J60_TX_BUFFER_SIZE 4096    // 4KB for TX
 
 // Maximum Ethernet frame size
 #define ENC28J60_MAX_FRAME_SIZE 1518
@@ -194,6 +194,7 @@ typedef struct {
     uint32_t packets_received;  // Statistics: received packets  
     uint32_t tx_errors;         // Statistics: transmission errors
     uint32_t rx_errors;         // Statistics: reception errors
+    uint32_t likely_false_collisions;   //Errata#15 collision false positives
 } enc28j60_state_t;
 
 /**
@@ -367,7 +368,7 @@ void enc28j60_clear_interrupts(uint8_t flags);
  * Process pending interrupts
  * @return true if interrupts were processed, false if none pending
  */
-bool enc28j60_process_interrupts(void);
+bool enc28j60_process_interrupts(bool forced);
 
 /**
  * Check if interrupt is pending
@@ -399,10 +400,10 @@ bool enc28j60_get_link_status(void);
 bool enc28j60_process_linkif_interrupt(void);
 
 /**
- * Gets txif status , clears pending interrupt bit
+ * Gets txif status , clears pending interrupt, also txerif bit
  * @return true 
  */
-bool enc28j60_process_txif_interrupt(void);
+bool enc28j60_clear_tx_interrupt_flags(void);
 
 /**
  * Set MAC address
