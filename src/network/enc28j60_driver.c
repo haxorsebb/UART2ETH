@@ -28,6 +28,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include "core1_timer.h"
+
+#include "pico/multicore.h"
+
 
 // Driver state (Arduino-style state management)
 static enc28j60_state_t g_enc28j60_state = {0};
@@ -39,10 +43,11 @@ static const uint8_t* g_local_mac = NULL; // MAC address storage (Arduino patter
 #define SPI_PORT spi1
 #define SPI_BAUDRATE 20000000  // 20MHz SPI clock (max for ENC28J60)
 
-// Buffer addresses (exact Arduino reference values)
-#define RX_BUF_START 0x0000
-#define RX_BUF_END   0x0FFF  // 4KB RX buffer 
-#define TX_BUF_START 0x1040  // TX buffer start (some buffer inbetween)
+// Buffer addresses (shamelessly lifted from linux kernel)
+#define TX_BUF_START		0x1A00
+#define TX_BUF_END		0x1FFF
+#define RX_BUF_START		0x0000
+#define RX_BUF_END		0x19FF
 
 // Maximum frame length (Arduino reference)
 #define MAX_MAC_LENGTH 1518
@@ -81,7 +86,10 @@ static uint8_t enc28j60_read_register_internal(uint8_t reg);
 static void enc28j60_write_register_internal(uint8_t reg, uint8_t value);
 static void enc28j60_set_register_bank_internal(uint8_t new_bank);
 static uint16_t enc28j60_read_phy_register(uint8_t phy_reg);
-
+/**
+ * @brief reset tx after timeout
+ */
+static void enc28j60_reset_tx_logic(void);
 
 /**
  * Check if ENC28J60 is ready for operation
@@ -232,7 +240,7 @@ static bool enc28j60_wait_for_osc_ready(void) {
     g_current_bank = ERXTX_BANK;
     
     printf("ENC28J60: Waiting for oscillator ready\n");
-    sleep_us(500);  // minimum time from datasheet 300 us
+    sleep_us(700);  // minimum time from datasheet 300 us
 
     while (timeout > 0) {
         uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
@@ -274,6 +282,13 @@ static void enc28j60_configure_buffers(void) {
     // Set RX read pointer (ERXRDPT) - Arduino reference
     enc28j60_write_register_internal(ENC28J60_ERXRDPTL, RX_BUF_END & 0xFF);
     enc28j60_write_register_internal(ENC28J60_ERXRDPTH, (RX_BUF_END >> 8) & 0xFF);
+        
+    // Set up transmit buffer boundaries (Linux kernel pattern)
+    enc28j60_write_register_internal(ENC28J60_ETXSTL, TX_BUF_START & 0xFF);
+    enc28j60_write_register_internal(ENC28J60_ETXSTH, (TX_BUF_START >> 8) & 0xFF);
+    enc28j60_write_register_internal(ENC28J60_ETXNDL, TX_BUF_END & 0xFF);
+    enc28j60_write_register_internal(ENC28J60_ETXNDH, (TX_BUF_END >> 8) & 0xFF);
+
     
     // Configure receive filters in Bank 1 (Arduino reference)
     enc28j60_set_register_bank_internal(EPKTCNT_BANK);
@@ -281,6 +296,8 @@ static void enc28j60_configure_buffers(void) {
     uint8_t erxfcon_value = ENC28J60_ERXFCON_UCEN | ENC28J60_ERXFCON_CRCEN | ENC28J60_ERXFCON_MCEN | ENC28J60_ERXFCON_BCEN;
     enc28j60_write_register_internal(ENC28J60_ERXFCON, erxfcon_value);
     
+    
+
     printf("ENC28J60: Buffer configuration complete\n");
 }
 
@@ -391,6 +408,12 @@ bool enc28j60_init(void) {
     
     // 3. Configure buffer memory layout
     enc28j60_configure_buffers();
+    
+    // 3a. Initialize TX FIFO boundaries (Linux kernel approach)
+    enc28j60_set_register_bank_internal(ERXTX_BANK);
+    enc28j60_write_register_internal(ENC28J60_ETXSTL, TX_BUF_START & 0xFF);
+    enc28j60_write_register_internal(ENC28J60_ETXSTH, (TX_BUF_START >> 8) & 0xFF);
+    printf("ENC28J60: TX FIFO initialized - Start: 0x%04X, End: 0x%04X\n", TX_BUF_START, TX_BUF_END);
     
     // 4. Configure MAC layer
     enc28j60_configure_mac();
@@ -640,9 +663,11 @@ static void enc28j60_interrupt_handler(uint gpio, uint32_t events) {
         //g_last_interrupt_status = enc28j60_read_register_internal(ENC28J60_EIR);
         g_interrupt_time = to_ms_since_boot(get_absolute_time());
         g_interrupt_pending = true;
-        DEBUG_ONLY({printf("INTERRUPT! %d\n", g_interrupt_time);});
+        //DEBUG_ONLY({
+            //printf("INTERRUPT! %d\n", g_interrupt_time);
+        //});
         
-        enc28j60_clear_interrupts(0xFF);    //clear all, we have a copy
+        //enc28j60_clear_interrupts(0xFF);    //clear all, we have a copy
     }
     return;
 }
@@ -699,35 +724,45 @@ static void enc28j60_enable_interrupts(void) {
     enc28j60_clear_register_bits(ENC28J60_EIR, 0xFF);
     
     // Enable global interrupts and specific interrupt sources
-    uint8_t eie = ENC28J60_EIE_INTIE | ENC28J60_EIE_PKTIE | ENC28J60_EIE_LINKIE ;
+    uint8_t eie = ENC28J60_EIE_INTIE /*ENABLE INTERRUPTS*/ 
+                | ENC28J60_EIE_PKTIE /* PACKET RECEIVED */
+                | ENC28J60_EIE_LINKIE /* LINK STATUS CHANGED */
+                | ENC28J60_EIE_TXIE /* TRANSMIT COMPLETED -> ERRATA 12,13 */ 
+                | ENC28J60_EIE_TXERIE /* TRANSMIT ERROR -> ERRATA 12,13 */ ;
     enc28j60_write_register_internal(ENC28J60_EIE, eie);
     
     printf("ENC28J60: Interrupts enabled (EIE=0x%02X)\n", eie);
 }
 
 /**
- * @brief Enable ENC28J60 interrupts
+ * @brief get enable ENC28J60 interrupts
  */
-static void enc28j60_get_enabled_interrupts(void) {
+static uint8_t enc28j60_get_enabled_interrupts(void) {
 
     enc28j60_set_register_bank_internal(ERXTX_BANK);
-    
-    
     // Enable global interrupts and specific interrupt sources
-    uint8_t eie=0; // = ENC28J60_EIE_INTIE | ENC28J60_EIE_PKTIE | ENC28J60_EIE_LINKIE ;
+    uint8_t eie=0;
     eie = enc28j60_read_register_internal(ENC28J60_EIE);
     
     DEBUG_ONLY({printf("ENC28J60: Interrupts currently enabled (EIE=0x%02X)\n", eie);});
+
+    return eie;
 }
 
+
+/**
+ * @brief unblock the interrupt gpio pin
+ */
 static void enc28j60_unblock_interrupt(void) {
     DEBUG_ONLY({printf("ENC28J60: UNBLOCKING IRQ!\n");});
     gpio_set_irq_enabled(ENC28J60_INTERRUPT_PIN, GPIO_IRQ_EDGE_FALL, true);
-    //enc28j60_enable_interrupts();
-    enc28j60_get_enabled_interrupts();
+
 }
 
-static void enc28j60_block_interrupt(void) {
+/**
+ * @brief block the interrupt gpio pin to avoid interrupts
+ */
+ static void enc28j60_block_interrupt(void) {
     DEBUG_ONLY({printf("ENC28J60: BLOCKING IRQ!\n");});
     gpio_set_irq_enabled(ENC28J60_INTERRUPT_PIN, GPIO_IRQ_EDGE_FALL, false);
 }
@@ -783,6 +818,56 @@ uint32_t get_interrupt_ms()
 }
 
 /**
+ * @brief Dump all transmission-relevant registers for debugging
+ */
+static void enc28j60_dump_tx_registers(const char* phase) {
+    printf("=== TX Register Dump - %s ===\n", phase);
+    
+    // Ensure we're in the right bank for each register
+    enc28j60_set_register_bank_internal(ERXTX_BANK);
+    uint8_t econ1 = enc28j60_read_register_internal(ENC28J60_ECON1);
+    uint8_t eir = enc28j60_read_register_internal(ENC28J60_EIR);
+    uint8_t eie = enc28j60_read_register_internal(ENC28J60_EIE);
+    uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
+    
+    uint16_t etxst = (enc28j60_read_register_internal(ENC28J60_ETXSTH) << 8) | 
+                     enc28j60_read_register_internal(ENC28J60_ETXSTL);
+    uint16_t etxnd = (enc28j60_read_register_internal(ENC28J60_ETXNDH) << 8) | 
+                     enc28j60_read_register_internal(ENC28J60_ETXNDL);
+    uint16_t ewrpt = (enc28j60_read_register_internal(ENC28J60_EWRPTH) << 8) | 
+                     enc28j60_read_register_internal(ENC28J60_EWRPTL);
+    
+    printf("  ECON1: 0x%02X (TXRTS=%d, RXEN=%d, TXRST=%d)\n", 
+           econ1, 
+           (econ1 & ENC28J60_ECON1_TXRTS) ? 1 : 0,
+           (econ1 & ENC28J60_ECON1_RXEN) ? 1 : 0,
+           (econ1 & ENC28J60_ECON1_TXRST) ? 1 : 0);
+    
+    printf("  EIR:   0x%02X (TXIF=%d, TXERIF=%d, PKTIF=%d, LINKIF=%d)\n", 
+           eir,
+           (eir & ENC28J60_EIR_TXIF) ? 1 : 0,
+           (eir & ENC28J60_EIR_TXERIF) ? 1 : 0,
+           (eir & ENC28J60_EIR_PKTIF) ? 1 : 0,
+           (eir & ENC28J60_EIR_LINKIF) ? 1 : 0);
+    
+    printf("  EIE:   0x%02X (INTIE=%d, TXIE=%d, TXERIE=%d)\n", 
+           eie,
+           (eie & ENC28J60_EIE_INTIE) ? 1 : 0,
+           (eie & ENC28J60_EIE_TXIE) ? 1 : 0,
+           (eie & ENC28J60_EIE_TXERIE) ? 1 : 0);
+    
+    printf("  ESTAT: 0x%02X (TXABRT=%d, CLKRDY=%d)\n", 
+           estat,
+           (estat & ENC28J60_ESTAT_TXABRT) ? 1 : 0,
+           (estat & ENC28J60_ESTAT_CLKRDY) ? 1 : 0);
+    
+    printf("  ETXST: 0x%04X, ETXND: 0x%04X, EWRPT: 0x%04X\n", etxst, etxnd, ewrpt);
+    printf("  TX Buffer: Start=0x%04X, End=0x%04X (Size=%d bytes)\n", 
+           TX_BUF_START, TX_BUF_END, TX_BUF_END - TX_BUF_START + 1);
+    printf("==================================\n");
+}
+
+/**
  * @brief Send Ethernet packet (Arduino reference implementation)
  */
 bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
@@ -799,65 +884,200 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
         return false;
     }
     
-    enc28j60_block_interrupt();
+    bool transfer_complete = false;
+    bool transfer_complete_interrupt_flag = false;
+    bool transfer_error_interrupt_flag = false;
+    uint32_t debug_counter = 0;
 
-    enc28j60_set_register_bank_internal(ERXTX_BANK);
-    
-    // Set up the transmit buffer pointer (Arduino reference)
-    enc28j60_write_register_internal(ENC28J60_ETXSTL, TX_BUF_START & 0xFF);
-    enc28j60_write_register_internal(ENC28J60_ETXSTH, (TX_BUF_START >> 8) & 0xFF);
-    enc28j60_write_register_internal(ENC28J60_EWRPTL, TX_BUF_START & 0xFF);
-    enc28j60_write_register_internal(ENC28J60_EWRPTH, (TX_BUF_START >> 8) & 0xFF);
-    
-    // Write per-packet control byte (Arduino reference)
-    uint8_t control_byte = 0x00;
-    enc28j60_write_buffer(&control_byte, 1);
-    
-    // Write packet data
-    enc28j60_write_buffer(packet->data, packet->length);
-    
-    // Set TX end pointer (Arduino reference - points to last byte of DATA PAYLOAD)
-    uint16_t tx_end = TX_BUF_START + packet->length; // Arduino: dataend = TX_BUF_START + datalen
-    enc28j60_write_register_internal(ENC28J60_ETXNDL, tx_end & 0xFF);
-    enc28j60_write_register_internal(ENC28J60_ETXNDH, (tx_end >> 8) & 0xFF);
-    
-    // Clear any previous TX interrupt
-    enc28j60_clear_register_bits(ENC28J60_EIR, ENC28J60_EIR_TXIF);
-    
-    // Start transmission (Arduino reference)
-    enc28j60_set_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRTS);
-    
+    //DEBUG_ONLY({printf("ENC28J60: Starting transmission of %d byte packet\n", packet->length);});
+    int retries = 3;
+    while(retries--)
+    {
+        DEBUG_ONLY({printf("ENC28J60: Starting transmission of %d byte packet\n", packet->length);});
+        if( retries < 2)
+        {
+            printf("ENC28J60: Starting transmission of %d byte packet TXERIF: %d\n", packet->length, transfer_error_interrupt_flag);
+        }
+        enc28j60_block_interrupt();
+        
+        enc28j60_set_register_bank_internal(ERXTX_BANK);
+        
+        // DEBUGGING: Dump registers before transmission
+        DEBUG_ONLY({enc28j60_dump_tx_registers("BEFORE TX");});
+        
+        //lifted from linux kernel
+        // Set write pointer to start of transmit buffer
+        enc28j60_write_register_internal(ENC28J60_EWRPTL, TX_BUF_START & 0xFF);
+        enc28j60_write_register_internal(ENC28J60_EWRPTH, (TX_BUF_START >> 8) & 0xFF);
+
+        // Set TX end pointer BEFORE writing data (Linux kernel approach)
+        uint16_t tx_end = TX_BUF_START + packet->length;
+        enc28j60_write_register_internal(ENC28J60_ETXNDL, tx_end & 0xFF);
+        enc28j60_write_register_internal(ENC28J60_ETXNDH, (tx_end >> 8) & 0xFF);
+
+        // Now write control byte and packet data
+        uint8_t control_byte = 0x00;
+        enc28j60_write_buffer(&control_byte, 1);
+        enc28j60_write_buffer(packet->data, packet->length);
+
+        // Clear any previous TX interrupt
+        enc28j60_clear_register_bits(ENC28J60_EIR, ENC28J60_EIR_TXIF);
+        //wait 1 us to get everything settled
+        sleep_us(1);
+        // Start transmission (Arduino reference)
+        enc28j60_set_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRTS);
+        
+        // DEBUGGING: Dump registers immediately after TXRTS set
+        DEBUG_ONLY({enc28j60_dump_tx_registers("AFTER TXRTS SET");});
+
+        core1_timer_set(CORE1_TIMER_NETWORK_TX_TIMEOUT,2);
+        enc28j60_unblock_interrupt();
+
+        //wait for interrupt
+        while( !core1_timer_is_expired(CORE1_TIMER_NETWORK_TX_TIMEOUT) ) {
+            __wfi();
+        
+            // block to read registers
+            enc28j60_block_interrupt();
+                
+            uint8_t econ1 = enc28j60_read_register_internal(ENC28J60_ECON1);
+            enc28j60_process_interrupts(true); // read g_last_interrupt_status fresh, interrupts are blocked!
+
+            enc28j60_unblock_interrupt();
+
+            transfer_complete = (econ1 & ENC28J60_ECON1_TXRTS) == 0;
+            transfer_complete_interrupt_flag = g_last_interrupt_status & ENC28J60_EIR_TXIF;
+            transfer_error_interrupt_flag = g_last_interrupt_status & ENC28J60_EIR_TXERIF;
+
+            if(transfer_complete || transfer_complete_interrupt_flag){ 
+                goto transfer_finished;
+            }
+            
+        }
+        //timer expired, reset and retry
+        enc28j60_reset_tx_logic();
+    /*    
     // Wait for transmission to complete (Arduino reference - synchronous!)
-    uint32_t timeout = 10000; // 10ms timeout
+    uint32_t timeout = 5000; // 5ms timeout Hardware transmission: ~1230μs max (for 1518 byte frame at 10Mbps)
     while (timeout > 0) {
+        ++debug_counter;
+        
         uint8_t econ1 = enc28j60_read_register_internal(ENC28J60_ECON1);
-        if ((econ1 & ENC28J60_ECON1_TXRTS) == 0) {
-            break; // Transmission complete
+        enc28j60_process_interrupts(true); // read g_last_interrupt_status fresh, interrupts are blocked!
+        uint16_t ewrpt = (enc28j60_read_register_internal(ENC28J60_EWRPTH) << 8) | 
+                     enc28j60_read_register_internal(ENC28J60_EWRPTL);
+
+        transfer_complete = (econ1 & ENC28J60_ECON1_TXRTS) == 0;
+        transfer_complete_interrupt_flag = g_last_interrupt_status & ENC28J60_EIR_TXIF;
+        transfer_error_interrupt_flag = g_last_interrupt_status & ENC28J60_EIR_TXERIF;
+
+        
+        // DEBUGGING: Print status every 1000 iterations (every ~1ms)
+        DEBUG_ONLY({
+            if (++debug_counter < 10) {
+            printf("  TX Poll #%u: ECON1=0x%02X(TXRTS=%d) EIR=0x%02X(TXIF=%d,TXERIF=%d ewrpt=0x%04X) timeout=%u\n",
+                   debug_counter, econ1, (econ1 & ENC28J60_ECON1_TXRTS) ? 1 : 0,
+                   g_last_interrupt_status, transfer_complete_interrupt_flag ? 1 : 0, 
+                   transfer_error_interrupt_flag ? 1 : 0, ewrpt, timeout);
+        }
+        });
+        
+        
+        // Check all completion conditions
+        if (transfer_complete) {
+            DEBUG_ONLY( {printf("  TX Complete: TXRTS cleared after %u iterations\n", debug_counter);});
+            break; // Original TXRTS cleared (if bug doesn't occur)
+        }
+        
+
+        transfer_complete_interrupt_flag = g_last_interrupt_status & ENC28J60_EIR_TXIF;
+        transfer_error_interrupt_flag = g_last_interrupt_status & ENC28J60_EIR_TXERIF;
+
+        if (transfer_complete_interrupt_flag) {
+            DEBUG_ONLY( {printf("  TX Complete: TXIF flag set after %u iterations\n", debug_counter);});
+            break; // SUCCESS: Transmission completed
+        }
+        
+        if (transfer_error_interrupt_flag) {
+            DEBUG_ONLY( {printf("  TX Error: TXERIF flag set after %u iterations\n", debug_counter);});
+            break; // ERROR: Transmission failed
         }
         sleep_us(1);
         timeout--;
     }
-    DEBUG_ONLY( {printf("ENC28J60: send took: %d us\n", 10000- timeout ); });
-        
-    
-    // Check for transmission errors (Arduino reference)
-    uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
-    bool tx_success = (estat & ENC28J60_ESTAT_TXABRT) == 0;
-    
+    if(timeout == 0)
+    {
+        printf("SEND TIMEOUT! packet->length: %d, iterations: %u\n", packet->length, debug_counter);
+        enc28j60_dump_tx_registers("TIMEOUT");
+        enc28j60_reset_tx_logic();
+    }
+    DEBUG_ONLY( {printf("ENC28J60: send took: %d us\n", 5000- timeout ); });
+    */
+    }
 
+transfer_finished:
+    enc28j60_block_interrupt();
+    bool other_error = false;
+    bool collision_error = false;
+                
+    bool tx_success = (transfer_complete && (!other_error) && (!collision_error) ) ;
+    if(!tx_success)
+    {
+        // Check for transmission errors (Arduino reference)
+        uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
+
+        other_error = (estat & ENC28J60_ESTAT_TXABRT);
+        collision_error = (g_last_interrupt_status & ENC28J60_EIR_TXERIF) && (!transfer_complete); // errata #15, if transfer_complete, probably collision false positive
+        
+        if(collision_error && transfer_complete)
+        {
+            // In switched full-duplex environment, treat collision errors as false
+            g_enc28j60_state.likely_false_collisions++;
+        }
+    }   
+    
     DEBUG_ONLY( {printf("total elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - g_interrupt_time);});
 
+    // DEBUGGING: Final register dump and analysis
+    DEBUG_ONLY({enc28j60_dump_tx_registers("FINAL");
+    
+    printf("=== TX Result Analysis ===\n");
+    printf("  timeout_remaining: %u, other_error: %d, collision_error: %d\n", 
+           timeout, other_error ? 1 : 0, collision_error ? 1 : 0);
+    printf("  transfer_complete: %d, transfer_complete_interrupt_flag: %d, transfer_error_interrupt_flag: %d\n",
+           transfer_complete ? 1 : 0, transfer_complete_interrupt_flag ? 1 : 0, transfer_error_interrupt_flag ? 1 : 0);
+    printf("  tx_success: %d\n", tx_success ? 1 : 0);
+    printf("========================\n");
+    });
+    
+    //refresh flags
+    enc28j60_process_interrupts(true);
+    enc28j60_clear_tx_interrupt_flags();
     enc28j60_unblock_interrupt();
 
     if (tx_success) {
         g_enc28j60_state.packets_sent++;
+        DEBUG_ONLY({printf("ENC28J60: TX SUCCESS - packet sent\n");});
         //log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, packet->length);
         return true;
     } else {
         g_enc28j60_state.tx_errors++;
-        printf("ENC28J60: TX error - packet aborted\n");
+        DEBUG_ONLY({printf("ENC28J60: TX FAILED - packet aborted\n");});
         return false;
     }
+}
+
+/**
+ * @brief reset tx after timeout
+ */
+static void enc28j60_reset_tx_logic(void) {
+    enc28j60_set_register_bank_internal(ERXTX_BANK);
+    enc28j60_set_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRST);
+    enc28j60_clear_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRST);
+    
+    // Re-initialize TX FIFO after reset
+    enc28j60_write_register_internal(ENC28J60_ETXSTL, TX_BUF_START & 0xFF);
+    enc28j60_write_register_internal(ENC28J60_ETXSTH, (TX_BUF_START >> 8) & 0xFF);
 }
 
 /**
@@ -934,9 +1154,11 @@ bool enc28j60_receive_packet(enc28j60_packet_t* packet, uint16_t max_length) {
     // Extract next packet pointer and packet length from header
     uint16_t next_packet = packet_header[0] | (packet_header[1] << 8);
     uint16_t packet_length = packet_header[2] | (packet_header[3] << 8);
+
+    DEBUG_ONLY({printf("ENC28J60: READ %d bytes, next at: %d, max_length: %d\n", packet_length, next_packet, max_length);});
     
     // Validate packet length
-    if (packet_length <= max_length || packet_length <= ENC28J60_MAX_FRAME_SIZE) {
+    if (packet_length <= max_length && packet_length <= ENC28J60_MAX_FRAME_SIZE) {
         
         // Read packet data if EVERYTHING is ok
         enc28j60_read_buffer(packet->data, packet_length);
@@ -950,9 +1172,9 @@ bool enc28j60_receive_packet(enc28j60_packet_t* packet, uint16_t max_length) {
     }
     else {
         g_enc28j60_state.rx_errors++;
-        DEBUG_ONLY({}
-            printf("ENC28J60: invalid packet received, wrong size: &d", packet_length);
-        );
+        DEBUG_ONLY({
+            printf("ENC28J60: invalid packet received, wrong size: %d", packet_length);
+        });
     }
     
 
@@ -1035,13 +1257,15 @@ bool enc28j60_has_pending_interrupt(void) {
 /**
  * @brief Process pending interrupts
  */
-bool enc28j60_process_interrupts(void) {
-    if (!g_interrupt_pending || !g_driver_initialized) {
+bool enc28j60_process_interrupts(bool forced) {
+    if (!forced && (!g_interrupt_pending || !g_driver_initialized) ) {
         return false;
     }
     //we keep the bits around in g_last_interrupt_status as we might need several rounds to handle everything
     g_last_interrupt_status |= enc28j60_get_interrupt_status();    
-    
+    //clear all
+    enc28j60_clear_interrupts(0xFF);    
+
     DEBUG_ONLY({
         printf("Processing pending interrupt flags:\n ENC28J60_EIR_LINKIF: %d\n ENC28J60_EIR_PKTIF: %d\n ENC28J60_EIR_RXERIF: %d\n ENC28J60_EIR_TXERIF: %d\n ENC28J60_EIR_TXIF: %d\n ",
             g_last_interrupt_status & ENC28J60_EIR_LINKIF,
@@ -1106,6 +1330,7 @@ bool enc28j60_process_linkif_interrupt(void)
     return link_up;
 }
 
+
 /**
  * @brief check if TXIF is set
  */
@@ -1115,20 +1340,28 @@ bool enc28j60_has_txif_pending(void)
 }
 
 /**
- * @brief Process TXIF interrupts
+ * @brief check if TXIF is set
  */
-bool enc28j60_process_txif_interrupt(void)
+bool enc28j60_has_txerif_pending(void)
+{
+    return (g_last_interrupt_status & ENC28J60_EIR_TXERIF);
+}
+
+
+/**
+ * @brief clear TXIF and TXEIF interrupts
+ */
+bool enc28j60_clear_tx_interrupt_flags(void)
 {
     // Process packet transmitted interrupt
-    if (g_last_interrupt_status & ENC28J60_EIR_TXIF) {
+    if (g_last_interrupt_status & (ENC28J60_EIR_TXIF | ENC28J60_EIE_TXERIE) ) {
         
-        //clear the bit 
-        g_last_interrupt_status &= ~ENC28J60_EIR_TXIF;
+        //clear the bits 
+        g_last_interrupt_status &= ~(ENC28J60_EIR_TXIF | ENC28J60_EIE_TXERIE);
         enc28j60_clear_interrupt_pending();
     }
     return true;
 }
-
 
 
 /**

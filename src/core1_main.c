@@ -93,12 +93,13 @@ void core1_main(void) {
         sub_state = state_machine_get_core1_substate();
         
         // DEBUG: Print states periodically
-        
+        DEBUG_ONLY({
         static uint32_t debug_counter = 0;
         debug_counter++;
         if (debug_counter % 500 == 0) {  // Every 50k loops
             printf("DEBUG: Core1 main_state=%d, sub_state=%d\n", main_state, sub_state);
         }
+        });
         
         // Big switch statement for main states
         switch (main_state) {
@@ -212,7 +213,7 @@ void core1_main(void) {
  */
 static bool check_for_pending_work(void) {
 
-    enc28j60_process_interrupts();
+    enc28j60_process_interrupts(false);
 
     if(network_manager_link_change_pending()) {
         DEBUG_ONLY({ printf("network has link change pending\n"); });
@@ -226,14 +227,14 @@ static bool check_for_pending_work(void) {
     
         return true; 
     }
-
+    
     if(network_manager_transmit_packets_pending()) {
         DEBUG_ONLY({ printf("network has pending transmit packets\n"); });
         //state_machine_process_core1_event(CORE1_EVENT_NETWORK_SENDING_ACTIVE);
         core1_process_packet_tx();
         return true; 
     }
-
+    
     if(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT))
     {
         network_manager_check_timeouts();

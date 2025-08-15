@@ -196,7 +196,7 @@ void test_manual_dhcp_monitoring(void) {
         // Check for interrupts
         if (enc28j60_has_pending_interrupt()) {
             printf("*** INTERRUPT DETECTED ***\n");
-            enc28j60_process_interrupts();
+            enc28j60_process_interrupts(false);
         }
         
         // Detailed status check every STATUS_CHECK_INTERVAL_MS

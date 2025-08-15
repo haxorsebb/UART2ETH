@@ -817,7 +817,7 @@ bool network_manager_is_dhcp_bound(void) {
  */
 void network_manager_process_tx(void)
 {
-    enc28j60_process_txif_interrupt();
+    //enc28j60_process_txif_interrupt();
 }
 
 /**
