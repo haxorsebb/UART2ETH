@@ -24,3 +24,4 @@ build/
 # Log files
 logs/
 *.log
+UART2ETH.code-workspace
