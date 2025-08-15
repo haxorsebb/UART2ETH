@@ -53,7 +53,9 @@ bool network_manager_init(const network_config_t* config) {
         return true;  // Already initialized
     }
     
-    printf("Network Manager: Starting initialization\n");
+    DEBUG_ONLY({
+        printf("Network Manager: Starting initialization\n");
+    });
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 0);
     
     // Store configuration
@@ -69,7 +71,9 @@ bool network_manager_init(const network_config_t* config) {
     
     // Initialize ENC28J60 driver
     if (!enc28j60_init()) {
-        printf("Network Manager: ENC28J60 initialization failed\n");
+        DEBUG_ONLY({
+            printf("Network Manager: ENC28J60 initialization failed\n");
+        });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
         g_network_status = NETWORK_STATUS_ERROR;
         return false;
@@ -80,13 +84,17 @@ bool network_manager_init(const network_config_t* config) {
         g_network_config.mac_address[2] != 0 || g_network_config.mac_address[3] != 0 ||
         g_network_config.mac_address[4] != 0 || g_network_config.mac_address[5] != 0) {
         enc28j60_set_mac_address(g_network_config.mac_address);
-        printf("Network Manager: MAC address configured\n");
+        DEBUG_ONLY({
+            printf("Network Manager: MAC address configured\n");
+        });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_CONFIG, 0);
     }
     
     // Initialize lwIP TCP/IP stack
     if (!network_manager_init_lwip()) {
-        printf("Network Manager: lwIP initialization failed\n");
+        DEBUG_ONLY({
+            printf("Network Manager: lwIP initialization failed\n");
+        });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 2);
         g_network_status = NETWORK_STATUS_ERROR;
         return false;
@@ -98,7 +106,9 @@ bool network_manager_init(const network_config_t* config) {
     
     g_network_initialized = true;
     
-    printf("Network Manager: Initialization complete\n");
+    DEBUG_ONLY({
+        printf("Network Manager: Initialization complete\n");
+    });
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 2);
     return true;
 }
@@ -111,13 +121,17 @@ void network_manager_deinit(void) {
         return;
     }
     
-    printf("Network Manager: Starting deinitialization\n");
+    DEBUG_ONLY({
+        printf("Network Manager: Starting deinitialization\n");
+    });
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, 0);
     
     // Stop DHCP if running
     if (g_netif && netif_is_up(g_netif) && dhcp_supplied_address(g_netif)) {
         dhcp_stop(g_netif);
-        printf("Network Manager: DHCP stopped\n");
+        DEBUG_ONLY({
+            printf("Network Manager: DHCP stopped\n");
+        });
     }
     
     // Deinitialize lwIP network interface
@@ -133,7 +147,9 @@ void network_manager_deinit(void) {
     g_network_initialized = false;
     g_dhcp_start_time = 0;
     
-    printf("Network Manager: Deinitialization complete\n");
+    DEBUG_ONLY({
+        printf("Network Manager: Deinitialization complete\n");
+    });
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, 1);
 }
 
@@ -177,12 +193,16 @@ void network_manager_process(void) {
     static uint32_t debug_counter = 0;
     debug_counter++;
     
-    if (debug_counter % 10000 == 0) {  // Print every 10000 calls
-        printf("DEBUG: network_manager_process() call #%u, status=%d\n", debug_counter, g_network_status);
-    }
+    DEBUG_ONLY({
+        if (debug_counter % 10000 == 0) {  // Print every 10000 calls
+            printf("DEBUG: network_manager_process() call #%u, status=%d\n", debug_counter, g_network_status);
+        }
+    });
     
     if (!g_network_initialized) {
-        printf("DEBUG: network_manager_process() - not initialized!\n");
+        DEBUG_ONLY({
+            printf("DEBUG: network_manager_process() - not initialized!\n");
+        });
         return;
     }
     
@@ -206,20 +226,28 @@ void network_manager_process(void) {
             bool hw_ready = enc28j60_is_ready();
             bool link_up = enc28j60_get_link_status();
             
-            printf("DEBUG: INITIALIZING state - hw_ready=%d, link_up=%d\n", hw_ready, link_up);
+            DEBUG_ONLY({
+                printf("DEBUG: INITIALIZING state - hw_ready=%d, link_up=%d\n", hw_ready, link_up);
+            });
             
             if (hw_ready) {
                 if (link_up) {
                     g_network_status = NETWORK_STATUS_LINK_UP;
                     g_network_stats.link_up_events++;
-                    printf("Network Manager: Physical link up\n");
+                    DEBUG_ONLY({
+                        printf("Network Manager: Physical link up\n");
+                    });
                     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_UP, 0);
                 } else {
-                    printf("DEBUG: Hardware ready but link down, transitioning to LINK_DOWN\n");
+                    DEBUG_ONLY({
+                        printf("DEBUG: Hardware ready but link down, transitioning to LINK_DOWN\n");
+                    });
                     g_network_status = NETWORK_STATUS_LINK_DOWN;
                 }
             } else {
-                printf("DEBUG: Hardware not ready, staying in INITIALIZING\n");
+                DEBUG_ONLY({
+                    printf("DEBUG: Hardware not ready, staying in INITIALIZING\n");
+                });
             }
             break;
             
@@ -228,7 +256,9 @@ void network_manager_process(void) {
             if (enc28j60_get_link_status()) {
                 g_network_status = NETWORK_STATUS_LINK_UP;
                 g_network_stats.link_up_events++;
-                printf("Network Manager: Physical link up\n");
+                DEBUG_ONLY({
+                    printf("Network Manager: Physical link up\n");
+                });
                 log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_UP, 0);
             }
             break;
@@ -238,7 +268,9 @@ void network_manager_process(void) {
             if (!enc28j60_get_link_status()) {
                 g_network_status = NETWORK_STATUS_LINK_DOWN;
                 g_network_stats.link_down_events++;
-                printf("Network Manager: Physical link down\n");
+                DEBUG_ONLY({
+                    printf("Network Manager: Physical link down\n");
+                });
                 log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 0);
             } else {
                 // Link is up - start DHCP if enabled
@@ -256,7 +288,9 @@ void network_manager_process(void) {
             if (!enc28j60_get_link_status()) {
                 g_network_status = NETWORK_STATUS_LINK_DOWN;
                 g_network_stats.link_down_events++;
-                printf("Network Manager: Physical link down during DHCP\n");
+                DEBUG_ONLY({
+                    printf("Network Manager: Physical link down during DHCP\n");
+                });
                 log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 0);
             } else {
                 // Continue DHCP processing
@@ -269,7 +303,9 @@ void network_manager_process(void) {
             if (!enc28j60_get_link_status()) {
                 g_network_status = NETWORK_STATUS_LINK_DOWN;
                 g_network_stats.link_down_events++;
-                printf("Network Manager: Physical link down\n");
+                DEBUG_ONLY({
+                    printf("Network Manager: Physical link down\n");
+                });
                 log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 0);
             }
             // Network is ready - full TCP/IP functionality available
@@ -279,7 +315,9 @@ void network_manager_process(void) {
             // Try to recover from error state
             if (enc28j60_is_ready() && enc28j60_get_link_status()) {
                 g_network_status = NETWORK_STATUS_LINK_UP;
-                printf("Network Manager: Attempting recovery from error state\n");
+                DEBUG_ONLY({
+                    printf("Network Manager: Attempting recovery from error state\n");
+                });
                 log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_UP, 1);
             }
             break;
@@ -546,7 +584,9 @@ int network_manager_get_diagnostic_info(char* info_buffer, size_t buffer_size) {
  * @brief Initialize lwIP TCP/IP stack and network interface
  */
 static bool network_manager_init_lwip(void) {
-    printf("Network Manager: Initializing lwIP TCP/IP stack\n");
+    DEBUG_ONLY({
+        printf("Network Manager: Initializing lwIP TCP/IP stack\n");
+    });
     
     // Initialize lwIP
     lwip_init();
@@ -560,23 +600,31 @@ static bool network_manager_init_lwip(void) {
         IP4_ADDR(&ip_addr, 0, 0, 0, 0);
         IP4_ADDR(&netmask, 0, 0, 0, 0);
         IP4_ADDR(&gateway, 0, 0, 0, 0);
-        printf("Network Manager: Configured for DHCP\n");
+        DEBUG_ONLY({
+            printf("Network Manager: Configured for DHCP\n");
+        });
     } else {
         // Use static IP configuration
         ip_addr.addr = g_network_config.static_ip.addr;
         netmask.addr = g_network_config.static_netmask.addr;
         gateway.addr = g_network_config.static_gateway.addr;
-        printf("Network Manager: Configured for static IP\n");
+        DEBUG_ONLY({
+            printf("Network Manager: Configured for static IP\n");
+        });
     }
     
     // Initialize the network interface
     g_netif = lwip_netif_enc28j60_init(&ip_addr, &netmask, &gateway);
     if (!g_netif) {
-        printf("Network Manager: Failed to initialize network interface\n");
+        DEBUG_ONLY({
+            printf("Network Manager: Failed to initialize network interface\n");
+        });
         return false;
     }
     
-    printf("Network Manager: lwIP initialization complete\n");
+    DEBUG_ONLY({
+        printf("Network Manager: lwIP initialization complete\n");
+    });
     return true;
 }
 
@@ -606,13 +654,17 @@ bool network_manager_reconfigure(const network_config_t* config) {
         IP4_ADDR(&ip_addr, 0, 0, 0, 0);
         IP4_ADDR(&netmask, 0, 0, 0, 0);
         IP4_ADDR(&gateway, 0, 0, 0, 0);
-        printf("Network Manager: (Re)Configured for DHCP\n");
+        DEBUG_ONLY({
+            printf("Network Manager: (Re)Configured for DHCP\n");
+        });
     } else {
         // Use static IP configuration
         ip_addr.addr = g_network_config.static_ip.addr;
         netmask.addr = g_network_config.static_netmask.addr;
         gateway.addr = g_network_config.static_gateway.addr;
-        printf("Network Manager: (Re)Configured for static IP\n");
+        DEBUG_ONLY({
+            printf("Network Manager: (Re)Configured for static IP\n");
+        });
     }
 
     netif_set_ipaddr(g_netif, &ip_addr);
@@ -643,7 +695,9 @@ bool network_manager_process_dhcp(void) {
     
     // Check if DHCP is already running
     if (dhcp_supplied_address(g_netif)) {
-        printf("Network Manager: DHCP bound, network ready\n");
+        DEBUG_ONLY({
+            printf("Network Manager: DHCP bound, network ready\n");
+        });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 0);
         return true;
     }
@@ -651,21 +705,31 @@ bool network_manager_process_dhcp(void) {
     // Start DHCP if not already started
     struct dhcp *dhcp = netif_dhcp_data(g_netif);
     if (dhcp == NULL || dhcp->state == DHCP_STATE_OFF) {
-        printf("Network Manager: Starting DHCP client\n");
+        DEBUG_ONLY({
+            printf("Network Manager: Starting DHCP client\n");
+        });
         
-        printf("netif status before DHCP: up=%d, link_up=%d\n", 
-        netif_is_up(g_netif), netif_is_link_up(g_netif));
+        DEBUG_ONLY({
+            printf("netif status before DHCP: up=%d, link_up=%d\n", 
+            netif_is_up(g_netif), netif_is_link_up(g_netif));
+        });
 
         err_t err = dhcp_start(g_netif);
         if (err != ERR_OK) {
-            printf("Network Manager: Failed to start DHCP client (error %d)\n", err);
+            DEBUG_ONLY({
+                printf("Network Manager: Failed to start DHCP client (error %d)\n", err);
+            });
             return false;
         }
-        printf("DHCP start called, err=%d\n", err);
+        DEBUG_ONLY({
+            printf("DHCP start called, err=%d\n", err);
+        });
         
         core1_timer_set(CORE1_TIMER_DHCP_DISCOVER, g_network_config.dhcp_timeout_ms);
         g_network_stats.dhcp_requests++;
-        printf("Network Manager: DHCP request sent\n");
+        DEBUG_ONLY({
+            printf("Network Manager: DHCP request sent\n");
+        });
     }
     return true;
 }
@@ -681,26 +745,28 @@ bool network_manager_check_dhcp_status(void) {
     // Process network interface (packet RX)
     lwip_netif_enc28j60_process();
     
-    printf("=== DHCP Debug ===\n");
-    printf("netif UP: %d\n", netif_is_up(g_netif));
-    printf("netif link UP: %d\n", netif_is_link_up(g_netif));
+    DEBUG_ONLY({
+        printf("=== DHCP Debug ===\n");
+        printf("netif UP: %d\n", netif_is_up(g_netif));
+        printf("netif link UP: %d\n", netif_is_link_up(g_netif));
 
-    struct dhcp *dhcp = netif_dhcp_data(g_netif);
-    if (dhcp) {
-        printf("DHCP state: %d\n", dhcp->state);
-        printf("DHCP server IP: %s\n", ip4addr_ntoa(&dhcp->server_ip_addr));
-    } else {
-        printf("No DHCP data\n");
-    }
+        struct dhcp *dhcp = netif_dhcp_data(g_netif);
+        if (dhcp) {
+            printf("DHCP state: %d\n", dhcp->state);
+            printf("DHCP server IP: %s\n", ip4addr_ntoa(&dhcp->server_ip_addr));
+        } else {
+            printf("No DHCP data\n");
+        }
 
-    if (!ip4_addr_isany(netif_ip4_addr(g_netif))) {
-        printf("Current IP: %s\n", ip4addr_ntoa(netif_ip4_addr(g_netif)));
-    } else {
-        printf("No IP assigned\n");
-    }
+        if (!ip4_addr_isany(netif_ip4_addr(g_netif))) {
+            printf("Current IP: %s\n", ip4addr_ntoa(netif_ip4_addr(g_netif)));
+        } else {
+            printf("No IP assigned\n");
+        }
 
-    printf("dhcp_supplied_address: %d\n", dhcp_supplied_address(g_netif));
-    printf("=================\n");
+        printf("dhcp_supplied_address: %d\n", dhcp_supplied_address(g_netif));
+        printf("=================\n");
+    });
 
 
     // Check if we got an IP address
@@ -717,8 +783,10 @@ bool network_manager_check_dhcp_status(void) {
                 (unsigned)ip4_addr3_16(netif_ip4_addr(g_netif)),
                 (unsigned)ip4_addr4_16(netif_ip4_addr(g_netif)));
         
-        printf("Network Manager: DHCP successful! IP: %s\n", ip_str);
-        printf("Network Manager: Network ready for ping and TCP/IP operations\n");
+        DEBUG_ONLY({
+            printf("Network Manager: DHCP successful! IP: %s\n", ip_str);
+            printf("Network Manager: Network ready for ping and TCP/IP operations\n");
+        });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 1);
         
         return true;

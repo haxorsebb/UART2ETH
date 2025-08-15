@@ -199,21 +199,10 @@ static uint8_t enc28j60_spi_transfer(uint8_t data) {
 }
 
 /**
- * @brief Soft reset (Arduino reference exact sequence)
+ * @brief Hard reset
  */
 void enc28j60_reset(void) {
-    printf("ENC28J60: Performing soft reset\n");
-    /*
-    // Ensure CS is high before reset
-    gpio_put(ENC28J60_CS_PIN, 1);
-    sleep_us(10);
     
-    // Perform SPI soft reset command (Arduino reference sequence)
-    enc28j60_arch_spi_select();
-    enc28j60_spi_transfer(ENC28J60_SOFT_RESET);
-    enc28j60_arch_spi_deselect();
-    */
-
     gpio_put(ENC28J60_RESET_PIN, 0);
 
      //pull enc from reset
@@ -226,8 +215,7 @@ void enc28j60_reset(void) {
     // Arduino reference: "Workaround for erratum #2" + wait for reset
     sleep_us(1000);  // 1ms delay (Arduino reference)
     
-    printf("ENC28J60: Soft reset complete\n");
-    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_RESET, 0);
+    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_RESET, 0);
 }
 
 /**
@@ -239,14 +227,14 @@ static bool enc28j60_wait_for_osc_ready(void) {
     // Ensure we're in bank 0 for ESTAT register
     g_current_bank = ERXTX_BANK;
     
-    printf("ENC28J60: Waiting for oscillator ready\n");
-    sleep_us(700);  // minimum time from datasheet 300 us
+    DEBUG_ONLY({ printf("ENC28J60: Waiting for oscillator ready\n"); });
+    sleep_us(1000);  // Errata #2
 
     while (timeout > 0) {
         uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
         
         if (estat != 0xFF && (estat & ENC28J60_ESTAT_CLKRDY)) {
-            printf("ENC28J60: Oscillator ready\n");
+            DEBUG_ONLY({ printf("ENC28J60: Oscillator ready\n"); });
             return true;
         }
         
@@ -254,7 +242,7 @@ static bool enc28j60_wait_for_osc_ready(void) {
         timeout -= 100;
     }
     
-    printf("ENC28J60: Oscillator timeout\n");
+    DEBUG_ONLY({ printf("ENC28J60: Oscillator timeout\n"); });
     return false;
 }
 
@@ -262,7 +250,7 @@ static bool enc28j60_wait_for_osc_ready(void) {
  * @brief Configure buffer memory layout (Arduino reference exact sequence)
  */
 static void enc28j60_configure_buffers(void) {
-    printf("ENC28J60: Configuring buffers\n");
+    DEBUG_ONLY({ printf("ENC28J60: Configuring buffers\n"); });
     
     // Set up receive buffer (must be in Bank 0) - exact Arduino order
     enc28j60_set_register_bank_internal(ERXTX_BANK);
@@ -298,14 +286,14 @@ static void enc28j60_configure_buffers(void) {
     
     
 
-    printf("ENC28J60: Buffer configuration complete\n");
+    DEBUG_ONLY({ printf("ENC28J60: Buffer configuration complete\n"); });
 }
 
 /**
  * @brief Configure MAC layer (Arduino reference exact sequence)
  */
 static void enc28j60_configure_mac(void) {
-    printf("ENC28J60: Configuring MAC\n");
+    DEBUG_ONLY({ printf("ENC28J60: Configuring MAC\n"); });
     
     // Configure Bank 2 MAC registers - follow Arduino exact sequence
     enc28j60_set_register_bank_internal(MACONX_BANK);
@@ -314,14 +302,14 @@ static void enc28j60_configure_mac(void) {
     // CRITICAL FIX: Use direct register write instead of bit field operations for MAC registers
     uint8_t macon1_value = ENC28J60_MACON1_MARXEN | ENC28J60_MACON1_TXPAUS | ENC28J60_MACON1_RXPAUS;
     enc28j60_write_register_internal(ENC28J60_MACON1, macon1_value);
-    printf("ENC28J60: MACON1 = 0x%02X (should be 0x0D)\n", macon1_value);
+    DEBUG_ONLY({ printf("ENC28J60: MACON1 = 0x%02X (should be 0x0D)\n", macon1_value); });
     
     // Arduino step 2: Set padding, crc, full duplex
     // CRITICAL FIX: Use direct register write instead of bit field operations for MAC registers
     uint8_t macon3_value = ENC28J60_MACON3_PADCFG_FULL | ENC28J60_MACON3_TXCRCEN | 
                            ENC28J60_MACON3_FULDPX | ENC28J60_MACON3_FRMLNEN;
     enc28j60_write_register_internal(ENC28J60_MACON3, macon3_value);
-    printf("ENC28J60: MACON3 = 0x%02X (should be 0xF3)\n", macon3_value);
+    DEBUG_ONLY({ printf("ENC28J60: MACON3 = 0x%02X (should be 0xF3)\n", macon3_value); });
     
     // Arduino step 3: Set maximum frame length
     enc28j60_write_register_internal(ENC28J60_MAMXFLL, MAX_MAC_LENGTH & 0xFF);
@@ -337,15 +325,12 @@ static void enc28j60_configure_mac(void) {
     enc28j60_set_register_bank_internal(MACONX_BANK);
     uint8_t macon1_verify = enc28j60_read_register_internal(ENC28J60_MACON1);
     uint8_t macon3_verify = enc28j60_read_register_internal(ENC28J60_MACON3);
-    printf("ENC28J60: MAC Verification - MACON1=0x%02X, MACON3=0x%02X\n", macon1_verify, macon3_verify);
     
     if (macon1_verify != macon1_value) {
-        printf("ENC28J60: WARNING! MACON1 verification failed (expected 0x%02X, got 0x%02X)\n", 
-               macon1_value, macon1_verify);
+        printf("ENC28J60: WARNING! MACON1 verification failed (expected 0x%02X, got 0x%02X)\n", macon1_value, macon1_verify);
     }
     if (macon3_verify != macon3_value) {
-        printf("ENC28J60: WARNING! MACON3 verification failed (expected 0x%02X, got 0x%02X)\n", 
-               macon3_value, macon3_verify);
+        printf("ENC28J60: WARNING! MACON3 verification failed (expected 0x%02X, got 0x%02X)\n", macon3_value, macon3_verify);
     }
     
     // Set MAC address if available
@@ -359,14 +344,14 @@ static void enc28j60_configure_mac(void) {
         enc28j60_write_register_internal(ENC28J60_MAADR1, g_local_mac[0]);
     }
     
-    printf("ENC28J60: MAC configuration complete\n");
+    DEBUG_ONLY({ printf("ENC28J60: MAC configuration complete\n"); });
 }
 
 /**
  * @brief Configure PHY layer (minimal for basic operation)
  */
 static void enc28j60_configure_phy(void) {
-    printf("ENC28J60: PHY configuration (using defaults)\n");
+    DEBUG_ONLY({ printf("ENC28J60: PHY configuration (using defaults)\n"); });
     // Use default PHY settings for basic operation
     // No PHY register writes needed for minimal functionality
 }
@@ -375,10 +360,8 @@ static void enc28j60_configure_phy(void) {
  * @brief Initialize ENC28J60 driver (Arduino reference exact sequence)
  */
 bool enc28j60_init(void) {
-    printf("ENC28J60: Starting initialization\n");
     
     if (g_driver_initialized) {
-        printf("ENC28J60: Already initialized\n");
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_INIT, 1);
         return true;
     }
@@ -401,7 +384,7 @@ bool enc28j60_init(void) {
     
     // 2. Wait for oscillator ready
     if (!enc28j60_wait_for_osc_ready()) {
-        printf("ENC28J60: Oscillator not ready - init failed\n");
+        DEBUG_ONLY({ printf("ENC28J60: Oscillator not ready - init failed\n"); });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
         return false;
     }
@@ -413,7 +396,7 @@ bool enc28j60_init(void) {
     enc28j60_set_register_bank_internal(ERXTX_BANK);
     enc28j60_write_register_internal(ENC28J60_ETXSTL, TX_BUF_START & 0xFF);
     enc28j60_write_register_internal(ENC28J60_ETXSTH, (TX_BUF_START >> 8) & 0xFF);
-    printf("ENC28J60: TX FIFO initialized - Start: 0x%04X, End: 0x%04X\n", TX_BUF_START, TX_BUF_END);
+    DEBUG_ONLY({ printf("ENC28J60: TX FIFO initialized - Start: 0x%04X, End: 0x%04X\n", TX_BUF_START, TX_BUF_END); });
     
     // 4. Configure MAC layer
     enc28j60_configure_mac();
@@ -428,7 +411,7 @@ bool enc28j60_init(void) {
     // 7. Verify chip communication by reading revision ID
     enc28j60_set_register_bank_internal(MAADRX_BANK);
     uint8_t revid = enc28j60_read_register_internal(ENC28J60_EREVID);
-    printf("ENC28J60: Chip revision = 0x%02X\n", revid);
+    DEBUG_ONLY({ printf("ENC28J60: Chip revision = 0x%02X\n", revid); });
      
     // Initialize driver state
     memset(&g_enc28j60_state, 0, sizeof(g_enc28j60_state));
@@ -449,13 +432,11 @@ bool enc28j60_init(void) {
     // Verify initialization by checking ECON1
     uint8_t econ1_check = enc28j60_read_register_internal(ENC28J60_ECON1);
     if ((econ1_check & ENC28J60_ECON1_RXEN) == 0) {
-        printf("ENC28J60: RXEN verification failed\n");
+        DEBUG_ONLY({ printf("ENC28J60: RXEN verification failed\n"); });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 2);
         return false;
     }
     
-    printf("ENC28J60: Initialization complete\n");
-
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 2);
 
     g_is_ready = true;
@@ -475,7 +456,6 @@ void enc28j60_deinit(void) {
     
     // Disable interrupts
     enc28j60_block_interrupt();
-    printf("ENC28J60: GPIO interrupts disabled\n");
     
     // Disable packet reception
     enc28j60_set_register_bank_internal(ERXTX_BANK);
@@ -663,9 +643,6 @@ static void enc28j60_interrupt_handler(uint gpio, uint32_t events) {
         //g_last_interrupt_status = enc28j60_read_register_internal(ENC28J60_EIR);
         g_interrupt_time = to_ms_since_boot(get_absolute_time());
         g_interrupt_pending = true;
-        //DEBUG_ONLY({
-            //printf("INTERRUPT! %d\n", g_interrupt_time);
-        //});
         
         //enc28j60_clear_interrupts(0xFF);    //clear all, we have a copy
     }
@@ -699,17 +676,12 @@ static void enc28j60_gpio_init(void) {
     gpio_set_input_enabled(ENC28J60_RESET_PIN, false);
 
     gpio_put(ENC28J60_RESET_PIN, 0);    //active low reset, keep in reset until software is ready
-    
-    //gpio_pull_up(ENC28J60_RESET_PIN);
-    //gpio_set_drive_strength(ENC28J60_RESET_PIN,GPIO_DRIVE_STRENGTH_12MA);
-    
-    
-    
+
     // Set up interrupt handler for falling edge (active low interrupt)
     gpio_set_irq_enabled_with_callback(ENC28J60_INTERRUPT_PIN, GPIO_IRQ_EDGE_FALL, 
                                        true, &enc28j60_interrupt_handler);                                       
     
-    printf("ENC28J60: GPIO interrupt handler configured for pin %d\n", ENC28J60_INTERRUPT_PIN);
+    DEBUG_ONLY({ printf("ENC28J60: GPIO interrupt handler configured for pin %d\n", ENC28J60_INTERRUPT_PIN); });
     
 }
 
@@ -731,7 +703,7 @@ static void enc28j60_enable_interrupts(void) {
                 | ENC28J60_EIE_TXERIE /* TRANSMIT ERROR -> ERRATA 12,13 */ ;
     enc28j60_write_register_internal(ENC28J60_EIE, eie);
     
-    printf("ENC28J60: Interrupts enabled (EIE=0x%02X)\n", eie);
+    DEBUG_ONLY({ printf("ENC28J60: Interrupts enabled (EIE=0x%02X)\n", eie); });
 }
 
 /**
@@ -821,51 +793,55 @@ uint32_t get_interrupt_ms()
  * @brief Dump all transmission-relevant registers for debugging
  */
 static void enc28j60_dump_tx_registers(const char* phase) {
-    printf("=== TX Register Dump - %s ===\n", phase);
-    
-    // Ensure we're in the right bank for each register
-    enc28j60_set_register_bank_internal(ERXTX_BANK);
-    uint8_t econ1 = enc28j60_read_register_internal(ENC28J60_ECON1);
-    uint8_t eir = enc28j60_read_register_internal(ENC28J60_EIR);
-    uint8_t eie = enc28j60_read_register_internal(ENC28J60_EIE);
-    uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
-    
-    uint16_t etxst = (enc28j60_read_register_internal(ENC28J60_ETXSTH) << 8) | 
-                     enc28j60_read_register_internal(ENC28J60_ETXSTL);
-    uint16_t etxnd = (enc28j60_read_register_internal(ENC28J60_ETXNDH) << 8) | 
-                     enc28j60_read_register_internal(ENC28J60_ETXNDL);
-    uint16_t ewrpt = (enc28j60_read_register_internal(ENC28J60_EWRPTH) << 8) | 
-                     enc28j60_read_register_internal(ENC28J60_EWRPTL);
-    
-    printf("  ECON1: 0x%02X (TXRTS=%d, RXEN=%d, TXRST=%d)\n", 
-           econ1, 
-           (econ1 & ENC28J60_ECON1_TXRTS) ? 1 : 0,
-           (econ1 & ENC28J60_ECON1_RXEN) ? 1 : 0,
-           (econ1 & ENC28J60_ECON1_TXRST) ? 1 : 0);
-    
-    printf("  EIR:   0x%02X (TXIF=%d, TXERIF=%d, PKTIF=%d, LINKIF=%d)\n", 
-           eir,
-           (eir & ENC28J60_EIR_TXIF) ? 1 : 0,
-           (eir & ENC28J60_EIR_TXERIF) ? 1 : 0,
-           (eir & ENC28J60_EIR_PKTIF) ? 1 : 0,
-           (eir & ENC28J60_EIR_LINKIF) ? 1 : 0);
-    
-    printf("  EIE:   0x%02X (INTIE=%d, TXIE=%d, TXERIE=%d)\n", 
-           eie,
-           (eie & ENC28J60_EIE_INTIE) ? 1 : 0,
-           (eie & ENC28J60_EIE_TXIE) ? 1 : 0,
-           (eie & ENC28J60_EIE_TXERIE) ? 1 : 0);
-    
-    printf("  ESTAT: 0x%02X (TXABRT=%d, CLKRDY=%d)\n", 
-           estat,
-           (estat & ENC28J60_ESTAT_TXABRT) ? 1 : 0,
-           (estat & ENC28J60_ESTAT_CLKRDY) ? 1 : 0);
-    
-    printf("  ETXST: 0x%04X, ETXND: 0x%04X, EWRPT: 0x%04X\n", etxst, etxnd, ewrpt);
-    printf("  TX Buffer: Start=0x%04X, End=0x%04X (Size=%d bytes)\n", 
-           TX_BUF_START, TX_BUF_END, TX_BUF_END - TX_BUF_START + 1);
-    printf("==================================\n");
+
+    DEBUG_ONLY({ 
+        printf("=== TX Register Dump - %s ===\n", phase);
+        
+        // Ensure we're in the right bank for each register
+        enc28j60_set_register_bank_internal(ERXTX_BANK);
+        uint8_t econ1 = enc28j60_read_register_internal(ENC28J60_ECON1);
+        uint8_t eir = enc28j60_read_register_internal(ENC28J60_EIR);
+        uint8_t eie = enc28j60_read_register_internal(ENC28J60_EIE);
+        uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
+        
+        uint16_t etxst = (enc28j60_read_register_internal(ENC28J60_ETXSTH) << 8) | 
+                        enc28j60_read_register_internal(ENC28J60_ETXSTL);
+        uint16_t etxnd = (enc28j60_read_register_internal(ENC28J60_ETXNDH) << 8) | 
+                        enc28j60_read_register_internal(ENC28J60_ETXNDL);
+        uint16_t ewrpt = (enc28j60_read_register_internal(ENC28J60_EWRPTH) << 8) | 
+                        enc28j60_read_register_internal(ENC28J60_EWRPTL);
+        
+        printf("  ECON1: 0x%02X (TXRTS=%d, RXEN=%d, TXRST=%d)\n", 
+            econ1, 
+            (econ1 & ENC28J60_ECON1_TXRTS) ? 1 : 0,
+            (econ1 & ENC28J60_ECON1_RXEN) ? 1 : 0,
+            (econ1 & ENC28J60_ECON1_TXRST) ? 1 : 0);
+        
+        printf("  EIR:   0x%02X (TXIF=%d, TXERIF=%d, PKTIF=%d, LINKIF=%d)\n", 
+            eir,
+            (eir & ENC28J60_EIR_TXIF) ? 1 : 0,
+            (eir & ENC28J60_EIR_TXERIF) ? 1 : 0,
+            (eir & ENC28J60_EIR_PKTIF) ? 1 : 0,
+            (eir & ENC28J60_EIR_LINKIF) ? 1 : 0);
+        
+        printf("  EIE:   0x%02X (INTIE=%d, TXIE=%d, TXERIE=%d)\n", 
+            eie,
+            (eie & ENC28J60_EIE_INTIE) ? 1 : 0,
+            (eie & ENC28J60_EIE_TXIE) ? 1 : 0,
+            (eie & ENC28J60_EIE_TXERIE) ? 1 : 0);
+        
+        printf("  ESTAT: 0x%02X (TXABRT=%d, CLKRDY=%d)\n", 
+            estat,
+            (estat & ENC28J60_ESTAT_TXABRT) ? 1 : 0,
+            (estat & ENC28J60_ESTAT_CLKRDY) ? 1 : 0);
+        
+        printf("  ETXST: 0x%04X, ETXND: 0x%04X, EWRPT: 0x%04X\n", etxst, etxnd, ewrpt);
+        printf("  TX Buffer: Start=0x%04X, End=0x%04X (Size=%d bytes)\n", 
+            TX_BUF_START, TX_BUF_END, TX_BUF_END - TX_BUF_START + 1);
+        printf("==================================\n");
+    });
 }
+
 
 /**
  * @brief Send Ethernet packet (Arduino reference implementation)
@@ -873,14 +849,14 @@ static void enc28j60_dump_tx_registers(const char* phase) {
 bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
     if (!g_driver_initialized || !packet || !packet->data || 
         packet->length == 0 || !packet->valid) {
-        printf("ENC28J60: can not send. NOT INITIALIZED\n" );
+        DEBUG_ONLY({  printf("ENC28J60: can not send. NOT INITIALIZED\n" ); });
     
         return false;
     }
     
     if (packet->length > ENC28J60_MAX_FRAME_SIZE) {
         g_enc28j60_state.tx_errors++;
-        printf("ENC28J60: can not send. TOO LONG\n" );
+        DEBUG_ONLY({ printf("ENC28J60: can not send. TOO LONG\n" ); });
         return false;
     }
     
@@ -889,14 +865,13 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
     bool transfer_error_interrupt_flag = false;
     uint32_t debug_counter = 0;
 
-    //DEBUG_ONLY({printf("ENC28J60: Starting transmission of %d byte packet\n", packet->length);});
     int retries = 3;
     while(retries--)
     {
         DEBUG_ONLY({printf("ENC28J60: Starting transmission of %d byte packet\n", packet->length);});
         if( retries < 2)
         {
-            printf("ENC28J60: Starting transmission of %d byte packet TXERIF: %d\n", packet->length, transfer_error_interrupt_flag);
+            DEBUG_ONLY({ printf("ENC28J60: Starting transmission of %d byte packet TXERIF: %d\n", packet->length, transfer_error_interrupt_flag); });
         }
         enc28j60_block_interrupt();
         
@@ -956,7 +931,8 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
         }
         //timer expired, reset and retry
         enc28j60_reset_tx_logic();
-    /*    
+
+    /*    TBD: this was the original arduino control flow. TBD: use or remove
     // Wait for transmission to complete (Arduino reference - synchronous!)
     uint32_t timeout = 5000; // 5ms timeout Hardware transmission: ~1230μs max (for 1518 byte frame at 10Mbps)
     while (timeout > 0) {
@@ -1036,18 +1012,18 @@ transfer_finished:
         }
     }   
     
-    DEBUG_ONLY( {printf("total elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - g_interrupt_time);});
+    DEBUG_ONLY({
+        printf("total elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - g_interrupt_time);
 
-    // DEBUGGING: Final register dump and analysis
-    DEBUG_ONLY({enc28j60_dump_tx_registers("FINAL");
+        enc28j60_dump_tx_registers("FINAL");
     
-    printf("=== TX Result Analysis ===\n");
-    printf("  timeout_remaining: %u, other_error: %d, collision_error: %d\n", 
-           timeout, other_error ? 1 : 0, collision_error ? 1 : 0);
-    printf("  transfer_complete: %d, transfer_complete_interrupt_flag: %d, transfer_error_interrupt_flag: %d\n",
-           transfer_complete ? 1 : 0, transfer_complete_interrupt_flag ? 1 : 0, transfer_error_interrupt_flag ? 1 : 0);
-    printf("  tx_success: %d\n", tx_success ? 1 : 0);
-    printf("========================\n");
+        printf("=== TX Result Analysis ===\n");
+        printf("  timeout_remaining: %u, other_error: %d, collision_error: %d\n", 
+            timeout, other_error ? 1 : 0, collision_error ? 1 : 0);
+        printf("  transfer_complete: %d, transfer_complete_interrupt_flag: %d, transfer_error_interrupt_flag: %d\n",
+            transfer_complete ? 1 : 0, transfer_complete_interrupt_flag ? 1 : 0, transfer_error_interrupt_flag ? 1 : 0);
+        printf("  tx_success: %d\n", tx_success ? 1 : 0);
+        printf("========================\n");
     });
     
     //refresh flags
@@ -1057,12 +1033,12 @@ transfer_finished:
 
     if (tx_success) {
         g_enc28j60_state.packets_sent++;
-        DEBUG_ONLY({printf("ENC28J60: TX SUCCESS - packet sent\n");});
+        DEBUG_ONLY({ printf("ENC28J60: TX SUCCESS - packet sent\n"); });
         //log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, packet->length);
         return true;
     } else {
         g_enc28j60_state.tx_errors++;
-        DEBUG_ONLY({printf("ENC28J60: TX FAILED - packet aborted\n");});
+        DEBUG_ONLY({ printf("ENC28J60: TX FAILED - packet aborted\n"); });
         return false;
     }
 }
@@ -1143,10 +1119,6 @@ bool enc28j60_receive_packet(enc28j60_packet_t* packet, uint16_t max_length) {
     
     enc28j60_set_register_bank_internal(ERXTX_BANK);
     
-    // Set read pointer to next packet
-    //enc28j60_write_register_internal(ENC28J60_ERDPTL, g_enc28j60_state.next_packet_ptr & 0xFF);
-    //enc28j60_write_register_internal(ENC28J60_ERDPTH, (g_enc28j60_state.next_packet_ptr >> 8) & 0xFF);
-    
     // Read packet header (6 bytes) - Arduino reference
     uint8_t packet_header[6];
     enc28j60_read_buffer(packet_header, 6);
@@ -1162,9 +1134,7 @@ bool enc28j60_receive_packet(enc28j60_packet_t* packet, uint16_t max_length) {
         
         // Read packet data if EVERYTHING is ok
         enc28j60_read_buffer(packet->data, packet_length);
-        DEBUG_ONLY({
-            printf("ENC28J60: READ %d bytes, next at: %d\n", packet_length, next_packet);
-        });
+        DEBUG_ONLY({ printf("ENC28J60: READ %d bytes, next at: %d\n", packet_length, next_packet); });
 
         packet->length = packet_length;
         packet->valid = true;
@@ -1172,18 +1142,14 @@ bool enc28j60_receive_packet(enc28j60_packet_t* packet, uint16_t max_length) {
     }
     else {
         g_enc28j60_state.rx_errors++;
-        DEBUG_ONLY({
-            printf("ENC28J60: invalid packet received, wrong size: %d", packet_length);
-        });
+        DEBUG_ONLY({ printf("ENC28J60: invalid packet received, wrong size: %d", packet_length); });
     }
     
 
     /* Read an additional byte at odd lengths, to avoid FIFO corruption */
     if ((packet_length % 2) != 0) {
         enc28j60_read_buffer(&r, 1);
-        DEBUG_ONLY({
-            printf("ENC28J60: READ 1 extra byte\n");
-        });
+        DEBUG_ONLY({ printf("ENC28J60: READ 1 extra byte\n"); });
     }
     
     // Free up the receive buffer space (Errata #14 workaround) - Arduino reference
@@ -1194,19 +1160,15 @@ bool enc28j60_receive_packet(enc28j60_packet_t* packet, uint16_t max_length) {
     }
 
     // Update next packet pointer for next receive
-    g_enc28j60_state.next_packet_ptr = next_packet;
+    DEBUG_ONLY({ printf("ENC28J60: Setting ERXRDPT register\n"); });
     
-    DEBUG_ONLY({
-        printf("ENC28J60: Setting ERXRDPT register\n");
-    });
+    g_enc28j60_state.next_packet_ptr = next_packet;
     enc28j60_write_register_internal(ENC28J60_ERXRDPTL, next_packet & 0xFF);
     enc28j60_write_register_internal(ENC28J60_ERXRDPTH, (next_packet >> 8) & 0xFF);
     
     // Decrement packet count
     enc28j60_set_register_bits(ENC28J60_ECON2, ENC28J60_ECON2_PKTDEC);
-    DEBUG_ONLY({
-        printf("ENC28J60: Decremented ECON2 register\n");
-    });
+    DEBUG_ONLY({ printf("ENC28J60: Decremented ECON2 register\n"); });
     
     //update packet counts and interrupt flags
     enc28j60_has_rx_packet();
@@ -1214,8 +1176,6 @@ bool enc28j60_receive_packet(enc28j60_packet_t* packet, uint16_t max_length) {
     enc28j60_unblock_interrupt();
 
     g_enc28j60_state.packets_received++;
-    
-    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_RX, packet_length);
     
     return packet->valid;
 }
@@ -1239,9 +1199,7 @@ void enc28j60_clear_interrupts(uint8_t flags) {
     if (!g_driver_initialized) {
         return;
     }
-    DEBUG_ONLY({
-        printf("Clearing interrupt flag in register %d", flags);
-    });
+    DEBUG_ONLY({ printf("Clearing interrupt flag in register %d", flags); });
     enc28j60_set_register_bank_internal(ERXTX_BANK);
     enc28j60_clear_register_bits(ENC28J60_EIR, flags);
 
@@ -1263,7 +1221,8 @@ bool enc28j60_process_interrupts(bool forced) {
     }
     //we keep the bits around in g_last_interrupt_status as we might need several rounds to handle everything
     g_last_interrupt_status |= enc28j60_get_interrupt_status();    
-    //clear all
+    
+    //clear all in the hardware
     enc28j60_clear_interrupts(0xFF);    
 
     DEBUG_ONLY({
@@ -1393,11 +1352,11 @@ static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
         sleep_us(1);
         timeout--;
     }
+    
     if(timeout == 0)
     {
-        DEBUG_ONLY({
-            printf("ENC28J60: TIMEOUT WHEN READING PHY REGISTER: %X", phy_reg);
-        });
+        // TBD: we should do something to mitigate the error
+        DEBUG_ONLY({ printf("ENC28J60: TIMEOUT WHEN READING PHY REGISTER: %X", phy_reg); });
     }
     // Return to Bank 2 for reading result
     enc28j60_set_register_bank_internal(MACONX_BANK);
@@ -1426,9 +1385,7 @@ bool enc28j60_get_link_status(void) {
     // Check bit 10 (0x0400) - Link Status bit
     bool link_up = (phstat2 & ENC28J60_PHSTAT2_LSTAT) != 0;
     
-    DEBUG_ONLY({
-        printf("ENC28J60: checking link state: %d\n", link_up);
-    });
+    DEBUG_ONLY({ printf("ENC28J60: checking link state: %d\n", link_up); });
     
     return link_up;
 }

@@ -274,7 +274,7 @@ static bool write_log_entry(const log_entry_t* entry) {
     g_shared_layout->log_mgmt.total_events_logged++;
     spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     
-    /*
+    /* this is a test to use atomic instead of spinlocks TBD: use or remove
 
     uint32_t current_write, next_write;
     do {
@@ -359,9 +359,6 @@ bool log_event(event_source_t event_source, log_level_t log_level,
                event_type_t event_type, uint32_t extra_value) {
     // Reset error state
     g_last_error = LOG_ERROR_NONE;
-    
-    return true;
-
 
     if (!g_log_initialized) {
         g_last_error = LOG_ERROR_NOT_INITIALIZED;
