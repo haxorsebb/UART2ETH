@@ -17,10 +17,6 @@
 #include <stdio.h>
 #include <stdatomic.h>
 
-// Define doorbell variables needed by state machine
-int doorbell_core0_wakes_core1 = 0;
-int doorbell_core1_wakes_core0 = 1;
-
 // Access to initialization flag for proper test reinitialization
 extern _Atomic bool g_initialized;
 
