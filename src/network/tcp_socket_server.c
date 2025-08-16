@@ -25,6 +25,11 @@
 #define TCP_SERVER_MAX_CONNECTIONS 4
 #define TCP_SERVER_LINE_BUFFER_SIZE 256
 
+// TCP server error codes for logging
+#define TCP_ERROR_PCB_CREATION_FAILED 1
+#define TCP_ERROR_BIND_FAILED 2
+#define TCP_ERROR_LISTEN_FAILED 3
+
 /**
  * @brief TCP connection state structure
  */
@@ -55,7 +60,10 @@ static void close_connection(tcp_connection_t* conn);
 static int process_received_data(tcp_connection_t* conn, const char* data, size_t len);
 
 /**
- * @brief Initialize TCP socket server
+ * @brief Initialize TCP socket server on specified port
+ * @param port TCP port to listen on (e.g., 4001)
+ * @return true if initialization successful, false otherwise
+ * @note Requires network manager to be initialized (not ERROR/UNINITIALIZED)
  */
 bool tcp_socket_server_init(uint16_t port) {
     if (g_server_initialized) {
@@ -85,7 +93,7 @@ bool tcp_socket_server_init(uint16_t port) {
         DEBUG_ONLY({
             printf("TCP Server: Failed to create PCB\n");
         });
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, TCP_ERROR_PCB_CREATION_FAILED);
         return false;
     }
     
@@ -97,7 +105,7 @@ bool tcp_socket_server_init(uint16_t port) {
         });
         tcp_close(g_server_pcb);
         g_server_pcb = NULL;
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 2);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, TCP_ERROR_BIND_FAILED);
         return false;
     }
     
@@ -107,7 +115,7 @@ bool tcp_socket_server_init(uint16_t port) {
         DEBUG_ONLY({
             printf("TCP Server: Failed to listen\n");
         });
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 3);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, TCP_ERROR_LISTEN_FAILED);
         return false;
     }
     
@@ -134,7 +142,8 @@ bool tcp_socket_server_init(uint16_t port) {
 }
 
 /**
- * @brief Deinitialize TCP socket server
+ * @brief Deinitialize TCP socket server and cleanup all resources
+ * @note Closes all active connections and resets server state
  */
 void tcp_socket_server_deinit(void) {
     if (!g_server_initialized) {
@@ -159,6 +168,9 @@ void tcp_socket_server_deinit(void) {
         g_server_pcb = NULL;
     }
     
+    // Reset all state
+    memset(g_connections, 0, sizeof(g_connections));
+    memset(&g_server_stats, 0, sizeof(tcp_server_stats_t));
     g_server_initialized = false;
     g_listen_port = 0;
     
@@ -419,9 +431,12 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         char ch = data[i];
         processed++;
         
-        // Add character to line buffer
-        if (conn->line_pos < sizeof(conn->line_buffer) - 1) {
+        // Add character to line buffer with bounds checking
+        if (conn->line_pos < TCP_SERVER_LINE_BUFFER_SIZE - 1) {
             conn->line_buffer[conn->line_pos++] = ch;
+        } else if (ch != '\n' && ch != '\r') {
+            // Buffer full, skip non-newline characters
+            continue;
         }
         
         // Process complete line on newline
