@@ -309,95 +309,77 @@ Core 0 specialization enables real-time UART processing without interference fro
 
 ==== Whitebox Core 1 Network Subsystem
 
-The Core 1 Network Subsystem manages all network communication including TCP/IP protocol processing, Ethernet controller interface, and bidirectional packet routing between ring buffer and network clients.
+The Core 1 Network Subsystem implements complete TCP/IP networking with lwIP stack, DHCP client, sophisticated state management, and interrupt-driven packet processing. Integrates with Core1 timers for DHCP timeout handling and network operations.
 
-[plantuml, level2-core1-network-simple, svg]
+[plantuml, level2-core1-network-actual, svg]
 ----
 @startuml
 !theme plain
 skinparam backgroundColor transparent
 skinparam componentStyle rectangle
 
-title Level 2 - Core 1 Network Subsystem (Whitebox)
+title Level 2 - Core 1 Network Subsystem (Actual Implementation)
 
 cloud "Network Infrastructure\nEthernet Switch/Router" as NI
-cloud "Ring Buffer System\nShared Memory" as RBS
-cloud "Management Interface" as management_interface
+cloud "Core1 Timer Subsystem\nDHCP Timeouts\nNetwork Timeouts" as TIMERS
+cloud "Core1 State Machine\nNetwork States\nEvent Generation" as STATE_MACHINE
 
 package "Core 1 Network Subsystem" {
+    component "Network Manager\nState Coordination\nDHCP Management\nCore1 Integration" as NETWORK_MGR #lightcyan
+    
+    component "lwIP TCP/IP Stack\nComplete Implementation\nDHCP Client\nTCP/UDP/IP/ARP/ICMP" as LWIP #lightblue
+    
+    component "ENC28J60 Driver\nSPI Interface\nInterrupt-Driven\nPacket RX/TX\nLink Status" as ENC28J60 #lightsalmon
+    
+    component "Network Interface (netif)\nlwIP Integration\nEthernet Interface\nIP Address Management" as NETIF #lightgreen
+    
+    component "DHCP State Machine\nIP Address Request\nTimeout Handling\nRenewal Logic" as DHCP #lightyellow
+    
+    component "Network Status Manager\n7-State FSM\nUNINITIALIZED → READY\nError Recovery" as STATUS #lightpink
+    
+    component "Network Statistics\nPacket Counters\nLink Events\nDiagnostics" as STATS #wheat
+}
 
-    component "Network Manager" as network_manager #lightsalmon
+package "ENC28J60 Hardware Interface" {
+    component "SPI Communication\nRegister Access\nBuffer Management\nMAC Address Config" as SPI #lightcyan
     
-    component "lwIP TCP/IP Stack\nSoftware Protocol\nNetwork processing" as LWIP #lightsalmon
+    component "Interrupt Handler\nLink Change\nPacket RX/TX\nError Conditions" as INT_HANDLER #lightgreen
     
-    component "ENC28J60 Driver\nSPI Interface\n10BASE-T controller\nFrame handling" as ENC #lightsalmon
-    
-    component "Socket Manager\nTCP Connections\n1 per UART channel\nBidirectional sockets" as socket_manager #lightsalmon
-    
-    component "Network Configuration\nPort Assignment" as network_configuration #lightsalmon
-    
-    component "Packet Assembler\nTCP → Packet\nNetwork RX data\nRing buffer format" as PA #lightblue
-    
-    component "Packet Disassembler\nPacket → TCP\nRing buffer data\nNetwork TX output" as PD #lightgreen
-    
-    component "Ring Buffer Interface\nProducer/Consumer\nTCP RX producer\nTCP TX consumer" as RBI #lightyellow
-
-    component "RX Interrupt Handler\nISR\nTime-critical events\nRX handling" as RXISR #LightBlue
-    component "TX Interrupt Handler\nISR\nTime-critical events\nTX handling" as TXISR #lightgreen
-    
-    component "DMA Controller\nBulk Transfer\nCPU optimization" as DMA #LightSalmon
-
-    component "TX DMA Channel\nBulk Transfers" as TXDMA #lightgreen
-    component "RX DMA Channel\nBulk Transfers" as RXDMA #LightBlue
-
-    component "DMA Controller\nBulk Transfer\nCPU optimization" as DMA #LightSalmon
+    component "Packet Processing\nFrame RX/TX\nCRC Validation\nBuffer Management" as PACKET_PROC #lightyellow
 }
 
 ' External connections
-ENC <--> NI : Ethernet Frames\n10BASE-T
-RBI <--> RBS : Bidirectional Packets\nShared Memory
-socket_manager <--> management_interface : Webserver connections
+ENC28J60 <--> NI : Ethernet Frames\n10BASE-T
+NETWORK_MGR <--> TIMERS : DHCP Timeouts\nNetwork Timeouts
+NETWORK_MGR --> STATE_MACHINE : Network Events\nLink Up/Down\nDHCP Status
 
-' Internal connections
+' Internal network subsystem connections
+NETWORK_MGR <--> LWIP : Stack Coordination\nInitialization\nStatus
+NETWORK_MGR --> NETIF : Interface Control\nUp/Down/Config
+NETWORK_MGR <--> DHCP : DHCP Control\nStart/Stop/Status
+NETWORK_MGR --> STATUS : Status Updates\nState Transitions
+NETWORK_MGR <--> STATS : Statistics Update\nCounter Management
 
-network_manager --> TXISR : Setup/Control\nHardware IRQ
-network_manager --> RXISR : Setup/Control\nHardware IRQ
-network_manager --> DMA : Setup/Control\nHardware DMA
-network_manager --> network_configuration : manage
-DMA --> TXDMA : Setup/Control\nHardware DMA
-DMA --> RXDMA : Setup/Control\nHardware DMA
+LWIP <--> NETIF : Packet Processing\nIP Layer Interface
+LWIP --> DHCP : DHCP Client\nIP Assignment
+NETIF <--> ENC28J60 : Frame Processing\nHardware Interface
 
-LWIP <--> socket_manager : TCP Events\nSocket Callbacks
+' ENC28J60 internal connections
+ENC28J60 --> SPI : Hardware Control\nRegister Access
+ENC28J60 <--> INT_HANDLER : Interrupt Processing\nEvent Handling
+ENC28J60 <--> PACKET_PROC : Packet I/O\nFrame Processing
 
-
-network_configuration --> LWIP : setup
-network_configuration --> socket_manager : setup
-
-ENC --> TXISR : HW sets interrupt
-ENC --> RXISR : HW sets interrupt
-TXISR --> TXDMA : Sets up DMA transfers
-RXISR --> RXDMA : Sets up DMA transfers
-TXDMA --> DMA : HW sets interrupt
-RXDMA --> DMA : HW sets interrupt
-
-' outgoing data to network
-RBI --> PD : Packets from Core0\nDequeue
-PD --> socket_manager : Outbound packets TX DMA Transfers 
-socket_manager --> LWIP : Outbound packets TX DMA Transfers
-LWIP --> ENC : TX DMA Transfers
-
-' incoming data from network
-ENC --> LWIP : RX DMA Transfers
-LWIP --> socket_manager : Inbound packets TX DMA Transfers 
-socket_manager --> PA : Inbound packets TX DMA Transfers 
-PA --> RBI : Packets to Core0\nEnqueue
+' Status and statistics flow
+STATUS --> STATS : State Changes\nEvent Logging
+PACKET_PROC --> STATS : Packet Counts\nError Statistics
+INT_HANDLER --> NETWORK_MGR : Hardware Events\nLink Status\nPacket Available
 
 @enduml
 ----
 
 ===== Motivation
 
-Core 1 specialization allows network processing to operate independently from time-critical UART operations. The modular design enables efficient TCP/IP processing while maintaining clear separation between hardware drivers and application logic.
+The actual implementation provides complete TCP/IP networking with automatic IP address assignment through DHCP, sophisticated state management for reliable network operation, and integration with Core1 timing and state machine systems for coordinated dual-core operation.
 
 ===== Contained Building Blocks
 
@@ -405,27 +387,84 @@ Core 1 specialization allows network processing to operate independently from ti
 |===
 |Name|Responsibility
 
+|*Network Manager*
+|Coordinates all network operations with 7-state FSM (UNINITIALIZED, INITIALIZING, LINK_DOWN, LINK_UP, DHCP_REQUESTING, READY, ERROR). Integrates with Core1 timers for DHCP timeouts and state machine for network events.
+
 |*lwIP TCP/IP Stack*
-|Complete software-based TCP/IP implementation providing standard network protocols and socket interfaces.
+|Complete software TCP/IP implementation with DHCP client, providing full network protocol suite (TCP, UDP, IP, ARP, ICMP, DHCP). Integrated with custom network interface for ENC28J60.
 
 |*ENC28J60 Driver*
-|Low-level SPI driver for the 10BASE-T Ethernet controller, handling frame transmission and reception.
+|Sophisticated SPI driver with interrupt handling, link status monitoring, packet transmission/reception, MAC address configuration, and comprehensive error handling and statistics.
 
-|*Socket Manager*
-|Manages TCP socket connections with one dedicated socket per UART channel. Handles connection lifecycle and error recovery.
+|*Network Interface (netif)*
+|lwIP integration layer providing Ethernet interface abstraction. Handles IP address management, interface up/down control, and packet processing between lwIP stack and ENC28J60 hardware.
 
-|*Packet Router*
-|Maps UART channel numbers to TCP port numbers and routes data bidirectionally between network and ring buffer interfaces.
+|*DHCP State Machine*
+|Automatic IP address acquisition with timeout handling (30s default), DHCP request/renewal logic, and integration with Core1 timers for timeout management.
 
-|*Packet Assembler*
-|Converts incoming TCP data streams into ring buffer packets for transmission to Core 0.
+|*Network Status Manager*
+|7-state finite state machine managing network lifecycle: initialization → link detection → DHCP → operational. Provides error recovery and status reporting to Core1 state machine.
 
-|*Packet Disassembler*
-|Extracts data from ring buffer packets and formats for TCP transmission to network clients.
-
-|*Ring Buffer Interface*
-|Provides producer operations (TCP RX data) and consumer operations (TCP TX data) with shared pool access.
+|*Network Statistics*
+|Comprehensive statistics collection including packet counters, link up/down events, DHCP requests, error conditions, and diagnostic information for monitoring and troubleshooting.
 |===
+
+===== Network Manager State Machine
+
+**Network States:**
+```c
+typedef enum {
+    NETWORK_STATUS_UNINITIALIZED,   // Not initialized
+    NETWORK_STATUS_INITIALIZING,    // Hardware initialization in progress
+    NETWORK_STATUS_LINK_DOWN,       // Physical link down
+    NETWORK_STATUS_LINK_UP,         // Physical link up, no IP
+    NETWORK_STATUS_DHCP_REQUESTING, // DHCP requesting IP address
+    NETWORK_STATUS_READY,           // Network ready for TCP/IP
+    NETWORK_STATUS_ERROR            // Error state
+} network_status_t;
+```
+
+**State Transitions:**
+- `UNINITIALIZED` → `INITIALIZING` (driver init)
+- `INITIALIZING` → `LINK_DOWN`/`LINK_UP` (hardware ready)
+- `LINK_UP` → `DHCP_REQUESTING` (DHCP enabled)
+- `DHCP_REQUESTING` → `READY` (IP assigned) / `LINK_DOWN` (link lost)
+- `READY` → `LINK_DOWN` (link lost)
+- Any state → `ERROR` (hardware failure)
+
+===== Core1 Integration
+
+**Timer Integration:**
+- `CORE1_TIMER_DHCP_DISCOVER`: DHCP timeout handling (30s default)
+- `CORE1_TIMER_NETWORK_TIMEOUT`: lwIP timeout processing
+
+**State Machine Integration:**
+- Generates `CORE1_EVENT_NETWORK_*` events for Core1 state machine
+- Link up/down detection drives state machine transitions
+- DHCP completion triggers configuration phase completion
+
+**Main Loop Integration:**
+```c
+// Core1 main loop network processing
+void core1_main(void) {
+    while (true) {
+        // High priority: packet processing
+        if (network_manager_receive_packets_pending()) {
+            network_manager_process();
+        }
+        
+        // Medium priority: link changes
+        if (network_manager_link_change_pending()) {
+            network_manager_link_change();
+        }
+        
+        // Low priority: timeout processing
+        if (core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT)) {
+            network_manager_check_timeouts();
+        }
+    }
+}
+```
 
 ==== Whitebox Ring Buffer Communication System
 
