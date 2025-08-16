@@ -30,6 +30,8 @@ typedef enum {
 } wake_reason_t;
 
 // Main system states (shared between cores, atomic access)
+// IMPORTANT: When adding/changing states, update corresponding log strings 
+//            at LOG_MAIN_STATE_* in log_manager.h to match order exactly
 typedef enum {
     MAIN_STATE_INIT = 0,           // System initialization and hardware setup
     MAIN_STATE_CONFIGURATION = 1,  // Configuration loading and validation
@@ -38,6 +40,8 @@ typedef enum {
 } main_state_t;
 
 // Core0 sub-states (UART processing, ISR-safe)
+// IMPORTANT: When adding/changing states, update corresponding log strings 
+//            at LOG_CORE0_* in log_manager.h to match order exactly
 typedef enum {
     CORE0_INIT_UART,        // Initializing UART hardware
     CORE0_INIT_COMPLETE,    // UART init complete, signaling main state
@@ -53,6 +57,8 @@ typedef enum {
 } core0_substate_t;
 
 // Core1 sub-states (Network and maintenance, ISR-safe)
+// IMPORTANT: When adding/changing states, update corresponding log strings 
+//            at LOG_CORE1_* in log_manager.h to match order exactly
 typedef enum {
     CORE1_INIT_PERISTENCE,      // Init persistence
     CORE1_INIT_LOGGING,         // init logging

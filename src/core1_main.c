@@ -237,6 +237,8 @@ static bool check_for_pending_work(void) {
     
     if(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT))
     {
+        DEBUG_ONLY({ printf("network_manager_check_timeouts\n"); });
+        
         network_manager_check_timeouts();
         return true;
     }
@@ -297,7 +299,6 @@ static void core1_idle_wait(void) {
  * @brief One-time Core1 initialization
  */
 static void core1_initialize(void) {
-    
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
     
     // Reset state tracking
@@ -335,19 +336,19 @@ static void core1_init_persistence(void) {
         return;  // Already done
     }
     
-    flash_persistence_init();
-    bool result = flash_persistence_load_configuration(); 
+    //flash_persistence_init();
+    bool result = true; //flash_persistence_load_configuration(); 
     DEBUG_ONLY({
         printf("RESULT OF flash_persistence_load_configuration on init: %d\n", result);
     });
     
     if (result) {
         g_persistence_initialized = true;
-        log_event(EVENT_SOURCE_PERSITENCE, LOG_LEVEL_INFO, LOG_EVENT_PERSISTENCE_INIT_SUCCESS, 1);
+        log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_INFO, LOG_EVENT_PERSISTENCE_INIT_SUCCESS, 1);
         // Generate network up event to move to next phase
         state_machine_process_core1_event(CORE1_EVENT_INIT_PERSISTENCE_COMPLETE);
     } else {
-        log_event(EVENT_SOURCE_PERSITENCE, LOG_LEVEL_ERROR, LOG_EVENT_PERSISTENCE_INIT_FAIL, 1);
+        log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_ERROR, LOG_EVENT_PERSISTENCE_INIT_FAIL, 1);
         state_machine_process_core1_event(CORE1_EVENT_INIT_PERSISTENCE_FAILED);
         // Retry after a delay
         sleep_ms(1000);
@@ -414,9 +415,7 @@ static void core1_init_hardware(void) {
  */
 static void core1_wait_for_link_up(void) {
 
-    DEBUG_ONLY({
-        printf("WAINTING FOR LINK UP!");
-    });
+    DEBUG_ONLY({  printf("WAINTING FOR LINK UP!"); });
     bool result = network_manager_is_link_up();
     
     if (result) {
@@ -453,9 +452,7 @@ static void core1_load_configuration(void) {
     shared_memory_layout_t* layout = shared_memory_get_layout();
 
     bool result = network_manager_reconfigure(&layout->config.network); //config gets copied inside
-    DEBUG_ONLY({
-        printf("RESULT OF network_manager_reconfigure on load: %d\n", result);
-    });
+    DEBUG_ONLY({ printf("RESULT OF network_manager_reconfigure on load: %d\n", result); });
     
     if (result) {
         // Generate to move to next phase

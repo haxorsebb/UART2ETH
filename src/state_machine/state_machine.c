@@ -12,6 +12,7 @@
  */
 
 #include "state_machine.h"
+#include "log_manager.h"
 #include "pico/stdlib.h"
 #include "pico/sync.h"
 #include "pico/multicore.h"
@@ -211,7 +212,7 @@ bool state_machine_process_main_event(main_state_event_t event) {
     if (new_state != current_state) {
         main_state_t old_state = current_state;
         atomic_store(&g_main_state, new_state);
-        
+        log_event(EVENT_SOURCE_MAIN_STATE, LOG_LEVEL_INFO, MAIN_STATE_CHANGE_STRING_BASE + new_state, 0);
         // Wake other core after main state change
         wake_other_core_after_main_state_change(new_state);
     }
@@ -343,6 +344,7 @@ bool state_machine_process_core0_event(core0_event_t event) {
     // Apply atomic state change if needed
     if (new_state != current_state) {
         atomic_store(&g_core0_substate, new_state);
+        log_event(EVENT_SOURCE_CORE0_SUBSTATE, LOG_LEVEL_INFO, CORE0_STATE_CHANGE_STRING_BASE + new_state, 0);
     }
     
     return true;  // Event processed successfully
@@ -654,6 +656,15 @@ bool state_machine_process_core1_event(core1_event_t event) {
     // Apply atomic state change if needed
     if (new_state != current_state) {
         atomic_store(&g_core1_substate, new_state);
+        //omit log state changes, otherwise it will spam the log
+        if(current_state!=CORE1_LOG_ACTIVE 
+            && new_state!=CORE1_LOG_ACTIVE
+            && current_state!=CORE1_CONFIG_LOG_ACTIVE 
+            && new_state!=CORE1_CONFIG_LOG_ACTIVE
+            && current_state!=CORE1_CONFIG_NET_CHECK_DHCP 
+            && new_state!=CORE1_CONFIG_NET_CHECK_DHCP) {
+            log_event(EVENT_SOURCE_CORE1_SUBSTATE, LOG_LEVEL_INFO, CORE1_STATE_CHANGE_STRING_BASE + new_state, 0);
+        }
     }
     
     return true;  // Event processed successfully

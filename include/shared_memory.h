@@ -76,6 +76,17 @@ typedef struct {
     spin_lock_t *entry_lock;               // For entry allocation protection
 } __attribute__((aligned(4))) log_management_t;
 
+
+// Flash persistence constants - RP2350 Partition Table Approach
+#define FLASH_PERSISTENCE_PARTITION_SIZE (512 * 1024)   // 512KB partition size (rest of 4MB flash)
+#define FLASH_PERSISTENCE_RING_SIZE 8                    // 4 pages in ring buffer
+#define FLASH_PERSISTENCE_STRIPE_SIZE (FLASH_PERSISTENCE_PARTITION_SIZE / FLASH_PERSISTENCE_RING_SIZE)                 // FLASH_PERSISTENCE_RING_SIZE Sripes of flash
+#define FLASH_PERSISTENCE_PAGE_SIZE 4096    //minimal erase/program unit
+#define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
+#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
+#define FLASH_PERSISTENCE_CONFIG_PARTITION_ID 2          // Configuration Data partition ID
+
+
 // Complete shared memory layout
 typedef struct {
     // Revision and integrity (at start for easy access)
@@ -93,16 +104,9 @@ typedef struct {
     log_management_t log_mgmt;
     
     // Log entry buffer (fixed-size entries calculated at compile time)
-    log_entry_t log_entries[1];       // Flexible array member placeholder
+    log_entry_t log_entries[ (FLASH_PERSISTENCE_STRIPE_SIZE / (sizeof(uint32_t) + sizeof(system_config_t) + sizeof(performance_counters_t) + sizeof(log_management_t) + 1 ) )   ];       // Flexible array member placeholder
 } __attribute__((aligned(4))) shared_memory_layout_t;
 
-// Flash persistence constants - RP2350 Partition Table Approach
-#define FLASH_PERSISTENCE_RING_SIZE 4                    // 4 pages in ring buffer
-#define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
-#define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
-#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
-#define FLASH_PERSISTENCE_CONFIG_PARTITION_ID 2          // Configuration Data partition ID
-#define FLASH_PERSISTENCE_PARTITION_SIZE (512 * 1024)   // 512KB partition size (rest of 4MB flash)
 
 // Flash page structure for ring buffer persistence
 typedef struct {
@@ -115,7 +119,7 @@ typedef struct {
     shared_memory_layout_t shared_memory_data;
     
     // Padding to ensure flash sector alignment
-    uint8_t padding[FLASH_PERSISTENCE_PAGE_SIZE - sizeof(uint32_t) * 8 - 32 - sizeof(shared_memory_layout_t)];
+    uint8_t padding[FLASH_PERSISTENCE_STRIPE_SIZE - sizeof(uint32_t) * 8 - 32 - sizeof(shared_memory_layout_t)];
 } __attribute__((packed, aligned(4096))) flash_persistence_page_t;
 
 // Function declarations - Core shared memory

@@ -12,7 +12,7 @@
     {
       "name": "Firmware A",
       "id": 0,
-      "size": "1792K",
+      "size": "1788K",
       "families": ["rp2350-arm-s"],
       "permissions": {
         "secure": "rw",
@@ -23,7 +23,7 @@
     {
       "name": "Firmware B", 
       "id": 1,
-      "size": "1792K",
+      "size": "1788K",
       "families": ["rp2350-arm-s"],
       "permissions": {
         "secure": "rw",

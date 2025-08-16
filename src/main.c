@@ -61,7 +61,6 @@ void core1_entry() {
  * respective main functions using the event-driven state machine.
  */
 int main() {
-
     // Initialize dual stdio like production system
     stdio_usb_init();
     
@@ -82,6 +81,13 @@ int main() {
             sleep_ms(1000);  // Halt system on critical error
         }
     }
+
+    flash_persistence_init();
+    bool result = flash_persistence_load_configuration(); 
+    DEBUG_ONLY({
+        printf("RESULT OF flash_persistence_load_configuration on init: %d\n", result);
+    });
+    
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_BOOT, 0);
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_INIT, 0);
     

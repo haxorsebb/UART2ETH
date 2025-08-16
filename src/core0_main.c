@@ -191,7 +191,7 @@ static void core0_initialize(void) {
     //unnecessary to add another handler, enabling IRQ is good enough
     //irq_add_shared_handler(irq, shared_doorbell_irq,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
     irq_set_enabled(irq, true);
-
+    
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
 }
 

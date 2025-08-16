@@ -148,6 +148,31 @@ void test_flash_persistence_write_frequency_limiting(void) {
 }
 
 /**
+ * Test: Flash persistence should dynamically discover partition information
+ * 
+ * Tests that the find_partition_info function can dynamically read partition table
+ * and find the configuration partition instead of using hardcoded values.
+ */
+void test_flash_persistence_dynamic_partition_discovery(void) {
+    // ARRANGE: Initialize shared memory
+    bool shared_init = shared_memory_init();
+    TEST_ASSERT_TRUE(shared_init);
+    
+    // ACT: Initialize flash persistence (triggers partition discovery)
+    bool init_result = flash_persistence_init();
+    
+    // ASSERT: Initialization should succeed with dynamic partition discovery
+    TEST_ASSERT_TRUE_MESSAGE(init_result, 
+        "Flash persistence should initialize with dynamic partition discovery");
+        
+    // The fact that init succeeded means find_partition_info worked
+    // Additional verification through successful configuration load
+    bool load_result = flash_persistence_load_configuration();
+    TEST_ASSERT_TRUE_MESSAGE(load_result,
+        "Configuration load should work with dynamically discovered partition");
+}
+
+/**
  * Test: Flash persistence should provide diagnostic information
  * 
  * Tests that the system can provide statistics about write operations
@@ -427,6 +452,7 @@ int main() {
     UNITY_BEGIN();
     
     RUN_TEST(test_flash_persistence_initialization);
+    RUN_TEST(test_flash_persistence_dynamic_partition_discovery);
     RUN_TEST(test_flash_persistence_load_configuration);
     RUN_TEST(test_flash_persistence_change_detection);
     RUN_TEST(test_flash_persistence_write_frequency_limiting);

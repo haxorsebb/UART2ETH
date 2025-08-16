@@ -10,8 +10,10 @@
  * - arc42 Chapter 6 - Runtime View - Fixed-Size Entry Pattern
  */
 
+#include "debug.h"
 #include "log_manager.h"
 #include "shared_memory.h"
+#include "state_machine.h"
 #include "pico/stdlib.h"
 #include "hardware/sync.h"
 #include <stdio.h>
@@ -216,6 +218,9 @@ static const char* const log_level_strings[] = {
 // Array bounds checking constants
 #define EVENT_SOURCE_STRINGS_COUNT (sizeof(event_source_strings) / sizeof(event_source_strings[0]))
 #define LOG_LEVEL_STRINGS_COUNT (sizeof(log_level_strings) / sizeof(log_level_strings[0]))
+
+// Forward declaration for early debug formatting
+static bool format_single_log_entry(const log_entry_t* entry, char* output_buffer, size_t buffer_size);
 
 /**
  * Validate that shared memory structure is properly initialized
@@ -483,6 +488,21 @@ bool log_event(event_source_t event_source, log_level_t log_level,
         .event_extra_value = extra_value
     };
     
+    DEBUG_ONLY({
+        // EARLY BOOT DEBUG: Direct printf during MAIN_STATE_INIT for real-time visibility
+        if (state_machine_get_main_state() == MAIN_STATE_INIT) {
+            char debug_buffer[LOG_MAX_MESSAGE_LENGTH];
+            if (format_single_log_entry(&entry, debug_buffer, sizeof(debug_buffer))) {
+                printf("INIT_DEBUG: %s\n", debug_buffer);
+                fflush(stdout);
+            } else {
+                printf("INIT_DEBUG: [%08u][%u][%u] FORMAT_ERROR (event_type:%u)\n", 
+                    entry.timestamp, entry.event_source, entry.event_number, entry.event_type);
+                fflush(stdout);
+            }
+        }
+    });
+
     // Write entry to buffer
     return write_log_entry(&entry);
 }

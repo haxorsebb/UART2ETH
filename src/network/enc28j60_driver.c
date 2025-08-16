@@ -992,6 +992,7 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
     }
 
 transfer_finished:
+    core1_timer_cancel(CORE1_TIMER_NETWORK_TX_TIMEOUT);
     enc28j60_block_interrupt();
     bool other_error = false;
     bool collision_error = false;
