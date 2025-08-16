@@ -17,6 +17,10 @@
 #include <stdio.h>
 #include <stdatomic.h>
 
+// Define doorbell variables needed by state machine
+int doorbell_core0_wakes_core1 = 0;
+int doorbell_core1_wakes_core0 = 1;
+
 // Access to initialization flag for proper test reinitialization
 extern _Atomic bool g_initialized;
 
@@ -89,7 +93,7 @@ void test_main_state_init_complete_event(void) {
     TEST_ASSERT_EQUAL(MAIN_STATE_INIT, state_machine_get_main_state());
     
     // ACT: Process INIT_COMPLETE event
-    bool result = state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE);
+    bool result = state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE0);
     
     // ASSERT: Event processing should succeed
     TEST_ASSERT_TRUE_MESSAGE(result, "INIT_COMPLETE event processing should succeed");
@@ -109,11 +113,11 @@ void test_main_state_init_complete_event(void) {
 void test_main_state_config_loaded_event(void) {
     // ARRANGE: Get to CONFIGURATION state first
     state_machine_init();
-    state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE);
+    state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE0);
     TEST_ASSERT_EQUAL(MAIN_STATE_CONFIGURATION, state_machine_get_main_state());
     
     // ACT: Process CONFIG_LOADED event
-    bool result = state_machine_process_main_event(MAIN_EVENT_CONFIG_LOADED);
+    bool result = state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE0);
     
     // ASSERT: Event processing should succeed
     TEST_ASSERT_TRUE_MESSAGE(result, "CONFIG_LOADED event processing should succeed");
@@ -132,8 +136,8 @@ void test_main_state_config_loaded_event(void) {
 void test_main_state_system_error_event(void) {
     // ARRANGE: Get to OPERATIONAL state
     state_machine_init();
-    state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE);
-    state_machine_process_main_event(MAIN_EVENT_CONFIG_LOADED);
+    state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE0);
+    state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE0);
     TEST_ASSERT_EQUAL(MAIN_STATE_OPERATIONAL, state_machine_get_main_state());
     
     // ACT: Process SYSTEM_ERROR event
@@ -255,7 +259,7 @@ void test_invalid_event_ignored(void) {
     TEST_ASSERT_EQUAL(MAIN_STATE_INIT, initial_state);
     
     // ACT: Send invalid event (CONFIG_LOADED while in INIT state - should be ignored)
-    bool result = state_machine_process_main_event(MAIN_EVENT_CONFIG_LOADED);
+    bool result = state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE0);
     
     // ASSERT: Event processing should still succeed (just ignored)
     TEST_ASSERT_TRUE_MESSAGE(result, "Invalid event processing should succeed but be ignored");

@@ -157,7 +157,7 @@ void test_ping_connectivity_30_seconds(void) {
         
         // Process network stack (handle incoming pings)
         network_manager_process();
-        sys_check_timeouts();
+        network_manager_check_timeouts();
         
         // Update statistics every 5 seconds
         if (current_time - last_status_time >= STATUS_UPDATE_INTERVAL_MS) {

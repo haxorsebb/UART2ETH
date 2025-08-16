@@ -40,6 +40,10 @@
 #include <string.h>
 #include <stdio.h>
 
+// Define doorbell variables needed by state machine
+int doorbell_core0_wakes_core1 = 0;
+int doorbell_core1_wakes_core0 = 1;
+
 // Test configuration
 #define TEST_TIMEOUT_MS 60000    // 60 seconds for DHCP
 #define POLLING_INTERVAL_MS 500  // 500ms between status checks
@@ -270,9 +274,6 @@ void test_network_connectivity(void) {
     
     printf("Core1 network processing active");
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < test_duration_ms) {
-        // IMPORTANT: Core0 only monitors, Core1 does all the work!
-        // No network_manager_process() calls here - that's Core1's job
-        
         // Print status every 5 seconds
         uint32_t current_time = to_ms_since_boot(get_absolute_time());
         if (current_time - last_status_time >= 5000) {
@@ -370,9 +371,7 @@ static bool wait_for_link_up(uint32_t timeout_ms) {
     uint32_t last_dot_time = start_time;
     
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < timeout_ms) {
-        // Core0 monitors only - Core1 handles all network processing
-        // No network_manager_process() calls here!
-        
+        // Monitor link status via network manager
         if (network_manager_is_link_up()) {
             printf("\n");
             return true;
@@ -401,10 +400,7 @@ static bool wait_for_dhcp_completion(uint32_t timeout_ms) {
     uint32_t last_status_time = start_time;
     
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < timeout_ms) {
-        // Core0 monitors only - Core1 handles all network processing
-        // No network_manager_process() or sys_check_timeouts() calls here!
-        
-        // Check if Core1 completed DHCP
+        // Check if DHCP completed
         if (network_manager_is_dhcp_bound()) {
             printf("\n");
             return true;
@@ -529,11 +525,11 @@ int main(void) {
     // CRITICAL: Send the state machine event that production Core0 would send
     // This signals Core1 that hardware initialization is complete
     extern bool state_machine_process_main_event(main_state_event_t event);
-    bool event_sent = state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE);
+    bool event_sent = state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE0);
     if (event_sent) {
-        printf("✓ Sent MAIN_EVENT_INIT_COMPLETE to Core1\n");
+        printf("✓ Sent MAIN_EVENT_INIT_COMPLETE_CORE0 to Core1\n");
     } else {
-        printf("⚠ Failed to send MAIN_EVENT_INIT_COMPLETE\n");
+        printf("⚠ Failed to send MAIN_EVENT_INIT_COMPLETE_CORE0\n");
     }
     
     printf("✓ Production dual-core system running\n");
