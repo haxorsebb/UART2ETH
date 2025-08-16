@@ -15,6 +15,7 @@ target_link_libraries(test_enc28j60_driver
     log_manager
     state_machine
     config_manager
+    timer_subsystems
 )
 
 # Enable dual stdio for test output
@@ -46,6 +47,7 @@ target_link_libraries(test_network_integration
     log_manager
     state_machine
     config_manager
+    timer_subsystems
 )
 
 # Enable dual stdio for test output
@@ -73,6 +75,7 @@ target_link_libraries(test_dhcp_debug
     log_manager
     state_machine
     config_manager
+    timer_subsystems
 )
 
 # Enable dual stdio for test output

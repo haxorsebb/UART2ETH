@@ -270,9 +270,6 @@ void test_network_connectivity(void) {
     
     printf("Core1 network processing active");
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < test_duration_ms) {
-        // IMPORTANT: Core0 only monitors, Core1 does all the work!
-        // No network_manager_process() calls here - that's Core1's job
-        
         // Print status every 5 seconds
         uint32_t current_time = to_ms_since_boot(get_absolute_time());
         if (current_time - last_status_time >= 5000) {
@@ -370,9 +367,7 @@ static bool wait_for_link_up(uint32_t timeout_ms) {
     uint32_t last_dot_time = start_time;
     
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < timeout_ms) {
-        // Core0 monitors only - Core1 handles all network processing
-        // No network_manager_process() calls here!
-        
+        // Monitor link status via network manager
         if (network_manager_is_link_up()) {
             printf("\n");
             return true;
@@ -401,10 +396,7 @@ static bool wait_for_dhcp_completion(uint32_t timeout_ms) {
     uint32_t last_status_time = start_time;
     
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < timeout_ms) {
-        // Core0 monitors only - Core1 handles all network processing
-        // No network_manager_process() or sys_check_timeouts() calls here!
-        
-        // Check if Core1 completed DHCP
+        // Check if DHCP completed
         if (network_manager_is_dhcp_bound()) {
             printf("\n");
             return true;

@@ -425,9 +425,8 @@ void test_enc28j60_raw_packet_reception(void) {
     uint32_t packets_detected = 0;
     
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < test_duration_ms) {
-        // Check EPKTCNT register directly (Arduino style)
-        enc28j60_set_bank(ENC28J60_BANK1);
-        uint8_t pktcnt = enc28j60_read_register(0x19);  // EPKTCNT
+        // Check for packets using updated API
+        uint8_t pktcnt = enc28j60_has_rx_packet();
         
         if (pktcnt > 0) {
             packets_detected++;
@@ -624,7 +623,8 @@ void test_enc28j60_interrupt_monitoring(void) {
         bool link_status = enc28j60_get_link_status();
         
         // Read packet count
-        bool has_packets = enc28j60_has_rx_packet();
+        uint8_t packet_count = enc28j60_has_rx_packet();
+        bool has_packets = (packet_count > 0);
         
         // Get driver statistics
         const enc28j60_state_t* state = enc28j60_get_state();

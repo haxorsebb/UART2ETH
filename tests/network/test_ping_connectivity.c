@@ -165,7 +165,7 @@ void test_ping_connectivity_30_seconds(void) {
         // CRITICAL PERFORMANCE: Process network stack with minimal delay
         // This is the main bottleneck for ping response times
         network_manager_process();
-        sys_check_timeouts();
+        network_manager_check_timeouts();
         network_process_calls++;
         
         // Update statistics every 10 seconds  

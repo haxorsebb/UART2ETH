@@ -215,10 +215,14 @@ void test_manual_dhcp_monitoring(void) {
                        state->tx_errors, state->rx_errors);
             }
             
-            // Check packet count register directly
-            enc28j60_set_bank(1);
-            uint8_t pktcnt = enc28j60_read_register(0x19);
-            printf("EPKTCNT Register: %u packets\n", pktcnt);
+            // Check packet count using updated API
+            uint8_t pktcnt = enc28j60_has_rx_packet();
+            printf("Packet Count: %u packets\n", pktcnt);
+            
+            // Process any pending interrupts
+            if (enc28j60_has_pending_interrupt()) {
+                enc28j60_process_interrupts(false);
+            }
             
             // Check interrupt status
             uint8_t eir = enc28j60_get_interrupt_status();
