@@ -760,17 +760,17 @@
 <div class="sect3">
 <h4 id="_whitebox_core_1_network_subsystem">Whitebox Core 1 Network Subsystem</h4>
 <div class="paragraph">
-<p>The Core 1 Network Subsystem manages all network communication including TCP/IP protocol processing, Ethernet controller interface, and bidirectional packet routing between ring buffer and network clients.</p>
+<p>The Core 1 Network Subsystem implements complete TCP/IP networking with lwIP stack, DHCP client, sophisticated state management, and interrupt-driven packet processing. Integrates with Core1 timers for DHCP timeout handling and network operations.</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="../../images/level2-core1-network-simple.svg" alt="level2 core1 network simple" width="1517" height="1280">
+<img src="../../images/level2-core1-network-actual.svg" alt="level2 core1 network actual" width="1552" height="963">
 </div>
 </div>
 <div class="sect4">
 <h5 id="_motivation_3">Motivation</h5>
 <div class="paragraph">
-<p>Core 1 specialization allows network processing to operate independently from time-critical UART operations. The modular design enables efficient TCP/IP processing while maintaining clear separation between hardware drivers and application logic.</p>
+<p>The actual implementation provides complete TCP/IP networking with automatic IP address assignment through DHCP, sophisticated state management for reliable network operation, and integration with Core1 timing and state machine systems for coordinated dual-core operation.</p>
 </div>
 </div>
 <div class="sect4">
@@ -788,35 +788,103 @@
 </thead>
 <tbody>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Coordinates all network operations with 7-state FSM (UNINITIALIZED, INITIALIZING, LINK_DOWN, LINK_UP, DHCP_REQUESTING, READY, ERROR). Integrates with Core1 timers for DHCP timeouts and state machine for network events.</p></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>lwIP TCP/IP Stack</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Complete software-based TCP/IP implementation providing standard network protocols and socket interfaces.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Complete software TCP/IP implementation with DHCP client, providing full network protocol suite (TCP, UDP, IP, ARP, ICMP, DHCP). Integrated with custom network interface for ENC28J60.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>ENC28J60 Driver</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Low-level SPI driver for the 10BASE-T Ethernet controller, handling frame transmission and reception.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sophisticated SPI driver with interrupt handling, link status monitoring, packet transmission/reception, MAC address configuration, and comprehensive error handling and statistics.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Socket Manager</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Manages TCP socket connections with one dedicated socket per UART channel. Handles connection lifecycle and error recovery.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Interface (netif)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lwIP integration layer providing Ethernet interface abstraction. Handles IP address management, interface up/down control, and packet processing between lwIP stack and ENC28J60 hardware.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Router</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Maps UART channel numbers to TCP port numbers and routes data bidirectionally between network and ring buffer interfaces.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>DHCP State Machine</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automatic IP address acquisition with timeout handling (30s default), DHCP request/renewal logic, and integration with Core1 timers for timeout management.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Assembler</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Converts incoming TCP data streams into ring buffer packets for transmission to Core 0.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Status Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">7-state finite state machine managing network lifecycle: initialization → link detection → DHCP → operational. Provides error recovery and status reporting to Core1 state machine.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Disassembler</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Extracts data from ring buffer packets and formats for TCP transmission to network clients.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Interface</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Provides producer operations (TCP RX data) and consumer operations (TCP TX data) with shared pool access.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Statistics</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Comprehensive statistics collection including packet counters, link up/down events, DHCP requests, error conditions, and diagnostic information for monitoring and troubleshooting.</p></td>
 </tr>
 </tbody>
 </table>
+</div>
+<div class="sect4">
+<h5 id="_network_manager_state_machine">Network Manager State Machine</h5>
+<div class="paragraph">
+<p><strong>Network States:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
+    NETWORK_STATUS_UNINITIALIZED,   // Not initialized
+    NETWORK_STATUS_INITIALIZING,    // Hardware initialization in progress
+    NETWORK_STATUS_LINK_DOWN,       // Physical link down
+    NETWORK_STATUS_LINK_UP,         // Physical link up, no IP
+    NETWORK_STATUS_DHCP_REQUESTING, // DHCP requesting IP address
+    NETWORK_STATUS_READY,           // Network ready for TCP/IP
+    NETWORK_STATUS_ERROR            // Error state
+} network_status_t;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>State Transitions:</strong>
+- <code>UNINITIALIZED</code> → <code>INITIALIZING</code> (driver init)
+- <code>INITIALIZING</code> → <code>LINK_DOWN</code>/<code>LINK_UP</code> (hardware ready)
+- <code>LINK_UP</code> → <code>DHCP_REQUESTING</code> (DHCP enabled)
+- <code>DHCP_REQUESTING</code> → <code>READY</code> (IP assigned) / <code>LINK_DOWN</code> (link lost)
+- <code>READY</code> → <code>LINK_DOWN</code> (link lost)
+- Any state → <code>ERROR</code> (hardware failure)</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_core1_integration">Core1 Integration</h5>
+<div class="paragraph">
+<p><strong>Timer Integration:</strong>
+- <code>CORE1_TIMER_DHCP_DISCOVER</code>: DHCP timeout handling (30s default)
+- <code>CORE1_TIMER_NETWORK_TIMEOUT</code>: lwIP timeout processing</p>
+</div>
+<div class="paragraph">
+<p><strong>State Machine Integration:</strong>
+- Generates <code>CORE1_EVENT_NETWORK_*</code> events for Core1 state machine
+- Link up/down detection drives state machine transitions
+- DHCP completion triggers configuration phase completion</p>
+</div>
+<div class="paragraph">
+<p><strong>Main Loop Integration:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Core1 main loop network processing
+void core1_main(void) {
+    while (true) {
+        // High priority: packet processing
+        if (network_manager_receive_packets_pending()) {
+            network_manager_process();
+        }
+
+        // Medium priority: link changes
+        if (network_manager_link_change_pending()) {
+            network_manager_link_change();
+        }
+
+        // Low priority: timeout processing
+        if (core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT)) {
+            network_manager_check_timeouts();
+        }
+    }
+}</code></pre>
+</div>
+</div>
 </div>
 </div>
 <div class="sect3">
