@@ -2074,7 +2074,11 @@ typedef struct {
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core 1 Network Subsystem</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Implements TCP/IP stack and Ethernet controller interface with interrupt/DMA handling. Copies packets from and to the network stack and manages TCP socket connections.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implements TCP/IP stack and Ethernet controller interface with interrupt/DMA handling. Integrates lwIP Raw TCP API for socket operations and packet processing.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>TCP Socket Server</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides TCP server functionality using lwIP Raw API with line-based protocol. Supports up to 4 concurrent connections on ports 4001-4004 for UART bridging. Implements echo functionality and connection lifecycle management with integration to Core1 timer subsystem.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Communication</strong></p></td>
