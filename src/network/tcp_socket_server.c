@@ -40,6 +40,7 @@ typedef struct tcp_connection {
     bool active;                                   // Connection active flag
     uint32_t bytes_sent;                          // Bytes sent on this connection
     uint32_t bytes_received;                      // Bytes received on this connection
+    uint32_t last_activity_ms;                    // For timeout detection
 } tcp_connection_t;
 
 // Server state
@@ -425,6 +426,9 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         return 0;
     }
     
+    // Update activity timestamp
+    conn->last_activity_ms = to_ms_since_boot(get_absolute_time());
+    
     int processed = 0;
     
     for (size_t i = 0; i < len; i++) {
@@ -442,7 +446,12 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         // Process complete line on newline
         if (ch == '\n' || ch == '\r') {
             if (conn->line_pos > 1) { // Skip empty lines
-                conn->line_buffer[conn->line_pos] = '\0';
+                // Ensure null termination with bounds check
+                if (conn->line_pos < TCP_SERVER_LINE_BUFFER_SIZE) {
+                    conn->line_buffer[conn->line_pos] = '\0';
+                } else {
+                    conn->line_buffer[TCP_SERVER_LINE_BUFFER_SIZE - 1] = '\0';
+                }
                 
                 // Echo the line back
                 err_t err = tcp_write(conn->pcb, conn->line_buffer, conn->line_pos, TCP_WRITE_FLAG_COPY);
@@ -453,6 +462,13 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
                     DEBUG_ONLY({
                         printf("TCP Server: Echoed line: %s", conn->line_buffer);
                     });
+                } else {
+                    // Handle write error - close connection to prevent resource leak
+                    DEBUG_ONLY({
+                        printf("TCP Server: Write failed (err=%d), closing connection\n", err);
+                    });
+                    close_connection(conn);
+                    return processed; // Exit early since connection is closed
                 }
             }
             
