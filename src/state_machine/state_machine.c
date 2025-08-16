@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include "debug.h"
 
+// Doorbell stub definitions for testing
+int doorbell_core0_wakes_core1 = 0;
+int doorbell_core1_wakes_core0 = 1;
+
 // State variables with proper synchronization
 static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;                   // Atomic for cross-core access
 static _Atomic core0_substate_t g_core0_substate = CORE0_UART_IDLE;           // Atomic for ISR-safe access
