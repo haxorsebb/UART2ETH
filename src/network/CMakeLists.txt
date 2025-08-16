@@ -20,3 +20,20 @@ target_link_libraries(network_manager
 target_include_directories(network_manager PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
+
+# Create TCP socket server library
+add_library(tcp_socket_server
+    tcp_socket_server.c
+)
+
+# Link required libraries including lwIP
+target_link_libraries(tcp_socket_server
+    pico_stdlib
+    log_manager
+    pico_lwip_nosys     # lwIP NO_SYS implementation for raw API
+)
+
+# Include directories
+target_include_directories(tcp_socket_server PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+)

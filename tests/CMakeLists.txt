@@ -25,9 +25,13 @@ add_executable(test_shared_memory
 
 target_link_libraries(test_shared_memory
     unity
+    network_manager     # Added: needed for shared_memory.c 
     pico_stdlib
     pico_sync
     hardware_sync
+    hardware_gpio       # Added: needed for network_manager
+    hardware_spi        # Added: needed for network_manager
+    log_manager         # Added: needed for network_manager
     hardware_watchdog   # Watchdog for stability
 )
 
@@ -49,10 +53,13 @@ target_include_directories(test_log_manager PRIVATE ../include)
 
 target_link_libraries(test_log_manager
     unity
+    network_manager     # Added: needed for shared_memory.c
     pico_stdlib
     pico_sync
     pico_multicore      # Dual core support for performance tests
     hardware_sync
+    hardware_gpio       # Added: needed for network_manager
+    hardware_spi        # Added: needed for network_manager
     hardware_watchdog   # Watchdog for stability
 )
 
@@ -75,10 +82,14 @@ target_include_directories(test_flash_persistence PRIVATE ../include)
 
 target_link_libraries(test_flash_persistence
     unity
+    network_manager     # Added: needed for IP string conversion
     pico_stdlib
     pico_sync
     pico_multicore      # For Core1 integration testing
     hardware_sync
+    hardware_gpio       # Added: needed for network_manager
+    hardware_spi        # Added: needed for network_manager
+    log_manager         # Added: needed for network_manager
     hardware_flash      # Flash operations
     hardware_sha256     # Hardware crypto for SHA256
     pico_bootrom        # Bootrom APIs for partition table

@@ -87,3 +87,33 @@ pico_set_uf2_family(test_dhcp_debug "rp2350-arm-s")
 
 # Create UF2 output
 pico_add_extra_outputs(test_dhcp_debug)
+
+# Create test executable for TCP Socket Server
+add_executable(test_tcp_socket_server
+    test_tcp_socket_server.c
+)
+
+# Link required libraries including lwIP stack
+target_link_libraries(test_tcp_socket_server
+    unity
+    network_manager
+    tcp_socket_server
+    pico_stdlib
+    pico_multicore      # Added: needed for state_machine doorbell functions
+    hardware_spi
+    hardware_gpio
+    log_manager
+    state_machine
+    config_manager
+    timer_subsystems
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_tcp_socket_server 1)
+pico_enable_stdio_uart(test_tcp_socket_server 1)
+
+# Set UF2 family for RP2350
+pico_set_uf2_family(test_tcp_socket_server "rp2350-arm-s")
+
+# Create UF2 output
+pico_add_extra_outputs(test_tcp_socket_server)
