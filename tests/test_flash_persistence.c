@@ -17,6 +17,7 @@
 
 #include "unity.h"
 #include "shared_memory.h"
+#include "network/network_manager.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
 #include <string.h>
@@ -200,14 +201,16 @@ void test_flash_persistence_factory_reset(void) {
     layout->config.uart_channels[0].baud_rate = 460800;  // Non-default
     layout->config.uart_channels[0].data_bits = 7;       // Non-default  
     layout->config.uart_channels[0].parity = 2;          // EVEN parity (non-default)
-    strncpy(layout->config.network.ip_address, "10.10.10.10", sizeof(layout->config.network.ip_address) - 1);
-    layout->config.network.ip_address[sizeof(layout->config.network.ip_address) - 1] = '\0';
+    // Set static IP address (10.10.10.10)
+    layout->config.network.static_ip.addr = (10 << 24) | (10 << 16) | (10 << 8) | 10;
     layout->config.network.tcp_ports[0] = 9999;          // Non-default port
     layout->config.log_level = 3;                        // ERROR level (non-default)
     
+    char ip_buffer[16];
+    network_manager_ip_to_string(&layout->config.network.static_ip, ip_buffer);
     printf("Factory reset test - before reset: baud=%u, ip=%s, port=%u\n",
            layout->config.uart_channels[0].baud_rate,
-           layout->config.network.ip_address, 
+           ip_buffer,
            layout->config.network.tcp_ports[0]);
     
     // ACT: Trigger factory reset (this automatically saves defaults to flash)
@@ -223,8 +226,8 @@ void test_flash_persistence_factory_reset(void) {
     layout->config.uart_channels[0].baud_rate = 1200;     // Corrupt baud
     layout->config.uart_channels[0].data_bits = 5;        // Corrupt data bits  
     layout->config.uart_channels[0].parity = 1;           // Corrupt parity
-    strncpy(layout->config.network.ip_address, "255.0.0.1", sizeof(layout->config.network.ip_address) - 1);  
-    layout->config.network.ip_address[sizeof(layout->config.network.ip_address) - 1] = '\0';
+    // Set corrupt IP address (255.0.0.1)
+    layout->config.network.static_ip.addr = (255 << 24) | (0 << 16) | (0 << 8) | 1;
     layout->config.network.tcp_ports[0] = 1;              // Corrupt port
     layout->config.log_level = 0;                         // Corrupt log level
     layout->config.watchdog_timeout_ms = 50;              // Corrupt timeout
@@ -235,9 +238,10 @@ void test_flash_persistence_factory_reset(void) {
     bool load_result = flash_persistence_load_configuration();
     TEST_ASSERT_TRUE_MESSAGE(load_result, "Should load factory defaults from flash");
     
+    network_manager_ip_to_string(&layout->config.network.static_ip, ip_buffer);
     printf("After boot sequence: baud=%u, ip=%s, port=%u, revision=%u\n",
            layout->config.uart_channels[0].baud_rate,
-           layout->config.network.ip_address,
+           ip_buffer,
            layout->config.network.tcp_ports[0],
            layout->revision_counter);
     
@@ -261,12 +265,14 @@ void test_flash_persistence_factory_reset(void) {
         "After factory reset boot sequence, UART should be disabled by default");
     
     // Network defaults should be loaded from flash
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("192.168.1.100", layout->config.network.ip_address,
+    // Default IP: 192.168.1.100 = (192 << 24) | (168 << 16) | (1 << 8) | 100
+    uint32_t expected_ip = (192 << 24) | (168 << 16) | (1 << 8) | 100;
+    TEST_ASSERT_EQUAL_MESSAGE(expected_ip, layout->config.network.static_ip.addr,
         "After factory reset boot sequence, IP should be default 192.168.1.100");
     TEST_ASSERT_EQUAL_MESSAGE(4001, layout->config.network.tcp_ports[0],
         "After factory reset boot sequence, TCP port 0 should be default 4001");
-    TEST_ASSERT_FALSE_MESSAGE(layout->config.network.use_dhcp,
-        "After factory reset boot sequence, DHCP should be disabled by default");
+    TEST_ASSERT_TRUE_MESSAGE(layout->config.network.use_dhcp,
+        "After factory reset boot sequence, DHCP should be enabled by default");
     
     // System settings should be defaults
     TEST_ASSERT_EQUAL_MESSAGE(1, layout->config.log_level,
@@ -298,6 +304,9 @@ void test_flash_persistence_write_read_cycle_verification(void) {
     shared_memory_layout_t* layout = shared_memory_get_layout();
     TEST_ASSERT_NOT_NULL_MESSAGE(layout, "Shared memory layout should be accessible");
     
+    // Declare IP buffer for string conversions
+    char ip_buffer[16];
+    
     // ARRANGE: Create unique test configuration data with known values
     printf("TEST: Setting up unique test configuration...\n");
     
@@ -312,17 +321,17 @@ void test_flash_persistence_write_read_cycle_verification(void) {
     layout->config.uart_channels[0].parity = 1;          // ODD parity (non-default)
     layout->config.uart_channels[1].baud_rate = 460800;  // Different for second channel
     layout->config.uart_channels[1].enabled = true;      // Enabled channel (non-default)
-    strncpy(layout->config.network.ip_address, "10.0.0.99", sizeof(layout->config.network.ip_address) - 1);
-    layout->config.network.ip_address[sizeof(layout->config.network.ip_address) - 1] = '\0';
+    // Set test IP: 10.0.0.99 = (10 << 24) | (0 << 16) | (0 << 8) | 99
+    layout->config.network.static_ip.addr = (10 << 24) | (0 << 16) | (0 << 8) | 99;
     layout->config.network.tcp_ports[0] = 9001;          // Non-default port
     layout->config.network.tcp_ports[1] = 9002;          // Different port
     layout->config.network.use_dhcp = true;              // Non-default network setting
     layout->config.log_level = 3;                        // ERROR level (non-default)
     layout->config.watchdog_timeout_ms = 1000;           // Non-default timeout
     
-    printf("  Test values to write: revision=%u, baud0=%u, ip=%s, port0=%u\n", 
+    printf("  Test values to write: revision=%u, baud0=%u, ip=10.0.0.99, port0=%u\n", 
            layout->revision_counter, layout->config.uart_channels[0].baud_rate,
-           layout->config.network.ip_address, layout->config.network.tcp_ports[0]);
+           layout->config.network.tcp_ports[0]);
     
     // ACT: Force save the test configuration to flash
     printf("TEST: Writing test configuration to flash...\n");
@@ -341,24 +350,26 @@ void test_flash_persistence_write_read_cycle_verification(void) {
     layout->config.uart_channels[0].parity = 2;          // Corrupt parity
     layout->config.uart_channels[1].baud_rate = 1200;    // Corrupt second channel
     layout->config.uart_channels[1].enabled = false;     // Corrupt enabled state
-    strncpy(layout->config.network.ip_address, "255.255.255.255", sizeof(layout->config.network.ip_address) - 1);
-    layout->config.network.ip_address[sizeof(layout->config.network.ip_address) - 1] = '\0';
+    // Set corrupt IP: 255.255.255.255 = (255 << 24) | (255 << 16) | (255 << 8) | 255
+    layout->config.network.static_ip.addr = (255 << 24) | (255 << 16) | (255 << 8) | 255;
     layout->config.network.tcp_ports[0] = 1;             // Corrupt port
     layout->config.network.tcp_ports[1] = 2;             // Corrupt port
     layout->config.network.use_dhcp = false;             // Corrupt DHCP setting
     layout->config.log_level = 0;                        // Corrupt log level
     layout->config.watchdog_timeout_ms = 50;             // Corrupt timeout
     
+    network_manager_ip_to_string(&layout->config.network.static_ip, ip_buffer);
     printf("  Corrupted values: revision=%u, baud0=%u, ip=%s, port0=%u\n",
            layout->revision_counter, layout->config.uart_channels[0].baud_rate,
-           layout->config.network.ip_address, layout->config.network.tcp_ports[0]);
+           ip_buffer, layout->config.network.tcp_ports[0]);
     
     // Verify corruption was applied (sanity check)
     TEST_ASSERT_EQUAL_MESSAGE(12345, layout->revision_counter, 
         "Memory should be corrupted with revision=12345");
     TEST_ASSERT_EQUAL_MESSAGE(9600, layout->config.uart_channels[0].baud_rate,
         "Memory should be corrupted with baud=9600");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("255.255.255.255", layout->config.network.ip_address,
+    uint32_t expected_corrupt_ip = (255 << 24) | (255 << 16) | (255 << 8) | 255;
+    TEST_ASSERT_EQUAL_MESSAGE(expected_corrupt_ip, layout->config.network.static_ip.addr,
         "Memory should be corrupted with IP=255.255.255.255");
     
     // ACT: Load configuration from flash (this should restore our ORIGINAL test data)
@@ -366,9 +377,10 @@ void test_flash_persistence_write_read_cycle_verification(void) {
     bool load_result = flash_persistence_load_configuration();
     TEST_ASSERT_TRUE_MESSAGE(load_result, "Load configuration from flash should succeed");
     
+    network_manager_ip_to_string(&layout->config.network.static_ip, ip_buffer);
     printf("  Restored values: revision=%u, baud0=%u, ip=%s, port0=%u\n",
            layout->revision_counter, layout->config.uart_channels[0].baud_rate,
-           layout->config.network.ip_address, layout->config.network.tcp_ports[0]);
+           ip_buffer, layout->config.network.tcp_ports[0]);
     
     // ASSERT: Verify that ALL our test data was correctly restored from flash
     // (This proves the write-read cycle works and data comes from flash, not memory)
@@ -394,8 +406,9 @@ void test_flash_persistence_write_read_cycle_verification(void) {
     TEST_ASSERT_TRUE_MESSAGE(layout->config.uart_channels[1].enabled,
         "UART1 enabled state should be restored from flash to original value");
     
-    // Network settings
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("10.0.0.99", layout->config.network.ip_address,
+    // Network settings - check IP address
+    uint32_t expected_test_ip = (10 << 24) | (0 << 16) | (0 << 8) | 99;
+    TEST_ASSERT_EQUAL_MESSAGE(expected_test_ip, layout->config.network.static_ip.addr,
         "Network IP address should be restored from flash to original value");
     TEST_ASSERT_EQUAL_MESSAGE(9001, layout->config.network.tcp_ports[0],
         "Network TCP port 0 should be restored from flash to original value");

@@ -40,6 +40,10 @@
 #include <string.h>
 #include <stdio.h>
 
+// Define doorbell variables needed by state machine
+int doorbell_core0_wakes_core1 = 0;
+int doorbell_core1_wakes_core0 = 1;
+
 // Test configuration
 #define TEST_TIMEOUT_MS 60000    // 60 seconds for DHCP
 #define POLLING_INTERVAL_MS 500  // 500ms between status checks
@@ -521,11 +525,11 @@ int main(void) {
     // CRITICAL: Send the state machine event that production Core0 would send
     // This signals Core1 that hardware initialization is complete
     extern bool state_machine_process_main_event(main_state_event_t event);
-    bool event_sent = state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE);
+    bool event_sent = state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE0);
     if (event_sent) {
-        printf("✓ Sent MAIN_EVENT_INIT_COMPLETE to Core1\n");
+        printf("✓ Sent MAIN_EVENT_INIT_COMPLETE_CORE0 to Core1\n");
     } else {
-        printf("⚠ Failed to send MAIN_EVENT_INIT_COMPLETE\n");
+        printf("⚠ Failed to send MAIN_EVENT_INIT_COMPLETE_CORE0\n");
     }
     
     printf("✓ Production dual-core system running\n");
