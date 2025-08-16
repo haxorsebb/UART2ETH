@@ -2090,7 +2090,7 @@ typedef struct {
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Global State Machine</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Coordinates overall system state across both cores through shared main_state (16-bit) and per-core sub_states. Implements INIT, CONFIGURATION, OPERATIONAL, and ERROR states with atomic state transitions and validation. Provides state-driven control logic for core main loops without persisting state information.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Coordinates overall system state across both cores through shared main_state (atomic) and per-core sub_states. Implements complex initialization sequences (UART setup, persistence, logging, network), configuration phases (UART config, DHCP), and operational states. Uses event-driven transitions with condition validation, doorbell-based cross-core wakeup, and ISR-safe atomic variables. Provides deterministic state-driven control logic for core main loops.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Log Manager</strong></p></td>
@@ -2180,22 +2180,22 @@ typedef struct {
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Main States</strong>: INIT, CONFIGURATION, OPERATIONAL, ERROR - shared 16-bit variable between cores</p>
+<p><strong>Main States</strong>: INIT, CONFIGURATION, OPERATIONAL, ERROR - atomic variable with cross-core doorbell wakeup</p>
 </li>
 <li>
-<p><strong>Core0 Sub-States</strong>: UART_IDLE, UART_ACTIVE, UART_ERROR - core-specific state machine</p>
+<p><strong>Core0 Sub-States</strong>: Complex initialization (INIT_UART, INIT_COMPLETE, INIT_IDLE), configuration (CONFIG_UART, CONFIG_COMPLETE, CONFIG_IDLE), and operational (UART_IDLE, UART_ACTIVE, UART_ERROR) sequences</p>
 </li>
 <li>
-<p><strong>Core1 Sub-States</strong>: NET_IDLE, NET_CONNECTED, NET_ERROR, PERSISTENCE_ACTIVE, LOG_ACTIVE</p>
+<p><strong>Core1 Sub-States</strong>: Multi-stage initialization (INIT_PERSISTENCE, INIT_LOGGING, INIT_NET, INIT_WAIT_FOR_LINK), DHCP configuration (CONFIG_NET_WAIT_FOR_DHCP, CONFIG_NET_CHECK_DHCP), and operational network/maintenance states</p>
 </li>
 <li>
-<p><strong>Transitions</strong>: Atomic state changes with validation, no persistence of state information</p>
+<p><strong>Event-Driven Transitions</strong>: All state changes via event processing with condition validation - no direct state setting</p>
 </li>
 <li>
-<p><strong>State-Driven Logic</strong>: Core main loops query states to control their behavior and operations</p>
+<p><strong>Cross-Core Synchronization</strong>: RP2350 multicore doorbells wake other core on main state changes</p>
 </li>
 <li>
-<p><strong>Synchronization</strong>: Inter-core state coordination through volatile variables and memory barriers</p>
+<p><strong>ISR-Safe Operations</strong>: Atomic variables for sub-states ensure interrupt compatibility</p>
 </li>
 </ul>
 </div>
@@ -2919,6 +2919,120 @@ typedef struct {
 </table>
 </div>
 </div>
+<div class="sect3">
+<h4 id="_whitebox_global_state_machine">5.2.9. Whitebox Global State Machine</h4>
+<div class="paragraph">
+<p>The Global State Machine provides event-driven coordination between cores through three independent state machines with atomic main state and ISR-safe sub-states.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../images/level2-state-machine-actual.svg" alt="level2 state machine actual" width="2026" height="1082">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_10">Motivation</h5>
+<div class="paragraph">
+<p>The actual implementation uses sophisticated event-driven state machines with complex initialization and configuration sequences. Cross-core coordination through atomic variables and doorbell wakeup ensures deterministic behavior without blocking operations.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_10">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Main State Machine</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Coordinates system-wide phases: INIT (hardware setup), CONFIGURATION (UART + DHCP), OPERATIONAL (normal operation), ERROR (recovery). Uses atomic variables and doorbell wakeup for cross-core synchronization.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core0 Sub-State Machine</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages UART-specific states: initialization sequence (INIT_UART → INIT_COMPLETE → INIT_IDLE), configuration sequence (CONFIG_UART → CONFIG_COMPLETE → CONFIG_IDLE), operational states (UART_IDLE ↔ UART_ACTIVE, error handling).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Core1 Sub-State Machine</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles network and maintenance: complex initialization (INIT_PERSISTENCE → INIT_LOGGING → INIT_NET → INIT_WAIT_FOR_LINK), DHCP configuration (CONFIG_NET_WAIT_FOR_DHCP ↔ CONFIG_NET_CHECK_DHCP), operational network/log/persistence states.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Event Processing Engine</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Processes all state machine events through validation pattern: current_state + event + check_condition() → new_state. Prevents invalid transitions and ensures only valid state changes occur.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Condition Checker</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Validates transition conditions including cross-core coordination checks (e.g., check_core0_initialization_complete(), check_core1_configuration_complete()) and hardware status validation.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Doorbell Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages RP2350 multicore doorbells for efficient cross-core wakeup when main state changes. Eliminates polling and provides immediate notification of state transitions.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_state_machine_implementation_details">State Machine Implementation Details</h5>
+<div class="sect5">
+<h6 id="_initialization_sequence_complex_multi_stage">Initialization Sequence (Complex Multi-Stage)</h6>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Core0 initialization: CORE0_INIT_UART → CORE0_INIT_COMPLETE → CORE0_INIT_IDLE
+// Core1 initialization: CORE1_INIT_PERSISTENCE → CORE1_INIT_LOGGING →
+//                       CORE1_INIT_NET → CORE1_INIT_WAIT_FOR_LINK →
+//                       CORE1_INIT_COMPLETE → CORE1_INIT_IDLE
+// Condition: Both cores must reach IDLE before main state transitions to CONFIGURATION</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_configuration_sequence_uart_dhcp">Configuration Sequence (UART + DHCP)</h6>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Core0 config: CORE0_CONFIG_UART → CORE0_CONFIG_COMPLETE → CORE0_CONFIG_IDLE
+// Core1 config: CORE1_CONFIG_NET → CORE1_CONFIG_NET_WAIT_FOR_DHCP ↔
+//               CORE1_CONFIG_NET_CHECK_DHCP → CORE1_CONFIG_COMPLETE → CORE1_CONFIG_IDLE
+// Condition: Both cores must complete configuration before main state transitions to OPERATIONAL</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_cross_core_coordination_example">Cross-Core Coordination Example</h6>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">static bool check_core0_initialization_complete(void) {
+    return atomic_load(&amp;g_initialized) &amp;&amp;
+           atomic_load(&amp;g_main_state) == MAIN_STATE_INIT &amp;&amp;
+           (atomic_load(&amp;g_core1_substate) == CORE1_INIT_IDLE) &amp;&amp;
+           (atomic_load(&amp;g_core0_substate) == CORE0_INIT_COMPLETE ||
+            atomic_load(&amp;g_core0_substate) == CORE0_INIT_IDLE);
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_event_driven_interface">Event-Driven Interface</h6>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// State queries (non-blocking, atomic reads)
+main_state_t state_machine_get_main_state(void);
+core0_substate_t state_machine_get_core0_substate(void);
+core1_substate_t state_machine_get_core1_substate(void);
+
+// Event processing (ONLY way to change states)
+bool state_machine_process_main_event(main_state_event_t event);
+bool state_machine_process_core0_event(core0_event_t event);
+bool state_machine_process_core1_event(core1_event_t event);</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_level_3">5.3. Level 3</h3>
@@ -2933,13 +3047,13 @@ typedef struct {
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_10">Motivation</h5>
+<h5 id="_motivation_11">Motivation</h5>
 <div class="paragraph">
 <p>UART processing utilizing UART specific ISR and DMA transfers for maximum troughput.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_10">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_11">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -3191,13 +3305,13 @@ uint32_t uart_channel_get_status(uint8_t channel);</code></pre>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_11">Motivation</h5>
+<h5 id="_motivation_12">Motivation</h5>
 <div class="paragraph">
 <p>Flash persistence ensures configuration survival across power cycles while preventing flash wear-out and corruption. The ring buffer approach provides automatic wear leveling and power-loss safety without complex file systems.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_11">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_12">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -3593,7 +3707,7 @@ bool validate_session_token(const char* token);</code></pre>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_whitebox_global_state_machine">5.3.6. Whitebox Global State Machine</h4>
+<h4 id="_whitebox_global_state_machine_2">5.3.6. Whitebox Global State Machine</h4>
 <div class="paragraph">
 <p>The Global State Machine implements <strong>three independent event-driven state machines</strong> with <strong>atomic main state</strong> and <strong>ISR-safe sub-states</strong>. Each state machine follows the strict pattern <code>current_state + event + check_condition() → new_state</code> with no direct state manipulation allowed. This architecture provides predictable system coordination without persisting state information.</p>
 </div>
@@ -3603,13 +3717,13 @@ bool validate_session_token(const char* token);</code></pre>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_12">Motivation</h5>
+<h5 id="_motivation_13">Motivation</h5>
 <div class="paragraph">
 <p>The event-driven architecture prevents invalid state transitions by eliminating direct state manipulation. Three independent state machines provide lock-free operation with atomic main state coordination and ISR-safe sub-state management. This design ensures predictable system behavior through validated state transitions while maintaining high performance for real-time operations.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_12">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_13">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
