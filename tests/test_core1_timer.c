@@ -56,10 +56,10 @@ void test_core1_timer_network_timers(void) {
     TEST_ASSERT_TRUE(core1_timer_is_active(CORE1_TIMER_DHCP_RENEWAL));
     TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_DHCP_RENEWAL));
     
-    // Test TCP keepalive timer
-    core1_timer_set(CORE1_TIMER_TCP_KEEPALIVE, 200);
-    TEST_ASSERT_TRUE(core1_timer_is_active(CORE1_TIMER_TCP_KEEPALIVE));
-    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_TCP_KEEPALIVE));
+    // Test connection timeout timer
+    core1_timer_set(CORE1_TIMER_CONNECTION_TIMEOUT, 200);
+    TEST_ASSERT_TRUE(core1_timer_is_active(CORE1_TIMER_CONNECTION_TIMEOUT));
+    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_CONNECTION_TIMEOUT));
     
     // Test network timeout
     core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, 300);
@@ -141,13 +141,13 @@ void test_core1_timer_network_expiration(void) {
     sleep_ms(60);
     TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT));
     
-    // Set TCP keepalive timer
-    core1_timer_set(CORE1_TIMER_TCP_KEEPALIVE, 80);
-    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_TCP_KEEPALIVE));
+    // Set connection timeout timer
+    core1_timer_set(CORE1_TIMER_CONNECTION_TIMEOUT, 80);
+    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_CONNECTION_TIMEOUT));
     
     // Wait for expiration
     sleep_ms(90);
-    TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_TCP_KEEPALIVE));
+    TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_CONNECTION_TIMEOUT));
 }
 
 /**
@@ -158,21 +158,21 @@ void test_core1_timer_network_expiration(void) {
 void test_core1_timer_mixed_operations(void) {
     // Set multiple different timers
     core1_timer_set(CORE1_TIMER_DHCP_RENEWAL, 200);
-    core1_timer_set(CORE1_TIMER_TCP_KEEPALIVE, 100);
+    core1_timer_set(CORE1_TIMER_CONNECTION_TIMEOUT, 100);
     core1_timer_set(CORE1_TIMER_LOG_FLUSH, 150);
     core1_timer_set(CORE1_TIMER_PERSISTENCE_INTERVAL, 300);
     
     TEST_ASSERT_EQUAL(4, core1_timer_get_active_count());
     
-    // Wait for TCP keepalive to expire first
+    // Wait for connection timeout to expire first
     sleep_ms(110);
-    TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_TCP_KEEPALIVE));
+    TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_CONNECTION_TIMEOUT));
     TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_DHCP_RENEWAL));
     TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_LOG_FLUSH));
     
     // Reset the expired timer
-    core1_timer_set(CORE1_TIMER_TCP_KEEPALIVE, 400);
-    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_TCP_KEEPALIVE));
+    core1_timer_set(CORE1_TIMER_CONNECTION_TIMEOUT, 400);
+    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_CONNECTION_TIMEOUT));
     
     // Cancel persistence timer
     core1_timer_cancel(CORE1_TIMER_PERSISTENCE_INTERVAL);
@@ -212,12 +212,12 @@ void test_core1_timer_concurrent_expiration(void) {
     
     // Set multiple timers with same interval
     core1_timer_set(CORE1_TIMER_DHCP_DISCOVER, interval);
-    core1_timer_set(CORE1_TIMER_ARP_TIMEOUT, interval);
+    core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, interval);
     core1_timer_set(CORE1_TIMER_CONNECTION_TIMEOUT, interval);
     
     // None should be expired initially
     TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_DHCP_DISCOVER));
-    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_ARP_TIMEOUT));
+    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT));
     TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_CONNECTION_TIMEOUT));
     
     // Wait for all to expire
@@ -225,7 +225,7 @@ void test_core1_timer_concurrent_expiration(void) {
     
     // All should be expired
     TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_DHCP_DISCOVER));
-    TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_ARP_TIMEOUT));
+    TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT));
     TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_CONNECTION_TIMEOUT));
 }
 

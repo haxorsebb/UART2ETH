@@ -343,11 +343,11 @@ static void core1_init_persistence(void) {
     
     if (result) {
         g_persistence_initialized = true;
-        log_event(EVENT_SOURCE_PERSITENCE, LOG_LEVEL_INFO, LOG_EVENT_PERSISTENCE_INIT_SUCCESS, 1);
+        log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_INFO, LOG_EVENT_PERSISTENCE_INIT_SUCCESS, 1);
         // Generate network up event to move to next phase
         state_machine_process_core1_event(CORE1_EVENT_INIT_PERSISTENCE_COMPLETE);
     } else {
-        log_event(EVENT_SOURCE_PERSITENCE, LOG_LEVEL_ERROR, LOG_EVENT_PERSISTENCE_INIT_FAIL, 1);
+        log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_ERROR, LOG_EVENT_PERSISTENCE_INIT_FAIL, 1);
         state_machine_process_core1_event(CORE1_EVENT_INIT_PERSISTENCE_FAILED);
         // Retry after a delay
         sleep_ms(1000);

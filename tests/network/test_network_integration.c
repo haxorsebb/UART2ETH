@@ -40,10 +40,6 @@
 #include <string.h>
 #include <stdio.h>
 
-// Define doorbell variables needed by state machine
-int doorbell_core0_wakes_core1 = 0;
-int doorbell_core1_wakes_core0 = 1;
-
 // Test configuration
 #define TEST_TIMEOUT_MS 60000    // 60 seconds for DHCP
 #define POLLING_INTERVAL_MS 500  // 500ms between status checks

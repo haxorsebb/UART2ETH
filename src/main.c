@@ -26,10 +26,6 @@
 #include "network/enc28j60_driver.h"
 #include "debug.h"
 
-// Define doorbell variables for cross-core synchronization
-int doorbell_core0_wakes_core1;
-int doorbell_core1_wakes_core0;
-
 // Forward declarations for core main functions
 
 void core0_main(void);
