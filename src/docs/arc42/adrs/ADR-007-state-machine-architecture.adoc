@@ -6,31 +6,31 @@
 :filename: /adrs/ADR-007-state-machine-architecture.adoc
 ifndef::imagesdir[:imagesdir: ../../images]
 
-= ADR-007: State Machine Architecture
+= ADR-007: Event-Driven State Machine Architecture
 
 == Status
-Decided
+Decided and Implemented
 
 == Date
-2024-01-16 (Updated: 2025-08-06)
+2024-01-16 (Updated: 2025-08-16)
 
 == Context
 
-The UART2ETH system requires coordinated dual-core operation with predictable behavior across system initialization, normal operation, error conditions, and configuration changes. The system needs a mechanism to synchronize Core0 (UART processing) and Core1 (network and persistence) while avoiding tight coupling between cores.
+The UART2ETH system requires coordinated dual-core operation with predictable behavior across system initialization, configuration loading, normal operation, error conditions, and recovery procedures. The system needs sophisticated state coordination between Core0 (UART processing) and Core1 (network, persistence, and maintenance) while maintaining deterministic behavior and avoiding race conditions.
 
 Key requirements:
-* Dual-core state coordination without blocking operations
-* State-driven control logic for predictable core behavior
-* Clear separation between runtime state and persistent configuration
+* **Dual-core state coordination** with atomic main state synchronization using doorbells
+* **Complex initialization sequences** with persistence, logging, and network hardware setup
+* **Configuration phase** with UART setup and DHCP network configuration
+* **Runtime state management** for UART processing and network operations
 * **Event-driven state transitions** with condition validation (no direct state manipulation)
-* **ISR-safe operations** for core-specific sub-states
-* **Atomic operations** for shared main state
-* Support for core-specific sub-states within global system states
-* Non-persistent state information (states should not survive reboots)
+* **ISR-safe operations** for core-specific sub-states with atomic variables
+* **Cross-core wakeup** using RP2350 multicore doorbells
+* **Comprehensive error handling** with recovery and fallback mechanisms
 
 == Decision
 
-We will implement **three independent event-driven state machines** with **atomic main state** and **ISR-safe sub-states** using the following architecture:
+We implement **three independent event-driven state machines** with **atomic main state** and **ISR-safe sub-states** using the following architecture:
 
 ### Event-Driven State Machine Architecture
 
@@ -47,23 +47,74 @@ We will implement **three independent event-driven state machines** with **atomi
 
 ### State Definitions
 
-**Main States (shared between cores):**
-* `INIT`: System initialization and hardware setup
-* `CONFIGURATION`: Configuration loading and validation  
-* `OPERATIONAL`: Normal operation mode
-* `ERROR`: Error state requiring recovery
+**Main States (shared between cores, atomic access):**
+```c
+typedef enum {
+    MAIN_STATE_INIT = 0,           // System initialization and hardware setup
+    MAIN_STATE_CONFIGURATION = 1,  // Configuration loading and validation
+    MAIN_STATE_OPERATIONAL = 2,    // Normal operation mode
+    MAIN_STATE_ERROR = 3           // Error state requiring recovery
+} main_state_t;
+```
 
-**Core0 Sub-States (UART processing):**
-* `UART_IDLE`: No active UART operations
-* `UART_ACTIVE`: Processing UART data
-* `UART_ERROR`: UART hardware error state
+**Core0 Sub-States (UART processing, ISR-safe):**
+```c
+typedef enum {
+    // Initialization sequence
+    CORE0_INIT_UART,        // Initializing UART hardware
+    CORE0_INIT_COMPLETE,    // UART init complete, signaling main state
+    CORE0_INIT_IDLE,        // Waiting for other core during init  
+    CORE0_INIT_ERROR,       // UART initialization failed
+    
+    // Configuration sequence
+    CORE0_CONFIG_UART,      // Configure UARTS 
+    CORE0_CONFIG_COMPLETE,  // Reconfiguration successful
+    CORE0_CONFIG_IDLE,      // Reconfiguration successful, waiting
+    CORE0_CONFIG_ERROR,     // Reconfiguration NOT successful
+    
+    // Operational states
+    CORE0_UART_IDLE,        // No active UART operations  
+    CORE0_UART_ACTIVE,      // Processing UART data
+    CORE0_UART_ERROR        // UART hardware error state
+} core0_substate_t;
+```
 
-**Core1 Sub-States (Network and maintenance):**
-* `NET_DISCONNECTED`: Network interface down
-* `NET_IDLE`: Network interface up, no active connections
-* `NET_ACTIVE`: Active network connections
-* `PERSISTENCE_ACTIVE`: Flash persistence operation active
-* `LOG_ACTIVE`: Log processing active
+**Core1 Sub-States (Network and maintenance, ISR-safe):**
+```c
+typedef enum {
+    // Initialization sequence
+    CORE1_INIT_PERISTENCE,      // Init persistence
+    CORE1_INIT_LOGGING,         // Init logging
+    CORE1_INIT_NET,             // Init net
+    CORE1_INIT_WAIT_FOR_LINK,   // Init is not complete without link
+    CORE1_INIT_COMPLETE,        // Init complete
+    CORE1_INIT_IDLE,            // Init complete, sleep until other core finishes init
+    
+    // Configuration sequence with DHCP
+    CORE1_CONFIG_NET,           // (re)-configure net 
+    CORE1_CONFIG_COMPLETE,      // (re)-configuration of net successfull
+    CORE1_CONFIG_NET_WAIT_FOR_DHCP, // (re)-configuration of net successfull, get dhcp
+    CORE1_CONFIG_NET_CHECK_DHCP, // (re)-configuration of net successfull, check if we got dhcp   
+    CORE1_CONFIG_IDLE,          // (re)-configuration of net successfull
+    CORE1_CONFIG_LOG_ACTIVE,    // There are logs queued during config
+    CORE1_CONFIG_ERROR,         // (re)-configuration of net NOT successfull
+    
+    // Operational states
+    CORE1_NET_LINK_CHANGE,      // Network interface changing
+    CORE1_NET_CONNECTED,        // Network interface up
+    CORE1_NET_DISCONNECTED,     // Network interface down
+    CORE1_NET_IDLE,             // Network interface up, no connections
+    CORE1_NET_ACTIVE_RECEIVE,   // Active network connections receiving
+    CORE1_NET_ACTIVE_SEND,      // Active network connections sending
+    CORE1_PERSISTENCE_ACTIVE,   // Flash persistence operation active
+    CORE1_LOG_ACTIVE,           // Log processing active
+    CORE1_IDLE,                 // Idle, may sleep here or schedule new work
+    
+    // Error states
+    CORE1_INIT_ERROR,           // Unrecoverable init error
+    CORE1_SHUTDOWN              // Stop main loop
+} core1_substate_t;
+```
 
 ### Event-Driven Interface Design
 
@@ -78,289 +129,389 @@ bool state_machine_process_core1_event(core1_event_t event);
 main_state_t state_machine_get_main_state(void);
 core0_substate_t state_machine_get_core0_substate(void);
 core1_substate_t state_machine_get_core1_substate(void);
+```
 
-// Event type definitions
+**Main State Events:**
+```c
 typedef enum {
-    MAIN_EVENT_INIT_COMPLETE,      // Initialization finished successfully
-    MAIN_EVENT_CONFIG_LOADED,      // Configuration loaded and validated
+    MAIN_EVENT_INIT_COMPLETE_CORE0,     // UART initialized
+    MAIN_EVENT_INIT_COMPLETE_CORE1,     // Network interface initialized 
+    MAIN_EVENT_CONFIG_COMPLETE_CORE0,   // Configuration loaded and validated
+    MAIN_EVENT_CONFIG_COMPLETE_CORE1,   // Configuration loaded and validated
     MAIN_EVENT_SYSTEM_ERROR,       // System error detected
     MAIN_EVENT_ERROR_RECOVERED     // Recovery from error state complete
 } main_state_event_t;
+```
 
+**Core0 Events:**
+```c
 typedef enum {
-    CORE0_EVENT_UART_DATA_READY,   // UART data available for processing
-    CORE0_EVENT_UART_IDLE,         // UART processing completed
-    CORE0_EVENT_UART_ERROR,        // UART hardware error detected
-    CORE0_EVENT_ERROR_RECOVERED    // UART error recovery complete
+    CORE0_EVENT_INIT_UART_COMPLETE,     // UART initialized
+    CORE0_EVENT_INIT_UART_FAILED,       // UART could not be initialized
+    CORE0_EVENT_CONFIG_UART_COMPLETE,   // UART reconfigured successfully
+    CORE0_EVENT_CONFIG_UART_FAILED,     // UART reconfiguration failed
+    CORE0_EVENT_UART_DATA_READY,        // UART data available for processing
+    CORE0_EVENT_UART_IDLE,              // UART processing completed
+    CORE0_EVENT_UART_ERROR,             // UART hardware error detected
+    CORE0_EVENT_ERROR_RECOVERED,        // UART error recovery complete
+    CORE0_EVENT_AUTO_TRANSITION         // Dummy event for auto-state transition
 } core0_event_t;
+```
 
+**Core1 Events (extensive network and maintenance events):**
+```c
 typedef enum {
-    CORE1_EVENT_NETWORK_UP,        // Network interface connected
-    CORE1_EVENT_NETWORK_DOWN,      // Network interface disconnected
-    CORE1_EVENT_CONNECTION_ACTIVE, // TCP connection established
-    CORE1_EVENT_CONNECTION_IDLE,   // All connections closed
-    CORE1_EVENT_PERSISTENCE_START, // Flash operation starting
-    CORE1_EVENT_PERSISTENCE_END,   // Flash operation completed
-    CORE1_EVENT_LOG_START,         // Log processing starting
-    CORE1_EVENT_LOG_END            // Log processing completed
+    // Initialization events
+    CORE1_EVENT_INIT_PERSISTENCE_COMPLETE, 
+    CORE1_EVENT_INIT_PERSISTENCE_FAILED, 
+    CORE1_EVENT_INIT_LOGGING_COMPLETE,     
+    CORE1_EVENT_INIT_LOGGING_FAILED,     
+    CORE1_EVENT_INIT_NET_WAIT_FOR_LINK_UP,  
+    CORE1_EVENT_INIT_NET_LINK_UP,        
+    CORE1_EVENT_INIT_NET_LINK_DOWN,        
+    CORE1_EVENT_INIT_NET_COMPLETE,     
+    CORE1_EVENT_INIT_NET_FAILED,     
+    
+    // Configuration events with DHCP handling
+    CORE1_EVENT_CONFIG_NET_DHCP_REQUEST,     
+    CORE1_EVENT_CONFIG_NET_GOT_DHCP,        
+    CORE1_EVENT_CONFIG_NET_WAIT_DHCP,       
+    CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT,     
+    CORE1_EVENT_CONFIG_NET_COMPLETE,     
+    CORE1_EVENT_CONFIG_NET_FAILED,     
+    
+    // Network operational events
+    CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE,        
+    CORE1_EVENT_NETWORK_LINK_UP,          
+    CORE1_EVENT_NETWORK_LINK_DOWN,          
+    CORE1_EVENT_NETWORK_RECEIVE_ACTIVE,        
+    CORE1_EVENT_NETWORK_RECEIVE_FINISHED,        
+    CORE1_EVENT_NETWORK_SENDING_ACTIVE,        
+    CORE1_EVENT_NETWORK_SENDING_FINISHED,        
+    CORE1_EVENT_NETWORK_UP,        
+    CORE1_EVENT_NETWORK_DOWN,      
+    CORE1_EVENT_CONNECTION_ACTIVE, 
+    CORE1_EVENT_CONNECTION_IDLE,   
+    
+    // Maintenance events
+    CORE1_EVENT_PERSISTENCE_START, 
+    CORE1_EVENT_PERSISTENCE_END,   
+    CORE1_EVENT_LOG_START,         
+    CORE1_EVENT_LOG_END,            
+    CORE1_EVENT_AUTO_TRANSITION            
 } core1_event_t;
 ```
 
 ### Concurrency and Safety Model
 
 **Main State Machine:**
-* **Atomic Operations**: Uses atomic compare-and-swap for state transitions
+* **Atomic Operations**: Uses `_Atomic` variables for state transitions
 * **Cross-Core Access**: Both cores can send events, both can read state
+* **Doorbell Synchronization**: RP2350 multicore doorbells wake other core on main state changes
 * **Memory Barriers**: Proper barriers ensure cache coherency
 
 **Sub-State Machines:**
-* **ISR-Safe**: Compatible with interrupt service routines
+* **ISR-Safe**: Compatible with interrupt service routines using `_Atomic` variables
 * **Single-Core Ownership**: Core0 owns Core0 sub-state, Core1 owns Core1 sub-state
 * **No Cross-Core Locking**: No mutexes required for sub-states
-* **Atomic Variables**: Use atomic variables for ISR safety
+* **Atomic Variables**: Use `_Atomic` variables for ISR safety
+
+**Doorbell Implementation:**
+```c
+extern int doorbell_core0_wakes_core1;
+extern int doorbell_core1_wakes_core0;
+
+static void wake_other_core_after_main_state_change(main_state_t new_state) {
+    // Wake the other core
+    multicore_doorbell_set_other_core(doorbell_core0_wakes_core1);
+    multicore_doorbell_set_other_core(doorbell_core1_wakes_core0);
+}
+```
 
 ### Core Main Loop Architecture
-* **Dual-Core Launch**: `main.c` modified to launch both cores
-* **Core-Specific Modules**: `core0_main.c` and `core1_main.c` with dedicated main functions
-* **State-Driven Logic**: Core main loops query states and send events to control behavior
-* **Non-Blocking Queries**: State access never blocks core operations
 
-### Core1 Integration Requirements
-* **Core1 Persistence**: Handle configuration persistence operations
-* **Core1 Log Processing**: Process **one log event per loop iteration**
-* **Priority Scheduling**: High-priority network, low-priority maintenance tasks
+**Dual-Core Launch**: `main.c` launches both cores with dedicated entry points
+**Core-Specific Modules**: `core0_main.c` and `core1_main.c` with dedicated main functions
+**State-Driven Logic**: Core main loops query states and send events to control behavior
+**Non-Blocking Queries**: State access never blocks core operations
+
+### Complex State Transition Examples
+
+**Initialization Sequence:**
+1. Main state starts in `MAIN_STATE_INIT`
+2. Core0: `CORE0_INIT_UART` → `CORE0_INIT_COMPLETE` → `CORE0_INIT_IDLE`
+3. Core1: `CORE1_INIT_PERISTENCE` → `CORE1_INIT_LOGGING` → `CORE1_INIT_NET` → `CORE1_INIT_WAIT_FOR_LINK` → `CORE1_INIT_COMPLETE` → `CORE1_INIT_IDLE`
+4. When both cores reach IDLE, main state transitions to `MAIN_STATE_CONFIGURATION`
+
+**Configuration Sequence:**
+1. Main state: `MAIN_STATE_CONFIGURATION`
+2. Core0: `CORE0_CONFIG_UART` → `CORE0_CONFIG_COMPLETE` → `CORE0_CONFIG_IDLE`
+3. Core1: `CORE1_CONFIG_NET` → `CORE1_CONFIG_NET_WAIT_FOR_DHCP` → `CORE1_CONFIG_NET_CHECK_DHCP` → `CORE1_CONFIG_COMPLETE` → `CORE1_CONFIG_IDLE`
+4. When both cores reach IDLE, main state transitions to `MAIN_STATE_OPERATIONAL`
+
+**DHCP Configuration Handling:**
+```c
+// Complex DHCP state handling in Core1
+case CORE1_CONFIG_NET_WAIT_FOR_DHCP:
+    switch (event) {
+        case CORE1_EVENT_NETWORK_RECEIVE_ACTIVE:
+            new_state = CORE1_CONFIG_NET_CHECK_DHCP;
+            break;
+        case CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT:
+            new_state = CORE1_CONFIG_NET; // Retry
+            break;
+        case CORE1_EVENT_LOG_START:
+            new_state = CORE1_CONFIG_LOG_ACTIVE; // Handle logs during DHCP
+            break;
+    }
+    break;
+```
+
+### Condition Checking Functions
+
+**Cross-Core Coordination Conditions:**
+```c
+// Checks if Core0 can trigger main state transition from INIT to CONFIGURATION
+static bool check_core0_initialization_complete(void) {
+    return atomic_load(&g_initialized) &&
+           atomic_load(&g_main_state) == MAIN_STATE_INIT &&
+           (atomic_load(&g_core1_substate) == CORE1_INIT_IDLE) &&
+           (atomic_load(&g_core0_substate) == CORE0_INIT_COMPLETE || 
+            atomic_load(&g_core0_substate) == CORE0_INIT_IDLE);
+}
+
+// Checks if Core1 can trigger main state transition from CONFIGURATION to OPERATIONAL
+static bool check_core1_configuration_complete(void) {
+    return atomic_load(&g_initialized) &&
+           atomic_load(&g_main_state) == MAIN_STATE_CONFIGURATION &&
+           (atomic_load(&g_core1_substate) == CORE1_CONFIG_COMPLETE || 
+            atomic_load(&g_core1_substate) == CORE1_CONFIG_IDLE) &&
+           (atomic_load(&g_core0_substate) == CORE0_CONFIG_IDLE);
+}
+```
 
 ## Rationale
 
 ### Advantages
-* **Event-Driven Safety**: Impossible to set invalid states - all transitions validated
+* **Deterministic Behavior**: Complex state sequences ensure predictable system behavior
+* **Robust Initialization**: Multi-stage initialization prevents race conditions
+* **DHCP Integration**: Sophisticated network configuration with timeout handling
+* **Cross-Core Coordination**: Atomic main state with doorbell wakeup ensures synchronization
 * **ISR Compatibility**: Sub-state machines safe for interrupt context
-* **Lock-Free Design**: Each core owns its sub-state, no cross-core locking required
-* **Predictable Behavior**: State-driven control logic provides deterministic system behavior
-* **Atomic Inter-Core Coordination**: Main state provides safe dual-core synchronization
+* **Error Recovery**: Comprehensive error handling at each stage
 * **Testability**: Event processing and condition functions can be unit tested independently
 * **Maintainability**: Clear event definitions make system behavior easier to understand
 * **Performance**: Non-blocking state queries and lock-free sub-states
 
-### Event-Driven Design Benefits
-* **Invalid State Prevention**: No way to directly set invalid states
-* **Condition Validation**: All transitions must pass validation checks
-* **Audit Trail**: Event processing provides clear state change history
-* **Debugging**: Events can be logged for system behavior analysis
-* **Deterministic**: Same event + same state + same conditions = same result
+### Implementation Strategy
 
-### Rejected Alternatives
-
-**Direct State Setting Functions**
-* Rejected because they allow invalid state transitions
-* No validation of transition legality
-* Difficult to debug and audit state changes
-* Race conditions in multi-core environment
-
-**Shared Memory State Storage**
-* Rejected because states are runtime information, not configuration data
-* Would persist unnecessary runtime state across reboots
-* Couples state management to configuration persistence
-
-**Message Passing Between Cores**
-* Rejected due to complexity and potential blocking behavior
-* Would require queue management and synchronization overhead
-* Atomic state variables are simpler for this use case
-
-**Single Global State Only**
-* Rejected as insufficient for core-specific operational states
-* Would require complex state encoding to represent per-core status
-* Sub-states provide cleaner separation of concerns
-
-### Trade-offs
-* **Code Complexity**: Event-driven pattern requires more code than direct setting
-* **Memory Usage**: Event processing functions and condition checks (minimal impact)
-* **Development Overhead**: Must design proper events and conditions for each transition
-
-== Consequences
-
-### Positive
-* **Impossible Invalid States**: Event-driven pattern prevents invalid state transitions
-* **ISR-Safe Operations**: Sub-state machines work correctly in interrupt context
-* **Lock-Free Performance**: No blocking between cores for sub-state operations
-* **Predictable System Behavior**: State-driven logic provides clear operational modes
-* **Inter-Core Coordination**: Safe dual-core operation with atomic main state
-* **Separation of Concerns**: Runtime state separate from persistent configuration
-* **Testability**: Event processing and condition logic can be tested independently
-* **Maintainability**: Clear event and condition definitions aid debugging
-* **Auditability**: Event processing provides state change history
-
-### Negative
-* **Additional Complexity**: Event-driven pattern requires more implementation code
-* **Memory Overhead**: Additional event processing and condition functions
-* **Development Time**: Must design proper events and conditions for each transition
-* **Learning Curve**: Developers must understand event-driven state machine patterns
-
-### Implementation Requirements
-* Event-driven state machine module with atomic operations and ISR-safe sub-states
-* Core0 main function with UART processing and event-driven control logic
-* Core1 main function with network, persistence, and log processing
-* Event processing with condition validation for all state transitions
-* Integration with existing shared memory and logging systems
-
-== Implementation Strategy
-
-### Event Processing Pattern
+**Memory Layout:**
 ```c
-// Example: Main state machine event processing
+// State variables with proper synchronization
+static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;
+static _Atomic core0_substate_t g_core0_substate = CORE0_INIT_UART;           
+static _Atomic core1_substate_t g_core1_substate = CORE1_INIT_PERISTENCE;    
+
+// Initialization flag
+_Atomic bool g_initialized = false;
+```
+
+**Event Processing Pattern:**
+```c
 bool state_machine_process_main_event(main_state_event_t event) {
-    main_state_t current_state = state_machine_get_main_state();
+    main_state_t current_state = atomic_load(&g_main_state);
     main_state_t new_state = current_state;  // Default: no change
     
     // State + Event + Condition → New State
     switch (current_state) {
         case MAIN_STATE_INIT:
             switch (event) {
-                case MAIN_EVENT_INIT_COMPLETE:
-                    if (check_initialization_complete()) {
+                case MAIN_EVENT_INIT_COMPLETE_CORE0:
+                    if (check_core0_initialization_complete()) {
                         new_state = MAIN_STATE_CONFIGURATION;
-                    }
-                    break;
-            }
-            break;
-            
-        case MAIN_STATE_CONFIGURATION:
-            switch (event) {
-                case MAIN_EVENT_CONFIG_LOADED:
-                    if (check_configuration_valid()) {
-                        new_state = MAIN_STATE_OPERATIONAL;
-                    }
-                    break;
-                case MAIN_EVENT_SYSTEM_ERROR:
-                    new_state = MAIN_STATE_ERROR;
-                    break;
-            }
-            break;
-            
-        case MAIN_STATE_OPERATIONAL:
-            switch (event) {
-                case MAIN_EVENT_SYSTEM_ERROR:
-                    new_state = MAIN_STATE_ERROR;
-                    break;
-            }
-            break;
-            
-        case MAIN_STATE_ERROR:
-            switch (event) {
-                case MAIN_EVENT_ERROR_RECOVERED:
-                    if (check_error_recovery_complete()) {
-                        new_state = MAIN_STATE_OPERATIONAL;
+                        // Also update substates for next phase
+                        atomic_store(&g_core0_substate, CORE0_CONFIG_UART);
+                        atomic_store(&g_core1_substate, CORE1_CONFIG_NET);
                     }
                     break;
             }
             break;
     }
     
-    // Atomic state transition if changed
+    // Apply state change if needed
     if (new_state != current_state) {
-        return atomic_compare_exchange_strong(&g_main_state, &current_state, new_state);
+        atomic_store(&g_main_state, new_state);
+        wake_other_core_after_main_state_change(new_state);
     }
     
-    return true;  // No change needed
-}
-
-// Example: Condition checking function
-static bool check_initialization_complete(void) {
-    return (shared_memory_initialized() && 
-            uart_hardware_initialized() && 
-            network_interface_ready());
+    return true;
 }
 ```
 
-### Core Main Loop Event-Driven Pattern
-```c
-// Core0 main loop with event-driven logic
-void core0_main(void) {
-    while (true) {
-        main_state_t main_state = state_machine_get_main_state();
-        core0_substate_t sub_state = state_machine_get_core0_substate();
+## Consequences
+
+### Positive
+* **Impossible Invalid States**: Event-driven pattern prevents invalid state transitions
+* **Complex Coordination**: Handles sophisticated dual-core initialization and configuration
+* **DHCP Integration**: Robust network configuration with proper timeout handling
+* **Cross-Core Synchronization**: Doorbell-based wakeup ensures efficient coordination
+* **ISR-Safe Operations**: Sub-state machines work correctly in interrupt context
+* **Comprehensive Error Handling**: Error states and recovery at each stage
+* **Maintainability**: Clear state diagrams show system behavior
+* **Testability**: Each state transition can be unit tested independently
+
+### Negative
+* **Implementation Complexity**: Large number of states and transitions
+* **Memory Overhead**: Event processing and condition functions for all transitions
+* **Development Time**: Must design proper events and conditions for each transition
+* **Learning Curve**: Developers must understand complex state machine interactions
+
+### Implementation Requirements
+* Event-driven state machine module with atomic operations and ISR-safe sub-states
+* Core0 main function with UART processing and complex initialization sequence
+* Core1 main function with network, persistence, DHCP handling, and log processing
+* Doorbell-based cross-core synchronization for main state changes
+* Comprehensive condition checking functions for state transition validation
+* Integration with existing shared memory, logging, and persistence systems
+
+== Updated State Machine Diagrams
+
+[plantuml, state-machine-overview, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+
+title UART2ETH Event-Driven State Machine Architecture
+
+state "Main State Machine\n(Atomic, Cross-Core)" as Main {
+    state MAIN_STATE_INIT : Initialization Phase
+    state MAIN_STATE_CONFIGURATION : Configuration Phase
+    state MAIN_STATE_OPERATIONAL : Normal Operation
+    state MAIN_STATE_ERROR : Error Recovery
+    
+    [*] --> MAIN_STATE_INIT
+    MAIN_STATE_INIT --> MAIN_STATE_CONFIGURATION : INIT_COMPLETE_CORE0/1\n+ condition check
+    MAIN_STATE_CONFIGURATION --> MAIN_STATE_OPERATIONAL : CONFIG_COMPLETE_CORE0/1\n+ condition check
+    MAIN_STATE_OPERATIONAL --> MAIN_STATE_ERROR : SYSTEM_ERROR
+    MAIN_STATE_INIT --> MAIN_STATE_ERROR : SYSTEM_ERROR
+    MAIN_STATE_CONFIGURATION --> MAIN_STATE_ERROR : SYSTEM_ERROR
+    MAIN_STATE_ERROR --> MAIN_STATE_OPERATIONAL : ERROR_RECOVERED\n+ condition check
+}
+
+state "Core0 Sub-State Machine\n(ISR-Safe, UART Processing)" as Core0 {
+    state "Initialization" as C0_Init {
+        state CORE0_INIT_UART
+        state CORE0_INIT_COMPLETE
+        state CORE0_INIT_IDLE
+        state CORE0_INIT_ERROR
         
-        // State-driven control logic with event generation
-        switch (main_state) {
-            case MAIN_STATE_OPERATIONAL:
-                switch (sub_state) {
-                    case CORE0_UART_IDLE:
-                        if (uart_data_available()) {
-                            state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
-                        }
-                        break;
-                    case CORE0_UART_ACTIVE:
-                        if (process_uart_data()) {
-                            // Processing complete
-                            state_machine_process_core0_event(CORE0_EVENT_UART_IDLE);
-                        }
-                        break;
-                    case CORE0_UART_ERROR:
-                        if (attempt_uart_recovery()) {
-                            state_machine_process_core0_event(CORE0_EVENT_ERROR_RECOVERED);
-                        }
-                        break;
-                }
-                break;
-        }
-        sleep_ms(10);  // 10ms loop frequency
+        [*] --> CORE0_INIT_UART
+        CORE0_INIT_UART --> CORE0_INIT_COMPLETE : INIT_UART_COMPLETE
+        CORE0_INIT_UART --> CORE0_INIT_ERROR : INIT_UART_FAILED
+        CORE0_INIT_COMPLETE --> CORE0_INIT_IDLE : auto-transition
     }
+    
+    state "Configuration" as C0_Config {
+        state CORE0_CONFIG_UART
+        state CORE0_CONFIG_COMPLETE
+        state CORE0_CONFIG_IDLE
+        state CORE0_CONFIG_ERROR
+        
+        CORE0_CONFIG_UART --> CORE0_CONFIG_COMPLETE : CONFIG_UART_COMPLETE
+        CORE0_CONFIG_UART --> CORE0_CONFIG_ERROR : CONFIG_UART_FAILED
+        CORE0_CONFIG_COMPLETE --> CORE0_CONFIG_IDLE : auto-transition
+    }
+    
+    state "Operational" as C0_Op {
+        state CORE0_UART_IDLE
+        state CORE0_UART_ACTIVE
+        state CORE0_UART_ERROR
+        
+        CORE0_UART_IDLE --> CORE0_UART_ACTIVE : UART_DATA_READY\n+ data available
+        CORE0_UART_ACTIVE --> CORE0_UART_IDLE : UART_IDLE\n+ processing complete
+        CORE0_UART_IDLE --> CORE0_UART_ERROR : UART_ERROR
+        CORE0_UART_ACTIVE --> CORE0_UART_ERROR : UART_ERROR
+        CORE0_UART_ERROR --> CORE0_UART_IDLE : ERROR_RECOVERED\n+ hardware recovered
+    }
+    
+    C0_Init --> C0_Config : Main state CONFIGURATION
+    C0_Config --> C0_Op : Main state OPERATIONAL
 }
-```
 
-### Memory Layout and Synchronization
-* **Separate Memory Region**: State variables in dedicated memory outside shared_memory_layout_t
-* **Atomic Variables**: Main state uses atomic types for cross-core safety
-* **Volatile Variables**: Sub-state variables marked volatile for ISR visibility
-* **Memory Barriers**: Proper barriers ensure cache coherency between cores
-* **ISR-Safe Operations**: Sub-state transitions safe for interrupt context
+state "Core1 Sub-State Machine\n(ISR-Safe, Network + Maintenance)" as Core1 {
+    state "Initialization" as C1_Init {
+        state CORE1_INIT_PERISTENCE
+        state CORE1_INIT_LOGGING  
+        state CORE1_INIT_NET
+        state CORE1_INIT_WAIT_FOR_LINK
+        state CORE1_INIT_COMPLETE
+        state CORE1_INIT_IDLE
+        state CORE1_INIT_ERROR
+        
+        [*] --> CORE1_INIT_PERISTENCE
+        CORE1_INIT_PERISTENCE --> CORE1_INIT_LOGGING : INIT_PERSISTENCE_COMPLETE
+        CORE1_INIT_PERISTENCE --> CORE1_INIT_ERROR : INIT_PERSISTENCE_FAILED
+        CORE1_INIT_LOGGING --> CORE1_INIT_NET : INIT_LOGGING_COMPLETE
+        CORE1_INIT_LOGGING --> CORE1_INIT_ERROR : INIT_LOGGING_FAILED
+        CORE1_INIT_NET --> CORE1_INIT_WAIT_FOR_LINK : INIT_NET_WAIT_FOR_LINK_UP
+        CORE1_INIT_NET --> CORE1_INIT_ERROR : INIT_NET_FAILED
+        CORE1_INIT_WAIT_FOR_LINK --> CORE1_INIT_COMPLETE : INIT_NET_LINK_UP
+        CORE1_INIT_WAIT_FOR_LINK --> CORE1_INIT_ERROR : INIT_NET_FAILED
+        CORE1_INIT_COMPLETE --> CORE1_INIT_IDLE : auto-transition
+    }
+    
+    state "Configuration" as C1_Config {
+        state CORE1_CONFIG_NET
+        state CORE1_CONFIG_NET_WAIT_FOR_DHCP
+        state CORE1_CONFIG_NET_CHECK_DHCP
+        state CORE1_CONFIG_COMPLETE
+        state CORE1_CONFIG_IDLE
+        state CORE1_CONFIG_LOG_ACTIVE
+        state CORE1_CONFIG_ERROR
+        
+        CORE1_CONFIG_NET --> CORE1_CONFIG_NET_WAIT_FOR_DHCP : CONFIG_NET_DHCP_REQUEST
+        CORE1_CONFIG_NET --> CORE1_CONFIG_ERROR : CONFIG_NET_FAILED
+        CORE1_CONFIG_NET_WAIT_FOR_DHCP --> CORE1_CONFIG_NET_CHECK_DHCP : NETWORK_RECEIVE_ACTIVE
+        CORE1_CONFIG_NET_WAIT_FOR_DHCP --> CORE1_CONFIG_NET : CONFIG_NET_DHCP_TIMEOUT
+        CORE1_CONFIG_NET_WAIT_FOR_DHCP --> CORE1_CONFIG_LOG_ACTIVE : LOG_START
+        CORE1_CONFIG_NET_CHECK_DHCP --> CORE1_CONFIG_COMPLETE : CONFIG_NET_GOT_DHCP
+        CORE1_CONFIG_NET_CHECK_DHCP --> CORE1_CONFIG_NET_WAIT_FOR_DHCP : CONFIG_NET_WAIT_DHCP
+        CORE1_CONFIG_LOG_ACTIVE --> CORE1_CONFIG_NET_WAIT_FOR_DHCP : LOG_END
+        CORE1_CONFIG_COMPLETE --> CORE1_CONFIG_IDLE : auto-transition
+    }
+    
+    state "Operational" as C1_Op {
+        state CORE1_IDLE
+        state CORE1_NET_ACTIVE_RECEIVE
+        state CORE1_NET_ACTIVE_SEND
+        state CORE1_NET_LINK_CHANGE
+        state CORE1_PERSISTENCE_ACTIVE
+        state CORE1_LOG_ACTIVE
+        
+        CORE1_IDLE --> CORE1_NET_ACTIVE_RECEIVE : NETWORK_RECEIVE_ACTIVE
+        CORE1_IDLE --> CORE1_NET_ACTIVE_SEND : NETWORK_SENDING_ACTIVE
+        CORE1_IDLE --> CORE1_NET_LINK_CHANGE : NETWORK_LINK_CHANGE_ACTIVE
+        CORE1_IDLE --> CORE1_PERSISTENCE_ACTIVE : PERSISTENCE_START
+        CORE1_IDLE --> CORE1_LOG_ACTIVE : LOG_START
+        
+        CORE1_NET_ACTIVE_RECEIVE --> CORE1_IDLE : NETWORK_RECEIVE_FINISHED
+        CORE1_NET_ACTIVE_SEND --> CORE1_IDLE : NETWORK_SENDING_FINISHED
+        CORE1_NET_LINK_CHANGE --> CORE1_IDLE : NETWORK_LINK_DOWN
+        CORE1_PERSISTENCE_ACTIVE --> CORE1_IDLE : PERSISTENCE_END
+        CORE1_LOG_ACTIVE --> CORE1_IDLE : LOG_END
+    }
+    
+    C1_Init --> C1_Config : Main state CONFIGURATION
+    C1_Config --> C1_Op : Main state OPERATIONAL
+    C1_Init --> CORE1_SHUTDOWN : INIT_ERROR
+}
 
-### Implementation Phases
+note top of Main : Uses doorbell wakeup\nfor cross-core synchronization
+note top of Core0 : Atomic variables\nISR-safe operations
+note top of Core1 : Complex network\nand maintenance states
 
-**Phase 1: Event-Driven State Machine Module**
-1. Create `state_machine.c/h` with event processing functions
-2. Implement atomic main state transitions with condition validation
-3. Implement ISR-safe sub-state transitions with condition validation
-4. Add comprehensive unit tests for event processing logic
-5. Document event types, conditions, and transition rules
+@enduml
+----
 
-**Phase 2: Core Main Loop Architecture**
-1. Modify `main.c` to launch both cores with dedicated entry points
-2. Create `core0_main.c` with UART processing and event-driven logic
-3. Create `core1_main.c` with network, persistence, and log processing
-4. Integrate event generation into existing control flow logic
-
-**Phase 3: System Integration**
-1. Integrate state machine initialization into system startup
-2. Add event-driven control logic for all major system components
-3. Implement error handling and recovery event generation
-4. Add comprehensive integration tests with both cores
-
-**Phase 4: Performance and Validation**
-1. Performance testing to ensure non-blocking event processing
-2. Stress testing with rapid event generation under load
-3. Validation of ISR-safe sub-state operations
-4. Documentation and final integration with existing systems
-
-### Test Strategy
-
-**Unit Tests (TDD Approach)**
-* Test event processing functions with all valid state/event combinations
-* Test condition checking functions with various system states
-* Test invalid event rejection and no-change scenarios
-* Test atomic state transitions with concurrent access
-* Test ISR-safe sub-state operations
-* Test state query functions for non-blocking behavior
-
-**Integration Tests**
-* Test dual-core launch and event-driven main loop operation
-* Test inter-core main state synchronization during event processing
-* Test ISR context sub-state operations during interrupt handling
-* Test error recovery and event processing during error conditions
-* Test performance impact on real-time UART and network operations
-
-**System Tests**
-* End-to-end testing of complete system with event-driven state transitions
-* Stress testing with rapid event generation and state changes
-* Validation of system behavior consistency across event-driven transitions
-* Long-running stability testing with continuous event processing
+This updated ADR-007 now accurately reflects the actual implemented state machine architecture with its complex initialization sequences, DHCP handling, and sophisticated cross-core coordination.

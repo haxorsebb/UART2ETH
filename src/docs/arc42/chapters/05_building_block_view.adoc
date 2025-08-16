@@ -129,7 +129,7 @@ The dual-core separation strategy from our solution approach drives this decompo
 |Manages secure firmware updates with A/B partition management, signature validation, and automatic rollback capabilities.
 
 |*Global State Machine*
-|Coordinates overall system state across both cores through shared main_state (16-bit) and per-core sub_states. Implements INIT, CONFIGURATION, OPERATIONAL, and ERROR states with atomic state transitions and validation. Provides state-driven control logic for core main loops without persisting state information.
+|Coordinates overall system state across both cores through shared main_state (atomic) and per-core sub_states. Implements complex initialization sequences (UART setup, persistence, logging, network), configuration phases (UART config, DHCP), and operational states. Uses event-driven transitions with condition validation, doorbell-based cross-core wakeup, and ISR-safe atomic variables. Provides deterministic state-driven control logic for core main loops.
 
 |*Log Manager*
 |Collects, formats, and stores system-wide events, errors, performance data, and diagnostic information from all components. Provides log rotation, filtering, and integration with management interface for diagnostics.
@@ -170,12 +170,12 @@ The dual-core separation strategy from our solution approach drives this decompo
 * **Configuration**: Per-channel baud rate, data bits, stop bits, parity settings
 
 ===== Global State Machine Interface
-* **Main States**: INIT, CONFIGURATION, OPERATIONAL, ERROR - shared 16-bit variable between cores
-* **Core0 Sub-States**: UART_IDLE, UART_ACTIVE, UART_ERROR - core-specific state machine
-* **Core1 Sub-States**: NET_IDLE, NET_CONNECTED, NET_ERROR, PERSISTENCE_ACTIVE, LOG_ACTIVE
-* **Transitions**: Atomic state changes with validation, no persistence of state information
-* **State-Driven Logic**: Core main loops query states to control their behavior and operations
-* **Synchronization**: Inter-core state coordination through volatile variables and memory barriers
+* **Main States**: INIT, CONFIGURATION, OPERATIONAL, ERROR - atomic variable with cross-core doorbell wakeup
+* **Core0 Sub-States**: Complex initialization (INIT_UART, INIT_COMPLETE, INIT_IDLE), configuration (CONFIG_UART, CONFIG_COMPLETE, CONFIG_IDLE), and operational (UART_IDLE, UART_ACTIVE, UART_ERROR) sequences
+* **Core1 Sub-States**: Multi-stage initialization (INIT_PERSISTENCE, INIT_LOGGING, INIT_NET, INIT_WAIT_FOR_LINK), DHCP configuration (CONFIG_NET_WAIT_FOR_DHCP, CONFIG_NET_CHECK_DHCP), and operational network/maintenance states
+* **Event-Driven Transitions**: All state changes via event processing with condition validation - no direct state setting
+* **Cross-Core Synchronization**: RP2350 multicore doorbells wake other core on main state changes
+* **ISR-Safe Operations**: Atomic variables for sub-states ensure interrupt compatibility
 
 ===== Logging Interface
 * **Log Levels**: DEBUG, INFO, WARN, ERROR, CRITICAL with configurable filtering
@@ -917,6 +917,152 @@ Core 1 manages diverse network and maintenance operations requiring various timi
 |*Expiration Calculator*
 |Finds minimum expiration time among active timers and programs hardware Timer Alarm 1 for next required interrupt. Handles varied timing scales from seconds to hours efficiently.
 |===
+
+==== Whitebox Global State Machine
+
+The Global State Machine provides event-driven coordination between cores through three independent state machines with atomic main state and ISR-safe sub-states.
+
+[plantuml, level2-state-machine-actual, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 2 - Global State Machine (Actual Implementation)
+
+cloud "Core 0 Main Loop\nEvent Generation\nState Queries" as CORE0
+cloud "Core 1 Main Loop\nEvent Generation\nState Queries" as CORE1
+cloud "Interrupt Handlers\nISR Context\nAtomic Access" as ISR
+cloud "RP2350 Doorbell System\nCross-Core Wakeup\nMain State Changes" as DOORBELL
+
+package "Global State Machine System" {
+    component "Main State Machine\nAtomic Variables\nCross-Core Coordination\nINIT → CONFIG → OPERATIONAL → ERROR" as MAIN_SM #lightcyan
+    
+    component "Core0 Sub-State Machine\nISR-Safe Atomic\nUART Processing States\nEvent-Driven Only" as CORE0_SM #lightgreen
+    
+    component "Core1 Sub-State Machine\nISR-Safe Atomic\nNetwork + Maintenance\nEvent-Driven Only" as CORE1_SM #lightblue
+    
+    component "Event Processing Engine\nCondition Validation\nTransition Logic\nNo Direct State Setting" as EVENT_ENGINE #lightyellow
+    
+    component "Condition Checker\nCross-Core Coordination\nState Validation\nTransition Guards" as CONDITIONS #lightpink
+    
+    component "Doorbell Manager\nWakeup Coordination\nMain State Changes\nCross-Core Signals" as DOORBELL_MGR #wheat
+}
+
+package "State Storage (Atomic)" {
+    component "g_main_state\n_Atomic main_state_t\nCross-Core Access" as MAIN_STATE #lightcyan
+    component "g_core0_substate\n_Atomic core0_substate_t\nISR-Safe" as CORE0_STATE #lightgreen
+    component "g_core1_substate\n_Atomic core1_substate_t\nISR-Safe" as CORE1_STATE #lightblue
+}
+
+' External connections
+CORE0 --> EVENT_ENGINE : Core0 Events\nstate_machine_process_core0_event()
+CORE1 --> EVENT_ENGINE : Core1 Events\nstate_machine_process_core1_event()
+CORE0 --> EVENT_ENGINE : Main Events\nstate_machine_process_main_event()
+CORE1 --> EVENT_ENGINE : Main Events\nstate_machine_process_main_event()
+
+CORE0 <-- MAIN_STATE : State Queries\nstate_machine_get_main_state()
+CORE1 <-- MAIN_STATE : State Queries\nstate_machine_get_main_state()
+CORE0 <-- CORE0_STATE : State Queries\nstate_machine_get_core0_substate()
+CORE1 <-- CORE1_STATE : State Queries\nstate_machine_get_core1_substate()
+
+ISR <-- CORE0_STATE : ISR-Safe Reads\nAtomic Access
+ISR <-- CORE1_STATE : ISR-Safe Reads\nAtomic Access
+
+DOORBELL_MGR <--> DOORBELL : Doorbell Operations\nmulticore_doorbell_*()
+
+' Internal connections
+EVENT_ENGINE --> MAIN_SM : Event Processing\nMain Events
+EVENT_ENGINE --> CORE0_SM : Event Processing\nCore0 Events  
+EVENT_ENGINE --> CORE1_SM : Event Processing\nCore1 Events
+
+MAIN_SM <--> CONDITIONS : Condition Checks\nCross-Core Validation
+CORE0_SM <--> CONDITIONS : Condition Checks\nUART Status
+CORE1_SM <--> CONDITIONS : Condition Checks\nNetwork Status
+
+MAIN_SM <--> MAIN_STATE : Atomic Updates\natomic_store()
+CORE0_SM <--> CORE0_STATE : Atomic Updates\natomic_store() 
+CORE1_SM <--> CORE1_STATE : Atomic Updates\natomic_store()
+
+MAIN_SM --> DOORBELL_MGR : Main State Changes\nWakeup Signal
+DOORBELL_MGR --> CORE0_SM : State Change Sync\nSubstate Updates
+DOORBELL_MGR --> CORE1_SM : State Change Sync\nSubstate Updates
+
+@enduml
+----
+
+===== Motivation
+
+The actual implementation uses sophisticated event-driven state machines with complex initialization and configuration sequences. Cross-core coordination through atomic variables and doorbell wakeup ensures deterministic behavior without blocking operations.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*Main State Machine*
+|Coordinates system-wide phases: INIT (hardware setup), CONFIGURATION (UART + DHCP), OPERATIONAL (normal operation), ERROR (recovery). Uses atomic variables and doorbell wakeup for cross-core synchronization.
+
+|*Core0 Sub-State Machine*
+|Manages UART-specific states: initialization sequence (INIT_UART → INIT_COMPLETE → INIT_IDLE), configuration sequence (CONFIG_UART → CONFIG_COMPLETE → CONFIG_IDLE), operational states (UART_IDLE ↔ UART_ACTIVE, error handling).
+
+|*Core1 Sub-State Machine*  
+|Handles network and maintenance: complex initialization (INIT_PERSISTENCE → INIT_LOGGING → INIT_NET → INIT_WAIT_FOR_LINK), DHCP configuration (CONFIG_NET_WAIT_FOR_DHCP ↔ CONFIG_NET_CHECK_DHCP), operational network/log/persistence states.
+
+|*Event Processing Engine*
+|Processes all state machine events through validation pattern: current_state + event + check_condition() → new_state. Prevents invalid transitions and ensures only valid state changes occur.
+
+|*Condition Checker*
+|Validates transition conditions including cross-core coordination checks (e.g., check_core0_initialization_complete(), check_core1_configuration_complete()) and hardware status validation.
+
+|*Doorbell Manager*
+|Manages RP2350 multicore doorbells for efficient cross-core wakeup when main state changes. Eliminates polling and provides immediate notification of state transitions.
+|===
+
+===== State Machine Implementation Details
+
+====== Initialization Sequence (Complex Multi-Stage)
+```c
+// Core0 initialization: CORE0_INIT_UART → CORE0_INIT_COMPLETE → CORE0_INIT_IDLE
+// Core1 initialization: CORE1_INIT_PERSISTENCE → CORE1_INIT_LOGGING → 
+//                       CORE1_INIT_NET → CORE1_INIT_WAIT_FOR_LINK → 
+//                       CORE1_INIT_COMPLETE → CORE1_INIT_IDLE
+// Condition: Both cores must reach IDLE before main state transitions to CONFIGURATION
+```
+
+====== Configuration Sequence (UART + DHCP)  
+```c
+// Core0 config: CORE0_CONFIG_UART → CORE0_CONFIG_COMPLETE → CORE0_CONFIG_IDLE
+// Core1 config: CORE1_CONFIG_NET → CORE1_CONFIG_NET_WAIT_FOR_DHCP ↔ 
+//               CORE1_CONFIG_NET_CHECK_DHCP → CORE1_CONFIG_COMPLETE → CORE1_CONFIG_IDLE
+// Condition: Both cores must complete configuration before main state transitions to OPERATIONAL
+```
+
+====== Cross-Core Coordination Example
+```c
+static bool check_core0_initialization_complete(void) {
+    return atomic_load(&g_initialized) &&
+           atomic_load(&g_main_state) == MAIN_STATE_INIT &&
+           (atomic_load(&g_core1_substate) == CORE1_INIT_IDLE) &&
+           (atomic_load(&g_core0_substate) == CORE0_INIT_COMPLETE || 
+            atomic_load(&g_core0_substate) == CORE0_INIT_IDLE);
+}
+```
+
+====== Event-Driven Interface
+```c
+// State queries (non-blocking, atomic reads)
+main_state_t state_machine_get_main_state(void);
+core0_substate_t state_machine_get_core0_substate(void); 
+core1_substate_t state_machine_get_core1_substate(void);
+
+// Event processing (ONLY way to change states)
+bool state_machine_process_main_event(main_state_event_t event);
+bool state_machine_process_core0_event(core0_event_t event);
+bool state_machine_process_core1_event(core1_event_t event);
+```
 
 === Level 3
 
