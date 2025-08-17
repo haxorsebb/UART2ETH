@@ -65,6 +65,7 @@ target_link_libraries(core_modules
     config_manager
     log_manager
     network_manager
+    tcp_socket_server
     timer_subsystems
     pico_stdlib
     pico_multicore

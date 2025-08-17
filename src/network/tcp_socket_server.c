@@ -425,58 +425,66 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
     if (!conn || !data || len == 0) {
         return 0;
     }
-    
+    char buf[1025];
+    if (len> 1024) {
+        len=1024;
+    }
+
+    memset(buf, 0x0, 1025);
+    memcpy(buf,data,len);
+
     // Update activity timestamp
     conn->last_activity_ms = to_ms_since_boot(get_absolute_time());
     
     int processed = 0;
-    
-    for (size_t i = 0; i < len; i++) {
-        char ch = data[i];
-        processed++;
-        
-        // Add character to line buffer with bounds checking
-        if (conn->line_pos < TCP_SERVER_LINE_BUFFER_SIZE - 1) {
-            conn->line_buffer[conn->line_pos++] = ch;
-        } else if (ch != '\n' && ch != '\r') {
-            // Buffer full, skip non-newline characters
-            continue;
-        }
-        
-        // Process complete line on newline
-        if (ch == '\n' || ch == '\r') {
-            if (conn->line_pos > 1) { // Skip empty lines
-                // Ensure null termination with bounds check
-                if (conn->line_pos < TCP_SERVER_LINE_BUFFER_SIZE) {
-                    conn->line_buffer[conn->line_pos] = '\0';
-                } else {
-                    conn->line_buffer[TCP_SERVER_LINE_BUFFER_SIZE - 1] = '\0';
-                }
-                
-                // Echo the line back
-                err_t err = tcp_write(conn->pcb, conn->line_buffer, conn->line_pos, TCP_WRITE_FLAG_COPY);
-                if (err == ERR_OK) {
-                    tcp_output(conn->pcb);
-                    g_server_stats.lines_processed++;
-                    
-                    DEBUG_ONLY({
-                        printf("TCP Server: Echoed line: %s", conn->line_buffer);
-                    });
-                } else {
-                    // Handle write error - close connection to prevent resource leak
-                    DEBUG_ONLY({
-                        printf("TCP Server: Write failed (err=%d), closing connection\n", err);
-                    });
-                    close_connection(conn);
-                    return processed; // Exit early since connection is closed
-                }
+    printf("incoming: %s", buf);
+    DEBUG_ONLY({
+        for (size_t i = 0; i < len; i++) {
+            char ch = data[i];
+            processed++;
+            
+            // Add character to line buffer with bounds checking
+            if (conn->line_pos < TCP_SERVER_LINE_BUFFER_SIZE - 1) {
+                conn->line_buffer[conn->line_pos++] = ch;
+            } else if (ch != '\n' && ch != '\r') {
+                // Buffer full, skip non-newline characters
+                continue;
             }
             
-            // Reset line buffer
-            conn->line_pos = 0;
-            memset(conn->line_buffer, 0, sizeof(conn->line_buffer));
+            // Process complete line on newline
+            if (ch == '\n' || ch == '\r') {
+                if (conn->line_pos > 1) { // Skip empty lines
+                    // Ensure null termination with bounds check
+                    if (conn->line_pos < TCP_SERVER_LINE_BUFFER_SIZE) {
+                        conn->line_buffer[conn->line_pos] = '\0';
+                    } else {
+                        conn->line_buffer[TCP_SERVER_LINE_BUFFER_SIZE - 1] = '\0';
+                    }
+                    
+                    // Echo the line back
+                    err_t err = tcp_write(conn->pcb, conn->line_buffer, conn->line_pos, TCP_WRITE_FLAG_COPY);
+                    if (err == ERR_OK) {
+                        tcp_output(conn->pcb);
+                        g_server_stats.lines_processed++;
+                        
+                        DEBUG_ONLY({
+                            printf("TCP Server: Echoed line: %s", conn->line_buffer);
+                        });
+                    } else {
+                        // Handle write error - close connection to prevent resource leak
+                        DEBUG_ONLY({
+                            printf("TCP Server: Write failed (err=%d), closing connection\n", err);
+                        });
+                        close_connection(conn);
+                        return processed; // Exit early since connection is closed
+                    }
+                }
+                
+                // Reset line buffer
+                conn->line_pos = 0;
+                memset(conn->line_buffer, 0, sizeof(conn->line_buffer));
+            }
         }
-    }
-    
+    });
     return processed;
 }
