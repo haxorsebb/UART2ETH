@@ -1,0 +1,104 @@
+:jbake-title: ADR-010: External Protocol Validation Tool
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 10
+:filename: /adrs/ADR-010-external-protocol-validation-tool.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+== ADR-010: External Protocol Validation Tool
+
+**Status:** Accepted
+
+**Date:** 2025-08-17
+
+**Context:** 
+
+The UART2ETH system implements a TCP socket server that bridges UART communication to network clients. The current system uses a simple line-based protocol (newline-delimited messages) for testing purposes. However, production deployments require a more sophisticated message protocol with specific validation requirements:
+
+- Valid message format: `#` + 4 hex digits + payload + `!\r\n`
+- Valid characters limited to: `0-9`, `A-F`, `#`, `!`, `\r`, `\n`
+- Maximum message length: 1024 bytes
+- Performance requirements: 500kBaud sustained throughput, <5ms latency
+- Reliability requirements: Message ordering, error detection, recovery testing
+
+The existing unit tests verify basic TCP server functionality, but lack comprehensive protocol validation and performance characterization. Integration testing currently relies on manual TCP client connections which are insufficient for:
+
+1. **Protocol Compliance Testing**: Systematic validation of message format adherence
+2. **Performance Benchmarking**: Sustained throughput measurement and latency analysis  
+3. **Stress Testing**: System behavior under load, overflow conditions, error scenarios
+4. **Regression Detection**: Automated validation of protocol changes and performance baselines
+5. **Edge Case Coverage**: Invalid message handling, concurrent connection behavior
+
+**Decision:**
+
+Create a sophisticated external TCP client test tool implemented in Python that systematically validates the UART2ETH TCP socket server implementation through comprehensive black-box testing.
+
+**Tool Characteristics:**
+
+- **External Implementation**: Python script running on development machine (not on target device)
+- **Network-Based Testing**: TCP client connections to UART2ETH ports 4001-4004
+- **Protocol Validation**: Comprehensive testing of hex-based message protocol compliance
+- **Performance Measurement**: Real-time throughput and latency analysis with statistical reporting
+- **Concurrent Operation**: Multi-connection, sustained testing capability
+- **Test Coverage**: Valid/invalid message scenarios, stress testing, error injection
+
+**Integration with Development Workflow:**
+
+- Automated testing capability for continuous integration
+- Correlation with target debug output via existing `persistent_uart_logger.sh`
+- Performance baseline establishment and regression detection
+- Protocol compliance certification for production releases
+
+**Alternatives Considered:**
+
+1. **Manual Testing**: Insufficient for systematic validation and performance measurement
+2. **Unit Test Extension**: Cannot provide realistic network conditions and end-to-end validation
+3. **Hardware-in-Loop Only**: Limited to specific hardware configurations, lacks protocol focus
+4. **Commercial Tools**: Lack protocol-specific validation and customization capabilities
+
+**Consequences:**
+
+**Positive:**
+- Comprehensive protocol validation reduces integration risks with external systems
+- Performance baseline establishment enables regression detection during development
+- Automated testing capability improves development velocity and quality assurance
+- Black-box testing approach validates actual system behavior under realistic conditions
+- Statistical analysis provides quantitative performance characteristics for documentation
+
+**Negative:**
+- Additional tool maintenance overhead and complexity
+- Python runtime dependency for testing infrastructure
+- Network connectivity requirements for test execution
+- Test execution time increases for comprehensive validation scenarios
+
+**Implementation Requirements:**
+
+1. **Test Message Generation**: Programmatic creation of valid/invalid message patterns
+2. **Concurrent TCP Connections**: Multi-channel testing with independent performance tracking
+3. **Statistical Analysis**: Round-trip time measurement, throughput calculation, percentile analysis
+4. **Error Scenario Testing**: Invalid message handling, connection interruption, recovery validation
+5. **Integration Hooks**: Coordination with existing logging and debug infrastructure
+
+**Success Criteria:**
+
+- Protocol compliance validation coverage: 100% of message format specifications
+- Performance characterization: Sustained 500kBaud measurement with <5ms latency verification
+- Error handling coverage: Comprehensive invalid message and failure scenario testing
+- Automation integration: Executable as part of continuous integration pipeline
+- Documentation output: Statistical reports and performance baselines for system documentation
+
+**Related Decisions:**
+
+- ADR-003: Programming Language Selection (Python for tooling consistency)
+- ADR-007: State Machine Architecture (validation of state transitions under load)
+- ADR-005: Buffer Allocation Strategy (stress testing of ring buffer overflow conditions)
+
+**References:**
+
+- Chapter 01: Quality Goals - Performance and Reliability requirements
+- Chapter 03: Technical Context - TCP Socket Interface specifications  
+- Chapter 06: Runtime View - Network Connection Handling scenarios
+- Chapter 11: Technical Risks - Protocol implementation and performance risks
