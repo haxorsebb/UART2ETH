@@ -878,6 +878,125 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 </ul>
 </div>
 </div>
+<div class="sect3">
+<h4 id="_protocol_validation_tool_architecture">Protocol Validation Tool Architecture</h4>
+<div class="paragraph">
+<p><strong>Implementation Structure</strong></p>
+</div>
+<div class="paragraph">
+<p>The external protocol validation tool implements a modular Python-based architecture using asyncio for concurrent TCP connections and comprehensive testing capabilities:</p>
+</div>
+<div class="listingblock">
+<div class="title">Tool Architecture Overview</div>
+<div class="content">
+<pre class="prettyprint highlight"><code>uart2eth_protocol_validator.py          # Main entry point
+├── protocol/
+│   ├── message_generator.py            # Creates test messages
+│   ├── validator.py                    # Validates protocol compliance
+│   └── formats.py                      # Message format definitions
+├── networking/
+│   ├── tcp_client.py                   # TCP connection management
+│   ├── connection_pool.py              # Manages multiple connections
+│   └── async_handler.py                # Async message handling
+├── testing/
+│   ├── test_scenarios.py               # Different test scenario implementations
+│   ├── stress_tester.py                # Stress testing logic
+│   └── performance_monitor.py          # Performance measurement
+├── statistics/
+│   ├── metrics_collector.py            # Collects performance data
+│   ├── reporter.py                     # Generates reports
+│   └── baseline_manager.py             # Handles baseline comparison
+└── utils/
+    ├── config_parser.py                # Command line argument handling
+    └── logger.py                       # Logging setup</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Core Components</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Protocol Layer</strong>: Message generation and validation according to '#' + 4_hex_digits + payload + '!\r\n' format</p>
+</li>
+<li>
+<p><strong>Networking Layer</strong>: Asyncio-based TCP client management with concurrent connection handling</p>
+</li>
+<li>
+<p><strong>Testing Layer</strong>: Configurable test scenarios for compliance, performance, and stress testing</p>
+</li>
+<li>
+<p><strong>Statistics Layer</strong>: Real-time metrics collection, statistical analysis, and reporting</p>
+</li>
+<li>
+<p><strong>Utilities Layer</strong>: Configuration management and structured logging</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Message Generation Strategy</strong></p>
+</div>
+<div class="paragraph">
+<p>The tool generates comprehensive test message categories:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Minimal Messages</strong>: '#0000!\r\n' to '#FFFF!\r\n' (systematic hex digit coverage)</p>
+</li>
+<li>
+<p><strong>Variable Payload</strong>: Messages with 8-1024 byte total lengths for size testing</p>
+</li>
+<li>
+<p><strong>Protocol Violations</strong>: Invalid characters, wrong format, length violations for error testing</p>
+</li>
+<li>
+<p><strong>Stress Patterns</strong>: High-frequency, concurrent, and sustained transmission patterns</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Performance Measurement Framework</strong></p>
+</div>
+<div class="paragraph">
+<p>Real-time statistical collection provides quantitative validation:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Round-trip Time Measurement</strong>: High-precision timing using time.perf_counter()</p>
+</li>
+<li>
+<p><strong>Throughput Calculation</strong>: Sustained kbytes/s measurement across all connections</p>
+</li>
+<li>
+<p><strong>Latency Analysis</strong>: Min/median/P95/P99/max statistical distribution</p>
+</li>
+<li>
+<p><strong>Connection Reliability</strong>: Drop/reconnect counting and recovery time measurement</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Integration with Development Infrastructure</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>UART Logger Coordination</strong>: Synchronization with persistent_uart_logger.sh for debug correlation</p>
+</li>
+<li>
+<p><strong>Baseline Management</strong>: Performance regression detection through saved baseline comparison</p>
+</li>
+<li>
+<p><strong>CI/CD Integration</strong>: Exit code reporting for automated build validation</p>
+</li>
+<li>
+<p><strong>Export Capabilities</strong>: JSON/CSV/human-readable output formats for different use cases</p>
+</li>
+</ul>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_performance_optimization">Performance Optimization</h3>
