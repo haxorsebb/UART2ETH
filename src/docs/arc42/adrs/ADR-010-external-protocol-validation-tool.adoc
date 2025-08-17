@@ -74,21 +74,139 @@ Create a sophisticated external TCP client test tool implemented in Python that 
 - Network connectivity requirements for test execution
 - Test execution time increases for comprehensive validation scenarios
 
+**Tool Specifications:**
+
+**Command Line Interface:**
+```bash
+python3 uart2eth_protocol_validator.py [OPTIONS] TARGET_IP [TARGET_PORTS...]
+
+Options:
+  --duration SECONDS        Test duration in seconds (default: 60)
+  --throughput KBPS        Target throughput in kbps (default: 500) 
+  --concurrent-connections N  Number of concurrent connections per port (default: 1)
+  --test-scenarios LIST    Comma-separated test scenarios (default: all)
+  --message-sizes RANGE    Message size range: min:max:step (default: 8:1024:100)
+  --invalid-ratio PERCENT  Percentage of invalid messages (default: 10)
+  --output-format FORMAT   Output format: json|csv|human (default: human)
+  --statistics-interval N  Statistics reporting interval in seconds (default: 10)
+  --log-level LEVEL       Logging level: debug|info|warn|error (default: info)
+  --save-results FILE     Save detailed results to file
+  --baseline-file FILE    Compare against baseline results
+```
+
+**Message Protocol Implementation:**
+```
+Valid Message Format: '#' + 4_hex_digits + payload + '!\r\n'
+Valid Characters:     '0'-'9', 'A'-'F', '#', '!', '\r', '\n'  
+Maximum Length:       1024 bytes total message length
+Minimum Length:       8 bytes ('#1234!\r\n')
+
+Test Message Categories:
+  - minimal:     '#0000!\r\n' to '#FFFF!\r\n' 
+  - medium:      Messages with 64-512 byte payloads
+  - maximum:     Messages approaching 1024 byte limit
+  - random:      Random sizes within valid range
+  - invalid:     Various protocol violations for error testing
+```
+
+**Statistical Output Format:**
+```
+Performance Metrics:
+  - Throughput: Current/Average/Peak (kbytes/s)
+  - Latency: Min/Median/P95/P99/Max round-trip time (ms)
+  - Message Statistics: Sent/Received/Lost/Invalid counts
+  - Connection Status: Active/Dropped/Reconnected per port
+  - Error Analysis: Protocol violations, timeout events, recovery times
+```
+
 **Implementation Requirements:**
 
 1. **Test Message Generation**: Programmatic creation of valid/invalid message patterns
-2. **Concurrent TCP Connections**: Multi-channel testing with independent performance tracking
+2. **Concurrent TCP Connections**: Multi-channel testing with independent performance tracking  
 3. **Statistical Analysis**: Round-trip time measurement, throughput calculation, percentile analysis
 4. **Error Scenario Testing**: Invalid message handling, connection interruption, recovery validation
 5. **Integration Hooks**: Coordination with existing logging and debug infrastructure
+6. **Real-time Monitoring**: Live statistics display with configurable reporting intervals
+7. **Baseline Comparison**: Performance regression detection against saved baselines
+8. **Export Capabilities**: Machine-readable output for CI integration
+
+**Usage Examples:**
+
+**Example 1: Basic Protocol Compliance Validation**
+```bash
+# Test all message format variations on single port
+python3 uart2eth_protocol_validator.py \
+    --test-scenarios compliance \
+    --duration 300 \
+    --message-sizes 8:1024:64 \
+    --invalid-ratio 20 \
+    --output-format json \
+    --save-results compliance_test_$(date +%Y%m%d_%H%M%S).json \
+    10.10.10.10 4001
+
+Expected Output:
+  Protocol Compliance: 2,847 valid messages processed
+  Invalid Handling: 712 invalid messages correctly rejected  
+  Format Coverage: 100% (all size ranges, all hex combinations)
+  Error Rate: 0% (no unexpected failures)
+  Test Duration: 300 seconds
+```
+
+**Example 2: Performance Benchmarking - Sustained Throughput**
+```bash
+# Measure sustained 500kBaud performance across all UART channels
+python3 uart2eth_protocol_validator.py \
+    --test-scenarios performance \
+    --duration 3600 \
+    --throughput 500 \
+    --concurrent-connections 2 \
+    --statistics-interval 30 \
+    --baseline-file baseline_500kbaud.json \
+    --save-results performance_$(hostname)_$(date +%Y%m%d_%H%M%S).json \
+    10.10.10.10 4001 4002 4003 4004
+
+Expected Output:
+  Sustained Throughput: 487.3 kbps (97.5% of target)
+  Peak Throughput: 523.1 kbps  
+  Average Latency: 3.2ms (64% under 5ms target)
+  P99 Latency: 4.8ms
+  Total Messages: 1,847,293 sent, 1,847,293 received
+  Packet Loss: 0%
+  Baseline Comparison: +2.1% improvement over baseline
+```
+
+**Example 3: Stress Testing - Concurrent Load with Error Injection**
+```bash
+# Stress test with connection drops, invalid messages, and recovery
+python3 uart2eth_protocol_validator.py \
+    --test-scenarios stress,error_injection \
+    --duration 1800 \
+    --concurrent-connections 4 \
+    --throughput 600 \
+    --invalid-ratio 15 \
+    --message-sizes 8:1024:random \
+    --log-level debug \
+    --save-results stress_test_$(date +%Y%m%d_%H%M%S).json \
+    10.10.10.10 4001 4002 4003
+
+Expected Output:
+  Connection Events: 23 drops, 23 successful reconnections
+  Recovery Time: Avg 1.2s, Max 3.4s
+  Message Ordering: 100% maintained during reconnections
+  Invalid Message Handling: 2,847 rejected correctly
+  System Stability: No unexpected errors or hangs
+  Memory Usage: Stable over 30-minute test duration
+  Error Injection Results: All scenarios handled gracefully
+```
 
 **Success Criteria:**
 
 - Protocol compliance validation coverage: 100% of message format specifications
-- Performance characterization: Sustained 500kBaud measurement with <5ms latency verification
+- Performance characterization: Sustained 500kBaud measurement with <5ms latency verification  
 - Error handling coverage: Comprehensive invalid message and failure scenario testing
 - Automation integration: Executable as part of continuous integration pipeline
 - Documentation output: Statistical reports and performance baselines for system documentation
+- Regression detection: Baseline comparison with configurable tolerance thresholds
 
 **Related Decisions:**
 
