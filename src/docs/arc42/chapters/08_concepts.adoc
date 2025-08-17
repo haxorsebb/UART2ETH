@@ -466,6 +466,70 @@ External testing directly addresses key technical risks:
 * **Concurrency Issues**: Multi-connection testing reveals race conditions and resource conflicts
 * **Error Handling Gaps**: Invalid message testing ensures robust error recovery
 
+==== Protocol Validation Tool Architecture
+
+**Implementation Structure**
+
+The external protocol validation tool implements a modular Python-based architecture using asyncio for concurrent TCP connections and comprehensive testing capabilities:
+
+.Tool Architecture Overview
+[source]
+----
+uart2eth_protocol_validator.py          # Main entry point
+├── protocol/
+│   ├── message_generator.py            # Creates test messages
+│   ├── validator.py                    # Validates protocol compliance
+│   └── formats.py                      # Message format definitions
+├── networking/
+│   ├── tcp_client.py                   # TCP connection management
+│   ├── connection_pool.py              # Manages multiple connections
+│   └── async_handler.py                # Async message handling
+├── testing/
+│   ├── test_scenarios.py               # Different test scenario implementations
+│   ├── stress_tester.py                # Stress testing logic
+│   └── performance_monitor.py          # Performance measurement
+├── statistics/
+│   ├── metrics_collector.py            # Collects performance data
+│   ├── reporter.py                     # Generates reports
+│   └── baseline_manager.py             # Handles baseline comparison
+└── utils/
+    ├── config_parser.py                # Command line argument handling
+    └── logger.py                       # Logging setup
+----
+
+**Core Components**
+
+* **Protocol Layer**: Message generation and validation according to '#' + 4_hex_digits + payload + '!\r\n' format
+* **Networking Layer**: Asyncio-based TCP client management with concurrent connection handling
+* **Testing Layer**: Configurable test scenarios for compliance, performance, and stress testing
+* **Statistics Layer**: Real-time metrics collection, statistical analysis, and reporting
+* **Utilities Layer**: Configuration management and structured logging
+
+**Message Generation Strategy**
+
+The tool generates comprehensive test message categories:
+
+* **Minimal Messages**: '#0000!\r\n' to '#FFFF!\r\n' (systematic hex digit coverage)
+* **Variable Payload**: Messages with 8-1024 byte total lengths for size testing
+* **Protocol Violations**: Invalid characters, wrong format, length violations for error testing
+* **Stress Patterns**: High-frequency, concurrent, and sustained transmission patterns
+
+**Performance Measurement Framework**
+
+Real-time statistical collection provides quantitative validation:
+
+* **Round-trip Time Measurement**: High-precision timing using time.perf_counter()
+* **Throughput Calculation**: Sustained kbytes/s measurement across all connections
+* **Latency Analysis**: Min/median/P95/P99/max statistical distribution
+* **Connection Reliability**: Drop/reconnect counting and recovery time measurement
+
+**Integration with Development Infrastructure**
+
+* **UART Logger Coordination**: Synchronization with persistent_uart_logger.sh for debug correlation
+* **Baseline Management**: Performance regression detection through saved baseline comparison
+* **CI/CD Integration**: Exit code reporting for automated build validation
+* **Export Capabilities**: JSON/CSV/human-readable output formats for different use cases
+
 === Performance Optimization
 
 ==== Buffer Management
