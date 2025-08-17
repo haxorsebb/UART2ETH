@@ -213,7 +213,7 @@
     <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link " href="../../arc42/adrs/ADR-008-hardware-pin-configuration.html"><span>arc42</span></a>
+                <a class="nav-link " href="../../arc42/adrs/ADR-010-external-protocol-validation-tool.html"><span>arc42</span></a>
             </li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
@@ -263,6 +263,11 @@
                         <ul class="td-sidebar-nav__section ul-0">
 <details id="d8b6e4f467a2500cfc57e1e4bb7bb7114"><summary><span class="label">adrs</span></summary>
                         <ul class="ul-1">
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/adrs/ADR-010-external-protocol-validation-tool.html" title="ADR-010: External Protocol Validation Tool">ADR-010: External Protocol Validation Tool</a>
+                                
+                            </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/adrs/ADR-008-hardware-pin-configuration.html" title="ADR-008: Hardware Pin Configuration Update">ADR-008: Hardware Pin Configuration Update</a>
@@ -370,6 +375,7 @@
 <li><a href="#_error_handling_strategy">Error Handling Strategy</a></li>
 <li><a href="#_security_architecture">Security Architecture</a></li>
 <li><a href="#_configuration_management">Configuration Management</a></li>
+<li><a href="#_testing_and_validation_strategy">Testing and Validation Strategy</a></li>
 <li><a href="#_performance_optimization">Performance Optimization</a></li>
 </ul>
 </li>
@@ -650,6 +656,226 @@ Output packets:
 * Corrupted pages detected via SHA256 mismatch
 * Fallback to previous valid page if available
 * Complete factory reset if no valid pages found</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_testing_and_validation_strategy">Testing and Validation Strategy</h3>
+<div class="paragraph">
+<p>The UART2ETH system requires comprehensive validation to ensure protocol compliance, performance characteristics, and reliability under various operating conditions. This is achieved through a multi-layered testing approach combining unit tests, integration tests, and external black-box validation.</p>
+</div>
+<div class="sect3">
+<h4 id="_external_protocol_validation">External Protocol Validation</h4>
+<div class="paragraph">
+<p><strong>Black-Box Testing Approach</strong></p>
+</div>
+<div class="paragraph">
+<p>External validation uses network-based TCP clients to test the system from the perspective of real-world applications. This approach validates:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Protocol compliance with message format specifications</p>
+</li>
+<li>
+<p>End-to-end performance under realistic network conditions</p>
+</li>
+<li>
+<p>System behavior under stress and error conditions</p>
+</li>
+<li>
+<p>Regression detection across firmware updates</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Protocol Validation Coverage</strong></p>
+</div>
+<div class="paragraph">
+<p>The validation strategy addresses the complete protocol specification:</p>
+</div>
+<div class="listingblock">
+<div class="title">Protocol Format Validation</div>
+<div class="content">
+<pre class="prettyprint highlight"><code>Valid Message Format: '#' + 4_hex_digits + payload + '!\r\n'
+Valid Characters:     '0'-'9', 'A'-'F', '#', '!', '\r', '\n'
+Maximum Length:       1024 bytes total message length
+
+Example Valid Messages:
+  #1234!\r\n                    (minimal valid message)
+  #ABCD&lt;payload_content&gt;!\r\n   (message with payload)
+  #0000&lt;958_byte_payload&gt;!\r\n  (maximum length message)
+
+Invalid Message Examples:
+  $1234!\r\n                    (invalid start character)
+  #123!\r\n                     (insufficient hex digits)
+  #1234&lt;payload&gt;!\n             (missing \r before \n)
+  #1234&lt;1025_byte_total&gt;!\r\n   (exceeds maximum length)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Test Scenario Categories</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Compliance Testing</strong></p>
+<div class="ulist">
+<ul>
+<li>
+<p>Valid message format verification</p>
+</li>
+<li>
+<p>Invalid message rejection testing</p>
+</li>
+<li>
+<p>Character set validation</p>
+</li>
+<li>
+<p>Length limit enforcement</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>Performance Testing</strong></p>
+<div class="ulist">
+<ul>
+<li>
+<p>Sustained throughput measurement (target: 500kBaud)</p>
+</li>
+<li>
+<p>Latency analysis (target: &lt;5ms end-to-end)</p>
+</li>
+<li>
+<p>Concurrent connection handling</p>
+</li>
+<li>
+<p>Load saturation testing</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>Reliability Testing</strong></p>
+<div class="ulist">
+<ul>
+<li>
+<p>Message ordering verification</p>
+</li>
+<li>
+<p>Connection recovery testing</p>
+</li>
+<li>
+<p>Error injection scenarios</p>
+</li>
+<li>
+<p>Long-duration stability testing</p>
+</li>
+</ul>
+</div>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Statistical Analysis Framework</strong></p>
+</div>
+<div class="paragraph">
+<p>External validation tools provide quantitative assessment:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Throughput Metrics</strong>: kbytes/s sustained transfer rates</p>
+</li>
+<li>
+<p><strong>Latency Analysis</strong>: Minimum, median, maximum round-trip times</p>
+</li>
+<li>
+<p><strong>Reliability Metrics</strong>: Message delivery success rates, ordering compliance</p>
+</li>
+<li>
+<p><strong>Error Characterization</strong>: Invalid message handling, recovery time measurement</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_integration_with_development_workflow">Integration with Development Workflow</h4>
+<div class="paragraph">
+<p><strong>Continuous Validation</strong></p>
+</div>
+<div class="paragraph">
+<p>External testing tools integrate with the development process:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Automated execution as part of build validation</p>
+</li>
+<li>
+<p>Performance baseline establishment and regression detection</p>
+</li>
+<li>
+<p>Protocol compliance certification for release candidates</p>
+</li>
+<li>
+<p>Cross-reference with target debug output for failure analysis</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Test Environment Configuration</strong></p>
+</div>
+<div class="listingblock">
+<div class="title">Network Test Setup</div>
+<div class="content">
+<pre class="prettyprint highlight"><code>Development Machine:  10.10.10.11 (TCP client)
+UART2ETH Target:      10.10.10.10 (TCP server)
+Test Ports:           4001-4004 (UART channels 0-3)
+Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Validation Tool Characteristics</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Multi-connection Testing</strong>: Concurrent validation across all UART channels</p>
+</li>
+<li>
+<p><strong>Configurable Test Scenarios</strong>: Parameterized test execution for different validation focuses</p>
+</li>
+<li>
+<p><strong>Real-time Statistics</strong>: Live performance monitoring during test execution</p>
+</li>
+<li>
+<p><strong>Correlation Capability</strong>: Cross-reference with target debug logs for comprehensive analysis</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_risk_mitigation_through_external_validation">Risk Mitigation Through External Validation</h4>
+<div class="paragraph">
+<p>External testing directly addresses key technical risks:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Protocol Implementation Risks</strong>: Systematic format validation prevents integration failures</p>
+</li>
+<li>
+<p><strong>Performance Regression</strong>: Baseline comparison detects degradation during development</p>
+</li>
+<li>
+<p><strong>Concurrency Issues</strong>: Multi-connection testing reveals race conditions and resource conflicts</p>
+</li>
+<li>
+<p><strong>Error Handling Gaps</strong>: Invalid message testing ensures robust error recovery</p>
+</li>
+</ul>
 </div>
 </div>
 </div>

@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/chapters/about-arc42.html -->
+    <!-- sourceuri: arc42/adrs/ADR-010-external-protocol-validation-tool.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>about-arc42.adoc</title>
+    <title>ADR-010: External Protocol Validation Tool</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -213,11 +213,11 @@
     <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link " href="../../arc42/adrs/ADR-010-external-protocol-validation-tool.html"><span>arc42</span></a>
+                <a class="nav-link active" href="../../arc42/adrs/ADR-010-external-protocol-validation-tool.html"><span>arc42</span></a>
             </li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link " href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+                <a class="nav-link active" href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
             </li>
 
         </ul>
@@ -264,7 +264,7 @@
 <details id="d8b6e4f467a2500cfc57e1e4bb7bb7114"><summary><span class="label">adrs</span></summary>
                         <ul class="ul-1">
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../../arc42/adrs/ADR-010-external-protocol-validation-tool.html" title="ADR-010: External Protocol Validation Tool">ADR-010: External Protocol Validation Tool</a>
                                 
                             </li>
@@ -354,18 +354,24 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/chapters/about-arc42.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-010-external-protocol-validation-tool.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27about-arc42.adoc%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/chapters/about-arc42.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-010%3A+External+Protocol+Validation+Tool%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-010-external-protocol-validation-tool.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
 
         <hr />
 
-        
+        <div id="toc" class="toc">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel1">
+<li><a href="#_adr_010_external_protocol_validation_tool">ADR-010: External Protocol Validation Tool</a></li>
+</ul>
+</div>
+
 
 
 
@@ -385,18 +391,229 @@
     <div class="td-content">
         <p>
             
+<div class="sect1">
+<h2 id="_adr_010_external_protocol_validation_tool">ADR-010: External Protocol Validation Tool</h2>
+<div class="sectionbody">
 <div class="paragraph">
-<p><strong>About arc42</strong></p>
-</div>
-<div class="paragraph lead">
-<p>arc42, the template for documentation of software and system architecture.</p>
-</div>
-<div class="paragraph">
-<p>Template Version {revnumber}. {revremark}, {revdate}</p>
+<p><strong>Status:</strong> Accepted</p>
 </div>
 <div class="paragraph">
-<p>Created, maintained and &#169; by Dr. Peter Hruschka, Dr. Gernot Starke and contributors.
-See <a href="https://arc42.org" class="bare">https://arc42.org</a>.</p>
+<p><strong>Date:</strong> 2025-08-17</p>
+</div>
+<div class="paragraph">
+<p><strong>Context:</strong></p>
+</div>
+<div class="paragraph">
+<p>The UART2ETH system implements a TCP socket server that bridges UART communication to network clients. The current system uses a simple line-based protocol (newline-delimited messages) for testing purposes. However, production deployments require a more sophisticated message protocol with specific validation requirements:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Valid message format: <code>#</code> + 4 hex digits + payload + <code>!\r\n</code></p>
+</li>
+<li>
+<p>Valid characters limited to: <code>0-9</code>, <code>A-F</code>, <code>#</code>, <code>!</code>, <code>\r</code>, <code>\n</code></p>
+</li>
+<li>
+<p>Maximum message length: 1024 bytes</p>
+</li>
+<li>
+<p>Performance requirements: 500kBaud sustained throughput, &lt;5ms latency</p>
+</li>
+<li>
+<p>Reliability requirements: Message ordering, error detection, recovery testing</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The existing unit tests verify basic TCP server functionality, but lack comprehensive protocol validation and performance characterization. Integration testing currently relies on manual TCP client connections which are insufficient for:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Protocol Compliance Testing</strong>: Systematic validation of message format adherence</p>
+</li>
+<li>
+<p><strong>Performance Benchmarking</strong>: Sustained throughput measurement and latency analysis</p>
+</li>
+<li>
+<p><strong>Stress Testing</strong>: System behavior under load, overflow conditions, error scenarios</p>
+</li>
+<li>
+<p><strong>Regression Detection</strong>: Automated validation of protocol changes and performance baselines</p>
+</li>
+<li>
+<p><strong>Edge Case Coverage</strong>: Invalid message handling, concurrent connection behavior</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Decision:</strong></p>
+</div>
+<div class="paragraph">
+<p>Create a sophisticated external TCP client test tool implemented in Python that systematically validates the UART2ETH TCP socket server implementation through comprehensive black-box testing.</p>
+</div>
+<div class="paragraph">
+<p><strong>Tool Characteristics:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>External Implementation</strong>: Python script running on development machine (not on target device)</p>
+</li>
+<li>
+<p><strong>Network-Based Testing</strong>: TCP client connections to UART2ETH ports 4001-4004</p>
+</li>
+<li>
+<p><strong>Protocol Validation</strong>: Comprehensive testing of hex-based message protocol compliance</p>
+</li>
+<li>
+<p><strong>Performance Measurement</strong>: Real-time throughput and latency analysis with statistical reporting</p>
+</li>
+<li>
+<p><strong>Concurrent Operation</strong>: Multi-connection, sustained testing capability</p>
+</li>
+<li>
+<p><strong>Test Coverage</strong>: Valid/invalid message scenarios, stress testing, error injection</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Integration with Development Workflow:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Automated testing capability for continuous integration</p>
+</li>
+<li>
+<p>Correlation with target debug output via existing <code>persistent_uart_logger.sh</code></p>
+</li>
+<li>
+<p>Performance baseline establishment and regression detection</p>
+</li>
+<li>
+<p>Protocol compliance certification for production releases</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Alternatives Considered:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Manual Testing</strong>: Insufficient for systematic validation and performance measurement</p>
+</li>
+<li>
+<p><strong>Unit Test Extension</strong>: Cannot provide realistic network conditions and end-to-end validation</p>
+</li>
+<li>
+<p><strong>Hardware-in-Loop Only</strong>: Limited to specific hardware configurations, lacks protocol focus</p>
+</li>
+<li>
+<p><strong>Commercial Tools</strong>: Lack protocol-specific validation and customization capabilities</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Consequences:</strong></p>
+</div>
+<div class="paragraph">
+<p><strong>Positive:</strong>
+- Comprehensive protocol validation reduces integration risks with external systems
+- Performance baseline establishment enables regression detection during development
+- Automated testing capability improves development velocity and quality assurance
+- Black-box testing approach validates actual system behavior under realistic conditions
+- Statistical analysis provides quantitative performance characteristics for documentation</p>
+</div>
+<div class="paragraph">
+<p><strong>Negative:</strong>
+- Additional tool maintenance overhead and complexity
+- Python runtime dependency for testing infrastructure
+- Network connectivity requirements for test execution
+- Test execution time increases for comprehensive validation scenarios</p>
+</div>
+<div class="paragraph">
+<p><strong>Implementation Requirements:</strong></p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Test Message Generation</strong>: Programmatic creation of valid/invalid message patterns</p>
+</li>
+<li>
+<p><strong>Concurrent TCP Connections</strong>: Multi-channel testing with independent performance tracking</p>
+</li>
+<li>
+<p><strong>Statistical Analysis</strong>: Round-trip time measurement, throughput calculation, percentile analysis</p>
+</li>
+<li>
+<p><strong>Error Scenario Testing</strong>: Invalid message handling, connection interruption, recovery validation</p>
+</li>
+<li>
+<p><strong>Integration Hooks</strong>: Coordination with existing logging and debug infrastructure</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p><strong>Success Criteria:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Protocol compliance validation coverage: 100% of message format specifications</p>
+</li>
+<li>
+<p>Performance characterization: Sustained 500kBaud measurement with &lt;5ms latency verification</p>
+</li>
+<li>
+<p>Error handling coverage: Comprehensive invalid message and failure scenario testing</p>
+</li>
+<li>
+<p>Automation integration: Executable as part of continuous integration pipeline</p>
+</li>
+<li>
+<p>Documentation output: Statistical reports and performance baselines for system documentation</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Related Decisions:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>ADR-003: Programming Language Selection (Python for tooling consistency)</p>
+</li>
+<li>
+<p>ADR-007: State Machine Architecture (validation of state transitions under load)</p>
+</li>
+<li>
+<p>ADR-005: Buffer Allocation Strategy (stress testing of ring buffer overflow conditions)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>References:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Chapter 01: Quality Goals - Performance and Reliability requirements</p>
+</li>
+<li>
+<p>Chapter 03: Technical Context - TCP Socket Interface specifications</p>
+</li>
+<li>
+<p>Chapter 06: Runtime View - Network Connection Handling scenarios</p>
+</li>
+<li>
+<p>Chapter 11: Technical Risks - Protocol implementation and performance risks</p>
+</li>
+</ul>
+</div>
+</div>
 </div>
         </p>
 
@@ -425,11 +642,11 @@ See <a href="https://arc42.org" class="bare">https://arc42.org</a>.</p>
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27about-arc42.adoc%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/chapters/about-arc42.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-010%3A+External+Protocol+Validation+Tool%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-010-external-protocol-validation-tool.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27about-arc42.adoc%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/chapters/about-arc42.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-010%3A+External+Protocol+Validation+Tool%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-010-external-protocol-validation-tool.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
