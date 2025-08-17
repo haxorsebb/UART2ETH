@@ -37,7 +37,7 @@ void setUp(void) {
     TEST_ASSERT_TRUE(network_manager_init(&test_config));
     
     // Wait for network ready
-    int timeout = 100;
+    int timeout = 300;  //wait 30 seconds
     while (network_manager_get_status() != NETWORK_STATUS_READY && timeout-- > 0) {
         network_manager_process();
         sleep_ms(100);

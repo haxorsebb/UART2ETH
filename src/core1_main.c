@@ -26,6 +26,7 @@
 #include "log_manager.h"
 #include "network/network_manager.h"
 #include "network/enc28j60_driver.h"
+#include "network/tcp_socket_server.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/timer.h"
@@ -513,6 +514,58 @@ static void core1_check_dhcp_status(void) {
 static void core1_configuration_complete(void) {
     
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 3);
+    
+    // DEBUG: Always log network status and try TCP init regardless
+    network_status_t net_status = network_manager_get_status();
+    DEBUG_ONLY({
+        printf("Core1: Network status = %d\n", net_status);
+    });
+    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, net_status);
+    
+    // Try to get IP address regardless of status
+    simple_ip_addr_t ip_addr;
+    bool has_ip = network_manager_get_ip_address(&ip_addr);
+    DEBUG_ONLY({
+        printf("Core1: Has IP address = %d\n", has_ip);
+    });
+    
+    if (has_ip) {
+        char ip_str[16];
+        network_manager_ip_to_string(&ip_addr, ip_str);
+        DEBUG_ONLY({
+            printf("Core1: Device IP address: %s\n", ip_str);
+        });
+        
+        // Log IP components as individual events for debugging
+        uint32_t addr = ip_addr.addr;
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, (addr >> 0) & 0xFF);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, (addr >> 8) & 0xFF);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, (addr >> 16) & 0xFF);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, (addr >> 24) & 0xFF);
+        
+        // Force TCP server init if we have IP (regardless of network status)
+        DEBUG_ONLY({
+            printf("Core1: Forcing TCP socket server init on port 4001\n");
+        });
+        
+        if (tcp_socket_server_init(4001)) {
+            DEBUG_ONLY({
+                printf("Core1: TCP socket server initialized successfully\n");
+            });
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 4001);
+        } else {
+            DEBUG_ONLY({
+                printf("Core1: TCP socket server initialization failed\n");
+            });
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 4001);
+        }
+    } else {
+        DEBUG_ONLY({
+            printf("Core1: No IP address available, skipping TCP server init\n");
+        });
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 999);
+    }
+    
     // Transition to operational phase
     // Transition to configuration phase
     state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE1);
@@ -577,6 +630,7 @@ static void core1_process_network_connectivity_down(void) {
  */
 static void core1_process_network(void) {
     static uint32_t call_counter = 0;
+    static uint32_t tcp_debug_counter = 0;
     call_counter++;
     
     DEBUG_ONLY({
@@ -585,6 +639,27 @@ static void core1_process_network(void) {
         }
     });
     network_manager_process();
+    
+    // Process TCP socket server (handle connections, data)
+    tcp_socket_server_process();
+    
+    // Debug TCP server status periodically
+    tcp_debug_counter++;
+    if (tcp_debug_counter % 50000 == 0) {
+        bool listening = tcp_socket_server_is_listening();
+        DEBUG_ONLY({
+            printf("DEBUG: TCP server listening = %d\n", listening);
+        });
+        if (listening) {
+            tcp_server_stats_t stats;
+            tcp_socket_server_get_stats(&stats);
+            DEBUG_ONLY({
+                printf("DEBUG: TCP port=%u, active=%u, total=%u\n", stats.listen_port, stats.active_connections, stats.total_connections);
+            });
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, stats.active_connections);
+        }
+    }
+    
     if(!network_manager_receive_packets_pending())
     {
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_FINISHED);

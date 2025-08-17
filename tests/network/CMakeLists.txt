@@ -40,6 +40,7 @@ add_executable(test_network_integration
 target_link_libraries(test_network_integration
     unity
     network_manager
+    tcp_socket_server
     pico_stdlib
     pico_multicore        # Required for dual-core operation
     hardware_spi
@@ -69,6 +70,7 @@ add_executable(test_dhcp_debug
 target_link_libraries(test_dhcp_debug
     unity
     network_manager
+    tcp_socket_server
     pico_stdlib
     hardware_spi
     hardware_gpio
