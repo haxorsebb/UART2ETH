@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-002-ethernet-controller-selection.html -->
+    <!-- sourceuri: arc42/adrs/ADR-011-ringbuffer-implementation.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-002: Ethernet Controller Selection for UART2ETH</title>
+    <title>ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -267,7 +267,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/adrs/ADR-002-ethernet-controller-selection.html" title="ADR-002: Ethernet Controller Selection for UART2ETH">ADR-002: Ethernet Controller Selection for UART2ETH</a>
                                 
                             </li>
@@ -297,7 +297,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../../arc42/adrs/ADR-011-ringbuffer-implementation.html" title="ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging">ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging</a>
                                 
                             </li>
@@ -313,11 +313,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-002-ethernet-controller-selection.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-011-ringbuffer-implementation.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-002%3A+Ethernet+Controller+Selection+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-002-ethernet-controller-selection.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-011%3A+Ring+Buffer+Implementation+for+UART-TCP+Message+Bridging%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-011-ringbuffer-implementation.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -327,27 +327,28 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel0">
-<li><a href="#_adr_002_ethernet_controller_selection_for_uart2eth">ADR-002: Ethernet Controller Selection for UART2ETH</a>
+<li><a href="#_adr_011_ring_buffer_implementation_for_uart_tcp_message_bridging">ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging</a>
 <ul class="sectlevel1">
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision_drivers">Decision Drivers</a>
+<li><a href="#_decision">Decision</a>
 <ul class="sectlevel2">
-<li><a href="#_primary_requirements">Primary Requirements</a></li>
-<li><a href="#_constraints">Constraints</a></li>
+<li><a href="#_ring_buffer_architecture">Ring Buffer Architecture</a></li>
+<li><a href="#_message_flow_implementation">Message Flow Implementation</a></li>
+<li><a href="#_doorbell_integration">Doorbell Integration</a></li>
+<li><a href="#_testing_integration">Testing Integration</a></li>
 </ul>
 </li>
-<li><a href="#_options_considered">Options Considered</a>
-<ul class="sectlevel2">
-<li><a href="#_option_a_wiznet_w5500">Option A: WIZnet W5500</a></li>
-<li><a href="#_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</a></li>
-</ul>
-</li>
-<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
-<li><a href="#_decision">Decision</a></li>
 <li><a href="#_rationale">Rationale</a>
 <ul class="sectlevel2">
-<li><a href="#_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</a></li>
-<li><a href="#_trade_offs_accepted">Trade-offs Accepted</a></li>
+<li><a href="#_why_minimal_echo_implementation">Why Minimal Echo Implementation</a></li>
+<li><a href="#_why_static_allocation_approach">Why Static Allocation Approach</a></li>
+</ul>
+</li>
+<li><a href="#_implementation_strategy">Implementation Strategy</a>
+<ul class="sectlevel2">
+<li><a href="#_phase_1_core_ring_buffer_module">Phase 1: Core Ring Buffer Module</a></li>
+<li><a href="#_phase_2_core_integration">Phase 2: Core Integration</a></li>
+<li><a href="#_phase_3_testing_and_validation">Phase 3: Testing and Validation</a></li>
 </ul>
 </li>
 <li><a href="#_consequences">Consequences</a>
@@ -357,18 +358,9 @@
 <li><a href="#_risks_and_mitigation">Risks and Mitigation</a></li>
 </ul>
 </li>
-<li><a href="#_implementation_results">Implementation Results</a>
-<ul class="sectlevel2">
-<li><a href="#_actual_performance_achieved">Actual Performance Achieved</a></li>
-<li><a href="#_core1_integration">Core1 Integration</a></li>
-</ul>
-</li>
-<li><a href="#_implementation_notes">Implementation Notes</a>
-<ul class="sectlevel2">
-<li><a href="#_performance_optimization">Performance Optimization</a></li>
-</ul>
-</li>
-<li><a href="#_follow_up_actions">Follow-up Actions</a></li>
+<li><a href="#_success_criteria">Success Criteria</a></li>
+<li><a href="#_related_decisions">Related Decisions</a></li>
+<li><a href="#_references">References</a></li>
 </ul>
 </li>
 </ul>
@@ -393,10 +385,10 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_002_ethernet_controller_selection_for_uart2eth" class="sect0">ADR-002: Ethernet Controller Selection for UART2ETH</h1>
+<h1 id="_adr_011_ring_buffer_implementation_for_uart_tcp_message_bridging" class="sect0">ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging</h1>
 <div class="paragraph">
 <p><strong>Status:</strong> ACCEPTED<br>
-<strong>Date:</strong> 2025-07-26<br>
+<strong>Date:</strong> 2025-08-18<br>
 <strong>Deciders:</strong> Architecture Team<br>
 <strong>Consulted:</strong> Senior Developer<br>
 <strong>Informed:</strong> Development Team</p>
@@ -405,300 +397,122 @@
 <h2 id="_context">Context</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>The UART2ETH system requires an Ethernet controller that interfaces with the RP2350 microcontroller via SPI to provide reliable TCP/IP connectivity. This component is critical for the core networking functionality of our product.</p>
+<p>Following Issue #68, the UART2ETH system requires a ring buffer implementation to enable bidirectional message passing between Core0 (UART processing) and Core1 (TCP/network processing). This implements the core data flow mechanism described in ADR-005 (Buffer Allocation Strategy).</p>
 </div>
 <div class="paragraph">
-<p>Based on our microcontroller selection (ADR-001), we need to determine the most appropriate Ethernet controller solution that can:</p>
+<p>The system needs:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>Support at least 10 Mbps Ethernet connectivity</p>
+<p><strong>Bidirectional message flow</strong>: UART↔TCP and TCP↔UART communication</p>
 </li>
 <li>
-<p>Interface with the RP2350 via SPI</p>
+<p><strong>Message protocol compliance</strong>: <code>#&lt;4_hex_digits&gt;&lt;payload&gt;!\r\n</code> format validation</p>
 </li>
 <li>
-<p>Handle the networking requirements of up to 4 concurrent UART-to-TCP bridges</p>
+<p><strong>Echo functionality</strong>: Core0 "turns around" TCP→UART messages back to TCP clients</p>
 </li>
 <li>
-<p>Operate reliably in industrial environments (-40°C to +85°C)</p>
+<p><strong>Inter-core synchronization</strong>: Doorbell-based wakeup mechanism (ADR-007)</p>
 </li>
 <li>
-<p>Maintain low latency while supporting our 500 kbps per port requirement</p>
+<p><strong>Static allocation</strong>: Fixed-size entries per ADR-005 buffer allocation strategy</p>
 </li>
 <li>
-<p>Simplify firmware development with minimal microcontroller overhead</p>
-</li>
-<li>
-<p>Meet our cost target for volume production</p>
-</li>
-<li>
-<p>Does not contain firmware on its own</p>
-</li>
-<li>
-<p>Comes from a 'western' supplier</p>
+<p><strong>Protocol validation</strong>: Integration with existing protocol_validator tool (ADR-010)</p>
 </li>
 </ul>
 </div>
-<div class="paragraph">
-<p>The Ethernet controller selection impacts system performance, reliability, development complexity, and overall BOM cost.</p>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_decision_drivers">Decision Drivers</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_primary_requirements">Primary Requirements</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Network Performance</strong>: Support for full 100 Mbps Ethernet with sufficient throughput for our use case</p>
-</li>
-<li>
-<p><strong>Memory Buffer Size</strong>: Sufficient buffer for packet handling and multiple connections</p>
-</li>
-<li>
-<p><strong>SPI Interface Speed</strong>: Fast and efficient communication with the microcontroller</p>
-</li>
-<li>
-<p><strong>Industrial Reliability</strong>: Operating temperature range and robustness for industrial use</p>
-</li>
-<li>
-<p><strong>Cost Effectiveness</strong>: Component cost for volume production</p>
-</li>
-<li>
-<p><strong>Development Complexity</strong>: Readily available OpenSource library for integration</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_constraints">Constraints</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Must use SPI interface to connect with the RP2350 microcontroller</p>
-</li>
-<li>
-<p>Must operate reliably in industrial environments (-40°C to +85°C)</p>
-</li>
-<li>
-<p>Must fit within the overall $10 system cost target for volume production</p>
-</li>
-<li>
-<p>Must use open-source compatible software stacks (GPL license compatible)</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_options_considered">Options Considered</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_option_a_wiznet_w5500">Option A: WIZnet W5500</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Interface</strong>: SPI (up to 80 MHz)</p>
-</li>
-<li>
-<p><strong>Network Speed</strong>: 10/100 Mbps Ethernet</p>
-</li>
-<li>
-<p><strong>TCP/IP Stack</strong>: Hardwired TCP/IP stack (integrated)</p>
-</li>
-<li>
-<p><strong>Buffer Memory</strong>: 32 KB internal buffer</p>
-</li>
-<li>
-<p><strong>Concurrent Connections</strong>: 8 independent hardware sockets</p>
-</li>
-<li>
-<p><strong>Protocols Support</strong>: TCP, UDP, IPv4, ICMP, ARP, IGMP, PPPoE</p>
-</li>
-<li>
-<p><strong>Temperature Range</strong>: -40°C to +85°C</p>
-</li>
-<li>
-<p><strong>Voltage Supply</strong>: 2.97V to 3.63V</p>
-</li>
-<li>
-<p><strong>Power Consumption</strong>: 132mA typical</p>
-</li>
-<li>
-<p><strong>Package Options</strong>: 48-LQFP (7x7mm)</p>
-</li>
-<li>
-<p><strong>Cost (Volume)</strong>: ~$2.00 per unit</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Extensive documentation, libraries for multiple platforms</p>
-</li>
-<li>
-<p><strong>Manufacturer</strong>: WIZnet.io (South Korea)</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_b_microchip_enc28j60">Option B: Microchip ENC28J60</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Interface</strong>: SPI (up to 20 MHz)</p>
-</li>
-<li>
-<p><strong>Network Speed</strong>: 10 Mbps Ethernet only</p>
-</li>
-<li>
-<p><strong>TCP/IP Stack</strong>: Software stack required (on microcontroller)</p>
-</li>
-<li>
-<p><strong>Buffer Memory</strong>: 8 KB internal buffer</p>
-</li>
-<li>
-<p><strong>Concurrent Connections</strong>: Limited by microcontroller implementation</p>
-</li>
-<li>
-<p><strong>Protocols Support</strong>: Requires microcontroller implementation (typically lwIP)</p>
-</li>
-<li>
-<p><strong>Temperature Range</strong>: 0°C to +70°C (commercial), -40°C to +85°C (industrial version)</p>
-</li>
-<li>
-<p><strong>Voltage Supply</strong>: 3.1V to 3.6V</p>
-</li>
-<li>
-<p><strong>Power Consumption</strong>: 160mA typical</p>
-</li>
-<li>
-<p><strong>Package Options</strong>: 28-pin SPDIP, SOIC, SSOP, QFN</p>
-</li>
-<li>
-<p><strong>Cost (Volume)</strong>: ~$2.50 per unit</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Mature, widely used in Arduino and other platforms</p>
-</li>
-<li>
-<p><strong>Manufacturer</strong>: Microchip Technology (USA)</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h2>
-<div class="sectionbody">
-<div class="paragraph">
-<p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
-<em>Baseline: ENC28J60 (all scores = 0)</em></p>
-</div>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 38.4615%;">
-<col style="width: 15.3846%;">
-<col style="width: 23.0769%;">
-<col style="width: 23.077%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
-<th class="tableblock halign-left valign-top"><strong>ENC28J60</strong></th>
-<th class="tableblock halign-left valign-top"><strong>W5500</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Speed</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (100 Mbps vs 10 Mbps)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>TCP/IP Implementation</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (hardwired vs software)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Microcontroller Overhead</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (minimal vs significant)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Buffer Size</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (32KB vs 8KB)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>SPI Interface Performance</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (80MHz vs 20MHz)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Temperature Range</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (standard -40°C to +85°C)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Ecosystem</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (both well-supported)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Firmware Complexity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (simple socket programming)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Open Internal Firmware</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (Complex, Closed Source)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Western Manufacturer</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (South Korea)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Auditable Sourcecode</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (Closed Source)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total PUGH Score</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-6</p></td>
-</tr>
-</tbody>
-</table>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_decision">Decision</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p><strong>Selected: ENC28J60</strong></p>
+<p>Implement a <strong>minimal echo-based ring buffer system</strong> with the following design:</p>
+</div>
+<div class="sect2">
+<h3 id="_ring_buffer_architecture">Ring Buffer Architecture</h3>
+<div class="paragraph">
+<p><strong>Ring Entry Structure</strong> (per ADR-005):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    // Management header (64 bytes, cache-aligned)
+    uint8_t  uart_channel;     // 0-3 for UART channels
+    uint8_t  direction;        // RX_TCP_TO_UART, RX_UART_TO_TCP
+    uint8_t  status;           // FILLING, READY, CONSUMED
+    uint8_t  payload_length;   // Actual data length (≤1024)
+    uint32_t timestamp;        // Message timestamp
+    uint32_t sequence_id;      // For ordering/debugging
+    uint32_t reserved[12];     // Padding to 64-byte boundary
+
+    // Payload data (1024 bytes fixed)
+    uint8_t  payload[1024];    // Protocol message data
+} __attribute__((aligned(64))) ring_entry_t;</code></pre>
+</div>
 </div>
 <div class="paragraph">
-<p>While the W5500 is technically superior in every aspect and more easy to integrate, the ENC28J60 is a <strong>dumb</strong> device, which is, given to goal of maximum control, auditable software and upgradeable software, exactly what we want. And additionally it is from a 'western' manufacturer.</p>
+<p><strong>Ring Buffer Management</strong>:
+* Single shared pool serving both directions (per ADR-005 shared pool design)
+* Cache-aligned entries (64-byte boundaries) for RP2350 optimization
+* Mutex-protected operations for inter-core thread safety
+* Drop-oldest overflow policy for deterministic behavior</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_message_flow_implementation">Message Flow Implementation</h3>
+<div class="paragraph">
+<p><strong>Core1 (TCP→Ring Buffer)</strong>:
+1. Receive TCP message with <code>#&lt;4_hex&gt;&lt;payload&gt;!\r\n</code> format
+2. Validate message format using existing protocol parser
+3. Enqueue to ring buffer with direction=<code>RX_TCP_TO_UART</code>
+4. Use doorbell to wake Core0 for processing</p>
+</div>
+<div class="paragraph">
+<p><strong>Core0 (Ring Buffer Echo)</strong>:
+1. Dequeue messages with direction=<code>RX_TCP_TO_UART</code>
+2. "Turn around" by changing direction to <code>RX_UART_TO_TCP</code>
+3. Enqueue back to ring buffer with new direction
+4. Use doorbell to wake Core1 for transmission</p>
+</div>
+<div class="paragraph">
+<p><strong>Core1 (Ring Buffer→TCP)</strong>:
+1. Dequeue messages with direction=<code>RX_UART_TO_TCP</code>
+2. Transmit back to original TCP client connection
+3. Update connection statistics and performance counters</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_doorbell_integration">Doorbell Integration</h3>
+<div class="paragraph">
+<p><strong>Cross-Core Wakeup</strong> (per ADR-007):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Wake Core1 after enqueueing message for TCP transmission
+static void wake_core1_for_tcp_tx(void) {
+    multicore_doorbell_set_other_core(doorbell_core0_wakes_core1);
+}
+
+// Wake Core0 after enqueueing message for UART echo processing
+static void wake_core0_for_uart_echo(void) {
+    multicore_doorbell_set_other_core(doorbell_core1_wakes_core0);
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_testing_integration">Testing Integration</h3>
+<div class="paragraph">
+<p><strong>Protocol Validator Integration</strong> (per ADR-010):
+* Existing <code>protocol_validator</code> tool validates <code>#&lt;4_hex&gt;&lt;payload&gt;!\r\n</code> format
+* Echo functionality testable via TCP connections to port 4001-4004
+* Performance measurement: round-trip latency through ring buffer
+* Stress testing: concurrent connections and message throughput</p>
+</div>
 </div>
 </div>
 </div>
@@ -706,32 +520,146 @@
 <h2 id="_rationale">Rationale</h2>
 <div class="sectionbody">
 <div class="sect2">
-<h3 id="_why_enc28j60_over_w5500">Why ENC28J60 Over W5500</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Dumb</strong>: The ENC28J60 has no complex firmware.</p>
-</li>
-<li>
-<p><strong>Auditable Sourcecode</strong>: The main network code is in the microcontrollers firmware, which we have total control over. This allows us to show <strong>all</strong> relevant code for audits.</p>
-</li>
-<li>
-<p><strong>Western Manufacturer</strong>: Because of supply chain considerations we want this project to contain only 'western' manufacturers. While technically South Korea is a western ally, it is still in the east.</p>
-</li>
-</ul>
+<h3 id="_why_minimal_echo_implementation">Why Minimal Echo Implementation</h3>
+<div class="paragraph">
+<p><strong>Incremental Development</strong>:
+* Establishes core ring buffer infrastructure first
+* Validates inter-core communication and doorbell mechanism
+* Provides testable functionality using existing protocol_validator
+* Creates foundation for future UART integration</p>
+</div>
+<div class="paragraph">
+<p><strong>Risk Mitigation</strong>:
+* Simple echo reduces implementation complexity
+* Focuses on ring buffer correctness before UART integration
+* Enables comprehensive testing of message flow patterns
+* Validates performance characteristics under load</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_trade_offs_accepted">Trade-offs Accepted</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Cost Premium</strong>: The $0.50 additional cost per unit for the W5500 is justified by the significant performance advantages, reduced development complexity, and system resource savings.</p>
-</li>
-<li>
-<p><strong>Lower Performance</strong>: The W5500 is superior in all aspects of performance. But the ENC28J60 is <strong>good enough</strong> to match the performance criteria.</p>
-</li>
-</ul>
+<h3 id="_why_static_allocation_approach">Why Static Allocation Approach</h3>
+<div class="paragraph">
+<p><strong>Predictable Behavior</strong> (per ADR-005):
+* Fixed 1088-byte entries (64-byte header + 1024-byte payload)
+* Compile-time memory allocation for deterministic behavior
+* Cache-aligned addressing for optimal RP2350 performance
+* No dynamic allocation eliminates memory fragmentation</p>
+</div>
+<div class="paragraph">
+<p><strong>Industrial Reliability</strong>:
+* Worst-case allocation handles maximum protocol message size
+* Drop-oldest overflow policy provides deterministic overload behavior
+* Static allocation prevents memory allocation failures</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_implementation_strategy">Implementation Strategy</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_phase_1_core_ring_buffer_module">Phase 1: Core Ring Buffer Module</h3>
+<div class="paragraph">
+<p><strong>File Structure</strong>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code>include/
+  ringbuffer.h              // Ring buffer API declarations
+src/
+  ringbuffer/
+    ringbuffer.c            // Core ring buffer implementation
+    ringbuffer_doorbell.c   // Doorbell integration
+tests/
+  test_ringbuffer.c         // Unit tests for ring buffer operations</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Core API Functions</strong>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Ring buffer management
+bool ringbuffer_init(void);
+ring_entry_t* ringbuffer_get_free_entry(void);
+bool ringbuffer_enqueue_entry(ring_entry_t* entry);
+ring_entry_t* ringbuffer_dequeue_entry(uint8_t direction);
+uint32_t ringbuffer_get_count(uint8_t direction);
+
+// Statistics and monitoring
+uint32_t ringbuffer_get_free_count(void);
+uint32_t ringbuffer_get_overflow_count(void);
+void ringbuffer_reset_statistics(void);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_phase_2_core_integration">Phase 2: Core Integration</h3>
+<div class="paragraph">
+<p><strong>Core0 Integration</strong> (<code>core0_main.c</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Main loop: check for TCP→UART messages to echo
+void core0_main_loop_ringbuffer_processing(void) {
+    ring_entry_t* entry = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+    if (entry) {
+        // Turn around message: TCP→UART becomes UART→TCP
+        entry-&gt;direction = RX_UART_TO_TCP;
+        ringbuffer_enqueue_entry(entry);
+        wake_core1_for_tcp_tx();
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Core1 Integration</strong> (<code>core1_main.c</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// TCP receive: enqueue TCP messages for Core0 echo
+void core1_tcp_receive_to_ringbuffer(tcp_connection_t* conn, const char* message) {
+    ring_entry_t* entry = ringbuffer_get_free_entry();
+    if (entry) {
+        entry-&gt;direction = RX_TCP_TO_UART;
+        entry-&gt;payload_length = strlen(message);
+        memcpy(entry-&gt;payload, message, entry-&gt;payload_length);
+        ringbuffer_enqueue_entry(entry);
+        wake_core0_for_uart_echo();
+    }
+}
+
+// Ring buffer transmit: send UART→TCP messages back to TCP clients
+void core1_ringbuffer_to_tcp_transmit(void) {
+    ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
+    if (entry) {
+        // Find original TCP connection and transmit response
+        tcp_transmit_to_client(entry-&gt;payload, entry-&gt;payload_length);
+        // Mark entry as consumed
+        entry-&gt;status = ENTRY_STATUS_CONSUMED;
+    }
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_phase_3_testing_and_validation">Phase 3: Testing and Validation</h3>
+<div class="paragraph">
+<p><strong>Unit Test Coverage</strong>:
+1. Ring buffer initialization and basic operations
+2. Message enqueueing and dequeueing by direction
+3. Overflow handling with drop-oldest policy
+4. Inter-core doorbell wakeup functionality
+5. Message format validation and protocol compliance
+6. Performance measurement and statistics collection</p>
+</div>
+<div class="paragraph">
+<p><strong>Integration Test Coverage</strong>:
+1. End-to-end TCP message echo via ring buffer
+2. Concurrent TCP connections with message ordering
+3. Stress testing with protocol_validator tool
+4. Performance validation: &lt;5ms round-trip latency
+5. Error handling: malformed messages, connection drops</p>
 </div>
 </div>
 </div>
@@ -744,16 +672,22 @@
 <div class="ulist">
 <ul>
 <li>
-<p>✅ <strong>Minimal Performance</strong>: ENC28J60 provides enough network bandwidth for current needs</p>
+<p>✅ <strong>Establishes Core Infrastructure</strong>: Ring buffer foundation for all future UART bridging</p>
 </li>
 <li>
-<p>✅ <strong>Physical Size</strong>: 28SSOP package requires slightly less PCB space</p>
+<p>✅ <strong>Validates Inter-Core Communication</strong>: Doorbell mechanism and synchronization</p>
 </li>
 <li>
-<p>✅ <strong>Industrial Reliability</strong>: Full industrial temperature range support</p>
+<p>✅ <strong>Enables Protocol Testing</strong>: Integration with existing protocol_validator tool</p>
 </li>
 <li>
-<p>✅ <strong>External Dependency</strong>: Reliance on a more generic controller with more alternatives</p>
+<p>✅ <strong>Provides Performance Baseline</strong>: Measurable echo latency and throughput</p>
+</li>
+<li>
+<p>✅ <strong>Deterministic Behavior</strong>: Static allocation and predictable overflow handling</p>
+</li>
+<li>
+<p>✅ <strong>Industrial Reliability</strong>: Cache-aligned, mutex-protected operations</p>
 </li>
 </ul>
 </div>
@@ -763,141 +697,95 @@
 <div class="ulist">
 <ul>
 <li>
-<p>⚠️ <strong>Resource Spending</strong>: More microcontroller overhead diminishes resources for other features</p>
+<p>❌ <strong>Limited Initial Functionality</strong>: Echo-only, no actual UART integration</p>
 </li>
 <li>
-<p>⚠️ <strong>Slightly Higher Cost</strong>: $0.50 cost premium per unit compared to W5500</p>
+<p>❌ <strong>Memory Inefficiency</strong>: Fixed 1088-byte entries for variable message sizes</p>
 </li>
 <li>
-<p>⚠️ <strong>More Complex Development</strong>: Software TCP/IP stack incraeses code complexity and development time</p>
+<p>❌ <strong>Implementation Complexity</strong>: Ring buffer management and synchronization logic</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_risks_and_mitigation">Risks and Mitigation</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Supply Chain Risk</strong>: Establish multiple supplier relationships, consider inventory strategy</p>
-</li>
-<li>
-<p><strong>Single-Source Component</strong>: Document adaptation path to alternative controllers if necessary</p>
-</li>
-<li>
-<p><strong>Integration Complexity</strong>: Thoroughly validate the ENC28J60-RP2350 integration early in development</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_implementation_results">Implementation Results</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_actual_performance_achieved">Actual Performance Achieved</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>lwIP Integration</strong>: Complete TCP/IP stack with DHCP client successfully implemented</p>
-</li>
-<li>
-<p><strong>SPI Performance</strong>: 20 MHz SPI achieved with burst mode transfers</p>
-</li>
-<li>
-<p><strong>Interrupt Handling</strong>: Link change, RX packet, and TX completion interrupts implemented</p>
-</li>
-<li>
-<p><strong>Buffer Management</strong>: 8KB buffer optimally configured (4KB RX, 4KB TX)</p>
-</li>
-<li>
-<p><strong>Network States</strong>: 7-state FSM (UNINITIALIZED → INITIALIZING → LINK_DOWN → LINK_UP → DHCP_REQUESTING → READY → ERROR)</p>
-</li>
-<li>
-<p><strong>DHCP Timeout</strong>: 30-second timeout with Core1 timer integration</p>
-</li>
-<li>
-<p><strong>Statistics</strong>: Comprehensive packet/error counting and diagnostics implemented</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_core1_integration">Core1 Integration</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Timer Integration</strong>: DHCP and network timeout handling via Core1 timer subsystem</p>
-</li>
-<li>
-<p><strong>State Machine</strong>: Network events integrated with Core1 state machine for coordinated operation</p>
-</li>
-<li>
-<p><strong>Interrupt Processing</strong>: Link status and packet processing integrated with Core1 main loop</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_implementation_notes">Implementation Notes</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_performance_optimization">Performance Optimization</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Use burst SPI mode for maximum throughput (achieved 20 MHz)</p>
-</li>
-<li>
-<p>Optimized buffer management for latency-sensitive applications</p>
-</li>
-<li>
-<p>Interrupt-driven packet processing reduces CPU overhead</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_follow_up_actions">Follow-up Actions</h2>
-<div class="sectionbody">
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><strong>Procurement</strong>: Source ENC28J60 components from multiple suppliers to validate availability</p>
-</li>
-<li>
-<p><strong>Prototyping</strong>: Develop initial integration test for RP2350 + ENC28J60 communication</p>
-</li>
-<li>
-<p><strong>Performance Testing</strong>: Benchmark SPI communication speeds and TCP throughput</p>
-</li>
-<li>
-<p><strong>Industrial Validation</strong>: Test operation across full temperature range</p>
-</li>
-</ol>
-</div>
-<hr>
 <div class="paragraph">
-<p><strong>Review Notes:</strong></p>
+<p><strong>Primary Risk: Ring Buffer Synchronization</strong>
+* <strong>Probability</strong>: Medium (inter-core communication complexity)
+* <strong>Impact</strong>: High (system deadlock or data corruption)
+* <strong>Mitigation</strong>: Comprehensive unit testing, mutex protection, atomic operations</p>
 </div>
-<div class="ulist checklist">
-<ul class="checklist">
+<div class="paragraph">
+<p><strong>Secondary Risk: Performance Bottleneck</strong>
+* <strong>Probability</strong>: Low (static allocation designed for performance)
+* <strong>Impact</strong>: Medium (latency target violation)
+* <strong>Mitigation</strong>: Cache-aligned addressing, minimal critical sections, performance testing</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_success_criteria">Success Criteria</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><strong>Functional Requirements</strong>:
+1. ✅ TCP messages successfully echoed through ring buffer
+2. ✅ Message format validation: <code>#&lt;4_hex&gt;&lt;payload&gt;!\r\n</code> compliance
+3. ✅ Concurrent TCP connections (up to 4 simultaneous)
+4. ✅ Proper message ordering and no data corruption
+5. ✅ Doorbell-based cross-core wakeup functionality</p>
+</div>
+<div class="paragraph">
+<p><strong>Performance Requirements</strong>:
+1. ✅ &lt;5ms round-trip latency for echo messages
+2. ✅ 500kBaud sustained throughput via protocol_validator
+3. ✅ 100% message delivery (no drops under normal operation)
+4. ✅ Deterministic overflow behavior (drop-oldest policy)</p>
+</div>
+<div class="paragraph">
+<p><strong>Quality Requirements</strong>:
+1. ✅ 100% unit test coverage for ring buffer operations
+2. ✅ Protocol_validator integration and validation
+3. ✅ Memory safety: no buffer overflows or corruption
+4. ✅ Industrial reliability: predictable behavior under stress</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_related_decisions">Related Decisions</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
 <li>
-<p>&#10063; Validate pricing from multiple suppliers</p>
+<p><strong>ADR-005</strong>: Ring Buffer Memory Allocation Strategy - Static worst-case allocation</p>
 </li>
 <li>
-<p>&#10063; Confirm SPI bus configuration with other peripherals</p>
+<p><strong>ADR-007</strong>: State Machine Architecture - Doorbell-based cross-core synchronization</p>
 </li>
 <li>
-<p>&#10063; Verify EMI/EMC considerations with ENC28J60 placement</p>
+<p><strong>ADR-010</strong>: External Protocol Validation Tool - Integration with protocol_validator</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_references">References</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Issue #68</strong>: Add ringbuffer implementation (GitHub issue requirements)</p>
 </li>
 <li>
-<p>&#10063; Test actual power consumption under various load scenarios</p>
+<p><strong>Chapter 5</strong>: Building Block View - Ring Buffer Communication System</p>
+</li>
+<li>
+<p><strong>Chapter 6</strong>: Runtime View - Inter-Core Message Flow Patterns</p>
+</li>
+<li>
+<p><strong>Chapter 8</strong>: Cross-cutting Concepts - Protocol Filtering and Message Format</p>
 </li>
 </ul>
 </div>
@@ -930,11 +818,11 @@
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-002%3A+Ethernet+Controller+Selection+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-002-ethernet-controller-selection.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-011%3A+Ring+Buffer+Implementation+for+UART-TCP+Message+Bridging%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-011-ringbuffer-implementation.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-002%3A+Ethernet+Controller+Selection+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-002-ethernet-controller-selection.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-011%3A+Ring+Buffer+Implementation+for+UART-TCP+Message+Bridging%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-011-ringbuffer-implementation.adoc">tell
     us how we can improve</a>.
     </p>
 </div>

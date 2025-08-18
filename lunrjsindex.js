@@ -130,6 +130,14 @@ var documents = [
 
 {
     "id": 16,
+    "uri": "arc42/adrs/ADR-011-ringbuffer-implementation.html",
+    "menu": "adrs",
+    "title": "ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging",
+    "text": " Table of Contents ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging Context Decision Ring Buffer Architecture Message Flow Implementation Doorbell Integration Testing Integration Rationale Why Minimal Echo Implementation Why Static Allocation Approach Implementation Strategy Phase 1: Core Ring Buffer Module Phase 2: Core Integration Phase 3: Testing and Validation Consequences Positive Negative Risks and Mitigation Success Criteria Related Decisions References ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging Status: ACCEPTED Date: 2025-08-18 Deciders: Architecture Team Consulted: Senior Developer Informed: Development Team Context Following Issue #68, the UART2ETH system requires a ring buffer implementation to enable bidirectional message passing between Core0 (UART processing) and Core1 (TCP/network processing). This implements the core data flow mechanism described in ADR-005 (Buffer Allocation Strategy). The system needs: Bidirectional message flow : UART↔TCP and TCP↔UART communication Message protocol compliance : #&lt;4_hex_digits&gt;&lt;payload&gt;!\\r\\n format validation Echo functionality : Core0 \"turns around\" TCP→UART messages back to TCP clients Inter-core synchronization : Doorbell-based wakeup mechanism (ADR-007) Static allocation : Fixed-size entries per ADR-005 buffer allocation strategy Protocol validation : Integration with existing protocol_validator tool (ADR-010) Decision Implement a minimal echo-based ring buffer system with the following design: Ring Buffer Architecture Ring Entry Structure (per ADR-005): typedef struct { // Management header (64 bytes, cache-aligned) uint8_t uart_channel; // 0-3 for UART channels uint8_t direction; // RX_TCP_TO_UART, RX_UART_TO_TCP uint8_t status; // FILLING, READY, CONSUMED uint8_t payload_length; // Actual data length (≤1024) uint32_t timestamp; // Message timestamp uint32_t sequence_id; // For ordering/debugging uint32_t reserved[12]; // Padding to 64-byte boundary // Payload data (1024 bytes fixed) uint8_t payload[1024]; // Protocol message data } __attribute__((aligned(64))) ring_entry_t; Ring Buffer Management : * Single shared pool serving both directions (per ADR-005 shared pool design) * Cache-aligned entries (64-byte boundaries) for RP2350 optimization * Mutex-protected operations for inter-core thread safety * Drop-oldest overflow policy for deterministic behavior Message Flow Implementation Core1 (TCP→Ring Buffer) : 1. Receive TCP message with #&lt;4_hex&gt;&lt;payload&gt;!\\r\\n format 2. Validate message format using existing protocol parser 3. Enqueue to ring buffer with direction= RX_TCP_TO_UART 4. Use doorbell to wake Core0 for processing Core0 (Ring Buffer Echo) : 1. Dequeue messages with direction= RX_TCP_TO_UART 2. \"Turn around\" by changing direction to RX_UART_TO_TCP 3. Enqueue back to ring buffer with new direction 4. Use doorbell to wake Core1 for transmission Core1 (Ring Buffer→TCP) : 1. Dequeue messages with direction= RX_UART_TO_TCP 2. Transmit back to original TCP client connection 3. Update connection statistics and performance counters Doorbell Integration Cross-Core Wakeup (per ADR-007): // Wake Core1 after enqueueing message for TCP transmission static void wake_core1_for_tcp_tx(void) { multicore_doorbell_set_other_core(doorbell_core0_wakes_core1); } // Wake Core0 after enqueueing message for UART echo processing static void wake_core0_for_uart_echo(void) { multicore_doorbell_set_other_core(doorbell_core1_wakes_core0); } Testing Integration Protocol Validator Integration (per ADR-010): * Existing protocol_validator tool validates #&lt;4_hex&gt;&lt;payload&gt;!\\r\\n format * Echo functionality testable via TCP connections to port 4001-4004 * Performance measurement: round-trip latency through ring buffer * Stress testing: concurrent connections and message throughput Rationale Why Minimal Echo Implementation Incremental Development : * Establishes core ring buffer infrastructure first * Validates inter-core communication and doorbell mechanism * Provides testable functionality using existing protocol_validator * Creates foundation for future UART integration Risk Mitigation : * Simple echo reduces implementation complexity * Focuses on ring buffer correctness before UART integration * Enables comprehensive testing of message flow patterns * Validates performance characteristics under load Why Static Allocation Approach Predictable Behavior (per ADR-005): * Fixed 1088-byte entries (64-byte header + 1024-byte payload) * Compile-time memory allocation for deterministic behavior * Cache-aligned addressing for optimal RP2350 performance * No dynamic allocation eliminates memory fragmentation Industrial Reliability : * Worst-case allocation handles maximum protocol message size * Drop-oldest overflow policy provides deterministic overload behavior * Static allocation prevents memory allocation failures Implementation Strategy Phase 1: Core Ring Buffer Module File Structure : include/ ringbuffer.h // Ring buffer API declarations src/ ringbuffer/ ringbuffer.c // Core ring buffer implementation ringbuffer_doorbell.c // Doorbell integration tests/ test_ringbuffer.c // Unit tests for ring buffer operations Core API Functions : // Ring buffer management bool ringbuffer_init(void); ring_entry_t* ringbuffer_get_free_entry(void); bool ringbuffer_enqueue_entry(ring_entry_t* entry); ring_entry_t* ringbuffer_dequeue_entry(uint8_t direction); uint32_t ringbuffer_get_count(uint8_t direction); // Statistics and monitoring uint32_t ringbuffer_get_free_count(void); uint32_t ringbuffer_get_overflow_count(void); void ringbuffer_reset_statistics(void); Phase 2: Core Integration Core0 Integration ( core0_main.c ): // Main loop: check for TCP→UART messages to echo void core0_main_loop_ringbuffer_processing(void) { ring_entry_t* entry = ringbuffer_dequeue_entry(RX_TCP_TO_UART); if (entry) { // Turn around message: TCP→UART becomes UART→TCP entry-&gt;direction = RX_UART_TO_TCP; ringbuffer_enqueue_entry(entry); wake_core1_for_tcp_tx(); } } Core1 Integration ( core1_main.c ): // TCP receive: enqueue TCP messages for Core0 echo void core1_tcp_receive_to_ringbuffer(tcp_connection_t* conn, const char* message) { ring_entry_t* entry = ringbuffer_get_free_entry(); if (entry) { entry-&gt;direction = RX_TCP_TO_UART; entry-&gt;payload_length = strlen(message); memcpy(entry-&gt;payload, message, entry-&gt;payload_length); ringbuffer_enqueue_entry(entry); wake_core0_for_uart_echo(); } } // Ring buffer transmit: send UART→TCP messages back to TCP clients void core1_ringbuffer_to_tcp_transmit(void) { ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP); if (entry) { // Find original TCP connection and transmit response tcp_transmit_to_client(entry-&gt;payload, entry-&gt;payload_length); // Mark entry as consumed entry-&gt;status = ENTRY_STATUS_CONSUMED; } } Phase 3: Testing and Validation Unit Test Coverage : 1. Ring buffer initialization and basic operations 2. Message enqueueing and dequeueing by direction 3. Overflow handling with drop-oldest policy 4. Inter-core doorbell wakeup functionality 5. Message format validation and protocol compliance 6. Performance measurement and statistics collection Integration Test Coverage : 1. End-to-end TCP message echo via ring buffer 2. Concurrent TCP connections with message ordering 3. Stress testing with protocol_validator tool 4. Performance validation: &lt;5ms round-trip latency 5. Error handling: malformed messages, connection drops Consequences Positive ✅ Establishes Core Infrastructure : Ring buffer foundation for all future UART bridging ✅ Validates Inter-Core Communication : Doorbell mechanism and synchronization ✅ Enables Protocol Testing : Integration with existing protocol_validator tool ✅ Provides Performance Baseline : Measurable echo latency and throughput ✅ Deterministic Behavior : Static allocation and predictable overflow handling ✅ Industrial Reliability : Cache-aligned, mutex-protected operations Negative ❌ Limited Initial Functionality : Echo-only, no actual UART integration ❌ Memory Inefficiency : Fixed 1088-byte entries for variable message sizes ❌ Implementation Complexity : Ring buffer management and synchronization logic Risks and Mitigation Primary Risk: Ring Buffer Synchronization * Probability : Medium (inter-core communication complexity) * Impact : High (system deadlock or data corruption) * Mitigation : Comprehensive unit testing, mutex protection, atomic operations Secondary Risk: Performance Bottleneck * Probability : Low (static allocation designed for performance) * Impact : Medium (latency target violation) * Mitigation : Cache-aligned addressing, minimal critical sections, performance testing Success Criteria Functional Requirements : 1. ✅ TCP messages successfully echoed through ring buffer 2. ✅ Message format validation: #&lt;4_hex&gt;&lt;payload&gt;!\\r\\n compliance 3. ✅ Concurrent TCP connections (up to 4 simultaneous) 4. ✅ Proper message ordering and no data corruption 5. ✅ Doorbell-based cross-core wakeup functionality Performance Requirements : 1. ✅ &lt;5ms round-trip latency for echo messages 2. ✅ 500kBaud sustained throughput via protocol_validator 3. ✅ 100% message delivery (no drops under normal operation) 4. ✅ Deterministic overflow behavior (drop-oldest policy) Quality Requirements : 1. ✅ 100% unit test coverage for ring buffer operations 2. ✅ Protocol_validator integration and validation 3. ✅ Memory safety: no buffer overflows or corruption 4. ✅ Industrial reliability: predictable behavior under stress Related Decisions ADR-005 : Ring Buffer Memory Allocation Strategy - Static worst-case allocation ADR-007 : State Machine Architecture - Doorbell-based cross-core synchronization ADR-010 : External Protocol Validation Tool - Integration with protocol_validator References Issue #68 : Add ringbuffer implementation (GitHub issue requirements) Chapter 5 : Building Block View - Ring Buffer Communication System Chapter 6 : Runtime View - Inter-Core Message Flow Patterns Chapter 8 : Cross-cutting Concepts - Protocol Filtering and Message Format "
+},
+
+{
+    "id": 17,
     "uri": "arc42/adrs/ADR-005-buffer-allocation-strategy.html",
     "menu": "adrs",
     "title": "ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH",
@@ -137,7 +145,7 @@ var documents = [
 },
 
 {
-    "id": 17,
+    "id": 18,
     "uri": "arc42/adrs/ADR-008-hardware-pin-configuration.html",
     "menu": "arc42",
     "title": "ADR-008: Hardware Pin Configuration Update",
@@ -145,7 +153,7 @@ var documents = [
 },
 
 {
-    "id": 18,
+    "id": 19,
     "uri": "arc42/adrs/ADR-010-external-protocol-validation-tool.html",
     "menu": "arc42",
     "title": "ADR-010: External Protocol Validation Tool",
@@ -153,7 +161,7 @@ var documents = [
 },
 
 {
-    "id": 19,
+    "id": 20,
     "uri": "arc42/adrs/ADR-001-microcontroller-selection.html",
     "menu": "adrs",
     "title": "ADR-001: Microcontroller Platform Selection for UART2ETH",
@@ -161,7 +169,7 @@ var documents = [
 },
 
 {
-    "id": 20,
+    "id": 21,
     "uri": "arc42/adrs/ADR-002-ethernet-controller-selection.html",
     "menu": "adrs",
     "title": "ADR-002: Ethernet Controller Selection for UART2ETH",
@@ -169,7 +177,7 @@ var documents = [
 },
 
 {
-    "id": 21,
+    "id": 22,
     "uri": "arc42/adrs/ADR-007-state-machine-architecture.html",
     "menu": "adrs",
     "title": "ADR-007: State Machine Architecture for UART2ETH",
@@ -177,7 +185,7 @@ var documents = [
 },
 
 {
-    "id": 22,
+    "id": 23,
     "uri": "arc42/arc42.html",
     "menu": "-",
     "title": "image:arc42-logo.png[arc42] Template",
@@ -185,7 +193,7 @@ var documents = [
 },
 
 {
-    "id": 23,
+    "id": 24,
     "uri": "search.html",
     "menu": "-",
     "title": "search",
@@ -193,7 +201,7 @@ var documents = [
 },
 
 {
-    "id": 24,
+    "id": 25,
     "uri": "lunrjsindex.html",
     "menu": "-",
     "title": "null",

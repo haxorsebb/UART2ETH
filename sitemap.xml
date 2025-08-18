@@ -82,6 +82,11 @@
     </url>
 
     <url>
+    	<loc>http://jbake.org/arc42/adrs/ADR-011-ringbuffer-implementation.html</loc>
+    	<lastmod>2025-08-18</lastmod>
+    </url>
+
+    <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-005-buffer-allocation-strategy.html</loc>
     	<lastmod>2025-08-18</lastmod>
     </url>
