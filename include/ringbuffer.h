@@ -18,16 +18,34 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>     // For memset, memcpy
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Message direction constants
+/**
+ * @brief Message direction enumeration
+ */
+typedef enum {
+    RX_TCP_TO_UART = 0,  // Message from TCP client to UART (to be echoed)
+    RX_UART_TO_TCP = 1   // Message from UART to TCP client (echo response)
+} ringbuffer_direction_t;
+
+/**
+ * @brief Entry status enumeration
+ */
+typedef enum {
+    ENTRY_STATUS_FREE = 0,      // Entry available for use
+    ENTRY_STATUS_FILLING = 1,   // Entry being filled by producer
+    ENTRY_STATUS_READY = 2,     // Entry ready for consumer
+    ENTRY_STATUS_CONSUMED = 3   // Entry consumed, ready for cleanup
+} entry_status_t;
+
+// Legacy constants for backward compatibility
 #define RX_TCP_TO_UART  0  // Message from TCP client to UART (to be echoed)
 #define RX_UART_TO_TCP  1  // Message from UART to TCP client (echo response)
 
-// Entry status constants  
 #define ENTRY_STATUS_FREE      0  // Entry available for use
 #define ENTRY_STATUS_FILLING   1  // Entry being filled by producer
 #define ENTRY_STATUS_READY     2  // Entry ready for consumer

@@ -19,6 +19,7 @@
 #include "hardware/sync.h"
 #include <string.h>
 #include <stdio.h>
+#include <limits.h>
 
 // Ring buffer configuration
 #define RINGBUFFER_CAPACITY 32  // Number of entries (must be power of 2 for efficiency)
@@ -53,9 +54,11 @@ static bool ringbuffer_is_empty(void);
 static uint32_t ringbuffer_get_used_count(void);
 static void ringbuffer_wake_other_core(uint8_t direction);
 static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(uint8_t direction);
+static ring_entry_t* ringbuffer_find_oldest_ready_entry(void);
 
 /**
- * Initialize ring buffer system
+ * @brief Initialize ring buffer system
+ * @return true if initialization successful, false otherwise
  */
 bool ringbuffer_init(void) {
     if (g_ringbuffer.initialized) {
@@ -78,7 +81,9 @@ bool ringbuffer_init(void) {
 }
 
 /**
- * Get free ring buffer entry for message production
+ * @brief Get free ring buffer entry for message production
+ * @return Pointer to free entry, NULL if buffer full
+ * @note Returned entry has status=FILLING, caller must set direction and payload
  */
 ring_entry_t* ringbuffer_get_free_entry(void) {
     if (!g_ringbuffer.initialized) {
@@ -90,20 +95,12 @@ ring_entry_t* ringbuffer_get_free_entry(void) {
     // Check if buffer is full
     if (ringbuffer_is_full()) {
         // Implement drop-oldest policy: find oldest READY entry and reuse it
-        ring_entry_t* oldest = NULL;
-        uint32_t oldest_timestamp = UINT32_MAX;
-        
-        for (uint32_t i = 0; i < RINGBUFFER_CAPACITY; i++) {
-            ring_entry_t* entry = &g_ringbuffer.entries[i];
-            if (entry->status == ENTRY_STATUS_READY && entry->timestamp < oldest_timestamp) {
-                oldest = entry;
-                oldest_timestamp = entry->timestamp;
-            }
-        }
+        ring_entry_t* oldest = ringbuffer_find_oldest_ready_entry();
         
         if (oldest) {
             // Reuse oldest entry
             oldest->status = ENTRY_STATUS_FILLING;
+            memset(oldest->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
             g_ringbuffer.overflow_count++;
             mutex_exit(&g_ringbuffer.access_mutex);
             return oldest;
@@ -131,7 +128,10 @@ ring_entry_t* ringbuffer_get_free_entry(void) {
 }
 
 /**
- * Enqueue filled entry to ring buffer (atomically mark as READY)
+ * @brief Enqueue filled entry to ring buffer (atomically mark as READY)
+ * @param entry Pointer to filled entry (must have status=FILLING)
+ * @return true if enqueue successful, false on error
+ * @note Triggers doorbell wakeup for other core
  */
 bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
     if (!g_ringbuffer.initialized || !entry) {
@@ -146,8 +146,16 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
         return false;
     }
     
+    // Validate entry belongs to our ring buffer
+    ptrdiff_t offset = entry - g_ringbuffer.entries;
+    if (offset < 0 || offset >= RINGBUFFER_CAPACITY) {
+        mutex_exit(&g_ringbuffer.access_mutex);
+        return false;
+    }
+    
     // Set timestamp and sequence
     entry->timestamp = to_ms_since_boot(get_absolute_time());
+    entry->sequence_id = g_ringbuffer.total_enqueued;
     
     // Mark as ready
     entry->status = ENTRY_STATUS_READY;
@@ -155,7 +163,7 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
     // Update statistics
     g_ringbuffer.total_enqueued++;
     
-    // Wake other core based on message direction
+    // Get direction for doorbell signaling
     uint8_t direction = entry->direction;
     
     mutex_exit(&g_ringbuffer.access_mutex);
@@ -167,7 +175,10 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
 }
 
 /**
- * Dequeue entry from ring buffer by direction
+ * @brief Dequeue entry from ring buffer by direction
+ * @param direction Message direction (RX_TCP_TO_UART or RX_UART_TO_TCP)
+ * @return Pointer to ready entry, NULL if none available
+ * @note Returned entry has status=READY, caller must mark CONSUMED when finished
  */
 ring_entry_t* ringbuffer_dequeue_entry(uint8_t direction) {
     if (!g_ringbuffer.initialized) {
@@ -189,7 +200,9 @@ ring_entry_t* ringbuffer_dequeue_entry(uint8_t direction) {
 }
 
 /**
- * Mark entry as consumed (return to free pool)
+ * @brief Mark entry as consumed (return to free pool)
+ * @param entry Pointer to consumed entry
+ * @note Entry status becomes FREE, available for reuse
  */
 void ringbuffer_mark_consumed(ring_entry_t* entry) {
     if (!g_ringbuffer.initialized || !entry) {
@@ -209,7 +222,9 @@ void ringbuffer_mark_consumed(ring_entry_t* entry) {
 }
 
 /**
- * Get count of messages waiting for processing by direction
+ * @brief Get count of messages waiting for processing by direction
+ * @param direction Message direction (RX_TCP_TO_UART or RX_UART_TO_TCP)
+ * @return Number of entries ready for processing
  */
 uint32_t ringbuffer_get_count(uint8_t direction) {
     if (!g_ringbuffer.initialized) {
@@ -231,7 +246,8 @@ uint32_t ringbuffer_get_count(uint8_t direction) {
 }
 
 /**
- * Get number of free entries available
+ * @brief Get number of free entries available
+ * @return Number of entries available for new messages
  */
 uint32_t ringbuffer_get_free_count(void) {
     if (!g_ringbuffer.initialized) {
@@ -252,7 +268,8 @@ uint32_t ringbuffer_get_free_count(void) {
 }
 
 /**
- * Get overflow count (messages dropped due to buffer full)
+ * @brief Get overflow count (messages dropped due to buffer full)
+ * @return Number of messages dropped since initialization
  */
 uint32_t ringbuffer_get_overflow_count(void) {
     if (!g_ringbuffer.initialized) {
@@ -263,7 +280,8 @@ uint32_t ringbuffer_get_overflow_count(void) {
 }
 
 /**
- * Get comprehensive ring buffer statistics
+ * @brief Get comprehensive ring buffer statistics
+ * @param stats Output structure for statistics (must not be NULL)
  */
 void ringbuffer_get_stats(ringbuffer_stats_t* stats) {
     if (!g_ringbuffer.initialized || !stats) {
@@ -272,10 +290,28 @@ void ringbuffer_get_stats(ringbuffer_stats_t* stats) {
     
     mutex_enter_blocking(&g_ringbuffer.access_mutex);
     
+    // Count entries by type within mutex protection
+    uint32_t free_count = 0;
+    uint32_t tcp_to_uart_count = 0;
+    uint32_t uart_to_tcp_count = 0;
+    
+    for (uint32_t i = 0; i < RINGBUFFER_CAPACITY; i++) {
+        ring_entry_t* entry = &g_ringbuffer.entries[i];
+        if (entry->status == ENTRY_STATUS_FREE) {
+            free_count++;
+        } else if (entry->status == ENTRY_STATUS_READY) {
+            if (entry->direction == RX_TCP_TO_UART) {
+                tcp_to_uart_count++;
+            } else if (entry->direction == RX_UART_TO_TCP) {
+                uart_to_tcp_count++;
+            }
+        }
+    }
+    
     stats->total_entries = RINGBUFFER_CAPACITY;
-    stats->free_entries = ringbuffer_get_free_count();
-    stats->entries_tcp_to_uart = ringbuffer_get_count(RX_TCP_TO_UART);
-    stats->entries_uart_to_tcp = ringbuffer_get_count(RX_UART_TO_TCP);
+    stats->free_entries = free_count;
+    stats->entries_tcp_to_uart = tcp_to_uart_count;
+    stats->entries_uart_to_tcp = uart_to_tcp_count;
     stats->total_enqueued = g_ringbuffer.total_enqueued;
     stats->total_dequeued = g_ringbuffer.total_dequeued;
     stats->overflow_count = g_ringbuffer.overflow_count;
@@ -285,7 +321,8 @@ void ringbuffer_get_stats(ringbuffer_stats_t* stats) {
 }
 
 /**
- * Reset ring buffer statistics counters
+ * @brief Reset ring buffer statistics counters
+ * @note Does not affect ring buffer contents or configuration
  */
 void ringbuffer_reset_statistics(void) {
     if (!g_ringbuffer.initialized) {
@@ -303,21 +340,25 @@ void ringbuffer_reset_statistics(void) {
 }
 
 /**
- * Get ring buffer capacity (total number of entries)
+ * @brief Get ring buffer capacity (total number of entries)
+ * @return Total ring buffer capacity
  */
 uint32_t ringbuffer_get_capacity(void) {
     return RINGBUFFER_CAPACITY;
 }
 
 /**
- * Check if ring buffer is initialized
+ * @brief Check if ring buffer is initialized
+ * @return true if initialized, false otherwise
  */
 bool ringbuffer_is_initialized(void) {
     return g_ringbuffer.initialized;
 }
 
 /**
- * Validate ring buffer entry pointer and contents
+ * @brief Validate ring buffer entry pointer and contents
+ * @param entry Pointer to entry to validate
+ * @return true if entry is valid, false otherwise
  */
 bool ringbuffer_validate_entry(const ring_entry_t* entry) {
     if (!entry || !g_ringbuffer.initialized) {
@@ -351,28 +392,33 @@ bool ringbuffer_validate_entry(const ring_entry_t* entry) {
 // Internal helper function implementations
 
 /**
- * Apply mask to index for circular buffer operation
+ * @brief Apply mask to index for circular buffer operation
+ * @param index Raw index value
+ * @return Masked index within buffer bounds
  */
 static uint32_t ringbuffer_mask(uint32_t index) {
     return index & (RINGBUFFER_CAPACITY - 1);
 }
 
 /**
- * Check if ring buffer is full
+ * @brief Check if ring buffer is full
+ * @return true if buffer is full, false otherwise
  */
 static bool ringbuffer_is_full(void) {
     return ringbuffer_get_used_count() >= RINGBUFFER_CAPACITY;
 }
 
 /**
- * Check if ring buffer is empty
+ * @brief Check if ring buffer is empty
+ * @return true if buffer is empty, false otherwise
  */
 static bool ringbuffer_is_empty(void) {
     return ringbuffer_get_used_count() == 0;
 }
 
 /**
- * Get number of used entries
+ * @brief Get number of used entries
+ * @return Number of entries not in FREE status
  */
 static uint32_t ringbuffer_get_used_count(void) {
     uint32_t used_count = 0;
@@ -385,24 +431,32 @@ static uint32_t ringbuffer_get_used_count(void) {
 }
 
 /**
- * Wake other core based on message direction (doorbell mechanism from ADR-007)
+ * @brief Wake other core based on message direction (doorbell mechanism from ADR-007)
+ * @param direction Message direction to determine which core to wake
  */
 static void ringbuffer_wake_other_core(uint8_t direction) {
     g_ringbuffer.doorbell_wakeups++;
     
     if (direction == RX_TCP_TO_UART) {
         // Message for Core0 (UART processing) - wake Core0
-        // Note: In real implementation, use multicore_doorbell_set_other_core()
-        // For testing, we just increment the counter
+        // Note: In full implementation, would use multicore_doorbell_set_other_core()
+        // For unit testing environment, we just track the wakeup count
+        #ifdef PICO_MULTICORE_H
+        // Only call if multicore is available (not in all test environments)
+        // multicore_doorbell_set_irq(DOORBELL_CORE1_TO_CORE0);
+        #endif
     } else if (direction == RX_UART_TO_TCP) {
         // Message for Core1 (TCP transmission) - wake Core1  
-        // Note: In real implementation, use multicore_doorbell_set_other_core()
-        // For testing, we just increment the counter
+        #ifdef PICO_MULTICORE_H
+        // multicore_doorbell_set_irq(DOORBELL_CORE0_TO_CORE1);
+        #endif
     }
 }
 
 /**
- * Find oldest entry with matching direction and READY status
+ * @brief Find oldest entry with matching direction and READY status
+ * @param direction Message direction to search for
+ * @return Pointer to oldest ready entry, NULL if none found
  */
 static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(uint8_t direction) {
     ring_entry_t* oldest = NULL;
@@ -413,6 +467,25 @@ static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(uint8_t direction
         if (entry->status == ENTRY_STATUS_READY && 
             entry->direction == direction && 
             entry->timestamp < oldest_timestamp) {
+            oldest = entry;
+            oldest_timestamp = entry->timestamp;
+        }
+    }
+    
+    return oldest;
+}
+
+/**
+ * @brief Find oldest ready entry for reuse during overflow
+ * @return Pointer to oldest ready entry, NULL if none found
+ */
+static ring_entry_t* ringbuffer_find_oldest_ready_entry(void) {
+    ring_entry_t* oldest = NULL;
+    uint32_t oldest_timestamp = UINT32_MAX;
+    
+    for (uint32_t i = 0; i < RINGBUFFER_CAPACITY; i++) {
+        ring_entry_t* entry = &g_ringbuffer.entries[i];
+        if (entry->status == ENTRY_STATUS_READY && entry->timestamp < oldest_timestamp) {
             oldest = entry;
             oldest_timestamp = entry->timestamp;
         }
