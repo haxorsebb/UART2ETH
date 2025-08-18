@@ -173,6 +173,29 @@ pico_enable_stdio_uart(test_core1_timer 0)
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_core1_timer)
 
+# Test for ring buffer
+add_executable(test_ringbuffer
+    test_ringbuffer.c
+    ../src/ringbuffer/ringbuffer.c
+)
+
+target_include_directories(test_ringbuffer PRIVATE ../include)
+
+target_link_libraries(test_ringbuffer
+    unity
+    pico_stdlib
+    pico_sync
+    pico_multicore      # Dual core support for doorbell testing
+    hardware_sync       # Mutex operations
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_ringbuffer 1)
+pico_enable_stdio_uart(test_ringbuffer 0)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_ringbuffer)
+
 # Add network tests subdirectory
 add_subdirectory(network)
 
