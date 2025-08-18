@@ -1,0 +1,53 @@
+{
+  "stress": {
+    "stress_duration": 120,
+    "concurrent_connections": 2,
+    "target_message_rate": 1000,
+    "total_messages": 23958,
+    "connection_failures": 2,
+    "actual_message_rate": 199.65
+  },
+  "summary": {
+    "overall_metrics": {
+      "messages_sent": 23958,
+      "messages_received": 23958,
+      "total_bytes": 6330835,
+      "throughput_kbps": 39.547741998891,
+      "average_latency_ms": 2.330017796182622,
+      "latency_percentiles_ms": {
+        "min": 0.7301339996956813,
+        "median": 1.7376179998791486,
+        "p95": 2.571701999841025,
+        "p99": 4.191228999843588,
+        "max": 1313.9168580000842
+      },
+      "test_duration_seconds": 156.33194065093994
+    },
+    "port_metrics": {
+      "4001": {
+        "messages_sent": 23958,
+        "messages_received": 23958,
+        "total_bytes": 6330835,
+        "throughput_kbps": 39.546978672064775,
+        "average_latency_ms": 2.330017796182622,
+        "latency_percentiles_ms": {
+          "min": 0.7301339996956813,
+          "median": 1.7376179998791486,
+          "p95": 2.571701999841025,
+          "p99": 4.191228999843588,
+          "max": 1313.9168580000842
+        },
+        "test_duration_seconds": 156.33485436439514
+      }
+    },
+    "test_configuration": {
+      "target_host": "10.10.10.19",
+      "target_ports": [
+        4001
+      ],
+      "test_duration": 120,
+      "target_throughput_kbps": 500
+    },
+    "collection_active": false
+  }
+}
