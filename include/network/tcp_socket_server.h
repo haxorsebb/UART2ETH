@@ -84,6 +84,14 @@ void tcp_socket_server_reset_stats(void);
 int tcp_socket_server_process_line(const char* input, size_t input_len, 
                                    char* output, size_t output_size);
 
+/**
+ * Check if buffer ends with exactly '!\r\n'
+ * @param buffer Input buffer to check
+ * @param length Length of buffer
+ * @return true if buffer ends with '!\r\n', false otherwise
+ */
+bool check_message_end(const char* buffer, size_t length);
+
 #ifdef __cplusplus
 }
 #endif
