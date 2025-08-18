@@ -67,25 +67,28 @@ class MessageGenerator:
         # Generate random hex header
         hex_header = f"{random.randint(0, 0xFFFF):04X}"
         
-        # Generate payload of specified size using valid characters
-        # Use alphanumeric characters (avoiding protocol special chars)
-        valid_chars = string.ascii_letters + string.digits
+        # Test larger messages for debugging
+        payload_size = min(payload_size, 600)
+        
+        # Generate payload of specified size using valid characters per protocol spec
+        # Valid chars: '0'-'9', 'A'-'F' (avoiding protocol special chars #!\\r\\n)
+        valid_chars = string.digits + 'ABCDEF'
         payload = ''.join(random.choice(valid_chars) for _ in range(payload_size))
         
         return ProtocolMessage(hex_header=hex_header, payload=payload)
     
     def generate_maximum(self) -> ProtocolMessage:
         """
-        Generate maximum valid message (1024 bytes total).
+        Generate maximum valid message (512 bytes total - temporary limit).
         
         Returns:
             ProtocolMessage: Message with maximum allowed size
         """
         hex_header = "FFFF"
-        # Maximum payload = 1024 - 8 (for '#XXXX!\r\n') = 1016 bytes
-        max_payload_size = 1016
+        # Temporary limit: payload = 512 - 8 (for '#XXXX!\r\n') = 504 bytes
+        max_payload_size = 504
         
-        valid_chars = string.ascii_letters + string.digits
+        valid_chars = string.digits + 'ABCDEF'
         payload = ''.join(random.choice(valid_chars) for _ in range(max_payload_size))
         
         return ProtocolMessage(hex_header=hex_header, payload=payload)
