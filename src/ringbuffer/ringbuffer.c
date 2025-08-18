@@ -55,6 +55,7 @@ static uint32_t ringbuffer_get_used_count(void);
 static void ringbuffer_wake_other_core(uint8_t direction);
 static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(uint8_t direction);
 static ring_entry_t* ringbuffer_find_oldest_ready_entry(void);
+static void ringbuffer_secure_clear_entry(ring_entry_t* entry);
 
 /**
  * @brief Initialize ring buffer system
@@ -98,9 +99,16 @@ ring_entry_t* ringbuffer_get_free_entry(void) {
         ring_entry_t* oldest = ringbuffer_find_oldest_ready_entry();
         
         if (oldest) {
-            // Reuse oldest entry
+            // SECURITY: Validate oldest entry before reuse
+            if (!ringbuffer_validate_entry(oldest)) {
+                g_ringbuffer.overflow_count++;
+                mutex_exit(&g_ringbuffer.access_mutex);
+                return NULL;
+            }
+            
+            // Reuse oldest entry with secure clearing
             oldest->status = ENTRY_STATUS_FILLING;
-            memset(oldest->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
+            ringbuffer_secure_clear_entry(oldest);
             g_ringbuffer.overflow_count++;
             mutex_exit(&g_ringbuffer.access_mutex);
             return oldest;
@@ -116,12 +124,19 @@ ring_entry_t* ringbuffer_get_free_entry(void) {
     uint32_t index = ringbuffer_mask(g_ringbuffer.head);
     ring_entry_t* entry = &g_ringbuffer.entries[index];
     
-    // Mark as filling
-    entry->status = ENTRY_STATUS_FILLING;
-    memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
+    // SECURITY: Validate entry is actually free
+    if (entry->status != ENTRY_STATUS_FREE) {
+        // This should not happen - indicates corruption
+        mutex_exit(&g_ringbuffer.access_mutex);
+        return NULL;
+    }
     
-    // Move head forward
-    g_ringbuffer.head++;
+    // Mark as filling with secure clearing
+    entry->status = ENTRY_STATUS_FILLING;
+    ringbuffer_secure_clear_entry(entry);
+    
+    // Move head forward (with overflow protection)
+    g_ringbuffer.head = (g_ringbuffer.head + 1) & 0x7FFFFFFF;
     
     mutex_exit(&g_ringbuffer.access_mutex);
     return entry;
@@ -153,9 +168,27 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
         return false;
     }
     
-    // Set timestamp and sequence
+    // SECURITY: Validate payload length to prevent buffer overflow
+    if (entry->payload_length > RINGBUFFER_PAYLOAD_MAX_SIZE) {
+        mutex_exit(&g_ringbuffer.access_mutex);
+        return false;
+    }
+    
+    // SECURITY: Validate direction is within expected range
+    if (entry->direction != RX_TCP_TO_UART && entry->direction != RX_UART_TO_TCP) {
+        mutex_exit(&g_ringbuffer.access_mutex);
+        return false;
+    }
+    
+    // SECURITY: Validate UART channel is within expected range
+    if (entry->uart_channel > 3) {
+        mutex_exit(&g_ringbuffer.access_mutex);
+        return false;
+    }
+    
+    // Set timestamp and sequence (with overflow protection)
     entry->timestamp = to_ms_since_boot(get_absolute_time());
-    entry->sequence_id = g_ringbuffer.total_enqueued;
+    entry->sequence_id = g_ringbuffer.total_enqueued & 0x7FFFFFFF; // Prevent overflow issues
     
     // Mark as ready
     entry->status = ENTRY_STATUS_READY;
@@ -211,12 +244,22 @@ void ringbuffer_mark_consumed(ring_entry_t* entry) {
     
     mutex_enter_blocking(&g_ringbuffer.access_mutex);
     
-    // Mark as free
-    entry->status = ENTRY_STATUS_FREE;
+    // SECURITY: Validate entry belongs to our ring buffer
+    ptrdiff_t offset = entry - g_ringbuffer.entries;
+    if (offset < 0 || offset >= RINGBUFFER_CAPACITY) {
+        mutex_exit(&g_ringbuffer.access_mutex);
+        return;
+    }
     
-    // Clear sensitive data
-    memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
-    entry->payload_length = 0;
+    // SECURITY: Only allow consuming READY entries
+    if (entry->status != ENTRY_STATUS_READY) {
+        mutex_exit(&g_ringbuffer.access_mutex);
+        return;
+    }
+    
+    // Mark as free and secure clear all data
+    entry->status = ENTRY_STATUS_FREE;
+    ringbuffer_secure_clear_entry(entry);
     
     mutex_exit(&g_ringbuffer.access_mutex);
 }
@@ -492,4 +535,28 @@ static ring_entry_t* ringbuffer_find_oldest_ready_entry(void) {
     }
     
     return oldest;
+}
+
+/**
+ * @brief Securely clear all sensitive data from ring buffer entry
+ * @param entry Pointer to entry to clear (must not be NULL)
+ * @note Clears payload, reserved fields, and resets all metadata
+ */
+static void ringbuffer_secure_clear_entry(ring_entry_t* entry) {
+    if (!entry) {
+        return;
+    }
+    
+    // Clear all payload data
+    memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
+    
+    // SECURITY: Clear reserved fields to prevent information disclosure
+    memset(entry->reserved, 0, sizeof(entry->reserved));
+    
+    // Reset metadata (but preserve status which is set by caller)
+    entry->uart_channel = 0;
+    entry->direction = 0;
+    entry->payload_length = 0;
+    entry->timestamp = 0;
+    entry->sequence_id = 0;
 }
