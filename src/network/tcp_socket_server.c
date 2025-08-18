@@ -23,7 +23,8 @@
 
 // Maximum number of concurrent connections
 #define TCP_SERVER_MAX_CONNECTIONS 4
-#define TCP_SERVER_LINE_BUFFER_SIZE 256
+#define TCP_SERVER_LINE_BUFFER_SIZE 1024
+#define MINIMUM_MESSAGE_LENGTH 8  // '#0000!\r\n' minimum
 
 // TCP server error codes for logging
 #define TCP_ERROR_PCB_CREATION_FAILED 1
@@ -35,7 +36,7 @@
  */
 typedef struct tcp_connection {
     struct tcp_pcb* pcb;                           // lwIP TCP PCB
-    char line_buffer[TCP_SERVER_LINE_BUFFER_SIZE]; // Line assembly buffer
+    char line_buffer[TCP_SERVER_LINE_BUFFER_SIZE+1]; // Line assembly buffer
     size_t line_pos;                               // Current position in buffer
     bool active;                                   // Connection active flag
     uint32_t bytes_sent;                          // Bytes sent on this connection
@@ -73,6 +74,7 @@ bool tcp_socket_server_init(uint16_t port) {
         });
         return true;
     }
+    
     
     // Check network is initialized (allow non-READY states for unit testing)
     network_status_t status = network_manager_get_status();
@@ -245,6 +247,19 @@ int tcp_socket_server_process_line(const char* input, size_t input_len,
     return (int)copy_len;
 }
 
+/**
+ * @brief Check if buffer ends with exactly '!\r\n'
+ */
+bool check_message_end(const char* buffer, size_t length) {
+    if (!buffer || length < MINIMUM_MESSAGE_LENGTH) {
+        return false;
+    }
+    
+    return buffer[length-3] == '!' && 
+           buffer[length-2] == '\r' && 
+           buffer[length-1] == '\n';
+}
+
 // Private function implementations
 
 /**
@@ -278,7 +293,9 @@ static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t
     conn->active = true;
     conn->bytes_sent = 0;
     conn->bytes_received = 0;
-    memset(conn->line_buffer, 0, sizeof(conn->line_buffer));
+    // Clear buffer with known pattern for debugging
+    memset(conn->line_buffer, 0xAA, sizeof(conn->line_buffer));
+    conn->line_buffer[sizeof(conn->line_buffer)-1] = '\0';
     
     // Set callbacks
     tcp_arg(newpcb, conn);
@@ -320,14 +337,25 @@ static err_t tcp_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, struc
     }
     
     // Process received data
-    int processed = process_received_data(conn, (const char*)p->payload, p->len);
-    if (processed > 0) {
-        tcp_recved(tpcb, processed);
-        conn->bytes_received += processed;
-        g_server_stats.bytes_received += processed;
+    // Process entire pbuf chain!
+    struct pbuf *q = p;
+    uint16_t total_len = p->tot_len;
+    int processed = 0;
+
+    while (q != NULL) {
+        // Extract data from q->payload, length q->len
+        processed += process_received_data(conn, (const char*)q->payload, q->len);
+
+        if (processed> 0) {
+            conn->bytes_received += processed;
+            g_server_stats.bytes_received += processed;
+        }
+        q = q->next;
     }
-    
+
+    tcp_recved(tpcb, total_len);
     pbuf_free(p);
+    
     return ERR_OK;
 }
 
@@ -425,66 +453,71 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
     if (!conn || !data || len == 0) {
         return 0;
     }
-    char buf[1025];
-    if (len> 1024) {
-        len=1024;
-    }
-
-    memset(buf, 0x0, 1025);
-    memcpy(buf,data,len);
-
+    
     // Update activity timestamp
     conn->last_activity_ms = to_ms_since_boot(get_absolute_time());
     
-    int processed = 0;
-    printf("incoming: %s", buf);
+    // DEBUG: Print incoming raw data byte-by-byte in hex
     DEBUG_ONLY({
+        printf("TCP recv %d bytes: ", len);
+
         for (size_t i = 0; i < len; i++) {
-            char ch = data[i];
-            processed++;
-            
-            // Add character to line buffer with bounds checking
-            if (conn->line_pos < TCP_SERVER_LINE_BUFFER_SIZE - 1) {
-                conn->line_buffer[conn->line_pos++] = ch;
-            } else if (ch != '\n' && ch != '\r') {
-                // Buffer full, skip non-newline characters
-                continue;
-            }
-            
-            // Process complete line on newline
-            if (ch == '\n' || ch == '\r') {
-                if (conn->line_pos > 1) { // Skip empty lines
-                    // Ensure null termination with bounds check
-                    if (conn->line_pos < TCP_SERVER_LINE_BUFFER_SIZE) {
-                        conn->line_buffer[conn->line_pos] = '\0';
-                    } else {
-                        conn->line_buffer[TCP_SERVER_LINE_BUFFER_SIZE - 1] = '\0';
-                    }
-                    
-                    // Echo the line back
-                    err_t err = tcp_write(conn->pcb, conn->line_buffer, conn->line_pos, TCP_WRITE_FLAG_COPY);
-                    if (err == ERR_OK) {
-                        tcp_output(conn->pcb);
-                        g_server_stats.lines_processed++;
-                        
-                        DEBUG_ONLY({
-                            printf("TCP Server: Echoed line: %s", conn->line_buffer);
-                        });
-                    } else {
-                        // Handle write error - close connection to prevent resource leak
-                        DEBUG_ONLY({
-                            printf("TCP Server: Write failed (err=%d), closing connection\n", err);
-                        });
-                        close_connection(conn);
-                        return processed; // Exit early since connection is closed
-                    }
-                }
-                
-                // Reset line buffer
-                conn->line_pos = 0;
-                memset(conn->line_buffer, 0, sizeof(conn->line_buffer));
-            }
+            printf("%02X ", (unsigned char)data[i]);
         }
+        printf("\n");
+    });
+    
+    int processed = 0;
+    
+    //copy to buffer
+    //prevent overflow
+    if( (conn->line_pos + len) > TCP_SERVER_LINE_BUFFER_SIZE ) {    
+        len = TCP_SERVER_LINE_BUFFER_SIZE - conn->line_pos;
+    }
+    memcpy( &(conn->line_buffer[conn->line_pos]), data, len);
+    conn->line_pos+=len;
+    processed = len;
+
+    bool message_complete = check_message_end(conn->line_buffer, conn->line_pos);
+    if (message_complete) {
+        processed = len;
+        
+        DEBUG_ONLY({
+            printf("Message end detected! Buffer length: %zu\n", len);
+        });
+        err_t err = tcp_write(conn->pcb, conn->line_buffer, conn->line_pos, TCP_WRITE_FLAG_COPY);
+        
+        if (err == ERR_OK) {
+            tcp_output(conn->pcb);
+            g_server_stats.lines_processed++;
+            DEBUG_ONLY({
+                printf("TCP Server: Echoed message (%zu bytes) - SUCCESS\n", conn->line_pos);
+            });
+        } else {
+            // Handle write error - close connection
+            DEBUG_ONLY({
+                printf("TCP Server: Write failed (err=%d) for %zu bytes, closing connection\n", err, conn->line_pos);
+            });
+            close_connection(conn);
+        }
+        
+    }
+    else {
+        //message end not yes detected, this is normal, there is a tcp window, we will probably not receive messages > 538 bytes at once    
+    }
+    
+    if(message_complete || (conn->line_pos >= TCP_SERVER_LINE_BUFFER_SIZE)) {
+        DEBUG_ONLY({
+            printf("TCP recv buffer RESET\n");
+    });
+        // Reset line buffer for next message
+        conn->line_pos = 0;
+        memset(conn->line_buffer, 0, sizeof(conn->line_buffer));
+    }
+
+    
+    DEBUG_ONLY({
+        printf("returning processed: %d\n", processed);
     });
     return processed;
 }

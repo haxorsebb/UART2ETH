@@ -146,14 +146,20 @@ void lwip_netif_enc28j60_process(void) {
                     
                     // Feed packet to lwIP
                     if (g_enc28j60_netif.input(p, &g_enc28j60_netif) != ERR_OK) {
-                        DEBUG_ONLY({ printf("lwIP netif: Failed to input packet to lwIP\n"); });
+                        DEBUG_ONLY({ 
+                            printf("lwIP netif: Failed to input packet to lwIP\n"); 
+                        });
                         pbuf_free(p);
                     }
                     else { 
-                        DEBUG_ONLY( { printf("lwIP: Packet successfully fed to lwIP!\n"); });
+                        DEBUG_ONLY( { 
+                            printf("lwIP: %d bytes Packet successfully fed to lwIP!\n", packet.length); 
+                        });
                     }
                 } else {
-                    DEBUG_ONLY({ printf("lwIP netif: Failed to allocate pbuf for incoming packet (length=%u)\n", packet.length); });
+                    DEBUG_ONLY({ 
+                        printf("lwIP netif: Failed to allocate pbuf for incoming packet (length=%u)\n", packet.length); 
+                    });
                 }
                 packets_processed++;
             }
