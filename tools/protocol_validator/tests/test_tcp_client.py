@@ -70,8 +70,10 @@ class TestTCPClient(unittest.TestCase):
         # Setup mock connection
         mock_reader = AsyncMock()
         mock_writer = AsyncMock()
-        mock_reader.readline.return_value = b"#1234test!\r\n"
-        # Make is_closing synchronous but other methods async
+        
+        # Mock proper protocol framing: return message byte by byte then end
+        response_bytes = b"#1234test!\r\n"
+        mock_reader.read.side_effect = [bytes([b]) for b in response_bytes] + [b""]
         mock_writer.is_closing = MagicMock(return_value=False)
         
         self.client.reader = mock_reader
@@ -89,14 +91,21 @@ class TestTCPClient(unittest.TestCase):
         # Verify message was sent
         mock_writer.write.assert_called_once_with(b"#1234test!\r\n")
         mock_writer.drain.assert_called_once()
-        mock_reader.readline.assert_called_once()
+        # Should call read() multiple times for protocol framing
+        self.assertGreater(mock_reader.read.call_count, 0)
 
     async def test_send_message_timeout(self):
         """Test message timeout handling."""
         # Setup mock connection with timeout
         mock_reader = AsyncMock()
         mock_writer = AsyncMock()
-        mock_reader.readline.side_effect = asyncio.TimeoutError()
+        
+        # Mock slow read that never completes
+        async def slow_read(size):
+            await asyncio.sleep(1.0)  # Longer than timeout
+            return b"x"
+            
+        mock_reader.read.side_effect = slow_read
         mock_writer.is_closing = MagicMock(return_value=False)
         
         self.client.reader = mock_reader
@@ -105,7 +114,7 @@ class TestTCPClient(unittest.TestCase):
         message = ProtocolMessage(hex_header="1234", payload="test")
         
         with self.assertRaises(asyncio.TimeoutError):
-            await self.client.send_message(message, timeout=1.0)
+            await self.client.send_message(message, timeout=0.01)  # Very short timeout
 
     async def test_disconnect(self):
         """Test proper connection cleanup."""

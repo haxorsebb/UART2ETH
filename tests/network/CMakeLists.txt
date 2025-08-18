@@ -119,3 +119,25 @@ pico_set_uf2_family(test_tcp_socket_server "rp2350-arm-s")
 
 # Create UF2 output
 pico_add_extra_outputs(test_tcp_socket_server)
+
+# Create test executable for message framing
+add_executable(test_message_framing
+    test_message_framing.c
+)
+
+# Link required libraries
+target_link_libraries(test_message_framing
+    unity
+    tcp_socket_server
+    pico_stdlib
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_message_framing 1)
+pico_enable_stdio_uart(test_message_framing 1)
+
+# Set UF2 family for RP2350
+pico_set_uf2_family(test_message_framing "rp2350-arm-s")
+
+# Create UF2 output
+pico_add_extra_outputs(test_message_framing)

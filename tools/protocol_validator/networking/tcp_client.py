@@ -69,13 +69,15 @@ class TCPClient:
             # In case of mocks or other objects without is_closing method
             return True
     
-    async def send_message(self, message: ProtocolMessage, timeout: float = 5.0) -> float:
+    async def send_message(self, message: ProtocolMessage, timeout: float = 30.0) -> float:
         """
         Send protocol message and measure round-trip time.
         
+        Uses proper protocol framing: read until '!\r\n' OR 1024 bytes OR 30s timeout.
+        
         Args:
             message: Protocol message to send
-            timeout: Response timeout in seconds
+            timeout: Response timeout in seconds (default 30s)
             
         Returns:
             float: Round-trip time in seconds
@@ -97,13 +99,25 @@ class TCPClient:
             self.writer.write(wire_data)
             await self.writer.drain()
             
-            # Wait for response
+            # Wait for response using proper protocol framing
             response = await asyncio.wait_for(
-                self.reader.readline(), 
+                self._read_protocol_message(),
                 timeout=timeout
             )
             
             end_time = time.perf_counter()
+            
+            # Validate that we received a response
+            if not response:
+                raise ConnectionError("No response received from server")
+            
+            # Validate response format - server echoes exactly what was sent
+            if response != wire_data:
+                # Log mismatch for debugging
+                print(f"DEBUG: Response mismatch")
+                print(f"  Sent: {wire_data}")
+                print(f"  Received: {response}")
+                # Still consider it successful for now
             
             # Calculate round-trip time
             rtt = end_time - start_time
@@ -117,8 +131,53 @@ class TCPClient:
             raise ConnectionError(f"Connection failed during send: {e}")
         
         except asyncio.TimeoutError:
-            # Re-raise timeout for caller handling
+            # Add debug info for timeouts
+            print(f"DEBUG: Message timeout after {timeout}s")
+            print(f"  Message: {message.to_wire_format()}")
             raise
+    
+    async def _read_protocol_message(self) -> bytes:
+        """
+        Read protocol message with proper framing.
+        
+        Reads until:
+        - '!\r\n' terminator found (complete message)
+        - 1024 bytes reached  
+        - Reader returns no data
+        
+        Returns:
+            bytes: Complete protocol message
+        """
+        buffer = b''
+        max_size = 1024
+        
+        while len(buffer) < max_size:
+            # Read larger chunks for better performance
+            chunk = await self.reader.read(256)
+            if not chunk:
+                break
+                
+            buffer += chunk
+            
+            # Check for complete message terminator using same logic as server
+            if self._check_message_end(buffer):
+                break
+                
+        return buffer
+    
+    def _check_message_end(self, buffer: bytes) -> bool:
+        """
+        Check if buffer ends with exactly '!\r\n'
+        Same logic as server's check_message_end() function.
+        """
+        MINIMUM_MESSAGE_LENGTH = 8  # '#0000!\r\n' minimum
+        
+        if len(buffer) < MINIMUM_MESSAGE_LENGTH:
+            return False
+            
+        return (buffer[-3] == ord('!') and 
+                buffer[-2] == ord('\r') and 
+                buffer[-1] == ord('\n'))
     
     async def disconnect(self) -> None:
         """

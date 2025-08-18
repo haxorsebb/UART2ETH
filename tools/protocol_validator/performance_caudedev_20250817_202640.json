@@ -1,0 +1,31 @@
+{
+  "stress": {
+    "stress_duration": 10,
+    "concurrent_connections": 1,
+    "target_message_rate": 1000,
+    "total_messages": 0,
+    "connection_failures": 2,
+    "actual_message_rate": 0.0
+  },
+  "summary": {
+    "overall_metrics": {
+      "messages_sent": 0,
+      "messages_received": 0,
+      "total_bytes": 0,
+      "throughput_kbps": 0.0,
+      "average_latency_ms": 0.0,
+      "latency_percentiles_ms": {},
+      "test_duration_seconds": 10.742342710494995
+    },
+    "port_metrics": {},
+    "test_configuration": {
+      "target_host": "10.10.10.10",
+      "target_ports": [
+        4001
+      ],
+      "test_duration": 10,
+      "target_throughput_kbps": 500
+    },
+    "collection_active": false
+  }
+}
