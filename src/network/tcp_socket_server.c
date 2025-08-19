@@ -19,11 +19,15 @@
 #include "lwip/tcp.h"
 #include "lwip/pbuf.h"
 #include "lwip/err.h"
+#include "state_machine.h"
 #include <string.h>
 #include <stdio.h>
 
-// Maximum number of concurrent connections
-#define TCP_SERVER_MAX_CONNECTIONS 4
+// Connection Management Policy:
+// Single Connection Mode - Only one active connection allowed at a time
+// When a new connection arrives, all existing connections are closed
+// This ensures one server handles all connections sequentially
+#define TCP_SERVER_MAX_CONNECTIONS 4  // Pool size (only 1 active due to single connection policy)
 #define TCP_SERVER_LINE_BUFFER_SIZE 1024
 #define MINIMUM_MESSAGE_LENGTH 8  // '#0000!\r\n' minimum
 
@@ -40,6 +44,7 @@ typedef struct tcp_connection {
     char line_buffer[TCP_SERVER_LINE_BUFFER_SIZE+1]; // Line assembly buffer
     size_t line_pos;                               // Current position in buffer
     bool active;                                   // Connection active flag
+    uint8_t uart_channel;                          // Associated UART channel (0-3)
     uint32_t bytes_sent;                          // Bytes sent on this connection
     uint32_t bytes_received;                      // Bytes received on this connection
     uint32_t last_activity_ms;                    // For timeout detection
@@ -60,6 +65,7 @@ static err_t tcp_connection_sent_callback(void* arg, struct tcp_pcb* tpcb, u16_t
 static tcp_connection_t* find_free_connection(void);
 static tcp_connection_t* find_connection_by_pcb(struct tcp_pcb* pcb);
 static void close_connection(tcp_connection_t* conn);
+static void close_all_connections(void);
 static int process_received_data(tcp_connection_t* conn, const char* data, size_t len);
 
 /**
@@ -196,18 +202,21 @@ void tcp_socket_server_process(void) {
     // Process only ONE message per call (test requirement #9)
     ring_entry_t* uart_to_tcp_msg = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
     if (uart_to_tcp_msg) {
-        DEBUG_ONLY({
-            printf("DEBUG: Core1 sending echo response, length=%u\n", uart_to_tcp_msg->payload_length);
-        });
-        
+        printf("TCP Server: DEQUEUE UART→TCP echo message - %u bytes: '", uart_to_tcp_msg->payload_length);
+        for (uint32_t i = 0; i < uart_to_tcp_msg->payload_length && i < 32; i++) {
+            printf("%c", uart_to_tcp_msg->payload[i] >= 32 && uart_to_tcp_msg->payload[i] < 127 ? uart_to_tcp_msg->payload[i] : '.');
+        }
+        printf("'\n");
+
         // Find an active connection to send the response
         // For now, send to first active connection (echo functionality)
         // TODO: In full implementation, track which connection sent the original message
         for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
             if (g_connections[i].active && g_connections[i].pcb) {
-                err_t err = tcp_write(g_connections[i].pcb, 
-                                    uart_to_tcp_msg->payload, 
-                                    uart_to_tcp_msg->payload_length, 
+                printf("TCP Server: SEND echo response to connection %d\n", i);
+                err_t err = tcp_write(g_connections[i].pcb,
+                                    uart_to_tcp_msg->payload,
+                                    uart_to_tcp_msg->payload_length,
                                     TCP_WRITE_FLAG_COPY);
                 
                 if (err == ERR_OK) {
@@ -308,10 +317,54 @@ bool check_message_end(const char* buffer, size_t length) {
            buffer[length-1] == '\n';
 }
 
+/**
+ * @brief Send message to TCP connection associated with specific UART channel
+ * 
+ * Since we now use single connection policy, this function sends to the
+ * currently active connection regardless of UART channel mapping.
+ */
+bool tcp_socket_server_send_to_uart_channel(uint8_t uart_channel, const uint8_t* data, size_t length) {
+    if (!data || length == 0) {
+        return false;
+    }
+    
+    // Find the currently active connection (should be only one due to single connection policy)
+    for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_connections[i].active && g_connections[i].pcb) {
+            DEBUG_ONLY({
+                printf("TCP Server: Sending %zu bytes to active connection (UART %u)\n", length, uart_channel);
+            });
+            
+            err_t err = tcp_write(g_connections[i].pcb, data, length, TCP_WRITE_FLAG_COPY);
+            if (err == ERR_OK) {
+                tcp_output(g_connections[i].pcb);
+                g_connections[i].bytes_sent += length;
+                g_server_stats.bytes_sent += length;
+                return true;
+            } else {
+                DEBUG_ONLY({
+                    printf("TCP Server: Failed to send data (error %d)\n", err);
+                });
+                return false;
+            }
+        }
+    }
+    
+    DEBUG_ONLY({
+        printf("TCP Server: No active connection to send to UART %u\n", uart_channel);
+    });
+    return false;
+}
+
 // Private function implementations
 
 /**
  * @brief TCP accept callback
+ * 
+ * Single Connection Policy:
+ * - Only one active connection allowed at a time
+ * - Close all existing connections when a new one arrives
+ * - This ensures one server handles all connections sequentially
  */
 static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t err) {
     LWIP_UNUSED_ARG(arg);
@@ -324,11 +377,18 @@ static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t
         printf("TCP Server: New connection attempt\n");
     });
     
-    // Find free connection slot
+    // Single Connection Policy: Close all existing connections
+    close_all_connections();
+    
+    DEBUG_ONLY({
+        printf("TCP Server: All existing connections closed, accepting new connection\n");
+    });
+    
+    // Find free connection slot (should always succeed after closing all)
     tcp_connection_t* conn = find_free_connection();
     if (!conn) {
         DEBUG_ONLY({
-            printf("TCP Server: No free connection slots\n");
+            printf("TCP Server: No free connection slots after cleanup\n");
         });
         g_server_stats.connection_errors++;
         tcp_close(newpcb);
@@ -341,6 +401,12 @@ static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t
     conn->active = true;
     conn->bytes_sent = 0;
     conn->bytes_received = 0;
+    
+    // Assign UART channel based on listening port
+    // Port 4001 -> UART 0, Port 4002 -> UART 1, etc.
+    conn->uart_channel = (g_listen_port >= 4001 && g_listen_port <= 4004) ? 
+                         (g_listen_port - 4001) : 0;
+    
     // Clear buffer with known pattern for debugging
     memset(conn->line_buffer, 0xAA, sizeof(conn->line_buffer));
     conn->line_buffer[sizeof(conn->line_buffer)-1] = '\0';
@@ -469,6 +535,30 @@ static tcp_connection_t* find_connection_by_pcb(struct tcp_pcb* pcb) {
 }
 
 /**
+ * @brief Close all active connections
+ * 
+ * Used to implement single connection policy - close all existing
+ * connections when a new one arrives.
+ */
+static void close_all_connections(void) {
+    int closed_count = 0;
+    
+    for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
+        if (g_connections[i].active) {
+            close_connection(&g_connections[i]);
+            closed_count++;
+        }
+    }
+    
+    if (closed_count > 0) {
+        DEBUG_ONLY({
+            printf("TCP Server: Closed %d existing connections\n", closed_count);
+        });
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, closed_count);
+    }
+}
+
+/**
  * @brief Close connection
  */
 static void close_connection(tcp_connection_t* conn) {
@@ -540,7 +630,7 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         if (entry) {
             // Setup ring buffer entry
             entry->direction = RX_TCP_TO_UART;
-            entry->uart_channel = 0;  // Default UART channel
+            entry->uart_channel = conn->uart_channel;  // Use connection's UART channel
             entry->payload_length = conn->line_pos;
             
             // Copy message data to ring buffer
@@ -553,18 +643,18 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
             bool enqueue_result = ringbuffer_enqueue_entry(entry);
             if (enqueue_result) {
                 g_server_stats.lines_processed++;
-                DEBUG_ONLY({
+            //    DEBUG_ONLY({
                     printf("TCP Server: Message enqueued for Core0 (%zu bytes) - SUCCESS\n", conn->line_pos);
-                });
+            //    });
             } else {
-                DEBUG_ONLY({
+            //    DEBUG_ONLY({
                     printf("TCP Server: Failed to enqueue message for Core0\n");
-                });
+            //    });
             }
         } else {
-            DEBUG_ONLY({
+            //DEBUG_ONLY({
                 printf("TCP Server: No free ring buffer entry available\n");
-            });
+            //});
         }
     }
     else {
@@ -580,7 +670,6 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         memset(conn->line_buffer, 0, sizeof(conn->line_buffer));
     }
 
-    
     DEBUG_ONLY({
         printf("returning processed: %d\n", processed);
     });
