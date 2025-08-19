@@ -153,6 +153,13 @@ bool uart1_driver_send_char(char c) {
     // Software loopback: if loopback enabled, immediately put sent char into RX buffer
     // This provides immediate loopback for testing without relying on IRQ handler
     if (g_uart1_state.config.enable_loopback) {
+        // For the first character of a message, clear any stale data
+        static bool first_char_after_init = true;
+        if (first_char_after_init) {
+            uart1_driver_clear_rx_buffer();
+            first_char_after_init = false;
+        }
+        
         size_t next_rx_head = (g_rx_head + 1) % UART1_RX_BUFFER_SIZE;
         if (next_rx_head != g_rx_tail) {
             g_rx_buffer[g_rx_head] = (uint8_t)c;

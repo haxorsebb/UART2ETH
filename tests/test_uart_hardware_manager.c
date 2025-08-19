@@ -69,6 +69,15 @@ void setUp(void) {
     reset_test_environment();
     g_initial_log_count = log_manager_get_total_count();
     memset(g_received_buffer, 0, sizeof(g_received_buffer));
+    
+    // Clear any residual data from previous tests
+    if (uart_hardware_manager_is_ready()) {
+        // Clear the RX buffer to ensure clean state
+        while (uart_hardware_manager_process_incoming_data()) {
+            // Process and discard any stale data
+        }
+    }
+    
     printf("TEST: setUp() complete\n");
 }
 
@@ -367,6 +376,13 @@ static bool send_and_verify_loopback(const char* message) {
  * @brief Create TCP→UART message in ring buffer
  */
 static void create_tcp_to_uart_message(const char* payload) {
+    // Clear any stale RX data before sending new message
+    if (uart_hardware_manager_is_ready()) {
+        while (uart_hardware_manager_process_incoming_data()) {
+            // Process and discard any stale data
+        }
+    }
+    
     ring_entry_t* entry = ringbuffer_get_free_entry();
     TEST_ASSERT_NOT_NULL_MESSAGE(entry, "Failed to get free ring buffer entry");
     
@@ -395,13 +411,27 @@ static bool verify_uart_to_tcp_response(const char* expected_payload) {
     
     // Verify payload matches expected
     if (response->payload_length != strlen(expected_payload)) {
-        printf("TEST: Response payload length mismatch\n");
+        printf("TEST: Response payload length mismatch - expected: %zu, actual: %u\n", 
+               strlen(expected_payload), response->payload_length);
+        printf("TEST: Expected payload: '%s'\n", expected_payload);
+        printf("TEST: Actual payload: '%.*s'\n", response->payload_length, response->payload);
         ringbuffer_mark_consumed(response);
         return false;
     }
     
     if (strncmp((char*)response->payload, expected_payload, response->payload_length) != 0) {
         printf("TEST: Response payload content mismatch\n");
+        printf("TEST: Expected (%zu chars): '%s'\n", strlen(expected_payload), expected_payload);
+        printf("TEST: Actual (%u chars): '%.*s'\n", response->payload_length, response->payload_length, response->payload);
+        printf("TEST: Expected bytes: ");
+        for (size_t i = 0; i < strlen(expected_payload); i++) {
+            printf("%02X ", (unsigned char)expected_payload[i]);
+        }
+        printf("\nTEST: Actual bytes: ");
+        for (uint32_t i = 0; i < response->payload_length; i++) {
+            printf("%02X ", (unsigned char)response->payload[i]);
+        }
+        printf("\n");
         ringbuffer_mark_consumed(response);
         return false;
     }

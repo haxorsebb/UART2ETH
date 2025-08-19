@@ -309,15 +309,29 @@ static bool process_incoming_characters(void) {
         char c = uart1_driver_read_char();
         g_manager_stats.bytes_received++;
         
+        // Skip leading null bytes at start of new line
+        if (g_line_buffer_pos == 0 && c == '\0') {
+            printf("DEBUG: Skipping leading null byte\n");
+            continue;  // Skip this character
+        }
+        
         // Add character to line buffer
         if (g_line_buffer_pos < (LINE_BUFFER_SIZE - 1)) {
             g_line_buffer[g_line_buffer_pos++] = c;
+            printf("DEBUG: Added char 0x%02X ('%c') at pos %zu, new pos = %zu\n", 
+                   (unsigned char)c, (c >= 32 && c < 127) ? c : '.', g_line_buffer_pos-1, g_line_buffer_pos);
             
             // Check for newline (end of message)
             if (c == '\n') {
-                g_line_buffer[g_line_buffer_pos] = '\0';
+                printf("DEBUG: Newline detected, calling process_complete_line with length %zu\n", g_line_buffer_pos);
+                printf("DEBUG: Line content: '");
+                for (size_t i = 0; i < g_line_buffer_pos; i++) {
+                    printf("%c", g_line_buffer[i]);
+                }
+                printf("'\n");
                 
-                // Process complete line
+                // Process complete line (include newline in payload)
+                // Note: g_line_buffer_pos already includes the newline position
                 if (process_complete_line(g_line_buffer, g_line_buffer_pos)) {
                     line_processed = true;
                     g_manager_stats.messages_uart_to_tcp++;
@@ -359,7 +373,20 @@ static bool process_complete_line(const char* line, size_t length) {
     entry->payload_length = (length > RINGBUFFER_PAYLOAD_MAX_SIZE) ? RINGBUFFER_PAYLOAD_MAX_SIZE : length;
     entry->timestamp = to_ms_since_boot(get_absolute_time());
     
+    printf("DEBUG: process_complete_line - input length=%zu, payload_length=%u\n", length, entry->payload_length);
+    printf("DEBUG: Input line bytes: ");
+    for (size_t i = 0; i < length; i++) {
+        printf("%02X ", (unsigned char)line[i]);
+    }
+    printf("\n");
+    
     memcpy(entry->payload, line, entry->payload_length);
+    
+    printf("DEBUG: Stored payload bytes: ");
+    for (uint32_t i = 0; i < entry->payload_length; i++) {
+        printf("%02X ", (unsigned char)entry->payload[i]);
+    }
+    printf("\n");
     
     // Enqueue entry
     if (!ringbuffer_enqueue_entry(entry)) {
