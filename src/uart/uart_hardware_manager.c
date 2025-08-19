@@ -320,9 +320,11 @@ static bool process_incoming_characters(void) {
             continue;  // Skip this character
         }
         
-        // Add character to line buffer
+        // Add character to line buffer with null-termination safety
         if (g_line_buffer_pos < (LINE_BUFFER_SIZE - 1)) {
             g_line_buffer[g_line_buffer_pos++] = c;
+            g_line_buffer[g_line_buffer_pos] = '\0';  // Ensure null-termination
+            
             if (g_debug_output_enabled) {
                 printf("DEBUG: Added char 0x%02X ('%c') at pos %zu, new pos = %zu\n", 
                        (unsigned char)c, (c >= 32 && c < 127) ? c : '.', g_line_buffer_pos-1, g_line_buffer_pos);
@@ -350,9 +352,19 @@ static bool process_incoming_characters(void) {
                 reset_line_buffer();
             }
         } else {
-            // Line buffer overflow - reset and log error
+            // Line buffer overflow - process what we have and reset
             log_event(EVENT_SOURCE_UART1, LOG_LEVEL_WARN, LOG_EVENT_UART1_ERROR, 3);
             g_manager_stats.reception_errors++;
+            
+            // Ensure null termination before processing
+            g_line_buffer[LINE_BUFFER_SIZE - 1] = '\0';
+            
+            // Try to process current buffer content before resetting
+            if (g_line_buffer_pos > 0 && process_complete_line(g_line_buffer, g_line_buffer_pos)) {
+                line_processed = true;
+                g_manager_stats.messages_uart_to_tcp++;
+            }
+            
             reset_line_buffer();
         }
     }
@@ -364,7 +376,7 @@ static bool process_incoming_characters(void) {
  * @brief Process complete line and send to ring buffer
  */
 static bool process_complete_line(const char* line, size_t length) {
-    if (!line || length == 0) {
+    if (!line || length == 0 || length > RINGBUFFER_PAYLOAD_MAX_SIZE) {
         return false;
     }
     
@@ -376,7 +388,13 @@ static bool process_complete_line(const char* line, size_t length) {
         return false;
     }
     
-    // Fill entry
+    // Verify entry payload buffer size for security  
+    if (sizeof(entry->payload) < RINGBUFFER_PAYLOAD_MAX_SIZE) {
+        log_event(EVENT_SOURCE_UART1, LOG_LEVEL_ERROR, LOG_EVENT_UART1_ERROR, 4);
+        return false;
+    }
+    
+    // Fill entry with length validation
     entry->uart_channel = 1;  // UART1
     entry->direction = RX_UART_TO_TCP;
     entry->payload_length = (length > RINGBUFFER_PAYLOAD_MAX_SIZE) ? RINGBUFFER_PAYLOAD_MAX_SIZE : length;
