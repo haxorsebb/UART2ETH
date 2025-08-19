@@ -23,6 +23,7 @@
 #include "shared_memory.h"
 #include "state_machine.h"
 #include "log_manager.h"
+#include "ringbuffer.h"
 #include "network/enc28j60_driver.h"
 #include "debug.h"
 
@@ -81,9 +82,18 @@ int main() {
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_BOOT, 0);
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_INIT, 0);
     
+    // Initialize ring buffer for UART-TCP message bridging
+    if (!ringbuffer_init()) {
+        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 2);
+        while (true) {
+            sleep_ms(1000);  // Halt system on critical error - ringbuffer init failed
+        }
+    }
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
+    
     // Initialize event-driven state machine
     if (!state_machine_init()) {
-        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 2);
+        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 3);
         while (true) {
             sleep_ms(1000);  // Halt system on critical error
         }
@@ -92,7 +102,7 @@ int main() {
     
     // Initialize log manager
     if (!log_manager_init()) {
-        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 3);
+        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 4);
         while (true) {
             sleep_ms(1000);  // Halt system on critical error
         }

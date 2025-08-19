@@ -196,6 +196,50 @@ pico_enable_stdio_uart(test_ringbuffer 0)
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_ringbuffer)
 
+# Test for ring buffer - minimal version for debugging
+add_executable(test_ringbuffer_minimal
+    test_ringbuffer_minimal.c
+    ../src/ringbuffer/ringbuffer.c
+)
+
+target_include_directories(test_ringbuffer_minimal PRIVATE ../include)
+
+target_link_libraries(test_ringbuffer_minimal
+    pico_stdlib
+    pico_sync
+    pico_multicore      # Dual core support for doorbell testing
+    hardware_sync       # Mutex operations
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_ringbuffer_minimal 1)
+pico_enable_stdio_uart(test_ringbuffer_minimal 0)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_ringbuffer_minimal)
+
+# Test for ring buffer - debug version with extensive printf
+add_executable(test_ringbuffer_debug
+    test_ringbuffer_debug.c
+    ../src/ringbuffer/ringbuffer.c
+)
+
+target_include_directories(test_ringbuffer_debug PRIVATE ../include)
+
+target_link_libraries(test_ringbuffer_debug
+    pico_stdlib
+    pico_sync
+    pico_multicore      # Dual core support for doorbell testing
+    hardware_sync       # Mutex operations
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_ringbuffer_debug 1)
+pico_enable_stdio_uart(test_ringbuffer_debug 1)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_ringbuffer_debug)
+
 # Add network tests subdirectory
 add_subdirectory(network)
 

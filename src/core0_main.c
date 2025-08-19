@@ -24,6 +24,7 @@
 #include "state_machine.h"
 #include "shared_memory.h"
 #include "log_manager.h"
+#include "ringbuffer.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/irq.h"
@@ -280,6 +281,11 @@ static void core0_configuration_complete(void) {
  * 
  * Handles all UART processing including data RX/TX, protocol filtering,
  * and TCP socket bridging. This is the core function for UART operations.
+ * 
+ * Ring Buffer Integration (Issue #68):
+ * - Dequeue messages with direction RX_TCP_TO_UART (from TCP clients)
+ * - "Turn around" by changing direction to RX_UART_TO_TCP (echo response)
+ * - Process only ONE message per main loop execution (per test requirement #7)
  */
 static void core0_process_uart(void) {
     static uint32_t call_counter = 0;
@@ -291,7 +297,37 @@ static void core0_process_uart(void) {
         }
     });
     
-    // Process UART data
+    // Ring Buffer Processing: Turn around TCP→UART messages (Issue #68)
+    // Process only ONE message per main loop execution (test requirement #7)
+    ring_entry_t* tcp_to_uart_msg = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+    if (tcp_to_uart_msg) {
+        DEBUG_ONLY({
+            printf("DEBUG: Core0 turning around message, length=%u\n", tcp_to_uart_msg->payload_length);
+        });
+        
+        // "Turn around" the message: change direction from TCP→UART to UART→TCP
+        tcp_to_uart_msg->direction = RX_UART_TO_TCP;
+        
+        // Re-enqueue the message for Core1 to transmit back to TCP client
+        bool enqueue_result = ringbuffer_enqueue_entry(tcp_to_uart_msg);
+        if (enqueue_result) {
+            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
+            DEBUG_ONLY({
+                printf("DEBUG: Core0 echo message enqueued successfully\n");
+            });
+        } else {
+            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 1);
+            DEBUG_ONLY({
+                printf("DEBUG: Core0 failed to enqueue echo message\n");
+            });
+        }
+        
+        // Only process ONE message per loop execution
+        state_machine_process_core0_event(CORE0_EVENT_UART_IDLE);
+        return;
+    }
+    
+    // Legacy UART data processing (for future UART hardware integration)
     if (process_uart_data()) {
         log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 0);
         // Processing complete, generate idle event
