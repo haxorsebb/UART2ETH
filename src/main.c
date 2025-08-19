@@ -68,45 +68,55 @@ int main() {
     // Wait for USB-serial connection for debugging
     sleep_ms(2000);
     
-    DEBUG_ONLY({
-        printf("UART2ETH COPYRIGHT 2025 CASSEL MESSTECHNIK GMBH\n--------SOFTWARE START--------\n");
-    });
+    printf("UART2ETH COPYRIGHT 2025 CASSEL MESSTECHNIK GMBH\n--------SOFTWARE START--------\n");
+    
+    // Debug: Add explicit debug prints to isolate hang location
+    printf("DEBUG: About to initialize shared memory...\n");
     
     // Initialize shared memory system
     if (!shared_memory_init()) {
-        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 1);
+        printf("ERROR: Shared memory init failed!\n");
         while (true) {
             sleep_ms(1000);  // Halt system on critical error
         }
     }
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_BOOT, 0);
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_INIT, 0);
+    printf("DEBUG: Shared memory init completed\n");
     
     // Initialize ring buffer for UART-TCP message bridging
+    printf("DEBUG: About to initialize ringbuffer...\n");
     if (!ringbuffer_init()) {
-        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 2);
+        printf("ERROR: Ringbuffer init failed!\n");
         while (true) {
             sleep_ms(1000);  // Halt system on critical error - ringbuffer init failed
         }
     }
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
+    printf("DEBUG: Ringbuffer init completed\n");
     
     // Initialize event-driven state machine
+    printf("DEBUG: About to initialize state machine...\n");
     if (!state_machine_init()) {
-        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 3);
+        printf("ERROR: State machine init failed!\n");
         while (true) {
             sleep_ms(1000);  // Halt system on critical error
         }
     }
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_STATE_MACHINE_INIT, 0);
+    printf("DEBUG: State machine init completed\n");
     
     // Initialize log manager
+    printf("DEBUG: About to initialize log manager...\n");
     if (!log_manager_init()) {
-        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_SYSTEM_ERROR, 4);
+        printf("ERROR: Log manager init failed!\n");
         while (true) {
             sleep_ms(1000);  // Halt system on critical error
         }
     }
+    printf("DEBUG: Log manager init completed\n");
+    
+    // Now we can use log_event() safely
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_BOOT, 0);
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_INIT, 0);
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_STATE_MACHINE_INIT, 0);
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_LOG_MANAGER_INIT, 0);
     
     // Launch Core1 with network and maintenance processing

@@ -17,6 +17,7 @@
 #include "pico/sync.h"
 #include "pico/multicore.h"
 #include "hardware/sync.h"
+#include "state_machine.h"
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
@@ -43,16 +44,11 @@ typedef struct {
 // Global ring buffer state
 static ringbuffer_state_t g_ringbuffer = {0};
 
-// Doorbell constants for cross-core wakeup (from ADR-007)
-static const uint32_t DOORBELL_CORE0_TO_CORE1 = 1;
-static const uint32_t DOORBELL_CORE1_TO_CORE0 = 2;
-
 // Internal helper functions
 static uint32_t ringbuffer_mask(uint32_t index);
 static bool ringbuffer_is_full(void);
 static bool ringbuffer_is_empty(void);
 static uint32_t ringbuffer_get_used_count(void);
-static void ringbuffer_wake_other_core(uint8_t direction);
 static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(uint8_t direction);
 static ring_entry_t* ringbuffer_find_oldest_ready_entry(void);
 static void ringbuffer_secure_clear_entry(ring_entry_t* entry);
@@ -199,11 +195,15 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
     // Get direction for doorbell signaling
     uint8_t direction = entry->direction;
     
+    if(direction==RX_TCP_TO_UART) {
+        wake_other_core(CORE1_WAKES_CORE0);
+    }
+    else {
+        wake_other_core(CORE0_WAKES_CORE1);
+    }
+
     mutex_exit(&g_ringbuffer.access_mutex);
-    
-    // Wake other core after releasing mutex
-    ringbuffer_wake_other_core(direction);
-    
+
     return true;
 }
 
@@ -471,29 +471,6 @@ static uint32_t ringbuffer_get_used_count(void) {
         }
     }
     return used_count;
-}
-
-/**
- * @brief Wake other core based on message direction (doorbell mechanism from ADR-007)
- * @param direction Message direction to determine which core to wake
- */
-static void ringbuffer_wake_other_core(uint8_t direction) {
-    g_ringbuffer.doorbell_wakeups++;
-    
-    if (direction == RX_TCP_TO_UART) {
-        // Message for Core0 (UART processing) - wake Core0
-        // Note: In full implementation, would use multicore_doorbell_set_other_core()
-        // For unit testing environment, we just track the wakeup count
-        #ifdef PICO_MULTICORE_H
-        // Only call if multicore is available (not in all test environments)
-        // multicore_doorbell_set_irq(DOORBELL_CORE1_TO_CORE0);
-        #endif
-    } else if (direction == RX_UART_TO_TCP) {
-        // Message for Core1 (TCP transmission) - wake Core1  
-        #ifdef PICO_MULTICORE_H
-        // multicore_doorbell_set_irq(DOORBELL_CORE0_TO_CORE1);
-        #endif
-    }
 }
 
 /**

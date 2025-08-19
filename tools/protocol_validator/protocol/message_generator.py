@@ -79,14 +79,14 @@ class MessageGenerator:
     
     def generate_maximum(self) -> ProtocolMessage:
         """
-        Generate maximum valid message (512 bytes total - temporary limit).
+        Generate maximum valid message (1024 bytes total).
         
         Returns:
             ProtocolMessage: Message with maximum allowed size
         """
         hex_header = "FFFF"
-        # Temporary limit: payload = 512 - 8 (for '#XXXX!\r\n') = 504 bytes
-        max_payload_size = 504
+        # Temporary limit: payload = 1024 - 8 (for '#XXXX!\r\n') = 1016 bytes
+        max_payload_size = 1016
         
         valid_chars = string.digits + 'ABCDEF'
         payload = ''.join(random.choice(valid_chars) for _ in range(max_payload_size))

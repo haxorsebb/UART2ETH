@@ -92,6 +92,15 @@ int tcp_socket_server_process_line(const char* input, size_t input_len,
  */
 bool check_message_end(const char* buffer, size_t length);
 
+/**
+ * Send message to TCP connection associated with specific UART channel
+ * @param uart_channel UART channel (0-3) to send message to
+ * @param data Message data to send
+ * @param length Length of message data
+ * @return true if message sent successfully, false if no connection or send failed
+ */
+bool tcp_socket_server_send_to_uart_channel(uint8_t uart_channel, const uint8_t* data, size_t length);
+
 #ifdef __cplusplus
 }
 #endif

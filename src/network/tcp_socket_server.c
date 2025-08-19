@@ -609,18 +609,18 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
             bool enqueue_result = ringbuffer_enqueue_entry(entry);
             if (enqueue_result) {
                 g_server_stats.lines_processed++;
-            //    DEBUG_ONLY({
+                DEBUG_ONLY({
                     printf("TCP Server: Message enqueued for Core0 (%zu bytes) - SUCCESS\n", conn->line_pos);
-            //    });
+                });
             } else {
-            //    DEBUG_ONLY({
+                DEBUG_ONLY({
                     printf("TCP Server: Failed to enqueue message for Core0\n");
-            //    });
+                });
             }
         } else {
-            //DEBUG_ONLY({
+            DEBUG_ONLY({
                 printf("TCP Server: No free ring buffer entry available\n");
-            //});
+            });
         }
     }
     else {
@@ -630,7 +630,7 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
     if(message_complete || (conn->line_pos >= TCP_SERVER_LINE_BUFFER_SIZE)) {
         DEBUG_ONLY({
             printf("TCP recv buffer RESET\n");
-    });
+        });
         // Reset line buffer for next message
         conn->line_pos = 0;
         memset(conn->line_buffer, 0, sizeof(conn->line_buffer));

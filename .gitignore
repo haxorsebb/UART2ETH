@@ -18,6 +18,12 @@ Thumbs.db
 # docToolchain cache
 .asciidoctor/
 
+# clangd cache
+.cache/
+
+# Python cache
+./tools/protocol_validator/networking/__pycache__/
+
 #build dir
 build/
 

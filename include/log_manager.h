@@ -86,10 +86,11 @@ typedef uint16_t event_source_t;
 #define EVENT_SOURCE_MAIN_STATE      ((event_source_t)14)
 #define EVENT_SOURCE_CORE0_SUBSTATE  ((event_source_t)15)
 #define EVENT_SOURCE_CORE1_SUBSTATE  ((event_source_t)16)
+#define EVENT_SOURCE_RINGBUFFER      ((event_source_t)17)
 
 // Valid event source ranges
 #define EVENT_SOURCE_MIN     EVENT_SOURCE_SYSTEM
-#define EVENT_SOURCE_MAX     EVENT_SOURCE_CORE1_SUBSTATE
+#define EVENT_SOURCE_MAX     EVENT_SOURCE_RINGBUFFER
 
 
 // Event type definitions with enum for automatic numbering and type safety
@@ -155,6 +156,10 @@ typedef enum {
     LOG_EVENT_NETWORK_DOWN,
     LOG_EVENT_NETWORK_AVAILABLE,
     LOG_EVENT_NETWORK_STATUS,
+    LOG_EVENT_NETWORK_IP_CONFIGURED_1,
+    LOG_EVENT_NETWORK_IP_CONFIGURED_2,
+    LOG_EVENT_NETWORK_IP_CONFIGURED_3,
+    LOG_EVENT_NETWORK_IP_CONFIGURED_4,
     LOG_EVENT_NETWORK_OPERATIONS,
     LOG_EVENT_CONNECTION_CHECK,
     LOG_EVENT_NETWORK_DEINIT,
@@ -189,6 +194,16 @@ typedef enum {
     LOG_EVENT_OTA_START = 400,
     LOG_EVENT_OTA_COMPLETE,
     LOG_EVENT_OTA_ERROR,
+    
+    // Ringbuffer events (410-419) per ADR-012
+    LOG_EVENT_RINGBUFFER_WORK_START = 410,      // Ringbuffer processing started
+    LOG_EVENT_RINGBUFFER_WORK_COMPLETE = 411,   // Ringbuffer processing completed
+    
+    // Core0 work events (420-429) per ADR-012
+    LOG_EVENT_CORE0_WORK_CHECK = 420,           // Core0 checking for pending work
+    LOG_EVENT_CORE0_IDLE_WAIT = 421,            // Core0 entering idle wait
+    LOG_EVENT_CORE0_UART_WORK_START = 422,      // UART hardware work started
+    LOG_EVENT_CORE0_UART_WORK_COMPLETE = 423,   // UART hardware work completed
 
     // PERSISTENCE events (500-599)
     LOG_EVENT_PERSISTENCE_INIT_SUCCESS = 500,
@@ -205,7 +220,7 @@ typedef enum {
     LOG_MAIN_STATE_OPERATIONAL,
     LOG_MAIN_STATE_ERROR,
 
-    // Core0 substate change events (720-730)
+    // Core0 substate change events (720-732) per ADR-012
     // IMPORTANT: These MUST match core0_substate_t enum order exactly and be complete
     LOG_CORE0_INIT_UART = 720,
     LOG_CORE0_INIT_COMPLETE,
@@ -215,8 +230,9 @@ typedef enum {
     LOG_CORE0_CONFIG_COMPLETE,
     LOG_CORE0_CONFIG_IDLE,
     LOG_CORE0_CONFIG_ERROR,
-    LOG_CORE0_UART_IDLE,
+    LOG_CORE0_IDLE,
     LOG_CORE0_UART_ACTIVE,
+    LOG_CORE0_RINGBUFFER_ACTIVE,
     LOG_CORE0_UART_ERROR,
 
     // Core1 substate change events (750-773)
@@ -242,6 +258,7 @@ typedef enum {
     LOG_CORE1_NET_ACTIVE_SEND,
     LOG_CORE1_PERSISTENCE_ACTIVE,
     LOG_CORE1_LOG_ACTIVE,
+    LOG_CORE1_RINGBUFFER_ACTIVE,
     LOG_CORE1_IDLE,
     LOG_CORE1_INIT_ERROR,
     LOG_CORE1_SHUTDOWN

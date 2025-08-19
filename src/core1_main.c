@@ -324,7 +324,7 @@ static void core1_initialize(void) {
     g_config_loading_cycles = 0;
     
     enable_doorbell_irq(CORE1_WAKES_CORE0);
-    
+
     //init timers
     core1_timer_init();
 
@@ -544,10 +544,10 @@ static void core1_configuration_complete(void) {
         
         // Log IP components as individual events for debugging
         uint32_t addr = ip_addr.addr;
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, (addr >> 0) & 0xFF);
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, (addr >> 8) & 0xFF);
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, (addr >> 16) & 0xFF);
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, (addr >> 24) & 0xFF);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_IP_CONFIGURED_1, (addr >> 0) & 0xFF);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_IP_CONFIGURED_2, (addr >> 8) & 0xFF);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_IP_CONFIGURED_3, (addr >> 16) & 0xFF);
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_IP_CONFIGURED_4, (addr >> 24) & 0xFF);
         
         // Force TCP server init if we have IP (regardless of network status)
         DEBUG_ONLY({
@@ -711,24 +711,14 @@ static void core1_process_ringbuffer(void) {
     ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
     
     if (entry != NULL) {
-        printf("Core1: DEQUEUE UART→TCP message - UART%d, %u bytes: '", 
-               entry->uart_channel, entry->payload_length);
-        for (uint32_t i = 0; i < entry->payload_length && i < 32; i++) {
-            printf("%c", entry->payload[i] >= 32 && entry->payload[i] < 127 ? entry->payload[i] : '.');
-        }
-        printf("'\n");
         
         // Send the message over the network via TCP socket server
         bool sent = tcp_socket_server_send_to_uart_channel(entry->uart_channel, entry->payload, entry->payload_length);
         
         if (sent) {
-            printf("Core1: SEND message over network - SUCCESS\n");
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, entry->payload_length);
-            log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_INFO, LOG_EVENT_RINGBUFFER_ECHO_SUCCESS, entry->uart_channel);
         } else {
-            printf("Core1: SEND message over network - FAILED (no active TCP connection)\n");
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, entry->uart_channel);
-            log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_WARN, LOG_EVENT_RINGBUFFER_ECHO_ERROR, entry->uart_channel);
         }
         
         // Mark the entry as consumed to return it to the free pool

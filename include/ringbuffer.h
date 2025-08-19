@@ -24,6 +24,7 @@
 extern "C" {
 #endif
 
+
 /**
  * @brief Message direction enumeration
  */
@@ -42,10 +43,6 @@ typedef enum {
     ENTRY_STATUS_CONSUMED = 3   // Entry consumed, ready for cleanup
 } entry_status_t;
 
-// Legacy constants for backward compatibility
-#define RX_TCP_TO_UART  0  // Message from TCP client to UART (to be echoed)
-#define RX_UART_TO_TCP  1  // Message from UART to TCP client (echo response)
-
 #define ENTRY_STATUS_FREE      0  // Entry available for use
 #define ENTRY_STATUS_FILLING   1  // Entry being filled by producer
 #define ENTRY_STATUS_READY     2  // Entry ready for consumer
@@ -63,14 +60,14 @@ typedef enum {
  * Implements static worst-case allocation per ADR-005.
  */
 typedef struct {
-    // Management header (64 bytes, cache-aligned)
+    // Management header
     uint8_t  uart_channel;     // 0-3 for UART channels 
     uint8_t  direction;        // RX_TCP_TO_UART, RX_UART_TO_TCP
     uint8_t  status;           // Entry status (FREE, FILLING, READY, CONSUMED)
-    uint8_t  payload_length;   // Actual data length (≤1024)
+    uint32_t  payload_length;   // Actual data length (≤1024)
     uint32_t timestamp;        // Message timestamp (milliseconds since boot)
     uint32_t sequence_id;      // For ordering/debugging
-    uint32_t reserved[12];     // Padding to 64-byte cache line boundary
+    uint32_t reserved[11];     
     
     // Payload data (1024 bytes fixed)
     uint8_t  payload[RINGBUFFER_PAYLOAD_MAX_SIZE];    // Protocol message data
