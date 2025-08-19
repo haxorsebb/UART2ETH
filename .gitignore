@@ -31,3 +31,4 @@ build/
 logs/
 *.log
 UART2ETH.code-workspace
+./tools/protocol_validator/*/__pycache__
