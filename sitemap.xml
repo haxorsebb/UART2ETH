@@ -77,6 +77,11 @@
     </url>
 
     <url>
+    	<loc>http://jbake.org/arc42/adrs/ADR-012-core0-ringbuffer-separation.html</loc>
+    	<lastmod>2025-08-19</lastmod>
+    </url>
+
+    <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-003-programming-language-selection.html</loc>
     	<lastmod>2025-08-19</lastmod>
     </url>

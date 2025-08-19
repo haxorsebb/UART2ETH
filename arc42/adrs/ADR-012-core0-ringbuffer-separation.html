@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-001-microcontroller-selection.html -->
+    <!-- sourceuri: arc42/adrs/ADR-012-core0-ringbuffer-separation.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-001: Microcontroller Platform Selection for UART2ETH</title>
+    <title>ADR-012: Core0 Ringbuffer Processing Separation</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -262,7 +262,7 @@
                           
                         <ul class="td-sidebar-nav__section ul-0">
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/adrs/ADR-001-microcontroller-selection.html" title="ADR-001: Microcontroller Platform Selection for UART2ETH">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
                                 
                             </li>
@@ -302,7 +302,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../../arc42/adrs/ADR-012-core0-ringbuffer-separation.html" title="ADR-012: Core0 Ringbuffer Processing Separation">ADR-012: Core0 Ringbuffer Processing Separation</a>
                                 
                             </li>
@@ -318,11 +318,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-001-microcontroller-selection.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-012-core0-ringbuffer-separation.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-001%3A+Microcontroller+Platform+Selection+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-001-microcontroller-selection.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-012%3A+Core0+Ringbuffer+Processing+Separation%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-012-core0-ringbuffer-separation.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -332,24 +332,30 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel0">
-<li><a href="#_adr_001_microcontroller_platform_selection_for_uart2eth">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
+<li><a href="#_adr_012_core0_ringbuffer_processing_separation">ADR-012: Core0 Ringbuffer Processing Separation</a>
 <ul class="sectlevel1">
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision_drivers">Decision Drivers</a>
+<li><a href="#_decision">Decision</a>
 <ul class="sectlevel2">
-<li><a href="#_primary_requirements">Primary Requirements</a></li>
-<li><a href="#_constraints">Constraints</a></li>
+<li><a href="#_new_core0_architecture">New Core0 Architecture</a></li>
+<li><a href="#_new_function_architecture">New Function Architecture</a></li>
+<li><a href="#_new_log_events">New Log Events</a></li>
 </ul>
 </li>
-<li><a href="#_options_considered">Options Considered</a>
+<li><a href="#_rationale">Rationale</a>
 <ul class="sectlevel2">
-<li><a href="#_option_a_raspberry_pi_rp2350">Option A: Raspberry Pi RP2350</a></li>
-<li><a href="#_option_b_atmega328p_baseline">Option B: ATMega328P (Baseline)</a></li>
-<li><a href="#_option_c_esp32">Option C: ESP32</a></li>
+<li><a href="#_why_separate_uart_hardware_from_ringbuffer_processing">Why Separate UART Hardware from Ringbuffer Processing</a></li>
+<li><a href="#_why_follow_core1_pattern">Why Follow Core1 Pattern</a></li>
 </ul>
 </li>
-<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
-<li><a href="#_decision">Decision</a></li>
+<li><a href="#_implementation_strategy">Implementation Strategy</a>
+<ul class="sectlevel2">
+<li><a href="#_phase_1_update_documentation_and_interfaces">Phase 1: Update Documentation and Interfaces</a></li>
+<li><a href="#_phase_2_write_tests_tdd_approach">Phase 2: Write Tests (TDD Approach)</a></li>
+<li><a href="#_phase_3_implement_production_code">Phase 3: Implement Production Code</a></li>
+<li><a href="#_phase_4_testing_and_validation">Phase 4: Testing and Validation</a></li>
+</ul>
+</li>
 <li><a href="#_consequences">Consequences</a>
 <ul class="sectlevel2">
 <li><a href="#_positive">Positive</a></li>
@@ -357,13 +363,9 @@
 <li><a href="#_risks_and_mitigation">Risks and Mitigation</a></li>
 </ul>
 </li>
-<li><a href="#_implementation_notes">Implementation Notes</a>
-<ul class="sectlevel2">
-<li><a href="#_required_external_components">Required External Components</a></li>
-<li><a href="#_architecture_implications">Architecture Implications</a></li>
-</ul>
-</li>
-<li><a href="#_follow_up_actions">Follow-up Actions</a></li>
+<li><a href="#_success_criteria">Success Criteria</a></li>
+<li><a href="#_related_decisions">Related Decisions</a></li>
+<li><a href="#_references">References</a></li>
 </ul>
 </li>
 </ul>
@@ -388,10 +390,10 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_001_microcontroller_platform_selection_for_uart2eth" class="sect0">ADR-001: Microcontroller Platform Selection for UART2ETH</h1>
+<h1 id="_adr_012_core0_ringbuffer_processing_separation" class="sect0">ADR-012: Core0 Ringbuffer Processing Separation</h1>
 <div class="paragraph">
 <p><strong>Status:</strong> ACCEPTED<br>
-<strong>Date:</strong> 2025-07-26<br>
+<strong>Date:</strong> 2025-08-19<br>
 <strong>Deciders:</strong> Architecture Team<br>
 <strong>Consulted:</strong> Senior Developer<br>
 <strong>Informed:</strong> Development Team</p>
@@ -400,327 +402,339 @@
 <h2 id="_context">Context</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>The UART2ETH system requires a microcontroller platform capable of:</p>
+<p>Following the ringbuffer implementation in Issue #68 (ADR-011), the Core0 integration currently mixes two distinct concerns in the <code>core0_process_uart()</code> function:</p>
 </div>
-<div class="ulist">
-<ul>
+<div class="olist arabic">
+<ol class="arabic">
 <li>
-<p>Supporting up to 4 concurrent UART interfaces</p>
+<p><strong>UART Hardware Processing</strong>: Managing actual UART hardware, RX/TX operations, DMA transfers, and interrupt handling</p>
 </li>
 <li>
-<p>Processing TCP/IP networking with industrial reliability</p>
+<p><strong>Ringbuffer Message Processing</strong>: Dequeuing TCP→UART messages from the ringbuffer and echoing them back as UART→TCP messages</p>
 </li>
-<li>
-<p>Implementing secure OTA firmware updates with A/B partitioning</p>
-</li>
-<li>
-<p>Operating in industrial environments (-40°C to +85°C)</p>
-</li>
-<li>
-<p>Achieving 500 kbps sustained throughput per UART port with sub-5ms latency</p>
-</li>
-<li>
-<p>Cost-effective solution for volume production</p>
-</li>
-</ul>
+</ol>
 </div>
 <div class="paragraph">
-<p>The microcontroller selection is a foundational decision that affects all system capabilities, development complexity, and long-term maintainability.</p>
+<p>This architectural mixing violates separation of concerns and makes the system harder to maintain and test. The current implementation also doesn&#8217;t follow the same architectural pattern as Core1, which properly separates different types of work through distinct states and functions.</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_decision_drivers">Decision Drivers</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_primary_requirements">Primary Requirements</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Multi-UART Support</strong>: Hardware support for multiple UARTs or flexible alternatives</p>
-</li>
-<li>
-<p><strong>Network Processing</strong>: Sufficient processing power for TCP/IP stack and protocol filtering</p>
-</li>
-<li>
-<p><strong>A/B Update Capability</strong>: Sufficient flash memory and architecture for dual firmware partitions</p>
-</li>
-<li>
-<p><strong>Security Capabilities</strong>: Hardware support for cryptographic operations and secure boot</p>
-</li>
-<li>
-<p><strong>Industrial Reliability</strong>: Temperature range, electrical robustness, proven track record</p>
-</li>
-<li>
-<p><strong>Real-time Performance</strong>: Deterministic behavior for latency-critical applications</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Mature toolchain, documentation, community support</p>
-</li>
-<li>
-<p><strong>Cost Effectiveness</strong>: Component cost + external components for volume production</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_constraints">Constraints</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Must operate reliably in industrial environments</p>
-</li>
-<li>
-<p>GPL open source licensing compatibility</p>
-</li>
-<li>
-<p>Maximum system cost target: $10 for volume production</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_options_considered">Options Considered</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_option_a_raspberry_pi_rp2350">Option A: Raspberry Pi RP2350</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Architecture</strong>: Dual-core ARM Cortex-M33 @ 150MHz</p>
-</li>
-<li>
-<p><strong>Memory</strong>: 520KB SRAM, external flash required</p>
-</li>
-<li>
-<p><strong>UARTs</strong>: 2 hardware UARTs + 12 programmable I/O (PIO) state machines</p>
-</li>
-<li>
-<p><strong>Networking</strong>: Requires external Ethernet controller (ENC28J60)</p>
-</li>
-<li>
-<p><strong>Security</strong>: Hardware SHA-256, ARM TrustZone, secure boot capabilities</p>
-</li>
-<li>
-<p><strong>A/B Updates</strong>: External flash enables dual partitions + secure bootloader</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Good documentation, smaller community than Arduino</p>
-</li>
-<li>
-<p><strong>Industrial Track Record</strong>: None (released August 2024, zero field deployment)</p>
-</li>
-<li>
-<p><strong>Cost</strong>: ~$1.00 + ~$1.50 (ENC28J60) = <strong>$2.50 total</strong></p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_b_atmega328p_baseline">Option B: ATMega328P (Baseline)</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Architecture</strong>: Single-core 8-bit AVR @ 16MHz</p>
-</li>
-<li>
-<p><strong>Memory</strong>: 2KB SRAM, 32KB Flash</p>
-</li>
-<li>
-<p><strong>UARTs</strong>: 1 hardware UART</p>
-</li>
-<li>
-<p><strong>Networking</strong>: Requires external Ethernet controller (ENC28J60)</p>
-</li>
-<li>
-<p><strong>Security</strong>: No hardware security features</p>
-</li>
-<li>
-<p><strong>A/B Updates</strong>: Insufficient flash space (32KB) for dual firmware images</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Arduino platform - most accessible ecosystem ever created, millions of tutorials</p>
-</li>
-<li>
-<p><strong>Industrial Track Record</strong>: Decades of proven deployment in industrial environments</p>
-</li>
-<li>
-<p><strong>Cost</strong>: ~$2.50 + ~$1.50 (ENC28J60) = <strong>$4.00 total</strong></p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_c_esp32">Option C: ESP32</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Architecture</strong>: Dual-core Xtensa LX6 @ 240MHz</p>
-</li>
-<li>
-<p><strong>Memory</strong>: 520KB SRAM, 4MB Flash</p>
-</li>
-<li>
-<p><strong>UARTs</strong>: 3 hardware UARTs</p>
-</li>
-<li>
-<p><strong>Networking</strong>: Built-in WiFi/Bluetooth, requires external Ethernet for wired</p>
-</li>
-<li>
-<p><strong>Security</strong>: Hardware crypto acceleration, secure boot</p>
-</li>
-<li>
-<p><strong>A/B Updates</strong>: 4MB flash supports dual partitions + ESP-IDF OTA framework</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Good tools (ESP-IDF, Arduino IDE), solid community, smaller than Arduino</p>
-</li>
-<li>
-<p><strong>Industrial Track Record</strong>: 8+ years deployment (2016+), moderate industrial adoption, less proven than ATMega328P</p>
-</li>
-<li>
-<p><strong>Cost</strong>: ~$2.50 + ~$1.50 (ENC28J60) = <strong>$4.00 total</strong></p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h2>
-<div class="sectionbody">
 <div class="paragraph">
-<p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
-<em>Baseline: ATMega328P (all scores = 0)</em></p>
+<p><strong>Current Core0 Architecture Problems:</strong>
+* Mixed UART hardware and ringbuffer processing in single function
+* Inconsistent with Core1&#8217;s work separation pattern
+* Difficult to unit test individual concerns
+* No clear distinction between hardware and message processing states
+* Missing <code>check_for_pending_work()</code> pattern that Core1 uses</p>
 </div>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 31.25%;">
-<col style="width: 12.5%;">
-<col style="width: 18.75%;">
-<col style="width: 18.75%;">
-<col style="width: 18.75%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
-<th class="tableblock halign-left valign-top"><strong>ATMega328P</strong></th>
-<th class="tableblock halign-left valign-top"><strong>RP2350</strong></th>
-<th class="tableblock halign-left valign-top"><strong>ESP32</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Support</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (PIO flexibility)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (3 HW UARTs)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Processing Power</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (dual 32-bit @150MHz)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (dual 32-bit @240MHz)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Capacity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (260x more SRAM)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (260x more SRAM)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>A/B Update Support</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (external flash + secure boot)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (4MB flash + OTA framework)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security Features</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (HW SHA-256 + TrustZone)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (HW crypto only)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Real-time Determinism</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (PIO + dual-core)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (dual-core)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Ecosystem</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (smaller community, newer)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (good tools, smaller than Arduino)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Reliability</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (new platform, zero field history)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (8+ years, less than decades)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Cost Effectiveness</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (37% cost reduction)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (same cost)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Architecture</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (same - external PHY)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (WiFi overhead)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total Weighted PUGH Score</strong></p></td>
-<td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">30</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">22</p></td>
-</tr>
-</tbody>
-</table>
+<div class="paragraph">
+<p><strong>Core1 Reference Pattern:</strong>
+Core1 properly separates concerns with:
+* <code>core1_work_or_idle_wait()</code> → calls <code>check_for_pending_work()</code>
+* <code>check_for_pending_work()</code> → inspects various work queues and fires appropriate events
+* Distinct states for different work types: <code>CORE1_NET_ACTIVE_RECEIVE</code>, <code>CORE1_LOG_ACTIVE</code>, <code>CORE1_PERSISTENCE_ACTIVE</code>
+* Clear separation between checking for work and executing work</p>
+</div>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_decision">Decision</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p><strong>Selected: Raspberry Pi RP2350</strong></p>
+<p>Refactor Core0 to <strong>separate UART hardware processing from ringbuffer message processing</strong> using the same architectural pattern as Core1.</p>
+</div>
+<div class="sect2">
+<h3 id="_new_core0_architecture">New Core0 Architecture</h3>
+<div class="paragraph">
+<p><strong>New Core0 Operational States:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
+    // Initialization states (unchanged)
+    CORE0_INIT_UART,
+    CORE0_INIT_COMPLETE,
+    CORE0_INIT_IDLE,
+    CORE0_INIT_ERROR,
+
+    // Configuration states (unchanged)
+    CORE0_CONFIG_UART,
+    CORE0_CONFIG_COMPLETE,
+    CORE0_CONFIG_IDLE,
+    CORE0_CONFIG_ERROR,
+
+    // NEW: Operational states (separated concerns)
+    CORE0_IDLE,                    // Check for work or sleep (like Core1)
+    CORE0_UART_ACTIVE,            // UART hardware processing only
+    CORE0_RINGBUFFER_ACTIVE,      // Ringbuffer message processing only
+    CORE0_UART_ERROR              // UART hardware error handling
+} core0_substate_t;</code></pre>
+</div>
 </div>
 <div class="paragraph">
-<p>The RP2350 scores significantly higher (+30 vs +22) in the weighted PUGH analysis, primarily due to:</p>
+<p><strong>New Core0 Events:</strong></p>
 </div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
+    // Existing events (unchanged)
+    CORE0_EVENT_INIT_UART_COMPLETE,
+    CORE0_EVENT_INIT_UART_FAILED,
+    CORE0_EVENT_CONFIG_UART_COMPLETE,
+    CORE0_EVENT_CONFIG_UART_FAILED,
+    CORE0_EVENT_UART_ERROR,
+    CORE0_EVENT_ERROR_RECOVERED,
+    CORE0_EVENT_AUTO_TRANSITION,
+
+    // NEW: Separated work events
+    CORE0_EVENT_UART_DATA_READY,       // UART hardware has data to process
+    CORE0_EVENT_UART_WORK_COMPLETE,    // UART hardware work finished
+    CORE0_EVENT_RINGBUFFER_DATA_READY, // Ringbuffer has messages to process
+    CORE0_EVENT_RINGBUFFER_WORK_COMPLETE, // Ringbuffer work finished
+    CORE0_EVENT_WORK_IDLE              // All work completed, return to idle
+} core0_event_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_new_function_architecture">New Function Architecture</h3>
+<div class="paragraph">
+<p><strong>Main Loop Integration</strong> (following Core1 pattern):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">case MAIN_STATE_OPERATIONAL:
+    switch (sub_state) {
+        case CORE0_IDLE:
+            core0_work_or_idle_wait();     // NEW: Check for work or sleep
+            break;
+        case CORE0_UART_ACTIVE:
+            core0_process_uart_hardware(); // NEW: UART hardware only
+            break;
+        case CORE0_RINGBUFFER_ACTIVE:
+            core0_process_ringbuffer();    // NEW: Ringbuffer messages only
+            break;
+        case CORE0_UART_ERROR:
+            core0_handle_uart_error();     // Unchanged
+            break;
+    }
+    break;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Core0 Work Detection</strong> (following Core1 pattern):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">static bool core0_check_for_pending_work(void) {
+    // Check for ringbuffer messages to process (highest priority)
+    if (ringbuffer_get_count(RX_TCP_TO_UART) &gt; 0) {
+        state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_DATA_READY);
+        return true;
+    }
+
+    // Check for UART hardware work (medium priority)
+    if (uart_hardware_has_pending_work()) {
+        state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
+        return true;
+    }
+
+    // No work pending
+    return false;
+}
+
+static void core0_work_or_idle_wait(void) {
+    // Check for work first
+    if (core0_check_for_pending_work()) {
+        return; // Work found, event fired, let state machine handle it
+    }
+
+    // No work, go to sleep
+    core0_idle_wait();
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Separated Processing Functions:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// NEW: Process ringbuffer messages only (moved from core0_process_uart)
+static void core0_process_ringbuffer(void) {
+    // Dequeue TCP→UART message and echo back as UART→TCP
+    ring_entry_t* tcp_to_uart_msg = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+    if (tcp_to_uart_msg) {
+        // Turn around the message
+        tcp_to_uart_msg-&gt;direction = RX_UART_TO_TCP;
+        bool success = ringbuffer_enqueue_entry(tcp_to_uart_msg);
+
+        log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_DEBUG,
+                  success ? LOG_EVENT_RINGBUFFER_ECHO_SUCCESS : LOG_EVENT_RINGBUFFER_ECHO_FAILED, 1);
+    }
+
+    // Work complete
+    state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_WORK_COMPLETE);
+}
+
+// NEW: Process UART hardware only (cleaned up from core0_process_uart)
+static void core0_process_uart_hardware(void) {
+    // Handle actual UART hardware operations
+    if (process_uart_data()) {
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 0);
+        state_machine_process_core0_event(CORE0_EVENT_UART_WORK_COMPLETE);
+    }
+    // If processing not complete, remain in UART_ACTIVE state
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_new_log_events">New Log Events</h3>
+<div class="paragraph">
+<p><strong>Core0-Specific Log Events:</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// New ringbuffer processing events
+LOG_EVENT_RINGBUFFER_ECHO_SUCCESS = 410,    // Ringbuffer message echoed successfully
+LOG_EVENT_RINGBUFFER_ECHO_FAILED = 411,     // Ringbuffer message echo failed
+LOG_EVENT_RINGBUFFER_WORK_START = 412,      // Ringbuffer processing started
+LOG_EVENT_RINGBUFFER_WORK_COMPLETE = 413,   // Ringbuffer processing completed
+
+// New Core0 state events
+LOG_EVENT_CORE0_WORK_CHECK = 420,           // Core0 checking for pending work
+LOG_EVENT_CORE0_IDLE_WAIT = 421,            // Core0 entering idle wait
+LOG_EVENT_CORE0_UART_WORK_START = 422,      // UART hardware work started
+LOG_EVENT_CORE0_UART_WORK_COMPLETE = 423,   // UART hardware work completed</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_rationale">Rationale</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_why_separate_uart_hardware_from_ringbuffer_processing">Why Separate UART Hardware from Ringbuffer Processing</h3>
+<div class="paragraph">
+<p><strong>Clear Separation of Concerns:</strong>
+* UART hardware processing deals with physical hardware, interrupts, DMA, and real-time constraints
+* Ringbuffer processing deals with message-level logic, echo functionality, and inter-core communication
+* Each can be unit tested independently with appropriate mocks</p>
+</div>
+<div class="paragraph">
+<p><strong>Consistent Architecture:</strong>
+* Follows same pattern as Core1 with <code>check_for_pending_work()</code> and distinct work states
+* Makes the codebase more maintainable and understandable
+* Enables future extensions like different ringbuffer processing modes</p>
+</div>
+<div class="paragraph">
+<p><strong>Performance Benefits:</strong>
+* Allows prioritization of ringbuffer work over UART hardware work
+* Enables fine-grained performance monitoring of each concern
+* Prevents blocking of one concern by the other</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_why_follow_core1_pattern">Why Follow Core1 Pattern</h3>
+<div class="paragraph">
+<p><strong>Architectural Consistency:</strong>
+* Both cores now follow the same <code>work_or_idle_wait()</code> → <code>check_for_pending_work()</code> → specific work pattern
+* Similar state machine structures with <code>IDLE</code> state for work detection
+* Consistent event naming and processing patterns</p>
+</div>
+<div class="paragraph">
+<p><strong>Proven Design:</strong>
+* Core1 pattern has been tested and works reliably
+* Well-understood by the development team
+* Provides good separation of concerns and testability</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_implementation_strategy">Implementation Strategy</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_phase_1_update_documentation_and_interfaces">Phase 1: Update Documentation and Interfaces</h3>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><strong>Superior UART Flexibility</strong>: PIO state machines provide unmatched capability for implementing custom UART protocols</p>
+<p><strong>Update state_machine.h</strong>: Add new Core0 states and events</p>
 </li>
 <li>
-<p><strong>A/B Update Architecture</strong>: External flash design enables reliable dual-partition firmware updates</p>
+<p><strong>Update log_manager.h</strong>: Add new Core0-specific log events</p>
 </li>
 <li>
-<p><strong>Security Architecture</strong>: Hardware SHA-256 and TrustZone directly address secure OTA requirements</p>
-</li>
-<li>
-<p><strong>Cost Advantage</strong>: 37% lower total system cost while providing better capabilities</p>
-</li>
-<li>
-<p><strong>Real-time Determinism</strong>: PIO subsystem + dual-core architecture enables predictable performance</p>
+<p><strong>Update this ADR</strong>: Document the complete new architecture</p>
 </li>
 </ol>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_phase_2_write_tests_tdd_approach">Phase 2: Write Tests (TDD Approach)</h3>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Test Core0 State Transitions</strong>: Test new IDLE → UART_ACTIVE/RINGBUFFER_ACTIVE transitions</p>
+</li>
+<li>
+<p><strong>Test Work Detection</strong>: Test <code>core0_check_for_pending_work()</code> logic with various work conditions</p>
+</li>
+<li>
+<p><strong>Test Separated Processing</strong>: Test <code>core0_process_ringbuffer()</code> and <code>core0_process_uart_hardware()</code> independently</p>
+</li>
+<li>
+<p><strong>Test Integration</strong>: Test complete flow from work detection to work completion</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_phase_3_implement_production_code">Phase 3: Implement Production Code</h3>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Refactor core0_main.c</strong>:</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Move ringbuffer processing from <code>core0_process_uart()</code> to new <code>core0_process_ringbuffer()</code></p>
+</li>
+<li>
+<p>Add <code>core0_work_or_idle_wait()</code> and <code>core0_check_for_pending_work()</code></p>
+</li>
+<li>
+<p>Update state machine integration in main loop</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p><strong>Update state_machine.c</strong>: Add new state transitions and event processing</p>
+</li>
+<li>
+<p><strong>Update log strings</strong>: Add log format strings for new events</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_phase_4_testing_and_validation">Phase 4: Testing and Validation</h3>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Unit Testing</strong>: Verify all functions work correctly in isolation</p>
+</li>
+<li>
+<p><strong>Integration Testing</strong>: Test complete Core0 operation with real ringbuffer</p>
+</li>
+<li>
+<p><strong>Performance Testing</strong>: Ensure no performance regression from refactoring</p>
+</li>
+<li>
+<p><strong>Protocol Validator</strong>: Validate echo functionality still works correctly</p>
+</li>
+</ol>
+</div>
 </div>
 </div>
 </div>
@@ -732,19 +746,22 @@
 <div class="ulist">
 <ul>
 <li>
-<p>✅ <strong>Technical Capability</strong>: Meets all performance and functionality requirements</p>
+<p>✅ <strong>Clear Separation of Concerns</strong>: UART hardware and ringbuffer processing are cleanly separated</p>
 </li>
 <li>
-<p>✅ <strong>Cost Optimization</strong>: Lowest total system cost among capable options</p>
+<p>✅ <strong>Architectural Consistency</strong>: Core0 now follows same pattern as Core1</p>
 </li>
 <li>
-<p>✅ <strong>Security Compliance</strong>: Hardware support for all security requirements</p>
+<p>✅ <strong>Better Testability</strong>: Each concern can be unit tested independently</p>
 </li>
 <li>
-<p>✅ <strong>Development Efficiency</strong>: Excellent documentation and tooling ecosystem</p>
+<p>✅ <strong>Improved Maintainability</strong>: Easier to understand and modify individual concerns</p>
 </li>
 <li>
-<p>✅ <strong>Future Flexibility</strong>: PIO enables protocol extensions without redesign</p>
+<p>✅ <strong>Performance Monitoring</strong>: Can measure performance of UART vs ringbuffer processing separately</p>
+</li>
+<li>
+<p>✅ <strong>Future Extensibility</strong>: Easy to add new types of Core0 work (e.g., protocol filtering)</p>
 </li>
 </ul>
 </div>
@@ -754,129 +771,96 @@
 <div class="ulist">
 <ul>
 <li>
-<p>⚠️ <strong>External Dependency</strong>: Requires external Ethernet controller</p>
+<p>❌ <strong>Code Complexity</strong>: More states and functions to manage</p>
 </li>
 <li>
-<p>⚠️ <strong>Industrial Deployment Risk</strong>: Zero field deployment history in industrial environments (released August 2024)</p>
+<p>❌ <strong>Development Time</strong>: Requires refactoring existing working code</p>
 </li>
 <li>
-<p>⚠️ <strong>Platform Maturity</strong>: Less proven than ATMega328P&#8217;s decades of industrial use</p>
-</li>
-<li>
-<p>⚠️ <strong>Development Ecosystem</strong>: Smaller community and fewer resources in Arduino&#8217;s massive ecosystem compared to ATMega328P</p>
-</li>
-<li>
-<p>⚠️ <strong>Custom Development</strong>: PIO programming requires specialized knowledge</p>
+<p>❌ <strong>Testing Overhead</strong>: More test cases needed for additional states and transitions</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_risks_and_mitigation">Risks and Mitigation</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Supply Chain Risk</strong>: Multiple suppliers available, stockpile strategy for critical components</p>
-</li>
-<li>
-<p><strong>ENC28J60 Dependency</strong>: Well-established component with multiple sources and alternatives</p>
-</li>
-<li>
-<p><strong>Industrial Reliability Risk</strong>: RP2350 has zero industrial field deployment history; mitigate with extensive environmental testing and validation program</p>
-</li>
-<li>
-<p><strong>Development Complexity</strong>: Comprehensive documentation and examples available</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_implementation_notes">Implementation Notes</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_required_external_components">Required External Components</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>external Ethernet Controller</strong>: Hardware Ethernet stack, SPI interface</p>
-</li>
-<li>
-<p><strong>Crystal/Oscillator</strong>: For precise timing if required by application</p>
-</li>
-<li>
-<p><strong>Power Supply</strong>: 3.3V regulation and filtering</p>
-</li>
-<li>
-<p><strong>Protection</strong>: ESD protection for industrial environments</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_architecture_implications">Architecture Implications</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Dual-Core Utilization</strong>: Core 0 for real-time UART processing, Core 1 for networking</p>
-</li>
-<li>
-<p><strong>Memory Management</strong>: Static allocation for predictable real-time behavior</p>
-</li>
-<li>
-<p><strong>Security Integration</strong>: TrustZone secure boot with hardware-accelerated crypto</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_follow_up_actions">Follow-up Actions</h2>
-<div class="sectionbody">
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><strong>Procurement</strong>: Establish supplier relationships for RP2350 and ENC28J60</p>
-</li>
-<li>
-<p><strong>Industrial Validation</strong>: Comprehensive environmental testing program to validate RP2350 reliability in industrial conditions</p>
-</li>
-<li>
-<p><strong>Prototyping</strong>: Develop basic hardware platform for validation testing</p>
-</li>
-<li>
-<p><strong>PIO Development</strong>: Create UART protocol templates using PIO state machines</p>
-</li>
-<li>
-<p><strong>Security Planning</strong>: Design secure boot and OTA update architecture</p>
-</li>
-<li>
-<p><strong>Testing Strategy</strong>: Define industrial environment validation procedures including EMI/EMC testing</p>
-</li>
-</ol>
-</div>
-<hr>
 <div class="paragraph">
-<p><strong>Review Notes:</strong></p>
+<p><strong>Primary Risk: Functional Regression</strong>
+* <strong>Probability</strong>: Low (careful TDD approach)
+* <strong>Impact</strong>: High (break existing echo functionality)
+* <strong>Mitigation</strong>: Comprehensive unit and integration testing, protocol validator validation</p>
 </div>
-<div class="ulist checklist">
-<ul class="checklist">
+<div class="paragraph">
+<p><strong>Secondary Risk: Performance Regression</strong>
+* <strong>Probability</strong>: Low (no fundamental algorithm changes)
+* <strong>Impact</strong>: Medium (slower echo response times)
+* <strong>Mitigation</strong>: Performance testing with protocol validator, benchmark comparison</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_success_criteria">Success Criteria</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><strong>Functional Requirements:</strong>
+1. ✅ Echo functionality maintains same behavior as before refactoring
+2. ✅ UART hardware processing works independently of ringbuffer processing
+3. ✅ Core0 follows same architectural pattern as Core1
+4. ✅ All existing tests continue to pass
+5. ✅ New unit tests achieve 100% coverage of new functions</p>
+</div>
+<div class="paragraph">
+<p><strong>Architectural Requirements:</strong>
+1. ✅ Clear separation between UART hardware and ringbuffer concerns
+2. ✅ <code>core0_process_uart()</code> only handles UART hardware
+3. ✅ New <code>core0_process_ringbuffer()</code> only handles ringbuffer messages
+4. ✅ <code>core0_check_for_pending_work()</code> pattern matches Core1
+5. ✅ New states and events properly integrated into state machine</p>
+</div>
+<div class="paragraph">
+<p><strong>Quality Requirements:</strong>
+1. ✅ No performance regression compared to current implementation
+2. ✅ Protocol validator tests continue to pass
+3. ✅ Code review approval from code quality and security specialists
+4. ✅ Comprehensive logging of all state transitions and work processing</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_related_decisions">Related Decisions</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
 <li>
-<p>&#10063; Confirm ENC28J60 vs W5500 preference</p>
+<p><strong>ADR-007</strong>: Event-Driven State Machine Architecture - Core0 now follows same pattern as Core1</p>
 </li>
 <li>
-<p>&#10063; Validate cost estimates with current supplier pricing</p>
+<p><strong>ADR-011</strong>: Ring Buffer Implementation - Ringbuffer processing now cleanly separated from UART hardware</p>
 </li>
 <li>
-<p>&#10063; Review A/B update architecture requirements vs RP2350 external flash approach</p>
+<p><strong>Issue #68</strong>: Core0 ringbuffer integration - This ADR addresses the architectural concerns from the integration</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_references">References</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Issue #68</strong>: Add ringbuffer implementation (GitHub issue requirements)</p>
 </li>
 <li>
-<p>&#10063; Confirm industrial temperature requirements vs RP2350 specs</p>
+<p><strong>Core1 Implementation</strong>: <code>src/core1_main.c</code> - Reference architecture pattern</p>
 </li>
 <li>
-<p>&#10063; Validate PUGH matrix criteria weights reflect actual project priorities</p>
+<p><strong>ADR-007</strong>: State Machine Architecture - Event-driven pattern and cross-core coordination</p>
+</li>
+<li>
+<p><strong>Chapter 5</strong>: Building Block View - Core0 UART Subsystem architectural documentation</p>
 </li>
 </ul>
 </div>
@@ -909,11 +893,11 @@
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-001%3A+Microcontroller+Platform+Selection+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-001-microcontroller-selection.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-012%3A+Core0+Ringbuffer+Processing+Separation%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-012-core0-ringbuffer-separation.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-001%3A+Microcontroller+Platform+Selection+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-001-microcontroller-selection.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-012%3A+Core0+Ringbuffer+Processing+Separation%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-012-core0-ringbuffer-separation.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
