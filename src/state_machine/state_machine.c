@@ -12,6 +12,7 @@
  */
 
 #include "state_machine.h"
+#include "log_manager.h"
 #include "pico/stdlib.h"
 #include "pico/sync.h"
 #include "pico/multicore.h"
@@ -21,12 +22,12 @@
 #include "debug.h"
 
 // Doorbell stub definitions for testing
-int doorbell_core0_wakes_core1 = 0;
-int doorbell_core1_wakes_core0 = 1;
+static int doorbell_core0_wakes_core1 = 0;
+static int doorbell_core1_wakes_core0 = 1;
 
 // State variables with proper synchronization
 static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;                   // Atomic for cross-core access
-static _Atomic core0_substate_t g_core0_substate = CORE0_UART_IDLE;           // Atomic for ISR-safe access
+static _Atomic core0_substate_t g_core0_substate = CORE0_INIT_UART;           // Atomic for ISR-safe access
 static _Atomic core1_substate_t g_core1_substate = CORE1_INIT_PERISTENCE;    // Atomic for ISR-safe access
 
 // Initialization flag (exposed to tests for proper reinitialization)
@@ -165,7 +166,7 @@ bool state_machine_process_main_event(main_state_event_t event) {
                     if (check_core0_configuration_complete()) {
                         new_state = MAIN_STATE_OPERATIONAL;
                         //change substates, too
-                        atomic_store(&g_core0_substate, CORE0_UART_IDLE);
+                        atomic_store(&g_core0_substate, CORE0_IDLE);
                         atomic_store(&g_core1_substate, CORE1_NET_DISCONNECTED);
                     }
                     break;
@@ -173,7 +174,7 @@ bool state_machine_process_main_event(main_state_event_t event) {
                     if (check_core1_configuration_complete()) {
                         new_state = MAIN_STATE_OPERATIONAL;
                         //change substates, too
-                        atomic_store(&g_core0_substate, CORE0_UART_IDLE);
+                        atomic_store(&g_core0_substate, CORE0_IDLE);
                         atomic_store(&g_core1_substate, CORE1_NET_DISCONNECTED);
                     }
                     break;
@@ -215,6 +216,10 @@ bool state_machine_process_main_event(main_state_event_t event) {
     if (new_state != current_state) {
         main_state_t old_state = current_state;
         atomic_store(&g_main_state, new_state);
+        
+        // Log main state change
+        log_event(EVENT_SOURCE_MAIN_STATE, LOG_LEVEL_INFO, 
+                  LOG_MAIN_STATE_INIT + new_state, (uint32_t)old_state);
         
         // Wake other core after main state change
         wake_other_core_after_main_state_change(new_state);
@@ -298,12 +303,17 @@ bool state_machine_process_core0_event(core0_event_t event) {
             // recoverable config error - no transitions
             break;
         
-        case CORE0_UART_IDLE:
+        // New operational states per ADR-012
+        case CORE0_IDLE:
             switch (event) {
                 case CORE0_EVENT_UART_DATA_READY:
                     if (check_uart_data_available()) {
                         new_state = CORE0_UART_ACTIVE;
                     }
+                    break;
+                case CORE0_EVENT_RINGBUFFER_DATA_READY:
+                    // Ringbuffer work detected
+                    new_state = CORE0_RINGBUFFER_ACTIVE;
                     break;
                 case CORE0_EVENT_UART_ERROR:
                     new_state = CORE0_UART_ERROR;
@@ -316,13 +326,33 @@ bool state_machine_process_core0_event(core0_event_t event) {
             
         case CORE0_UART_ACTIVE:
             switch (event) {
-                case CORE0_EVENT_UART_IDLE:
+                case CORE0_EVENT_UART_WORK_COMPLETE:
                     if (check_uart_processing_complete()) {
-                        new_state = CORE0_UART_IDLE;
+                        new_state = CORE0_IDLE;
                     }
+                    break;
+                case CORE0_EVENT_WORK_IDLE:
+                    // Alternative completion event
+                    new_state = CORE0_IDLE;
                     break;
                 case CORE0_EVENT_UART_ERROR:
                     new_state = CORE0_UART_ERROR;
+                    break;
+                default:
+                    // Invalid event for this state - ignore
+                    break;
+            }
+            break;
+            
+        case CORE0_RINGBUFFER_ACTIVE:
+            switch (event) {
+                case CORE0_EVENT_RINGBUFFER_WORK_COMPLETE:
+                    // Ringbuffer work completed, return to idle
+                    new_state = CORE0_IDLE;
+                    break;
+                case CORE0_EVENT_WORK_IDLE:
+                    // Alternative completion event
+                    new_state = CORE0_IDLE;
                     break;
                 default:
                     // Invalid event for this state - ignore
@@ -334,7 +364,7 @@ bool state_machine_process_core0_event(core0_event_t event) {
             switch (event) {
                 case CORE0_EVENT_ERROR_RECOVERED:
                     if (check_uart_hardware_recovered()) {
-                        new_state = CORE0_UART_IDLE;
+                        new_state = CORE0_IDLE;
                     }
                     break;
                 default:
@@ -346,7 +376,14 @@ bool state_machine_process_core0_event(core0_event_t event) {
     
     // Apply atomic state change if needed
     if (new_state != current_state) {
+        core0_substate_t old_state = current_state;
         atomic_store(&g_core0_substate, new_state);
+        
+        // Log Core0 substate change (skip high-frequency UART_ACTIVE state)
+        if (true || (old_state != CORE0_UART_ACTIVE && new_state != CORE0_UART_ACTIVE)) {
+            log_event(EVENT_SOURCE_CORE0_SUBSTATE, LOG_LEVEL_INFO, 
+                      LOG_CORE0_INIT_UART + new_state, (uint32_t)old_state);
+        }
     }
     
     return true;  // Event processed successfully
@@ -641,6 +678,22 @@ bool state_machine_process_core1_event(core1_event_t event) {
                     //ready to print logs
                     new_state = CORE1_LOG_ACTIVE;
                     break;
+                case CORE1_EVENT_RINGBUFFER_DATA_READY:
+                    //ready to process ringbuffer messages for network transmission
+                    new_state = CORE1_RINGBUFFER_ACTIVE;
+                    break;
+                default:
+                    // Invalid event for this state - ignore
+                    break;
+            }
+            break;
+
+        case CORE1_RINGBUFFER_ACTIVE:
+            switch (event) {
+                case CORE1_EVENT_RINGBUFFER_WORK_COMPLETE:
+                    // Return to idle, will check for more work or sleep
+                    new_state = CORE1_IDLE;
+                    break;
                 default:
                     // Invalid event for this state - ignore
                     break;
@@ -657,7 +710,16 @@ bool state_machine_process_core1_event(core1_event_t event) {
     
     // Apply atomic state change if needed
     if (new_state != current_state) {
+        core1_substate_t old_state = current_state;
         atomic_store(&g_core1_substate, new_state);
+        
+        // Log Core1 substate change (skip high-frequency network states)
+        if (old_state != CORE1_CONFIG_NET_CHECK_DHCP && new_state != CORE1_CONFIG_NET_CHECK_DHCP &&
+            old_state != CORE1_LOG_ACTIVE && new_state != CORE1_LOG_ACTIVE &&
+            old_state != CORE1_CONFIG_LOG_ACTIVE && new_state != CORE1_CONFIG_LOG_ACTIVE) {
+            log_event(EVENT_SOURCE_CORE1_SUBSTATE, LOG_LEVEL_INFO, 
+                      LOG_CORE1_INIT_PERISTENCE + new_state, (uint32_t)old_state);
+        }
     }
     
     return true;  // Event processed successfully
@@ -827,6 +889,72 @@ static void wake_other_core_after_main_state_change(main_state_t new_state) {
 }
 
 /**
+ * wake the other core from WFI
+ */
+void wake_other_core(wake_direction_t direction) {
+    //wake the other core
+    if(direction == CORE0_WAKES_CORE1) {
+        multicore_doorbell_set_other_core(doorbell_core0_wakes_core1);
+    } 
+    else {
+        multicore_doorbell_set_other_core(doorbell_core1_wakes_core0);
+    }
+}
+
+/**
+ * clear doorbell for init
+ */
+int clear_doorbbell(wake_direction_t direction) {
+    //clear the right doorbell
+    if(direction == CORE0_WAKES_CORE1) {
+        multicore_doorbell_clear_current_core(doorbell_core0_wakes_core1);
+        return doorbell_core0_wakes_core1;
+    } 
+    else {
+        multicore_doorbell_clear_current_core(doorbell_core1_wakes_core0);
+        return doorbell_core1_wakes_core0;
+    }
+}
+
+/**
+ * enable doorbell for irq for cores
+ */
+void enable_doorbell_irq(wake_direction_t direction) {
+    
+    int doorbell_num = 0;
+
+    if(direction == CORE0_WAKES_CORE1) {
+        doorbell_num = doorbell_core0_wakes_core1;
+    } 
+    else {
+        doorbell_num = doorbell_core1_wakes_core0;
+    }
+
+
+    // Make sure the doorbell_on_mainstate_change doorbell is not set for this core
+    multicore_doorbell_clear_current_core(doorbell_num);
+
+    //set up doorbell irq - all doorbells have the same irq anyway. it is shared
+    uint32_t irq = multicore_doorbell_irq_num(doorbell_num);
+    DEBUG_ONLY({
+        printf("Core%d: Setting up doorbell IRQ %u for doorbell %d\n", get_core_num(), irq, doorbell_num);
+    });
+
+    if(direction == CORE1_WAKES_CORE0) {
+        //set shared handler
+        irq_add_shared_handler(irq, shared_doorbell_irq,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY-1);
+        irq_set_enabled(irq, true);
+
+    }
+    else {
+        //unnecessary to add another handler, enabling IRQ is good enough
+        irq_set_enabled(irq, true);
+    }
+
+}
+
+
+/**
  * Handle the doorbell set from core0 or core 1
  */
 extern void shared_doorbell_irq() {
@@ -850,3 +978,4 @@ extern void shared_doorbell_irq() {
 
     irq_clear(multicore_doorbell_irq_num(doorbell_core1_wakes_core0));
 }
+

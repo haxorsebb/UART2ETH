@@ -17,11 +17,18 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// Doorbell numbers for cross-core synchronization - extern for global access
-extern int doorbell_core0_wakes_core1;
-extern int doorbell_core1_wakes_core0;
 
 extern void shared_doorbell_irq();
+
+
+/**
+ * @brief Message direction enumeration
+ */
+typedef enum {
+    CORE0_WAKES_CORE1 = 0,   
+    CORE1_WAKES_CORE0 = 1    
+} wake_direction_t;
+
 
 typedef enum {
     WAKE_MAIN_STATE_CHANGED = 1,
@@ -39,16 +46,22 @@ typedef enum {
 
 // Core0 sub-states (UART processing, ISR-safe)
 typedef enum {
+    // Initialization sequence
     CORE0_INIT_UART,        // Initializing UART hardware
     CORE0_INIT_COMPLETE,    // UART init complete, signaling main state
     CORE0_INIT_IDLE,        // Waiting for other core during init  
     CORE0_INIT_ERROR,       // UART initialization failed
-    CORE0_CONFIG_UART,      // configure UARTS 
-    CORE0_CONFIG_COMPLETE,      // reconfiguration successful
-    CORE0_CONFIG_IDLE,      // reconfiguration successful
-    CORE0_CONFIG_ERROR,      // reconfiguration NOT successful
-    CORE0_UART_IDLE,        // No active UART operations  
-    CORE0_UART_ACTIVE,      // Processing UART data
+    
+    // Configuration sequence
+    CORE0_CONFIG_UART,      // Configure UARTs 
+    CORE0_CONFIG_COMPLETE,  // Reconfiguration successful
+    CORE0_CONFIG_IDLE,      // Reconfiguration successful, waiting
+    CORE0_CONFIG_ERROR,     // Reconfiguration NOT successful
+    
+    // Operational sequence (separated concerns per ADR-012)
+    CORE0_IDLE,             // Check for work or sleep (like Core1)
+    CORE0_UART_ACTIVE,      // Processing UART hardware only
+    CORE0_RINGBUFFER_ACTIVE, // Processing ringbuffer messages only
     CORE0_UART_ERROR        // UART hardware error state
 } core0_substate_t;
 
@@ -75,6 +88,7 @@ typedef enum {
     CORE1_NET_ACTIVE_SEND,      // Active network connections
     CORE1_PERSISTENCE_ACTIVE,   // Flash persistence operation active
     CORE1_LOG_ACTIVE,           // Log processing active
+    CORE1_RINGBUFFER_ACTIVE,    // Processing ringbuffer messages for network transmission
     CORE1_IDLE,                 // we might sleep here or schedule new work
     CORE1_INIT_ERROR,           // unrecoverable init error
     CORE1_SHUTDOWN              // stop main loop
@@ -93,15 +107,27 @@ typedef enum {
 
 // Core0 state machine events
 typedef enum {
+    // Initialization events
     CORE0_EVENT_INIT_UART_COMPLETE,     // UART initialized
     CORE0_EVENT_INIT_UART_FAILED,       // UART could not be initialized
-    CORE0_EVENT_CONFIG_UART_COMPLETE,       // UART could not be initialized
-    CORE0_EVENT_CONFIG_UART_FAILED,       // UART could not be initialized
-    CORE0_EVENT_UART_DATA_READY,        // UART data available for processing
-    CORE0_EVENT_UART_IDLE,              // UART processing completed
+    
+    // Configuration events
+    CORE0_EVENT_CONFIG_UART_COMPLETE,   // UART reconfigured successfully
+    CORE0_EVENT_CONFIG_UART_FAILED,     // UART reconfiguration failed
+    
+    // Work detection events (per ADR-012)
+    CORE0_EVENT_UART_DATA_READY,        // UART hardware has data to process
+    CORE0_EVENT_RINGBUFFER_DATA_READY,  // Ringbuffer has messages to process
+    
+    // Work completion events (per ADR-012)
+    CORE0_EVENT_UART_WORK_COMPLETE,     // UART hardware work finished
+    CORE0_EVENT_RINGBUFFER_WORK_COMPLETE, // Ringbuffer work finished
+    CORE0_EVENT_WORK_IDLE,              // All work completed, return to idle
+    
+    // Error and recovery events
     CORE0_EVENT_UART_ERROR,             // UART hardware error detected
-    CORE0_EVENT_ERROR_RECOVERED,         // UART error recovery complete
-    CORE0_EVENT_AUTO_TRANSITION            // DUMMY EVENT FOR auto-state transition
+    CORE0_EVENT_ERROR_RECOVERED,        // UART error recovery complete
+    CORE0_EVENT_AUTO_TRANSITION         // DUMMY EVENT FOR auto-state transition
 } core0_event_t;
 
 // Core1 state machine events
@@ -136,6 +162,8 @@ typedef enum {
     CORE1_EVENT_PERSISTENCE_END,   // Flash operation completed
     CORE1_EVENT_LOG_START,         // Log processing starting
     CORE1_EVENT_LOG_END,            // Log processing completed
+    CORE1_EVENT_RINGBUFFER_DATA_READY,    // Ringbuffer has messages for network transmission
+    CORE1_EVENT_RINGBUFFER_WORK_COMPLETE, // Ringbuffer processing completed
     CORE1_EVENT_AUTO_TRANSITION            // DUMMY EVENT FOR auto-state transition
 } core1_event_t;
 
@@ -148,6 +176,15 @@ typedef enum {
  * @return true if initialization successful, false otherwise
  */
 bool state_machine_init(void);
+
+/**
+ * @brief Wakes the 'other' core from WFI
+ * 
+ * 
+ */
+// Cross-core synchronization
+void wake_other_core(wake_direction_t direction);
+void enable_doorbell_irq(wake_direction_t direction);
 
 /**
  * @brief Get current main state (thread-safe, non-blocking)

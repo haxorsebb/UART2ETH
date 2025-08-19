@@ -37,7 +37,7 @@ target_link_libraries(test_shared_memory
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_shared_memory 1)
-pico_enable_stdio_uart(test_shared_memory 0)  # Disable UART0 to avoid SPI0 conflict
+pico_enable_stdio_uart(test_shared_memory 1)  
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_shared_memory)
@@ -65,7 +65,7 @@ target_link_libraries(test_log_manager
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_log_manager 1)
-pico_enable_stdio_uart(test_log_manager 0)  # Disable UART0 to avoid SPI0 conflict
+pico_enable_stdio_uart(test_log_manager 1)  
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_log_manager)
@@ -97,7 +97,7 @@ target_link_libraries(test_flash_persistence
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_flash_persistence 1)
-pico_enable_stdio_uart(test_flash_persistence 0)  # Disable UART0 to avoid SPI0 conflict
+pico_enable_stdio_uart(test_flash_persistence 1)  
 
 # Embed partition table for flash persistence testing
 pico_embed_pt_in_binary(test_flash_persistence "${CMAKE_CURRENT_SOURCE_DIR}/../partition_table.json")
@@ -124,7 +124,7 @@ target_link_libraries(test_state_machine
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_state_machine 1)
-pico_enable_stdio_uart(test_state_machine 0)  # Disable UART0 to avoid SPI0 conflict
+pico_enable_stdio_uart(test_state_machine 1)  
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_state_machine)
@@ -146,7 +146,7 @@ target_link_libraries(test_core0_timer
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_core0_timer 1)
-pico_enable_stdio_uart(test_core0_timer 0)
+pico_enable_stdio_uart(test_core0_timer 1)
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_core0_timer)
@@ -168,7 +168,7 @@ target_link_libraries(test_core1_timer
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_core1_timer 1)
-pico_enable_stdio_uart(test_core1_timer 0)
+pico_enable_stdio_uart(test_core1_timer 1)
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_core1_timer)
@@ -191,7 +191,7 @@ target_link_libraries(test_ringbuffer
 
 # Enable dual stdio for test output
 pico_enable_stdio_usb(test_ringbuffer 1)
-pico_enable_stdio_uart(test_ringbuffer 0)
+pico_enable_stdio_uart(test_ringbuffer 1)
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_ringbuffer)
@@ -239,6 +239,55 @@ pico_enable_stdio_uart(test_ringbuffer_debug 1)
 
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_ringbuffer_debug)
+
+# Test for Core0 ringbuffer separation (ADR-012)
+add_executable(test_core0_ringbuffer_separation
+    test_core0_ringbuffer_separation.c
+    ../src/core0_main.c
+    ../src/state_machine/state_machine.c
+    ../src/config/shared_memory.c
+    ../src/log/log_manager.c
+    ../src/ringbuffer/ringbuffer.c
+)
+
+target_include_directories(test_core0_ringbuffer_separation PRIVATE ../include)
+
+target_link_libraries(test_core0_ringbuffer_separation
+    unity
+    network_manager     # Added: needed for shared_memory.c dependency
+    pico_stdlib
+    pico_sync
+    pico_multicore      # Dual core support for state machine and ringbuffer
+    hardware_sync       # Atomic operations and mutex
+    hardware_gpio       # Added: needed for network_manager
+    hardware_spi        # Added: needed for network_manager
+    hardware_watchdog   # Watchdog for stability
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_core0_ringbuffer_separation 1)
+pico_enable_stdio_uart(test_core0_ringbuffer_separation 1)  
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_core0_ringbuffer_separation)
+
+# Test for Core0 minimal (debugging)
+add_executable(test_core0_minimal
+    test_core0_minimal.c
+)
+
+target_include_directories(test_core0_minimal PRIVATE ../include)
+
+target_link_libraries(test_core0_minimal
+    pico_stdlib
+    hardware_sync       # Basic atomic operations
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_core0_minimal 1)
+pico_enable_stdio_uart(test_core0_minimal 1)  
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_core0_minimal)
 
 # Add network tests subdirectory
 add_subdirectory(network)

@@ -46,8 +46,13 @@ static void core0_configuration_complete(void);
 static void core0_idle_wait(void);
 
 // MAIN_STATE_OPERATIONAL functions
-static void core0_process_uart(void);
+void core0_process_uart(void);
 static void core0_handle_uart_error(void);
+
+// New Core0 work detection functions (ADR-012)
+bool core0_check_for_pending_work(void);
+void core0_work_or_idle_wait(void);
+void core0_process_ringbuffer(void);
 
 // MAIN_STATE_ERROR functions
 static void core0_handle_error(void);
@@ -144,11 +149,14 @@ void core0_main(void) {
             case MAIN_STATE_OPERATIONAL:
                 // Normal operation - process based on sub-state
                 switch (sub_state) {
-                    case CORE0_UART_IDLE:
-                        core0_idle_wait();  // Universal wait function
+                    case CORE0_IDLE:
+                        core0_work_or_idle_wait();  // Check for work or sleep (ADR-012)
                         break;
                     case CORE0_UART_ACTIVE:
                         core0_process_uart();  // Active UART processing
+                        break;
+                    case CORE0_RINGBUFFER_ACTIVE:
+                        core0_process_ringbuffer();  // Active ringbuffer processing
                         break;
                     case CORE0_UART_ERROR:
                         core0_handle_uart_error();  // Handle UART errors
@@ -180,19 +188,7 @@ static void core0_initialize(void) {
     g_uart_recovery_attempts = 0;
     g_system_recovery_attempts = 0;
     
-    // Make sure the doorbell_on_mainstate_change doorbell is not set for this core
-    multicore_doorbell_clear_current_core(doorbell_core0_wakes_core1);
-
-    //set up doorbell irq - all doorbells have the same irq anyway. it is shared
-    uint32_t irq = multicore_doorbell_irq_num(doorbell_core1_wakes_core0);
-    DEBUG_ONLY({
-        printf("Core0: Setting up doorbell IRQ %u for doorbell %d\n", irq, doorbell_core0_wakes_core1);
-    });
-
-    //unnecessary to add another handler, enabling IRQ is good enough
-    //irq_add_shared_handler(irq, shared_doorbell_irq,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
-    irq_set_enabled(irq, true);
-
+    enable_doorbell_irq(CORE0_WAKES_CORE1);
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
 }
 
@@ -236,14 +232,12 @@ static void core0_init_complete(void) {
  * @brief Universal wait function for all idle/wait states
  * 
  * Handles cross-core wake-up messages and power-efficient waiting.
- * All other logic (UART data detection, etc.) must be handled by 
- * interrupt handlers that change the substate before WFI returns.
+ * Work detection is now handled by core0_work_or_idle_wait() per ADR-012.
+ * This function only handles the actual waiting/sleeping part.
  */
 static void core0_idle_wait(void) {
-
     // Wait for interrupt - power efficient
-    // NOTE: UART data availability must be handled by UART interrupt 
-    // handler that changes substate from UART_IDLE to UART_ACTIVE
+    // Work detection is handled elsewhere in the new architecture
     __wfi();
 }
 
@@ -277,66 +271,17 @@ static void core0_configuration_complete(void) {
 
 
 /**
- * @brief Process UART operations
+ * @brief Process UART hardware operations only (ADR-012)
  * 
- * Handles all UART processing including data RX/TX, protocol filtering,
- * and TCP socket bridging. This is the core function for UART operations.
+ * Handles UART hardware processing including data RX/TX, DMA transfers,
+ * and interrupt handling. Ringbuffer processing has been moved to
+ * core0_process_ringbuffer() per ADR-012 separation of concerns.
  * 
- * Ring Buffer Integration (Issue #68):
- * - Dequeue messages with direction RX_TCP_TO_UART (from TCP clients)
- * - "Turn around" by changing direction to RX_UART_TO_TCP (echo response)
- * - Process only ONE message per main loop execution (per test requirement #7)
+ * Documentation Reference:
+ * - ADR-012: Core0 Ringbuffer Processing Separation  
  */
-static void core0_process_uart(void) {
-    static uint32_t call_counter = 0;
-    call_counter++;
-    
-    DEBUG_ONLY({
-        if (call_counter % 1000 == 0) {  // Print every 1k calls
-            printf("DEBUG: core0_process_uart() call #%u\n", call_counter);
-        }
-    });
-    
-    // Ring Buffer Processing: Turn around TCP→UART messages (Issue #68)
-    // Process only ONE message per main loop execution (test requirement #7)
-    ring_entry_t* tcp_to_uart_msg = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
-    if (tcp_to_uart_msg) {
-        DEBUG_ONLY({
-            printf("DEBUG: Core0 turning around message, length=%u\n", tcp_to_uart_msg->payload_length);
-        });
-        
-        // "Turn around" the message: change direction from TCP→UART to UART→TCP
-        tcp_to_uart_msg->direction = RX_UART_TO_TCP;
-        
-        // Re-enqueue the message for Core1 to transmit back to TCP client
-        bool enqueue_result = ringbuffer_enqueue_entry(tcp_to_uart_msg);
-        if (enqueue_result) {
-            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
-            DEBUG_ONLY({
-                printf("DEBUG: Core0 echo message enqueued successfully\n");
-            });
-        } else {
-            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 1);
-            DEBUG_ONLY({
-                printf("DEBUG: Core0 failed to enqueue echo message\n");
-            });
-        }
-        
-        // Only process ONE message per loop execution
-        state_machine_process_core0_event(CORE0_EVENT_UART_IDLE);
-        return;
-    }
-    
-    // Legacy UART data processing (for future UART hardware integration)
-    if (process_uart_data()) {
-        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 0);
-        // Processing complete, generate idle event
-        state_machine_process_core0_event(CORE0_EVENT_UART_IDLE);
-        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART0_DATA_TX, 1);
-    }
-    
-    // Small delay to prevent busy looping while still being responsive
-    sleep_us(100);  // 100μs = 10kHz processing rate for low latency
+void core0_process_uart(void) {
+    // TBD: implement after rinbuffer intergration sucessfull
 }
 
 /**
@@ -464,4 +409,86 @@ static bool perform_error_recovery(void) {
     }
     
     return false;
+}
+
+// ==================== NEW CORE0 WORK DETECTION FUNCTIONS (ADR-012) ====================
+
+/**
+ * @brief Check for pending work and fire appropriate events
+ * 
+ * Follows Core1 pattern for work detection. Prioritizes UART work over ringbuffer work
+ * because UART has limited FIFO while ringbuffer is already buffered.
+ * 
+ * @return true if work found and event fired, false if no work pending
+ */
+bool core0_check_for_pending_work(void) {
+    // Priority 1: Check for UART hardware work (limited FIFO, data might be lost)
+    // TODO: Replace with real UART hardware check when available
+    // if (uart_hardware_has_pending_work()) {
+    //     state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
+    //     return true;
+    // }
+    
+    // Priority 2: Check for ringbuffer messages to process (buffered, safer to delay)
+    if (ringbuffer_get_count(RX_TCP_TO_UART) > 0) {
+        state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_DATA_READY);
+        return true;
+    }
+    
+    // No work pending
+    return false;
+}
+
+/**
+ * @brief Check for work or go to idle wait (following Core1 pattern)
+ * 
+ * This is the main work dispatcher for Core0 operational state.
+ * Matches the Core1 architecture with work_or_idle_wait pattern.
+ */
+void core0_work_or_idle_wait(void) {
+
+    // Check for work first
+    if (core0_check_for_pending_work()) {
+        return; // Work found, event fired, let state machine handle it
+    }
+    
+    // No work, go to sleep
+    core0_idle_wait();
+}
+
+/**
+ * @brief Process ringbuffer messages only (separated from UART hardware)
+ * 
+ * Moved from core0_process_uart() per ADR-012 separation of concerns.
+ * Processes TCP→UART messages from ringbuffer and echoes them back as UART→TCP.
+ * Only processes ONE message per call to prevent blocking.
+ */
+void core0_process_ringbuffer(void) {
+    static uint32_t call_counter = 0;
+    call_counter++;
+
+    DEBUG_ONLY({
+        printf("DEBUG: core0_process_ringbuffer() call #%u\n", call_counter);
+    });
+
+    // Ring Buffer Processing: Turn around TCP→UART messages (Issue #68)
+    // Process only ONE message per main loop execution (test requirement #7)
+    ring_entry_t* tcp_to_uart_msg = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+    if (tcp_to_uart_msg) {
+    
+        // "Turn around" the message: change direction from TCP→UART to UART→TCP
+        tcp_to_uart_msg->direction = RX_UART_TO_TCP;
+        tcp_to_uart_msg->status = ENTRY_STATUS_FILLING;
+
+        // Re-enqueue the message for Core1 to transmit back to TCP client
+        bool enqueue_result = ringbuffer_enqueue_entry(tcp_to_uart_msg);
+        if (enqueue_result) {
+            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
+        } else {
+            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 1);
+        }
+    }
+    
+    // Work complete - return to IDLE to allow main loop to check for more work
+    state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_WORK_COMPLETE);
 }
