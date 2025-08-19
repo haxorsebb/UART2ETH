@@ -29,8 +29,8 @@ We will update the hardware pin configuration to use SPI1 for the ENC28J60 Ether
 
 |UART0 TX |GP0 |N/A (was on UART1) |Debug output (115200 baud)
 |UART0 RX |GP1 |N/A (was on UART1) |Debug input (115200 baud)
-|ENC-RESET |GP2 |N/A |New dedicated reset pin for ENC28J60
-|ENC-INTERRUPT |GP8 |GP14 |ENC28J60 interrupt signal (active low)
+|ENC-RESET |GP3 |N/A |New dedicated reset pin for ENC28J60
+|ENC-INTERRUPT |GP2 |GP14 |ENC28J60 interrupt signal (active low)
 |ENC-SCK |GP10 |GP2 |SPI1 clock signal
 |ENC-SI (MOSI) |GP11 |GP3 |SPI1 serial input to ENC28J60
 |ENC-SO (MISO) |GP12 |GP4 |SPI1 serial output from ENC28J60
