@@ -192,59 +192,25 @@ void tcp_socket_server_deinit(void) {
 /**
  * @brief Process TCP server tasks
  * 
- * Ring Buffer Integration (Issue #68):
- * - Dequeue messages with direction RX_UART_TO_TCP (echo responses from Core0)
- * - Send echo responses back to TCP clients
- * - Process only ONE message per call (per test requirement #9)
+ * TCP Server Processing:
+ * - Handle lwIP TCP stack callbacks and connection management
+ * - TCP packet processing is handled by lwIP callbacks
+ * - Ringbuffer processing is handled by Core1 main loop
+ * 
+ * Note: Ringbuffer message sending is now handled by Core1 main loop
+ * via core1_process_ringbuffer() -> tcp_socket_server_send_to_uart_channel()
  */
 void tcp_socket_server_process(void) {
-    // Ring Buffer Processing: Send UART→TCP messages back to TCP clients (Issue #68)
-    // Process only ONE message per call (test requirement #9)
-    ring_entry_t* uart_to_tcp_msg = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
-    if (uart_to_tcp_msg) {
-        printf("TCP Server: DEQUEUE UART→TCP echo message - %u bytes: '", uart_to_tcp_msg->payload_length);
-        for (uint32_t i = 0; i < uart_to_tcp_msg->payload_length && i < 32; i++) {
-            printf("%c", uart_to_tcp_msg->payload[i] >= 32 && uart_to_tcp_msg->payload[i] < 127 ? uart_to_tcp_msg->payload[i] : '.');
-        }
-        printf("'\n");
-
-        // Find an active connection to send the response
-        // For now, send to first active connection (echo functionality)
-        // TODO: In full implementation, track which connection sent the original message
-        for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
-            if (g_connections[i].active && g_connections[i].pcb) {
-                printf("TCP Server: SEND echo response to connection %d\n", i);
-                err_t err = tcp_write(g_connections[i].pcb,
-                                    uart_to_tcp_msg->payload,
-                                    uart_to_tcp_msg->payload_length,
-                                    TCP_WRITE_FLAG_COPY);
-                
-                if (err == ERR_OK) {
-                    tcp_output(g_connections[i].pcb);
-                    g_server_stats.lines_processed++;
-                    DEBUG_ONLY({
-                        printf("DEBUG: Core1 echo response sent successfully\n");
-                    });
-                } else {
-                    DEBUG_ONLY({
-                        printf("DEBUG: Core1 failed to send echo response (err=%d)\n", err);
-                    });
-                }
-                
-                // Mark message as consumed
-                ringbuffer_mark_consumed(uart_to_tcp_msg);
-                
-                // Only process ONE message per call
-                return;
-            }
-        }
-        
-        // No active connections found - mark message as consumed anyway
-        DEBUG_ONLY({
-            printf("DEBUG: Core1 no active connections for echo response\n");
-        });
-        ringbuffer_mark_consumed(uart_to_tcp_msg);
-    }
+    // TCP server processing is primarily handled by lwIP callbacks
+    // This function is kept for future TCP server management tasks
+    // such as connection timeout handling, statistics updates, etc.
+    
+    // For now, this function is mainly a placeholder for future TCP server tasks
+    // The main TCP processing happens in the lwIP callbacks:
+    // - tcp_server_accept_callback() - handles new connections
+    // - tcp_connection_recv_callback() - handles incoming data
+    // - tcp_connection_error_callback() - handles connection errors
+    // - tcp_connection_sent_callback() - handles sent data confirmation
 }
 
 /**

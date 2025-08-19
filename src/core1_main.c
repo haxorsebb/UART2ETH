@@ -53,7 +53,7 @@ static void core1_validate_configuration(void);
 static void core1_configuration_complete(void);
 
 // MAIN_STATE_OPERATIONAL functions
-static bool check_for_pending_work(void);
+static bool core1_check_for_pending_work(void);
 static void core1_work_or_idle_wait(void);
 static void core1_idle_wait(void);
 static void core1_process_network_link_change(void);
@@ -61,6 +61,7 @@ static void core1_process_packet_tx(void);
 static void core1_process_network(void);
 static void core1_process_persistence(void);
 static void core1_process_logs(void);
+static void core1_process_ringbuffer(void);
 
 // MAIN_STATE_ERROR functions
 static void core1_handle_error(void);
@@ -190,6 +191,9 @@ void core1_main(void) {
                     case CORE1_LOG_ACTIVE:
                         core1_process_logs();                        
                         break;
+                    case CORE1_RINGBUFFER_ACTIVE:
+                        core1_process_ringbuffer();
+                        break;
 
                     case CORE1_IDLE: //check for work or sleep
                         core1_work_or_idle_wait();
@@ -213,7 +217,7 @@ void core1_main(void) {
 /**
  * @brief check if we need to do anything and fire a corresponding event
  */
-static bool check_for_pending_work(void) {
+static bool core1_check_for_pending_work(void) {
 
     enc28j60_process_interrupts(false);
 
@@ -222,6 +226,7 @@ static bool check_for_pending_work(void) {
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE);
         return true; 
     }
+
     if(network_manager_receive_packets_pending()) {
         DEBUG_ONLY({ printf("network has pending receive packets\n"); });
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
@@ -236,13 +241,22 @@ static bool check_for_pending_work(void) {
         core1_process_packet_tx();
         return true; 
     }
-    
+
     if(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT))
     {
         network_manager_check_timeouts();
         return true;
     }
 
+    // Check for ringbuffer messages to transmit over network (medium priority, messages are cached)
+    if(ringbuffer_get_count(RX_UART_TO_TCP) > 0) {
+        DEBUG_ONLY({ printf("Core1: ringbuffer has %u pending messages for network transmission\n", 
+                             ringbuffer_get_count(RX_UART_TO_TCP)); });
+        state_machine_process_core1_event(CORE1_EVENT_RINGBUFFER_DATA_READY);
+        return true;
+    }
+
+    //low priority tasks
     if(log_manager_get_pending_count()) {
         DEBUG_ONLY({ printf("Logmanager has pending count %d\n",log_manager_get_pending_count()); });
         state_machine_process_core1_event(CORE1_EVENT_LOG_START);
@@ -266,7 +280,7 @@ static bool check_for_pending_work(void) {
 static void core1_work_or_idle_wait(void) {
     
     //check if we need to do something
-    if(check_for_pending_work())    
+    if(core1_check_for_pending_work())    
     {
         return;
     }
@@ -309,17 +323,8 @@ static void core1_initialize(void) {
     g_configuration_loaded = false;
     g_config_loading_cycles = 0;
     
-    // Make sure the doorbell_on_mainstate_change doorbell is not set for this core
-    multicore_doorbell_clear_current_core(doorbell_core1_wakes_core0);
-
-    //set up doorbell irq - all doorbells have the same irq anyway. it is shared
-    uint32_t irq = multicore_doorbell_irq_num(doorbell_core1_wakes_core0);
-    DEBUG_ONLY({
-        printf("Core1: Setting up doorbell IRQ %u for doorbell %d\n", irq, doorbell_core1_wakes_core0);
-    });
-    irq_add_shared_handler(irq, shared_doorbell_irq,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY-1);
-    irq_set_enabled(irq, true);
-
+    enable_doorbell_irq(CORE1_WAKES_CORE0);
+    
     //init timers
     core1_timer_init();
 
@@ -688,6 +693,51 @@ static void core1_process_logs(void) {
     
     // Complete log processing after 1 log format to run higher priorities tasks
     state_machine_process_core1_event(CORE1_EVENT_LOG_END);
+}
+
+/**
+ * @brief Process ringbuffer messages for network transmission
+ * 
+ * Fetches messages from the ringbuffer (populated by Core0 UART processing)
+ * and transmits them over the network via TCP socket server.
+ * This implements the Core1 side of the UART→ringbuffer→network pipeline.
+ */
+static void core1_process_ringbuffer(void) {
+    log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_DEBUG, LOG_EVENT_RINGBUFFER_WORK_START, 1);
+    
+    // Process ringbuffer messages - fetch from ringbuffer and send over network
+    // Implementation: fetch one message per call to avoid blocking other tasks
+    
+    ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
+    
+    if (entry != NULL) {
+        printf("Core1: DEQUEUE UART→TCP message - UART%d, %u bytes: '", 
+               entry->uart_channel, entry->payload_length);
+        for (uint32_t i = 0; i < entry->payload_length && i < 32; i++) {
+            printf("%c", entry->payload[i] >= 32 && entry->payload[i] < 127 ? entry->payload[i] : '.');
+        }
+        printf("'\n");
+        
+        // Send the message over the network via TCP socket server
+        bool sent = tcp_socket_server_send_to_uart_channel(entry->uart_channel, entry->payload, entry->payload_length);
+        
+        if (sent) {
+            printf("Core1: SEND message over network - SUCCESS\n");
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, entry->payload_length);
+            log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_INFO, LOG_EVENT_RINGBUFFER_ECHO_SUCCESS, entry->uart_channel);
+        } else {
+            printf("Core1: SEND message over network - FAILED (no active TCP connection)\n");
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, entry->uart_channel);
+            log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_WARN, LOG_EVENT_RINGBUFFER_ECHO_ERROR, entry->uart_channel);
+        }
+        
+        // Mark the entry as consumed to return it to the free pool
+        ringbuffer_mark_consumed(entry);
+    }
+        
+    // Complete ringbuffer processing and return to idle for next work check
+    state_machine_process_core1_event(CORE1_EVENT_RINGBUFFER_WORK_COMPLETE);
+    log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_DEBUG, LOG_EVENT_RINGBUFFER_WORK_COMPLETE, 0);
 }
 
 
