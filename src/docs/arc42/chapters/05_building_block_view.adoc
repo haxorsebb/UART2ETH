@@ -1500,6 +1500,184 @@ typedef struct {
 } uart_channel_status_t;
 ----
 
+==== UART Hardware Manager Implementation (Issue #76)
+
+The UART Hardware Manager implementation for Issue #76 provides a minimal, production-ready UART1 interface that integrates with the existing ring buffer system and Core0 state machine architecture.
+
+[plantuml, uart-hardware-manager-implementation, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title UART Hardware Manager Implementation - Issue #76
+
+cloud "Core0 State Machine\nUART Events\nState Coordination" as STATE_MACHINE
+cloud "Ring Buffer System\nBidirectional Communication\nTCP↔UART Bridge" as RING_BUFFER
+cloud "UART1 Hardware\nRP2350 Peripheral\nGP9(RX)/GP10(TX)" as UART_HW
+
+package "UART Hardware Manager" {
+    component "UART Manager\nHigh-level Interface\nConfiguration & Control\nIntegration Layer" as UART_MGR #lightgreen
+    
+    component "UART1 Driver\nLow-level Hardware\nInterrupt-driven I/O\nRegister Management" as UART1_DRV #lightblue
+    
+    component "Interrupt Handler\nUART1 IRQ\nRX/TX Events\nReal-time Processing" as INT_HANDLER #lightyellow
+    
+    component "Line Buffer\nNewline Detection\nMessage Framing\nPacket Assembly" as LINE_BUFFER #lightcyan
+}
+
+' External connections
+STATE_MACHINE <--> UART_MGR : UART Events\nState Integration
+UART_MGR <--> RING_BUFFER : Message Exchange\nPacket Format
+UART1_DRV <--> UART_HW : Register Access\nPhysical Interface
+
+' Internal connections
+UART_MGR --> UART1_DRV : Configuration\nControl Operations
+UART1_DRV --> INT_HANDLER : IRQ Setup\nEvent Registration
+INT_HANDLER --> LINE_BUFFER : RX Data\nCharacter Assembly
+LINE_BUFFER --> UART_MGR : Complete Lines\nPacket Ready
+UART_MGR --> UART1_DRV : TX Data\nTransmission Request
+
+@enduml
+----
+
+===== Implementation Scope and Requirements
+
+**Hardware Configuration:**
+- UART1 peripheral on RP2350
+- RX: GPIO9, TX: GPIO10  
+- 230400 baud, 8N1 configuration
+- Hardware loopback for testing (RX+TX connected)
+
+**Integration Requirements:**
+- Ring buffer system integration for TCP↔UART bridging
+- Core0 state machine event-driven architecture
+- Interrupt-driven pattern following ENC28J60 implementation
+- Line-based protocol with newline detection
+
+**Functional Requirements:**
+1. TCP client connects to port 4001
+2. Send line of text to system (ending with newline)
+3. System echoes line back to TCP client
+4. Support multiple sequential messages
+5. Integration with existing HiL testing framework
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*UART Manager*
+|High-level interface providing configuration, status monitoring, and integration with Core0 state machine. Manages ring buffer message exchange and coordinates with other system components.
+
+|*UART1 Driver*
+|Low-level hardware abstraction for UART1 peripheral. Handles register configuration, interrupt setup, and direct hardware communication following pico-sdk patterns.
+
+|*Interrupt Handler*
+|Real-time processing of UART1 RX/TX interrupts. Manages character reception, transmission completion, and error handling with minimal latency.
+
+|*Line Buffer*
+|Message framing logic that assembles incoming characters into complete lines. Detects newline characters and creates complete messages for ring buffer transmission.
+|===
+
+===== Important Interfaces
+
+====== UART Manager API
+High-level interface for Core0 integration.
+
+[source,c]
+----
+// Initialization and control
+bool uart_hardware_manager_init(void);
+void uart_hardware_manager_deinit(void);
+bool uart_hardware_manager_is_ready(void);
+
+// Ring buffer integration
+bool uart_hardware_manager_process_incoming_data(void);
+bool uart_hardware_manager_process_outgoing_data(void);
+bool uart_hardware_manager_has_pending_work(void);
+
+// Status and diagnostics
+uart_manager_status_t uart_hardware_manager_get_status(void);
+void uart_hardware_manager_get_stats(uart_manager_stats_t* stats);
+----
+
+====== UART1 Driver API
+Low-level hardware interface following pico-sdk patterns.
+
+[source,c]
+----
+// Hardware control
+bool uart1_driver_init(const uart1_config_t* config);
+void uart1_driver_deinit(void);
+bool uart1_driver_is_ready(void);
+
+// Data transmission
+bool uart1_driver_send_char(char c);
+bool uart1_driver_send_data(const uint8_t* data, size_t length);
+bool uart1_driver_is_tx_ready(void);
+
+// Interrupt handling
+void uart1_driver_enable_rx_interrupt(void);
+void uart1_driver_disable_rx_interrupt(void);
+bool uart1_driver_has_rx_data(void);
+char uart1_driver_read_char(void);
+----
+
+====== Configuration Structure
+UART1 hardware configuration parameters.
+
+[source,c]
+----
+typedef struct {
+    uint32_t baud_rate;        // 230400 for Issue #76
+    uint8_t data_bits;         // 8 bits
+    uint8_t stop_bits;         // 1 bit
+    uart_parity_t parity;      // None
+    uint16_t rx_gpio;          // GPIO9
+    uint16_t tx_gpio;          // GPIO10
+    bool enable_loopback;      // For testing
+} uart1_config_t;
+----
+
+====== Message Flow Integration
+Integration with ring buffer system for bidirectional communication.
+
+**RX Path (UART → TCP):**
+1. UART1 interrupt receives character
+2. Line buffer assembles characters until newline
+3. Complete line converted to ring buffer entry
+4. Ring buffer entry marked as RX_UART_TO_TCP
+5. Core1 processes entry and sends to TCP client
+
+**TX Path (TCP → UART):**
+1. Ring buffer entry arrives as RX_TCP_TO_UART
+2. UART Manager extracts payload data
+3. UART1 Driver transmits characters sequentially
+4. Entry marked as consumed when transmission complete
+
+===== Testing Strategy
+
+**Unit Tests:**
+- UART1 driver hardware configuration and loopback
+- Line buffer message framing and newline detection
+- Ring buffer integration and message conversion
+- Interrupt handler timing and reliability
+
+**Integration Tests:**
+- End-to-end TCP→UART→TCP message flow
+- Core0 state machine event integration
+- Error recovery and fault tolerance
+- Performance and timing validation
+
+**Hardware-in-the-Loop Tests:**
+- Protocol validator tool verification
+- Real hardware loopback testing
+- Network client integration testing
+- Long-duration stability testing
+
 ==== Whitebox Flash Persistence System
 
 The Flash Persistence System provides reliable storage and recovery of the complete shared memory structure using a flash ring buffer approach that ensures wear leveling and power-loss safety for embedded systems.
