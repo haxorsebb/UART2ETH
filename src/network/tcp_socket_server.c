@@ -13,6 +13,7 @@
 #include "network/tcp_socket_server.h"
 #include "network/network_manager.h"
 #include "log_manager.h"
+#include "ringbuffer.h"
 #include "debug.h"
 #include "pico/stdlib.h"
 #include "lwip/tcp.h"
@@ -184,10 +185,57 @@ void tcp_socket_server_deinit(void) {
 
 /**
  * @brief Process TCP server tasks
+ * 
+ * Ring Buffer Integration (Issue #68):
+ * - Dequeue messages with direction RX_UART_TO_TCP (echo responses from Core0)
+ * - Send echo responses back to TCP clients
+ * - Process only ONE message per call (per test requirement #9)
  */
 void tcp_socket_server_process(void) {
-    // No explicit processing needed - all handled by lwIP callbacks
-    // This function exists for integration with Core1 main loop
+    // Ring Buffer Processing: Send UART→TCP messages back to TCP clients (Issue #68)
+    // Process only ONE message per call (test requirement #9)
+    ring_entry_t* uart_to_tcp_msg = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
+    if (uart_to_tcp_msg) {
+        DEBUG_ONLY({
+            printf("DEBUG: Core1 sending echo response, length=%u\n", uart_to_tcp_msg->payload_length);
+        });
+        
+        // Find an active connection to send the response
+        // For now, send to first active connection (echo functionality)
+        // TODO: In full implementation, track which connection sent the original message
+        for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
+            if (g_connections[i].active && g_connections[i].pcb) {
+                err_t err = tcp_write(g_connections[i].pcb, 
+                                    uart_to_tcp_msg->payload, 
+                                    uart_to_tcp_msg->payload_length, 
+                                    TCP_WRITE_FLAG_COPY);
+                
+                if (err == ERR_OK) {
+                    tcp_output(g_connections[i].pcb);
+                    g_server_stats.lines_processed++;
+                    DEBUG_ONLY({
+                        printf("DEBUG: Core1 echo response sent successfully\n");
+                    });
+                } else {
+                    DEBUG_ONLY({
+                        printf("DEBUG: Core1 failed to send echo response (err=%d)\n", err);
+                    });
+                }
+                
+                // Mark message as consumed
+                ringbuffer_mark_consumed(uart_to_tcp_msg);
+                
+                // Only process ONE message per call
+                return;
+            }
+        }
+        
+        // No active connections found - mark message as consumed anyway
+        DEBUG_ONLY({
+            printf("DEBUG: Core1 no active connections for echo response\n");
+        });
+        ringbuffer_mark_consumed(uart_to_tcp_msg);
+    }
 }
 
 /**
@@ -483,24 +531,41 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         processed = len;
         
         DEBUG_ONLY({
-            printf("Message end detected! Buffer length: %zu\n", len);
+            printf("Message end detected! Buffer length: %zu\n", conn->line_pos);
         });
-        err_t err = tcp_write(conn->pcb, conn->line_buffer, conn->line_pos, TCP_WRITE_FLAG_COPY);
         
-        if (err == ERR_OK) {
-            tcp_output(conn->pcb);
-            g_server_stats.lines_processed++;
-            DEBUG_ONLY({
-                printf("TCP Server: Echoed message (%zu bytes) - SUCCESS\n", conn->line_pos);
-            });
+        // Ring Buffer Integration (Issue #68): Enqueue TCP messages for Core0 processing
+        // Instead of direct echo, enqueue message with direction RX_TCP_TO_UART
+        ring_entry_t* entry = ringbuffer_get_free_entry();
+        if (entry) {
+            // Setup ring buffer entry
+            entry->direction = RX_TCP_TO_UART;
+            entry->uart_channel = 0;  // Default UART channel
+            entry->payload_length = conn->line_pos;
+            
+            // Copy message data to ring buffer
+            if (entry->payload_length > RINGBUFFER_PAYLOAD_MAX_SIZE) {
+                entry->payload_length = RINGBUFFER_PAYLOAD_MAX_SIZE;
+            }
+            memcpy(entry->payload, conn->line_buffer, entry->payload_length);
+            
+            // Enqueue for Core0 processing
+            bool enqueue_result = ringbuffer_enqueue_entry(entry);
+            if (enqueue_result) {
+                g_server_stats.lines_processed++;
+                DEBUG_ONLY({
+                    printf("TCP Server: Message enqueued for Core0 (%zu bytes) - SUCCESS\n", conn->line_pos);
+                });
+            } else {
+                DEBUG_ONLY({
+                    printf("TCP Server: Failed to enqueue message for Core0\n");
+                });
+            }
         } else {
-            // Handle write error - close connection
             DEBUG_ONLY({
-                printf("TCP Server: Write failed (err=%d) for %zu bytes, closing connection\n", err, conn->line_pos);
+                printf("TCP Server: No free ring buffer entry available\n");
             });
-            close_connection(conn);
         }
-        
     }
     else {
         //message end not yes detected, this is normal, there is a tcp window, we will probably not receive messages > 538 bytes at once    

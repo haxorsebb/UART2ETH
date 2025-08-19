@@ -24,6 +24,7 @@
 #include "state_machine.h"
 #include "shared_memory.h"
 #include "log_manager.h"
+#include "ringbuffer.h"
 #include "network/network_manager.h"
 #include "network/enc28j60_driver.h"
 #include "network/tcp_socket_server.h"

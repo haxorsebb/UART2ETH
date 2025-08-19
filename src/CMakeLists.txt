@@ -28,6 +28,19 @@ target_link_libraries(log_manager
     hardware_sync
 )
 
+# Ring buffer for UART-TCP message bridging
+add_library(ringbuffer
+    ringbuffer/ringbuffer.c
+)
+
+target_include_directories(ringbuffer PUBLIC ../include)
+target_link_libraries(ringbuffer 
+    pico_stdlib
+    pico_sync
+    pico_multicore
+    hardware_sync
+)
+
 # State machine (event-driven)
 add_library(state_machine
     state_machine/state_machine.c
@@ -67,6 +80,7 @@ target_link_libraries(core_modules
     network_manager
     tcp_socket_server
     timer_subsystems
+    ringbuffer
     pico_stdlib
     pico_multicore
     pico_sync

@@ -1018,8 +1018,8 @@ transfer_finished:
         enc28j60_dump_tx_registers("FINAL");
     
         printf("=== TX Result Analysis ===\n");
-        printf("  timeout_remaining: %u, other_error: %d, collision_error: %d\n", 
-            timeout, other_error ? 1 : 0, collision_error ? 1 : 0);
+        printf("  other_error: %d, collision_error: %d\n", 
+            other_error ? 1 : 0, collision_error ? 1 : 0);
         printf("  transfer_complete: %d, transfer_complete_interrupt_flag: %d, transfer_error_interrupt_flag: %d\n",
             transfer_complete ? 1 : 0, transfer_complete_interrupt_flag ? 1 : 0, transfer_error_interrupt_flag ? 1 : 0);
         printf("  tx_success: %d\n", tx_success ? 1 : 0);
