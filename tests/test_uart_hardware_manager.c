@@ -223,6 +223,9 @@ void test_ring_buffer_integration_single_message(void) {
     bool init_result = uart_hardware_manager_init();
     TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Hardware Manager initialization failed");
     
+    // Disable debug output for cleaner test output
+    uart_hardware_manager_set_debug(false);
+    
     // Create a TCP→UART message in ring buffer
     const char* test_payload = "Ring Buffer Test Message\n";
     create_tcp_to_uart_message(test_payload);
@@ -259,6 +262,9 @@ void test_ring_buffer_integration_multiple_messages(void) {
     // Initialize UART hardware manager
     bool init_result = uart_hardware_manager_init();
     TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Hardware Manager initialization failed");
+    
+    // Disable debug output for cleaner test output
+    uart_hardware_manager_set_debug(false);
     
     const char* test_messages[] = {
         "Message 1\n",

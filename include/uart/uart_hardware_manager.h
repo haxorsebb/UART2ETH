@@ -54,6 +54,37 @@ typedef struct {
 } __attribute__((aligned(4))) uart_manager_stats_t;
 
 /**
+ * @brief UART Hardware Manager result codes for better error handling
+ */
+typedef enum {
+    UART_MANAGER_SUCCESS = 0,
+    UART_MANAGER_ERROR_ALREADY_INITIALIZED,
+    UART_MANAGER_ERROR_DRIVER_INIT_FAILED,
+    UART_MANAGER_ERROR_BUFFER_OVERFLOW,
+    UART_MANAGER_ERROR_INVALID_CONFIG,
+    UART_MANAGER_ERROR_NOT_INITIALIZED
+} uart_manager_result_t;
+
+/**
+ * @brief UART Hardware Manager configuration structure
+ */
+typedef struct {
+    uint32_t baud_rate;          // UART baud rate (default: 230400)
+    uint8_t data_bits;           // Data bits (default: 8)
+    uint8_t stop_bits;           // Stop bits (default: 1)  
+    uint8_t parity;              // Parity setting (default: none)
+    uint8_t rx_gpio;             // RX GPIO pin (default: 9)
+    uint8_t tx_gpio;             // TX GPIO pin (default: 10)
+    bool enable_loopback;        // Enable loopback for testing (default: false)
+    bool enable_debug_output;    // Enable debug logging (default: false)
+} uart_hardware_manager_config_t;
+
+// Default configuration constants
+#define UART_HARDWARE_MANAGER_DEFAULT_BAUD    230400
+#define UART_HARDWARE_MANAGER_DEFAULT_RX_GPIO 9
+#define UART_HARDWARE_MANAGER_DEFAULT_TX_GPIO 10
+
+/**
  * @brief UART Hardware Manager initialization and control
  */
 
@@ -119,6 +150,12 @@ void uart_hardware_manager_get_stats(uart_manager_stats_t* stats);
  * Reset UART Hardware Manager statistics counters
  */
 void uart_hardware_manager_reset_stats(void);
+
+/**
+ * Enable or disable debug output for UART Hardware Manager
+ * @param enable True to enable debug output, false to disable
+ */
+void uart_hardware_manager_set_debug(bool enable);
 
 /**
  * @brief Diagnostic and testing functions
