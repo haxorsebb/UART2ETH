@@ -1760,6 +1760,190 @@ uint32_t uart_channel_get_status(uint8_t channel);</code></pre>
 </div>
 </div>
 <div class="sect3">
+<h4 id="_uart_hardware_manager_implementation_issue_76">UART Hardware Manager Implementation (Issue #76)</h4>
+<div class="paragraph">
+<p>The UART Hardware Manager implementation for Issue #76 provides a minimal, production-ready UART1 interface that integrates with the existing ring buffer system and Core0 state machine architecture.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/uart-hardware-manager-implementation.svg" alt="uart hardware manager implementation" width="701" height="891">
+</div>
+</div>
+<div class="sect4">
+<h5 id="_implementation_scope_and_requirements">Implementation Scope and Requirements</h5>
+<div class="paragraph">
+<p><strong>Hardware Configuration:</strong>
+- UART1 peripheral on RP2350
+- RX: GPIO9, TX: GPIO10
+- 230400 baud, 8N1 configuration
+- Hardware loopback for testing (RX+TX connected)</p>
+</div>
+<div class="paragraph">
+<p><strong>Integration Requirements:</strong>
+- Ring buffer system integration for TCP↔UART bridging
+- Core0 state machine event-driven architecture
+- Interrupt-driven pattern following ENC28J60 implementation
+- Line-based protocol with newline detection</p>
+</div>
+<div class="paragraph">
+<p><strong>Functional Requirements:</strong>
+1. TCP client connects to port 4001
+2. Send line of text to system (ending with newline)
+3. System echoes line back to TCP client
+4. Support multiple sequential messages
+5. Integration with existing HiL testing framework</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_12">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High-level interface providing configuration, status monitoring, and integration with Core0 state machine. Manages ring buffer message exchange and coordinates with other system components.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART1 Driver</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low-level hardware abstraction for UART1 peripheral. Handles register configuration, interrupt setup, and direct hardware communication following pico-sdk patterns.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Interrupt Handler</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Real-time processing of UART1 RX/TX interrupts. Manages character reception, transmission completion, and error handling with minimal latency.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Line Buffer</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Message framing logic that assembles incoming characters into complete lines. Detects newline characters and creates complete messages for ring buffer transmission.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_important_interfaces_4">Important Interfaces</h5>
+<div class="sect5">
+<h6 id="_uart_manager_api">UART Manager API</h6>
+<div class="paragraph">
+<p>High-level interface for Core0 integration.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Initialization and control
+bool uart_hardware_manager_init(void);
+void uart_hardware_manager_deinit(void);
+bool uart_hardware_manager_is_ready(void);
+
+// Ring buffer integration
+bool uart_hardware_manager_process_incoming_data(void);
+bool uart_hardware_manager_process_outgoing_data(void);
+bool uart_hardware_manager_has_pending_work(void);
+
+// Status and diagnostics
+uart_manager_status_t uart_hardware_manager_get_status(void);
+void uart_hardware_manager_get_stats(uart_manager_stats_t* stats);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_uart1_driver_api">UART1 Driver API</h6>
+<div class="paragraph">
+<p>Low-level hardware interface following pico-sdk patterns.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Hardware control
+bool uart1_driver_init(const uart1_config_t* config);
+void uart1_driver_deinit(void);
+bool uart1_driver_is_ready(void);
+
+// Data transmission
+bool uart1_driver_send_char(char c);
+bool uart1_driver_send_data(const uint8_t* data, size_t length);
+bool uart1_driver_is_tx_ready(void);
+
+// Interrupt handling
+void uart1_driver_enable_rx_interrupt(void);
+void uart1_driver_disable_rx_interrupt(void);
+bool uart1_driver_has_rx_data(void);
+char uart1_driver_read_char(void);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_configuration_structure">Configuration Structure</h6>
+<div class="paragraph">
+<p>UART1 hardware configuration parameters.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    uint32_t baud_rate;        // 230400 for Issue #76
+    uint8_t data_bits;         // 8 bits
+    uint8_t stop_bits;         // 1 bit
+    uart_parity_t parity;      // None
+    uint16_t rx_gpio;          // GPIO9
+    uint16_t tx_gpio;          // GPIO10
+    bool enable_loopback;      // For testing
+} uart1_config_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_message_flow_integration">Message Flow Integration</h6>
+<div class="paragraph">
+<p>Integration with ring buffer system for bidirectional communication.</p>
+</div>
+<div class="paragraph">
+<p><strong>RX Path (UART → TCP):</strong>
+1. UART1 interrupt receives character
+2. Line buffer assembles characters until newline
+3. Complete line converted to ring buffer entry
+4. Ring buffer entry marked as RX_UART_TO_TCP
+5. Core1 processes entry and sends to TCP client</p>
+</div>
+<div class="paragraph">
+<p><strong>TX Path (TCP → UART):</strong>
+1. Ring buffer entry arrives as RX_TCP_TO_UART
+2. UART Manager extracts payload data
+3. UART1 Driver transmits characters sequentially
+4. Entry marked as consumed when transmission complete</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_testing_strategy">Testing Strategy</h5>
+<div class="paragraph">
+<p><strong>Unit Tests:</strong>
+- UART1 driver hardware configuration and loopback
+- Line buffer message framing and newline detection
+- Ring buffer integration and message conversion
+- Interrupt handler timing and reliability</p>
+</div>
+<div class="paragraph">
+<p><strong>Integration Tests:</strong>
+- End-to-end TCP→UART→TCP message flow
+- Core0 state machine event integration
+- Error recovery and fault tolerance
+- Performance and timing validation</p>
+</div>
+<div class="paragraph">
+<p><strong>Hardware-in-the-Loop Tests:</strong>
+- Protocol validator tool verification
+- Real hardware loopback testing
+- Network client integration testing
+- Long-duration stability testing</p>
+</div>
+</div>
+</div>
+<div class="sect3">
 <h4 id="_whitebox_flash_persistence_system">Whitebox Flash Persistence System</h4>
 <div class="paragraph">
 <p>The Flash Persistence System provides reliable storage and recovery of the complete shared memory structure using a flash ring buffer approach that ensures wear leveling and power-loss safety for embedded systems.</p>
@@ -1776,7 +1960,7 @@ uint32_t uart_channel_get_status(uint8_t channel);</code></pre>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_12">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_13">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -1817,7 +2001,7 @@ uint32_t uart_channel_get_status(uint8_t channel);</code></pre>
 </table>
 </div>
 <div class="sect4">
-<h5 id="_important_interfaces_4">Important Interfaces</h5>
+<h5 id="_important_interfaces_5">Important Interfaces</h5>
 <div class="sect5">
 <h6 id="_flash_page_structure">Flash Page Structure</h6>
 <div class="ulist">
@@ -2004,7 +2188,7 @@ void core1_main(void) {
 </div>
 </div>
 <div class="sect5">
-<h6 id="_testing_strategy">Testing Strategy</h6>
+<h6 id="_testing_strategy_2">Testing Strategy</h6>
 <div class="paragraph">
 <p><strong>Real Hardware Testing Approach:</strong>
 - All persistence tests run on actual RP2350 flash hardware
@@ -2188,7 +2372,7 @@ bool validate_session_token(const char* token);</code></pre>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_13">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_14">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -2237,7 +2421,7 @@ bool validate_session_token(const char* token);</code></pre>
 </table>
 </div>
 <div class="sect4">
-<h5 id="_important_interfaces_5">Important Interfaces</h5>
+<h5 id="_important_interfaces_6">Important Interfaces</h5>
 <div class="sect5">
 <h6 id="_main_state_definitions">Main State Definitions</h6>
 <div class="listingblock">
