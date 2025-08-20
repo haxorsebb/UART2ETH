@@ -289,6 +289,41 @@ pico_enable_stdio_uart(test_core0_minimal 1)
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_core0_minimal)
 
+# Test for UART Hardware Manager (Issue #76)
+add_executable(test_uart_hardware_manager
+    test_uart_hardware_manager.c
+    ../src/state_machine/state_machine.c
+    ../src/config/shared_memory.c
+    ../src/log/log_manager.c
+    ../src/ringbuffer/ringbuffer.c
+    ../src/uart/uart_hardware_manager.c
+    ../src/uart/uart1_driver.c
+)
+
+target_include_directories(test_uart_hardware_manager PRIVATE 
+    ../include
+    ../include/uart
+)
+
+target_link_libraries(test_uart_hardware_manager
+    unity
+    network_manager     # Added: needed for shared_memory.c dependency  
+    pico_stdlib
+    pico_sync
+    pico_multicore      # Dual core support for state machine and ringbuffer
+    hardware_sync       # Atomic operations and mutex
+    hardware_gpio       # GPIO configuration for UART pins
+    hardware_uart       # UART hardware support
+    hardware_watchdog   # Watchdog for stability
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_uart_hardware_manager 1)
+pico_enable_stdio_uart(test_uart_hardware_manager 1)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_uart_hardware_manager)
+
 # Add network tests subdirectory
 add_subdirectory(network)
 
