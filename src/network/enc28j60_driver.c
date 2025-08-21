@@ -234,7 +234,9 @@ static bool enc28j60_wait_for_osc_ready(void) {
         uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
         
         if (estat != 0xFF && (estat & ENC28J60_ESTAT_CLKRDY)) {
-            DEBUG_ONLY({ printf("ENC28J60: Oscillator ready\n"); });
+            DEBUG_ONLY({ 
+                printf("ENC28J60: Oscillator ready, estat: %d, timeout: %d\n", estat, timeout); 
+            });
             return true;
         }
         
@@ -295,6 +297,8 @@ static void enc28j60_configure_buffers(void) {
 static void enc28j60_configure_mac(void) {
     DEBUG_ONLY({ printf("ENC28J60: Configuring MAC\n"); });
     
+    enc28j60_block_interrupt();
+
     // Configure Bank 2 MAC registers - follow Arduino exact sequence
     enc28j60_set_register_bank_internal(MACONX_BANK);
     
@@ -302,14 +306,18 @@ static void enc28j60_configure_mac(void) {
     // CRITICAL FIX: Use direct register write instead of bit field operations for MAC registers
     uint8_t macon1_value = ENC28J60_MACON1_MARXEN | ENC28J60_MACON1_TXPAUS | ENC28J60_MACON1_RXPAUS;
     enc28j60_write_register_internal(ENC28J60_MACON1, macon1_value);
-    DEBUG_ONLY({ printf("ENC28J60: MACON1 = 0x%02X (should be 0x0D)\n", macon1_value); });
+    //DEBUG_ONLY({ 
+        printf("ENC28J60: MACON1 = 0x%02X (should be 0x0D)\n", macon1_value); 
+    //});
     
     // Arduino step 2: Set padding, crc, full duplex
     // CRITICAL FIX: Use direct register write instead of bit field operations for MAC registers
     uint8_t macon3_value = ENC28J60_MACON3_PADCFG_FULL | ENC28J60_MACON3_TXCRCEN | 
                            ENC28J60_MACON3_FULDPX | ENC28J60_MACON3_FRMLNEN;
     enc28j60_write_register_internal(ENC28J60_MACON3, macon3_value);
-    DEBUG_ONLY({ printf("ENC28J60: MACON3 = 0x%02X (should be 0xF3)\n", macon3_value); });
+    //DEBUG_ONLY({ 
+        printf("ENC28J60: MACON3 = 0x%02X (should be 0xF3)\n", macon3_value); 
+    //});
     
     // Arduino step 3: Set maximum frame length
     enc28j60_write_register_internal(ENC28J60_MAMXFLL, MAX_MAC_LENGTH & 0xFF);
@@ -344,6 +352,8 @@ static void enc28j60_configure_mac(void) {
         enc28j60_write_register_internal(ENC28J60_MAADR1, g_local_mac[0]);
     }
     
+    enc28j60_unblock_interrupt();
+
     DEBUG_ONLY({ printf("ENC28J60: MAC configuration complete\n"); });
 }
 
@@ -384,7 +394,9 @@ bool enc28j60_init(void) {
     
     // 2. Wait for oscillator ready
     if (!enc28j60_wait_for_osc_ready()) {
-        DEBUG_ONLY({ printf("ENC28J60: Oscillator not ready - init failed\n"); });
+        //DEBUG_ONLY({ 
+            printf("ENC28J60: Oscillator not ready - init failed\n"); 
+        //});
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
         return false;
     }
@@ -432,7 +444,9 @@ bool enc28j60_init(void) {
     // Verify initialization by checking ECON1
     uint8_t econ1_check = enc28j60_read_register_internal(ENC28J60_ECON1);
     if ((econ1_check & ENC28J60_ECON1_RXEN) == 0) {
-        DEBUG_ONLY({ printf("ENC28J60: RXEN verification failed\n"); });
+        //DEBUG_ONLY({ 
+            printf("ENC28J60: RXEN verification failed\n");
+        //});
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 2);
         return false;
     }
@@ -1330,7 +1344,8 @@ static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
     if (!g_driver_initialized) {
         return 0xFFFF;
     }
-    
+    enc28j60_block_interrupt();
+
     // Set bank 2 for MII access (Arduino reference)
     enc28j60_set_register_bank_internal(MACONX_BANK);
     
@@ -1342,9 +1357,10 @@ static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
     
     // Wait for the PHY read to complete (Arduino reference)
     // MISTAT is in Bank 3
+    enc28j60_set_register_bank_internal(MAADRX_BANK);  // Bank 3 for MISTAT
+        
     uint32_t timeout = 1000;  // 1ms timeout
     while (timeout > 0) {
-        enc28j60_set_register_bank_internal(MAADRX_BANK);  // Bank 3 for MISTAT
         uint8_t mistat = enc28j60_read_register_internal(ENC28J60_MISTAT);
         if ((mistat & ENC28J60_MISTAT_BUSY) == 0) {
             break;  // Read complete
@@ -1353,10 +1369,14 @@ static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
         timeout--;
     }
     
+    printf("ENC28J60: TIMEOUT AFTER READING PHY REGISTER: %X, timeout: %d", phy_reg,timeout); 
+
     if(timeout == 0)
     {
         // TBD: we should do something to mitigate the error
-        DEBUG_ONLY({ printf("ENC28J60: TIMEOUT WHEN READING PHY REGISTER: %X", phy_reg); });
+        //DEBUG_ONLY({ 
+            
+        //});
     }
     // Return to Bank 2 for reading result
     enc28j60_set_register_bank_internal(MACONX_BANK);
@@ -1368,6 +1388,9 @@ static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
     uint8_t low_byte = enc28j60_read_register_internal(ENC28J60_MIRDL);
     uint8_t high_byte = enc28j60_read_register_internal(ENC28J60_MIRDH);
     
+    enc28j60_unblock_interrupt();
+    
+
     return (high_byte << 8) | low_byte;
 }
 
@@ -1382,10 +1405,13 @@ bool enc28j60_get_link_status(void) {
     // Arduino reference: phyread(MACSTAT2) & 0x400
     uint16_t phstat2 = enc28j60_read_phy_register(ENC28J60_PHSTAT2);
     
+    
     // Check bit 10 (0x0400) - Link Status bit
     bool link_up = (phstat2 & ENC28J60_PHSTAT2_LSTAT) != 0;
     
-    DEBUG_ONLY({ printf("ENC28J60: checking link state: %d\n", link_up); });
+    //DEBUG_ONLY({ 
+        printf("ENC28J60: checking link state: %d\n", link_up); 
+    //});
     
     return link_up;
 }

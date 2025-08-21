@@ -20,6 +20,7 @@
 #include "ringbuffer.h"
 #include "log_manager.h"
 #include "pico/stdlib.h"
+#include <hardware/uart.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -35,7 +36,7 @@ static uint32_t g_manager_start_time = 0;
 #define UART_LINE_END_CHAR '\n'
 static char g_line_buffer[LINE_BUFFER_SIZE];
 static size_t g_line_buffer_pos = 0;
-static bool g_debug_output_enabled = false;
+static bool g_debug_output_enabled = true;
 
 // Forward declarations
 static bool process_incoming_characters(void);
@@ -63,13 +64,13 @@ bool uart_hardware_manager_init(void) {
     uart1_driver_get_default_config(&config);
     
     // Override with Issue #76 specific settings
-    config.baud_rate = 230400;
+    config.baud_rate = UART1_DEFAULT_BAUD;
     config.data_bits = 8;
     config.stop_bits = 1;
     config.parity = UART_PARITY_NONE;
-    config.rx_gpio = 9;
-    config.tx_gpio = 10;
-    config.enable_loopback = true;  // Enable for testing
+    config.rx_gpio = UART1_DEFAULT_RX_GPIO;
+    config.tx_gpio = UART1_DEFAULT_TX_GPIO;
+    config.enable_loopback = false;  // Enable only for software qualification
     
     if (!uart1_driver_init(&config)) {
         log_event(EVENT_SOURCE_UART1, LOG_LEVEL_ERROR, LOG_EVENT_UART1_ERROR, 1);
@@ -190,14 +191,14 @@ bool uart_hardware_manager_process_outgoing_data(void) {
     g_manager_status = UART_MANAGER_STATUS_ACTIVE;
     update_manager_stats();
     
+    printf("UART DEBUG: outgoing message found\n");
     // Send message via UART
     bool result = send_outgoing_message((char*)entry->payload, entry->payload_length);
     
     if (result) {
         g_manager_stats.messages_tcp_to_uart++;
         g_manager_stats.bytes_transmitted += entry->payload_length;
-        // Loopback echo is now handled at the UART1 driver level when loopback is enabled
-        // The echoed data will be available via process_incoming_data()
+
     } else {
         g_manager_stats.transmission_errors++;
     }
@@ -436,7 +437,7 @@ static bool send_outgoing_message(const char* data, size_t length) {
     if (!data || length == 0) {
         return false;
     }
-    
+    printf("UART DEBUG: sending outgoing message of %d bytes\n", length);
     // Send data via UART1 driver
     return uart1_driver_send_data((const uint8_t*)data, length);
 }

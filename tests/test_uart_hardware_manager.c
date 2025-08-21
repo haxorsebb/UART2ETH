@@ -44,7 +44,7 @@
 #define TEST_TIMEOUT_MS 1000
 #define TEST_BAUD_RATE 230400
 #define TEST_RX_GPIO 9
-#define TEST_TX_GPIO 10
+#define TEST_TX_GPIO 8
 #define TEST_MESSAGE_MAX_LEN 256
 
 // Test data

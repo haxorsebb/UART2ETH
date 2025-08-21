@@ -39,10 +39,15 @@ void core1_main(void);
  * Core1-specific initialization and then calls the main Core1 loop.
  */
 void core1_entry() {
+    printf("DEBUG: Core1 entry point reached\n");
+    
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
+    printf("DEBUG: Core1 logged starting event\n");
     
     // Core1 runs the network, persistence, and log processing
+    printf("DEBUG: Core1 about to call core1_main()\n");
     core1_main();
+    printf("DEBUG: Core1 core1_main() returned (should never happen!)\n");
     
     // Should never reach here
     while (true) {
@@ -112,27 +117,42 @@ int main() {
     }
     printf("DEBUG: Log manager init completed\n");
     
-    // Now we can use log_event() safely
+    // Now we can use log_event() safely - add debug around this critical point
+    printf("DEBUG: About to call first log_event...\n");
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_BOOT, 0);
+    printf("DEBUG: First log_event completed\n");
+    printf("DEBUG: About to call second batch of log_events...\n");
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_INIT, 0);
+    printf("DEBUG: Log event 2 completed\n");
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
+    printf("DEBUG: Log event 3 completed\n");
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_STATE_MACHINE_INIT, 0);
+    printf("DEBUG: Log event 4 completed\n");
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_LOG_MANAGER_INIT, 0);
+    printf("DEBUG: All log_events completed, about to launch Core1...\n");
     
     // Launch Core1 with network and maintenance processing
     multicore_launch_core1(core1_entry);
+    printf("DEBUG: Core1 launch call completed\n");
     
     // Give Core1 a moment to initialize
+    printf("DEBUG: About to sleep 100ms for Core1 init...\n");
     sleep_ms(100);
+    printf("DEBUG: Sleep completed, about to log events...\n");
     
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_LAUNCHED, 0);
+    printf("DEBUG: LOG_EVENT_CORE1_LAUNCHED completed\n");
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE0_STARTING, 0);
+    printf("DEBUG: LOG_EVENT_CORE0_STARTING completed\n");
     
     // Log dual-core launch completion
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
+    printf("DEBUG: LOG_EVENT_SYSTEM_READY completed\n");
     
     // Core0 runs the UART processing with event-driven state machine
+    printf("DEBUG: About to call core0_main()...\n");
     core0_main();
+    printf("DEBUG: core0_main() returned (this should never happen!)\n");
     
     // Should never reach here
     while (true) {

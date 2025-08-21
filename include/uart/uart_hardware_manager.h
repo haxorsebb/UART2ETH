@@ -82,7 +82,7 @@ typedef struct {
 // Default configuration constants
 #define UART_HARDWARE_MANAGER_DEFAULT_BAUD    230400
 #define UART_HARDWARE_MANAGER_DEFAULT_RX_GPIO 9
-#define UART_HARDWARE_MANAGER_DEFAULT_TX_GPIO 10
+#define UART_HARDWARE_MANAGER_DEFAULT_TX_GPIO 8
 
 /**
  * @brief UART Hardware Manager initialization and control

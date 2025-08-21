@@ -25,16 +25,17 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "hardware/uart.h"
+#include "hardware/irq.h"
+#include "hardware/regs/intctrl.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// UART1 Hardware configuration
+// UART1 Hardware configuration  
 #define UART1_INSTANCE      uart1
-#define UART1_IRQ           UART1_IRQ  
 #define UART1_DEFAULT_RX_GPIO    9
-#define UART1_DEFAULT_TX_GPIO    10
+#define UART1_DEFAULT_TX_GPIO    8
 #define UART1_DEFAULT_BAUD       230400
 
 // Buffer sizes
@@ -50,7 +51,7 @@ typedef struct {
     uint8_t stop_bits;         // Stop bits (1-2, default 1)
     uart_parity_t parity;      // Parity (NONE/EVEN/ODD, default NONE) - uses pico-sdk type
     uint16_t rx_gpio;          // RX GPIO pin (default 9)
-    uint16_t tx_gpio;          // TX GPIO pin (default 10)
+    uint16_t tx_gpio;          // TX GPIO pin (default 8)
     bool enable_loopback;      // Enable hardware loopback for testing
 } uart1_config_t;
 

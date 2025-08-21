@@ -80,29 +80,35 @@ static uint32_t g_config_loading_cycles = 0;
  * Single while loop with state update + switch statement architecture.
  * Each sub-state calls exactly one function for clean separation.
  */
+// Core1 debug counter - shared memory for debugging without printf conflicts
+static volatile uint32_t g_core1_loop_counter = 0;
+static volatile uint32_t g_core1_state_reads = 0;
+
 void core1_main(void) {
-    // One-time initialization
+    // One-time initialization - minimal printf to avoid conflicts
     core1_initialize();
     
     // Get current states once 
     main_state_t main_state = state_machine_get_main_state();
     core1_substate_t sub_state = state_machine_get_core1_substate();
     
+    // Single debug print - avoid printf flooding
+    printf("DEBUG: Core1 starting main loop - main_state=%d, sub_state=%d\n", main_state, sub_state);
 
     while (sub_state != CORE1_SHUTDOWN) {
+        // Increment loop counter for debugging (no printf)
+        g_core1_loop_counter++;
         
-        // Get current states
+        // Get current states - track this separately
         main_state = state_machine_get_main_state();
         sub_state = state_machine_get_core1_substate();
+        g_core1_state_reads++;
         
-        // DEBUG: Print states periodically
-        DEBUG_ONLY({
-        static uint32_t debug_counter = 0;
-        debug_counter++;
-        if (debug_counter % 500 == 0) {  // Every 50k loops
-            printf("DEBUG: Core1 main_state=%d, sub_state=%d\n", main_state, sub_state);
+        // Minimal debug output - only every 10000 loops to avoid printf floods
+        if (g_core1_loop_counter % 10000 == 0) {
+            printf("DEBUG: Core1 loop=%u, states=%u, main=%d, sub=%d\n", 
+                   g_core1_loop_counter, g_core1_state_reads, main_state, sub_state);
         }
-        });
         
         // Big switch statement for main states
         switch (main_state) {
@@ -222,13 +228,17 @@ static bool core1_check_for_pending_work(void) {
     enc28j60_process_interrupts(false);
 
     if(network_manager_link_change_pending()) {
-        DEBUG_ONLY({ printf("network has link change pending\n"); });
+        // DEBUG_ONLY({ 
+            printf("network has link change pending\n"); 
+        // });
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE);
         return true; 
     }
 
     if(network_manager_receive_packets_pending()) {
-        DEBUG_ONLY({ printf("network has pending receive packets\n"); });
+        // DEBUG_ONLY({ 
+            printf("network has pending receive packets\n"); 
+        // });
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
         network_manager_check_timeouts();
     
@@ -236,7 +246,9 @@ static bool core1_check_for_pending_work(void) {
     }
     
     if(network_manager_transmit_packets_pending()) {
-        DEBUG_ONLY({ printf("network has pending transmit packets\n"); });
+        // DEBUG_ONLY({ 
+            printf("network has pending transmit packets\n"); 
+        // });
         //state_machine_process_core1_event(CORE1_EVENT_NETWORK_SENDING_ACTIVE);
         core1_process_packet_tx();
         return true; 
@@ -244,21 +256,28 @@ static bool core1_check_for_pending_work(void) {
 
     if(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT))
     {
+        DEBUG_ONLY({ 
+            printf("network timer expired\n"); 
+        });
         network_manager_check_timeouts();
         return true;
     }
 
     // Check for ringbuffer messages to transmit over network (medium priority, messages are cached)
     if(ringbuffer_get_count(RX_UART_TO_TCP) > 0) {
-        DEBUG_ONLY({ printf("Core1: ringbuffer has %u pending messages for network transmission\n", 
-                             ringbuffer_get_count(RX_UART_TO_TCP)); });
+        // DEBUG_ONLY({ 
+            printf("Core1: ringbuffer has %u pending messages for network transmission\n", 
+                             ringbuffer_get_count(RX_UART_TO_TCP)); 
+        //                     });
         state_machine_process_core1_event(CORE1_EVENT_RINGBUFFER_DATA_READY);
         return true;
     }
 
     //low priority tasks
     if(log_manager_get_pending_count()) {
-        DEBUG_ONLY({ printf("Logmanager has pending count %d\n",log_manager_get_pending_count()); });
+        // DEBUG_ONLY({ 
+            printf("Logmanager has pending count %d\n",log_manager_get_pending_count()); 
+        // );
         state_machine_process_core1_event(CORE1_EVENT_LOG_START);
         return true;
     }
@@ -313,6 +332,8 @@ static void core1_idle_wait(void) {
  * @brief One-time Core1 initialization
  */
 static void core1_initialize(void) {
+    // Minimal printf to avoid dual-core conflicts
+    printf("DEBUG: Core1 initialize() starting\n");
     
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
     
@@ -324,11 +345,10 @@ static void core1_initialize(void) {
     g_config_loading_cycles = 0;
     
     enable_doorbell_irq(CORE1_WAKES_CORE0);
-
-    //init timers
     core1_timer_init();
-
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
+    
+    printf("DEBUG: Core1 initialize() completed\n");
 }
 
 

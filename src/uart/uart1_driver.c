@@ -146,33 +146,35 @@ bool uart1_driver_send_char(char c) {
         return false;
     }
     
-    // Add character to buffer
+    // Add character to TX buffer for hardware transmission
     g_tx_buffer[g_tx_head] = (uint8_t)c;
     g_tx_head = next_head;
     
-    // Software loopback: if loopback enabled, immediately put sent char into RX buffer
-    // This provides immediate loopback for testing without relying on IRQ handler
+    // Software loopback for debugging: if enabled, also put copy into RX buffer
+    // This is independent of hardware transmission which always occurs
     if (g_uart1_state.config.enable_loopback) {
-        // For the first character of a message, clear any stale data
-        static bool first_char_after_init = true;
-        if (first_char_after_init) {
-            uart1_driver_clear_rx_buffer();
-            first_char_after_init = false;
-        }
-        
         size_t next_rx_head = (g_rx_head + 1) % UART1_RX_BUFFER_SIZE;
         if (next_rx_head != g_rx_tail) {
             g_rx_buffer[g_rx_head] = (uint8_t)c;
             g_rx_head = next_rx_head;
             g_uart1_state.chars_received++;
         } else {
-            // RX buffer overflow during loopback
+            // RX buffer overflow during software loopback
             g_uart1_state.overrun_errors++;
         }
     }
     
-    // Enable TX interrupt to start transmission
+    // Enable TX interrupt and start transmission if hardware is ready
     uart_set_irq_enables(UART1_INSTANCE, true, true);
+    
+    // Kickstart transmission if UART is ready and no transmission in progress
+    if (uart_is_writable(UART1_INSTANCE) && g_tx_head != g_tx_tail) {
+        char tx_char = g_tx_buffer[g_tx_tail];
+        uart_putc_raw(UART1_INSTANCE, tx_char);
+        g_tx_tail = (g_tx_tail + 1) % UART1_TX_BUFFER_SIZE;
+        g_uart1_state.chars_sent++;
+        // TX interrupt will continue sending remaining characters
+    }
     
     return true;
 }
@@ -185,6 +187,9 @@ bool uart1_driver_send_data(const uint8_t* data, size_t length) {
         return false;
     }
     
+    printf("UART DEBUG: sending data of %d bytes\n", length);
+    
+
     for (size_t i = 0; i < length; i++) {
         if (!uart1_driver_send_char((char)data[i])) {
             return false;
@@ -426,6 +431,10 @@ void uart1_driver_reset_stats(void) {
  * @brief Configure UART1 hardware
  */
 static bool uart1_configure_hardware(const uart1_config_t* config) {
+    // Configure GPIO pins first
+    gpio_set_function(config->tx_gpio, UART_FUNCSEL_NUM(UART1_INSTANCE, config->tx_gpio));
+    gpio_set_function(config->rx_gpio, UART_FUNCSEL_NUM(UART1_INSTANCE, config->rx_gpio));
+
     // Initialize UART1 with specified baud rate
     uart_init(UART1_INSTANCE, config->baud_rate);
     
@@ -434,11 +443,7 @@ static bool uart1_configure_hardware(const uart1_config_t* config) {
                    config->data_bits, 
                    config->stop_bits, 
                    (uart_parity_t)config->parity);
-    
-    // Configure GPIO pins
-    gpio_set_function(config->rx_gpio, GPIO_FUNC_UART);
-    gpio_set_function(config->tx_gpio, GPIO_FUNC_UART);
-    
+        
     // Enable loopback if requested (for testing)
     if (config->enable_loopback) {
         // Note: This is a simplified loopback - in real hardware testing,
@@ -453,7 +458,7 @@ static bool uart1_configure_hardware(const uart1_config_t* config) {
  * @brief Setup UART1 interrupts
  */
 static void uart1_setup_interrupts(void) {
-    // Set IRQ handler
+    // Set IRQ handler - use UART1_IRQ constant from pico-sdk
     irq_set_exclusive_handler(UART1_IRQ, uart1_irq_handler);
     
     // Enable RX interrupt (TX interrupt enabled when needed)
@@ -492,7 +497,6 @@ static void uart1_irq_handler(void) {
             uart_putc_raw(UART1_INSTANCE, tx_char);
             g_tx_tail = (g_tx_tail + 1) % UART1_TX_BUFFER_SIZE;
             g_uart1_state.chars_sent++;
-            // Loopback is now handled synchronously in uart1_driver_send_char()
         }
         
         // Disable TX interrupt if buffer is empty
