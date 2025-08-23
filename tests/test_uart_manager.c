@@ -377,6 +377,11 @@ static bool send_and_verify_loopback(const char* message) {
  * @brief Create TCP→UART message in ring buffer
  */
 static void create_tcp_to_uart_message(const char* payload) {
+    if (payload == NULL) {
+        printf("TEST ERROR: NULL payload provided\n");
+        return;
+    }
+    
     // Clear any stale RX data before sending new message
     if (uart_manager_is_ready()) {
         while (uart_manager_process_incoming_data()) {
@@ -387,8 +392,9 @@ static void create_tcp_to_uart_message(const char* payload) {
     ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, 1);  // Channel 1
     TEST_ASSERT_NOT_NULL_MESSAGE(entry, "Failed to get free ring buffer entry");
     
-    // Fill entry with payload data
+    // Fill entry with payload data - ensure null termination
     strncpy((char*)entry->payload, payload, sizeof(entry->payload) - 1);
+    entry->payload[sizeof(entry->payload) - 1] = '\0';
     entry->fill_index = strlen(payload);
     entry->drain_index = 0;
     entry->status = ENTRY_STATUS_READY;
