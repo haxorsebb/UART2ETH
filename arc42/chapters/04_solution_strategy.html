@@ -466,7 +466,7 @@
 <pre class="prettyprint highlight"><code data-lang="c">// Each entry = 1 cache line (64 bytes base + 1024 payload)
 typedef struct {
     // Management Data (16 bytes)
-    uint8_t  uart_channel;     // 0-3
+    uint8_t  channel;     // 0-3
     uint8_t  direction;        // TX/RX
     uint8_t  status;           // FILLING/DRAINING/FULL/EMPTY
     uint8_t  payload_length;   // Actual data length

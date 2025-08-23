@@ -1609,20 +1609,20 @@ bool state_machine_process_core1_event(core1_event_t event);</code></pre>
 <div class="content">
 <pre class="prettyprint highlight"><code data-lang="c">// Core buffer operations
 ring_entry_t* find_next_free_block(void);
-ring_entry_t* find_next_ready_block(uint8_t uart_channel, uint8_t direction);
+ring_entry_t* find_next_ready_block(channel_id_t channel, uint8_t direction);
 bool is_buffer_full(void);
 bool is_buffer_empty(void);
 
 // Statistics and monitoring
 uint32_t get_cached_message_count(void);
-uint32_t get_cached_message_count_by_channel(uint8_t uart_channel);
+uint32_t get_cached_message_count_by_channel(channel_id_t channel);
 uint32_t get_cached_message_count_by_direction(uint8_t direction);
 uint32_t get_free_block_count(void);
 uint32_t get_overflow_count(void);          // Dropped messages
 uint32_t get_total_throughput_bytes(void);
 
 // Advanced operations
-ring_entry_t* peek_next_block(uint8_t uart_channel, uint8_t direction);
+ring_entry_t* peek_next_block(channel_id_t channel, uint8_t direction);
 void mark_block_ready(ring_entry_t* entry);
 void mark_block_consumed(ring_entry_t* entry);
 void reset_buffer_statistics(void);</code></pre>
@@ -1669,7 +1669,7 @@ void reset_buffer_statistics(void);</code></pre>
 <div class="content">
 <pre class="prettyprint highlight"><code data-lang="c">typedef struct {
     // Management Data (16 bytes)
-    uint8_t  uart_channel;     // 0-3
+    uint8_t  channel;     // 0-3
     uint8_t  direction;        // RX_UART_TO_TCP / RX_TCP_TO_UART
     uint8_t  status;           // FILLING/DRAINING/FULL/EMPTY
     uint8_t  payload_length;   // Actual data length
@@ -1693,7 +1693,7 @@ void reset_buffer_statistics(void);</code></pre>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="../../images/level3-uart-hardware-simple.svg" alt="level3 uart hardware simple" width="3921" height="581">
+<img src="../../images/level3-uart-hardware-simple.svg" alt="level3 uart hardware simple" width="3888" height="581">
 </div>
 </div>
 <div class="sect4">
@@ -1730,11 +1730,11 @@ void reset_buffer_statistics(void);</code></pre>
 <div class="listingblock">
 <div class="content">
 <pre class="prettyprint highlight"><code data-lang="c">// Channel operations
-int uart_channel_configure(uint8_t channel, uart_config_t* config);
-int uart_channel_read(uint8_t channel, uint8_t* buffer, size_t length);
-int uart_channel_write(uint8_t channel, const uint8_t* data, size_t length);
-bool uart_channel_is_ready(uint8_t channel);
-uint32_t uart_channel_get_status(uint8_t channel);</code></pre>
+int channel_configure(channel_id_t channel, uart_config_t* config);
+int channel_read(channel_id_t channel, uint8_t* buffer, size_t length);
+int channel_write(channel_id_t channel, const uint8_t* data, size_t length);
+bool channel_is_ready(channel_id_t channel);
+uint32_t channel_get_status(channel_id_t channel);</code></pre>
 </div>
 </div>
 </div>
@@ -1753,7 +1753,7 @@ uint32_t uart_channel_get_status(uint8_t channel);</code></pre>
     uint32_t tx_errors;
     uint32_t frames_received;
     uint32_t frames_transmitted;
-} uart_channel_status_t;</code></pre>
+} channel_status_t;</code></pre>
 </div>
 </div>
 </div>
@@ -2320,7 +2320,7 @@ bool validate_session_token(const char* token);</code></pre>
     char description[64];              // User-friendly name
     bool protocol_filter_enabled;
     char protocol_filter_type[32];     // "SharkNet", "custom", etc.
-} uart_channel_settings_t;</code></pre>
+} channel_settings_t;</code></pre>
 </div>
 </div>
 <div class="paragraph">
