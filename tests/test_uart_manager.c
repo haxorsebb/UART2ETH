@@ -45,6 +45,7 @@
 #define TEST_RX_GPIO 9
 #define TEST_TX_GPIO 8
 #define TEST_MESSAGE_MAX_LEN 256
+#define STATE_MACHINE_STABILIZATION_MS 50
 
 // Test data
 static char g_test_message[] = "Hello UART Test\n";
@@ -81,8 +82,14 @@ void setUp(void) {
  * @brief Clean up after each test
  */
 void tearDown(void) {
+    printf("TEST: tearDown() - UART Hardware Manager Test\n");
+    
     // Deinitialize UART hardware manager if initialized
     uart_manager_deinit();
+    
+    // Allow time for cleanup to complete
+    sleep_ms(10);
+    
     printf("TEST: tearDown() complete\n");
 }
 
@@ -104,13 +111,18 @@ static void reset_test_environment(void) {
     
     // Set system to operational state - proper sequence with timing
     printf("TEST: Processing state machine events...\n");
-    state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE0);
-    state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE1);
-    state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE0);
-    state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE1);
+    bool event_success = true;
+    event_success &= state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE0);
+    event_success &= state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE1);
+    event_success &= state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE0);
+    event_success &= state_machine_process_main_event(MAIN_EVENT_CONFIG_COMPLETE_CORE1);
+    
+    if (!event_success) {
+        printf("TEST ERROR: Failed to process state machine events\n");
+    }
     
     // Allow time for state machine to process events and reach operational state
-    sleep_ms(50);
+    sleep_ms(STATE_MACHINE_STABILIZATION_MS);
     
     printf("TEST: Test environment reset complete\n");
 }
