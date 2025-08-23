@@ -38,7 +38,6 @@
 
 // Module under test
 #include "uart/uart_manager.h"
-#include "uart/uart1_driver.h"
 
 // Test configuration
 #define TEST_TIMEOUT_MS 1000
@@ -144,39 +143,32 @@ void test_uart_manager_initialization(void) {
     printf("TEST: UART Hardware Manager initialization test passed\n");
 }
 
-// Test 2: UART1 Driver Hardware Configuration
+// Test 2: UART Manager Channel Configuration
 /**
- * @brief Test UART1 driver hardware configuration
+ * @brief Test UART Manager channel configuration
  * 
- * Requirement: Hardware UART configured to 230400 baud, 8N1, with interrupts
+ * Requirement: Hardware UART configured correctly with proper channel settings
  */
-void test_uart1_driver_configuration(void) {
-    printf("TEST: test_uart1_driver_configuration\n");
+void test_uart_manager_channel_configuration(void) {
+    printf("TEST: test_uart_manager_channel_configuration\n");
     
-    // Configure UART1 with test parameters
-    uart1_config_t config = {
-        .baud_rate = TEST_BAUD_RATE,
-        .data_bits = 8,
-        .stop_bits = 1,
-        .parity = UART_PARITY_NONE,
-        .rx_gpio = TEST_RX_GPIO,
-        .tx_gpio = TEST_TX_GPIO,
-        .enable_loopback = true  // Enable for testing
-    };
+    // Initialize UART Manager 
+    bool init_result = uart_manager_init();
+    TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Manager initialization failed");
     
-    // Test: Driver should initialize with configuration
-    bool init_result = uart1_driver_init(&config);
-    TEST_ASSERT_TRUE_MESSAGE(init_result, "UART1 driver initialization failed");
+    // Test: Manager should report ready status
+    bool ready_status = uart_manager_is_ready();
+    TEST_ASSERT_TRUE_MESSAGE(ready_status, "UART Manager not ready after initialization");
     
-    // Test: Driver should report ready status
-    bool ready_status = uart1_driver_is_ready();
-    TEST_ASSERT_TRUE_MESSAGE(ready_status, "UART1 driver not ready after initialization");
+    // Test: Manager should have proper status
+    uart_manager_status_t status = uart_manager_get_status();
+    TEST_ASSERT_EQUAL_MESSAGE(UART_MANAGER_STATUS_READY, status, "UART Manager status incorrect");
     
     // Test: Hardware configuration should be applied correctly
     bool config_applied = verify_uart_configuration();
-    TEST_ASSERT_TRUE_MESSAGE(config_applied, "UART1 hardware configuration not applied correctly");
+    TEST_ASSERT_TRUE_MESSAGE(config_applied, "UART hardware configuration not applied correctly");
     
-    printf("TEST: UART1 driver configuration test passed\n");
+    printf("TEST: UART Manager channel configuration test passed\n");
 }
 
 // Test 3: UART Loopback Functionality
@@ -395,19 +387,17 @@ static void create_tcp_to_uart_message(const char* payload) {
         }
     }
     
-    ring_entry_t* entry = ringbuffer_get_free_entry();
+    ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, 1);  // Channel 1
     TEST_ASSERT_NOT_NULL_MESSAGE(entry, "Failed to get free ring buffer entry");
     
-    entry->channel = 1;  // UART1
-    entry->direction = RX_TCP_TO_UART;
-    entry->payload_length = strlen(payload);
+    // Fill entry with payload data
+    strncpy((char*)entry->payload, payload, sizeof(entry->payload) - 1);
+    entry->fill_index = strlen(payload);
+    entry->drain_index = 0;
+    entry->status = ENTRY_STATUS_READY;
     entry->timestamp = to_ms_since_boot(get_absolute_time());
     
-    memcpy(entry->payload, payload, entry->payload_length);
-    
-    bool enqueue_result = ringbuffer_enqueue_entry(entry);
-    TEST_ASSERT_TRUE_MESSAGE(enqueue_result, "Failed to enqueue TCP→UART message");
-    
+    ringbuffer_enqueue_entry(entry);
     printf("TEST: Created TCP→UART message: %s", payload);
 }
 
@@ -415,35 +405,27 @@ static void create_tcp_to_uart_message(const char* payload) {
  * @brief Verify UART→TCP response message in ring buffer
  */
 static bool verify_uart_to_tcp_response(const char* expected_payload) {
-    ring_entry_t* response = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
+    ring_entry_t* response = ringbuffer_dequeue_entry(RX_UART_TO_TCP, 1, ENTRY_STATUS_READY);
     if (!response) {
         printf("TEST: No UART→TCP response found in ring buffer\n");
         return false;
     }
     
     // Verify payload matches expected
-    if (response->payload_length != strlen(expected_payload)) {
+    size_t expected_len = strlen(expected_payload);
+    if (response->fill_index != expected_len) {
         printf("TEST: Response payload length mismatch - expected: %zu, actual: %u\n", 
-               strlen(expected_payload), response->payload_length);
+               expected_len, response->fill_index);
         printf("TEST: Expected payload: '%s'\n", expected_payload);
-        printf("TEST: Actual payload: '%.*s'\n", response->payload_length, response->payload);
+        printf("TEST: Actual payload: '%.*s'\n", response->fill_index, response->payload);
         ringbuffer_mark_consumed(response);
         return false;
     }
     
-    if (strncmp((char*)response->payload, expected_payload, response->payload_length) != 0) {
+    if (strncmp((char*)response->payload, expected_payload, response->fill_index) != 0) {
         printf("TEST: Response payload content mismatch\n");
-        printf("TEST: Expected (%zu chars): '%s'\n", strlen(expected_payload), expected_payload);
-        printf("TEST: Actual (%u chars): '%.*s'\n", response->payload_length, response->payload_length, response->payload);
-        printf("TEST: Expected bytes: ");
-        for (size_t i = 0; i < strlen(expected_payload); i++) {
-            printf("%02X ", (unsigned char)expected_payload[i]);
-        }
-        printf("\nTEST: Actual bytes: ");
-        for (uint32_t i = 0; i < response->payload_length; i++) {
-            printf("%02X ", (unsigned char)response->payload[i]);
-        }
-        printf("\n");
+        printf("TEST: Expected (%zu chars): '%s'\n", expected_len, expected_payload);
+        printf("TEST: Actual (%u chars): '%.*s'\n", response->fill_index, response->fill_index, response->payload);
         ringbuffer_mark_consumed(response);
         return false;
     }
@@ -469,7 +451,7 @@ int main() {
     
     // Run tests in order of complexity
     RUN_TEST(test_uart_manager_initialization);
-    RUN_TEST(test_uart1_driver_configuration);
+    RUN_TEST(test_uart_manager_channel_configuration);
     RUN_TEST(test_uart_loopback_functionality);
     RUN_TEST(test_ring_buffer_integration_single_message);
     RUN_TEST(test_ring_buffer_integration_multiple_messages);

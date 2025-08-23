@@ -298,6 +298,7 @@ add_executable(test_uart_manager
     ../src/ringbuffer/ringbuffer.c
     ../src/uart/uart_manager.c
     ../src/uart/pl011_driver.c
+    ../src/uart/uart_receive_buffer.c
 )
 
 target_include_directories(test_uart_manager PRIVATE 
@@ -327,9 +328,13 @@ pico_add_extra_outputs(test_uart_manager)
 # Test for UART minimal (debugging UART hardware issues)
 add_executable(test_uart_minimal
     test_uart_minimal.c
+    ../src/uart/uart_manager.c
     ../src/uart/pl011_driver.c
+    ../src/uart/uart_receive_buffer.c
     ../src/log/log_manager.c
     ../src/config/shared_memory.c
+    ../src/ringbuffer/ringbuffer.c
+    ../src/state_machine/state_machine.c
 )
 
 target_include_directories(test_uart_minimal PRIVATE 

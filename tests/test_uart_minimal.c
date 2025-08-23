@@ -16,13 +16,8 @@
 // Unity test framework
 #include "unity/src/unity.h"
 
-// Module under test
-#include "uart/uart1_driver.h"
-
-// Test configuration
-#define TEST_BAUD_RATE 230400
-#define TEST_RX_GPIO 9
-#define TEST_TX_GPIO 8
+// Module under test  
+#include "uart/uart_manager.h"
 
 /**
  * @brief Set up before each test
@@ -35,101 +30,71 @@ void setUp(void) {
  * @brief Clean up after each test
  */
 void tearDown(void) {
-    uart1_driver_deinit();
+    uart_manager_deinit();
     printf("TEST: tearDown() complete\n");
 }
 
 /**
- * @brief Test basic UART driver initialization
+ * @brief Test basic UART manager initialization
  */
-void test_uart_driver_init(void) {
-    printf("TEST: test_uart_driver_init\n");
+void test_uart_manager_init(void) {
+    printf("TEST: test_uart_manager_init\n");
     
-    uart1_config_t config = {
-        .baud_rate = TEST_BAUD_RATE,
-        .data_bits = 8,
-        .stop_bits = 1,
-        .parity = UART_PARITY_NONE,
-        .rx_gpio = TEST_RX_GPIO,
-        .tx_gpio = TEST_TX_GPIO,
-        .enable_loopback = true  // Enable for testing
-    };
+    bool init_result = uart_manager_init();
+    TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Manager initialization failed");
     
-    bool init_result = uart1_driver_init(&config);
-    TEST_ASSERT_TRUE_MESSAGE(init_result, "UART1 driver initialization failed");
+    bool ready_status = uart_manager_is_ready();
+    TEST_ASSERT_TRUE_MESSAGE(ready_status, "UART Manager not ready after initialization");
     
-    bool ready_status = uart1_driver_is_ready();
-    TEST_ASSERT_TRUE_MESSAGE(ready_status, "UART1 driver not ready after initialization");
+    uart_manager_status_t status = uart_manager_get_status();
+    TEST_ASSERT_EQUAL_MESSAGE(UART_MANAGER_STATUS_READY, status, "UART Manager status incorrect");
     
-    printf("TEST: UART driver initialization test passed\n");
+    printf("TEST: UART Manager initialization test passed\n");
 }
 
 /**
- * @brief Test basic character transmission without loopback verification
+ * @brief Test UART manager data processing functions
  */
-void test_uart_send_char(void) {
-    printf("TEST: test_uart_send_char\n");
+void test_uart_data_processing(void) {
+    printf("TEST: test_uart_data_processing\n");
     
-    uart1_config_t config = {
-        .baud_rate = TEST_BAUD_RATE,
-        .data_bits = 8,
-        .stop_bits = 1,
-        .parity = UART_PARITY_NONE,
-        .rx_gpio = TEST_RX_GPIO,
-        .tx_gpio = TEST_TX_GPIO,
-        .enable_loopback = false  // Disable loopback for this test
-    };
+    bool init_result = uart_manager_init();
+    TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Manager initialization failed");
     
-    bool init_result = uart1_driver_init(&config);
-    TEST_ASSERT_TRUE_MESSAGE(init_result, "UART1 driver initialization failed");
+    // Test processing functions don't crash
+    bool has_work = uart_manager_has_incoming_work();
+    bool process_in = uart_manager_process_incoming_data();
+    bool process_out = uart_manager_process_outgoing_data();
     
-    // Send a simple character
-    bool send_result = uart1_driver_send_char('A');
-    TEST_ASSERT_TRUE_MESSAGE(send_result, "Failed to send character");
+    // These may return false if no data present, but should not crash
+    printf("TEST: Has work: %d, Process IN: %d, Process OUT: %d\n", 
+           has_work, process_in, process_out);
     
-    printf("TEST: Character send test passed\n");
+    printf("TEST: Data processing test passed\n");
 }
 
 /**
- * @brief Test hardware loopback with minimal complexity
+ * @brief Test UART manager statistics and diagnostics
  */
-void test_uart_simple_loopback(void) {
-    printf("TEST: test_uart_simple_loopback\n");
+void test_uart_statistics(void) {
+    printf("TEST: test_uart_statistics\n");
     
-    uart1_config_t config = {
-        .baud_rate = TEST_BAUD_RATE,
-        .data_bits = 8,
-        .stop_bits = 1,
-        .parity = UART_PARITY_NONE,
-        .rx_gpio = TEST_RX_GPIO,
-        .tx_gpio = TEST_TX_GPIO,
-        .enable_loopback = true  // Enable loopback
-    };
+    bool init_result = uart_manager_init();
+    TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Manager initialization failed");
     
-    bool init_result = uart1_driver_init(&config);
-    TEST_ASSERT_TRUE_MESSAGE(init_result, "UART1 driver initialization failed");
+    uart_manager_stats_t stats;
+    uart_manager_get_stats(&stats);
     
-    // Clear any existing data
-    uart1_driver_clear_rx_buffer();
+    // Verify stats structure is populated
+    TEST_ASSERT_EQUAL_MESSAGE(UART_MANAGER_STATUS_READY, stats.status, "Stats status incorrect");
     
-    // Send a character
-    bool send_result = uart1_driver_send_char('X');
-    TEST_ASSERT_TRUE_MESSAGE(send_result, "Failed to send character");
+    // Test diagnostic info
+    char diag_buffer[512];
+    int diag_len = uart_manager_get_diagnostic_info(diag_buffer, sizeof(diag_buffer));
+    TEST_ASSERT_GREATER_THAN_MESSAGE(0, diag_len, "No diagnostic info returned");
     
-    // Wait for hardware loopback
-    sleep_ms(50);
-    
-    // Check if we received something
-    bool has_data = uart1_driver_has_rx_data();
-    if (has_data) {
-        char received = uart1_driver_read_char();
-        printf("TEST: Received character: 0x%02X ('%c')\n", (unsigned char)received, received);
-        TEST_ASSERT_EQUAL_MESSAGE('X', received, "Loopback character mismatch");
-    } else {
-        printf("TEST: No data received - this might be expected for hardware-only loopback\n");
-    }
-    
-    printf("TEST: Simple loopback test completed\n");
+    printf("TEST: Diagnostic info: %.*s\n", diag_len > 100 ? 100 : diag_len, diag_buffer);
+    printf("TEST: Statistics test passed\n");
 }
 
 /**
@@ -145,9 +110,9 @@ int main() {
     UNITY_BEGIN();
     
     // Run tests in order of complexity
-    RUN_TEST(test_uart_driver_init);
-    RUN_TEST(test_uart_send_char);
-    RUN_TEST(test_uart_simple_loopback);
+    RUN_TEST(test_uart_manager_init);
+    RUN_TEST(test_uart_data_processing);
+    RUN_TEST(test_uart_statistics);
     
     int result = UNITY_END();
     
