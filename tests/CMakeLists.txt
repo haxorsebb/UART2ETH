@@ -290,22 +290,22 @@ pico_enable_stdio_uart(test_core0_minimal 1)
 pico_add_extra_outputs(test_core0_minimal)
 
 # Test for UART Hardware Manager (Issue #76)
-add_executable(test_uart_hardware_manager
-    test_uart_hardware_manager.c
+add_executable(test_uart_manager
+    test_uart_manager.c
     ../src/state_machine/state_machine.c
     ../src/config/shared_memory.c
     ../src/log/log_manager.c
     ../src/ringbuffer/ringbuffer.c
-    ../src/uart/uart_hardware_manager.c
-    ../src/uart/uart1_driver.c
+    ../src/uart/uart_manager.c
+    ../src/uart/pl011_driver.c
 )
 
-target_include_directories(test_uart_hardware_manager PRIVATE 
+target_include_directories(test_uart_manager PRIVATE 
     ../include
     ../include/uart
 )
 
-target_link_libraries(test_uart_hardware_manager
+target_link_libraries(test_uart_manager
     unity
     network_manager     # Added: needed for shared_memory.c dependency  
     pico_stdlib
@@ -318,11 +318,43 @@ target_link_libraries(test_uart_hardware_manager
 )
 
 # Enable dual stdio for test output
-pico_enable_stdio_usb(test_uart_hardware_manager 1)
-pico_enable_stdio_uart(test_uart_hardware_manager 1)
+pico_enable_stdio_usb(test_uart_manager 1)
+pico_enable_stdio_uart(test_uart_manager 1)
 
 # Create UF2 output for flashing to device
-pico_add_extra_outputs(test_uart_hardware_manager)
+pico_add_extra_outputs(test_uart_manager)
+
+# Test for UART minimal (debugging UART hardware issues)
+add_executable(test_uart_minimal
+    test_uart_minimal.c
+    ../src/uart/pl011_driver.c
+    ../src/log/log_manager.c
+    ../src/config/shared_memory.c
+)
+
+target_include_directories(test_uart_minimal PRIVATE 
+    ../include
+    ../include/uart
+)
+
+target_link_libraries(test_uart_minimal
+    unity
+    network_manager     # Added: needed for shared_memory.c dependency
+    pico_stdlib
+    pico_sync
+    hardware_sync       # Atomic operations
+    hardware_gpio       # GPIO configuration for UART pins
+    hardware_uart       # UART hardware support
+    hardware_irq        # Interrupt support
+    hardware_watchdog   # Watchdog for stability
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_uart_minimal 1)
+pico_enable_stdio_uart(test_uart_minimal 1)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_uart_minimal)
 
 # Add network tests subdirectory
 add_subdirectory(network)

@@ -1,5 +1,5 @@
 /**
- * @file test_uart_hardware_manager.c
+ * @file test_uart_manager.c
  * @brief Unit tests for UART Hardware Manager implementation (Issue #76)
  * 
  * Tests the UART Hardware Manager that provides UART1 integration with the 
@@ -37,7 +37,7 @@
 #include "shared_memory.h"
 
 // Module under test
-#include "uart/uart_hardware_manager.h"
+#include "uart/uart_manager.h"
 #include "uart/uart1_driver.h"
 
 // Test configuration
@@ -71,9 +71,9 @@ void setUp(void) {
     memset(g_received_buffer, 0, sizeof(g_received_buffer));
     
     // Clear any residual data from previous tests
-    if (uart_hardware_manager_is_ready()) {
+    if (uart_manager_is_ready()) {
         // Clear the RX buffer to ensure clean state
-        while (uart_hardware_manager_process_incoming_data()) {
+        while (uart_manager_process_incoming_data()) {
             // Process and discard any stale data
         }
     }
@@ -86,7 +86,7 @@ void setUp(void) {
  */
 void tearDown(void) {
     // Deinitialize UART hardware manager if initialized
-    uart_hardware_manager_deinit();
+    uart_manager_deinit();
     printf("TEST: tearDown() complete\n");
 }
 
@@ -121,15 +121,15 @@ static void reset_test_environment(void) {
  * 
  * Requirement: Successful configuring of hardware UART to 230400 baud, 8N1, and interrupt
  */
-void test_uart_hardware_manager_initialization(void) {
-    printf("TEST: test_uart_hardware_manager_initialization\n");
+void test_uart_manager_initialization(void) {
+    printf("TEST: test_uart_manager_initialization\n");
     
     // Test: Manager should initialize successfully
-    bool init_result = uart_hardware_manager_init();
+    bool init_result = uart_manager_init();
     TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Hardware Manager initialization failed");
     
     // Test: Manager should report ready status
-    bool ready_status = uart_hardware_manager_is_ready();
+    bool ready_status = uart_manager_is_ready();
     TEST_ASSERT_TRUE_MESSAGE(ready_status, "UART Hardware Manager not ready after initialization");
     
     // Test: UART1 driver should be configured correctly
@@ -189,7 +189,7 @@ void test_uart_loopback_functionality(void) {
     printf("TEST: test_uart_loopback_functionality\n");
     
     // Initialize UART hardware manager
-    bool init_result = uart_hardware_manager_init();
+    bool init_result = uart_manager_init();
     TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Hardware Manager initialization failed");
     
     // Setup loopback test configuration
@@ -220,27 +220,30 @@ void test_ring_buffer_integration_single_message(void) {
     printf("TEST: test_ring_buffer_integration_single_message\n");
     
     // Initialize UART hardware manager
-    bool init_result = uart_hardware_manager_init();
+    bool init_result = uart_manager_init();
     TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Hardware Manager initialization failed");
     
     // Disable debug output for cleaner test output
-    uart_hardware_manager_set_debug(false);
+    uart_manager_set_debug(false);
     
     // Create a TCP→UART message in ring buffer
     const char* test_payload = "Ring Buffer Test Message\n";
     create_tcp_to_uart_message(test_payload);
     
     // Test: Manager should detect pending work
-    bool has_work = uart_hardware_manager_has_pending_work();
+    bool has_work = uart_manager_has_incoming_work();
     TEST_ASSERT_TRUE_MESSAGE(has_work, "UART Hardware Manager should detect pending work");
     
-    // Test: Process outgoing data (TCP→UART)
-    bool process_result = uart_hardware_manager_process_outgoing_data();
+    // Test: Process outgoing data (TCP→UART) 
+    bool process_result = uart_manager_process_outgoing_data();
     TEST_ASSERT_TRUE_MESSAGE(process_result, "Failed to process outgoing data");
     
-    // Test: Process incoming data (UART→TCP)
-    // Loopback is now immediate in uart1_driver_send_char(), no delay needed
-    bool incoming_result = uart_hardware_manager_process_incoming_data();
+    // Wait for hardware loopback to complete (TX interrupt + physical loopback + RX interrupt)
+    sleep_ms(10);
+    
+    // Test: Process incoming data (UART→TCP) 
+    // Follow production pattern: call both functions like core0_process_uart() does
+    bool incoming_result = uart_manager_process_incoming_data();
     TEST_ASSERT_TRUE_MESSAGE(incoming_result, "Failed to process incoming data");
     
     // Test: Verify UART→TCP response message in ring buffer
@@ -260,11 +263,11 @@ void test_ring_buffer_integration_multiple_messages(void) {
     printf("TEST: test_ring_buffer_integration_multiple_messages\n");
     
     // Initialize UART hardware manager
-    bool init_result = uart_hardware_manager_init();
+    bool init_result = uart_manager_init();
     TEST_ASSERT_TRUE_MESSAGE(init_result, "UART Hardware Manager initialization failed");
     
     // Disable debug output for cleaner test output
-    uart_hardware_manager_set_debug(false);
+    uart_manager_set_debug(false);
     
     const char* test_messages[] = {
         "Message 1\n",
@@ -282,11 +285,14 @@ void test_ring_buffer_integration_multiple_messages(void) {
         create_tcp_to_uart_message(test_messages[i]);
         
         // Process outgoing data
-        bool process_out = uart_hardware_manager_process_outgoing_data();
+        bool process_out = uart_manager_process_outgoing_data();
         TEST_ASSERT_TRUE_MESSAGE(process_out, "Failed to process outgoing data");
         
-        // Process incoming echo (loopback is now immediate)
-        bool process_in = uart_hardware_manager_process_incoming_data();
+        // Wait for hardware loopback to complete (TX interrupt + physical loopback + RX interrupt)
+        sleep_ms(10);
+        
+        // Process incoming echo
+        bool process_in = uart_manager_process_incoming_data();
         TEST_ASSERT_TRUE_MESSAGE(process_in, "Failed to process incoming data");
         
         // Verify response
@@ -305,19 +311,19 @@ void test_uart_error_handling(void) {
     printf("TEST: test_uart_error_handling\n");
     
     // Test: Double initialization should be handled gracefully
-    bool first_init = uart_hardware_manager_init();
+    bool first_init = uart_manager_init();
     TEST_ASSERT_TRUE_MESSAGE(first_init, "First initialization failed");
     
-    bool second_init = uart_hardware_manager_init();
+    bool second_init = uart_manager_init();
     TEST_ASSERT_TRUE_MESSAGE(second_init, "Second initialization should succeed (idempotent)");
     
     // Test: Manager should still be ready after double initialization
-    bool ready_status = uart_hardware_manager_is_ready();
+    bool ready_status = uart_manager_is_ready();
     TEST_ASSERT_TRUE_MESSAGE(ready_status, "Manager not ready after double initialization");
     
     // Test: Deinitialization should work
-    uart_hardware_manager_deinit();
-    bool ready_after_deinit = uart_hardware_manager_is_ready();
+    uart_manager_deinit();
+    bool ready_after_deinit = uart_manager_is_ready();
     TEST_ASSERT_FALSE_MESSAGE(ready_after_deinit, "Manager should not be ready after deinitialization");
     
     printf("TEST: UART error handling test passed\n");
@@ -344,7 +350,7 @@ static bool wait_for_uart_ready(uint32_t timeout_ms) {
     uint32_t start_time = to_ms_since_boot(get_absolute_time());
     
     while ((to_ms_since_boot(get_absolute_time()) - start_time) < timeout_ms) {
-        if (uart_hardware_manager_is_ready()) {
+        if (uart_manager_is_ready()) {
             return true;
         }
         sleep_ms(10);
@@ -383,8 +389,8 @@ static bool send_and_verify_loopback(const char* message) {
  */
 static void create_tcp_to_uart_message(const char* payload) {
     // Clear any stale RX data before sending new message
-    if (uart_hardware_manager_is_ready()) {
-        while (uart_hardware_manager_process_incoming_data()) {
+    if (uart_manager_is_ready()) {
+        while (uart_manager_process_incoming_data()) {
             // Process and discard any stale data
         }
     }
@@ -392,7 +398,7 @@ static void create_tcp_to_uart_message(const char* payload) {
     ring_entry_t* entry = ringbuffer_get_free_entry();
     TEST_ASSERT_NOT_NULL_MESSAGE(entry, "Failed to get free ring buffer entry");
     
-    entry->uart_channel = 1;  // UART1
+    entry->channel = 1;  // UART1
     entry->direction = RX_TCP_TO_UART;
     entry->payload_length = strlen(payload);
     entry->timestamp = to_ms_since_boot(get_absolute_time());
@@ -462,7 +468,7 @@ int main() {
     UNITY_BEGIN();
     
     // Run tests in order of complexity
-    RUN_TEST(test_uart_hardware_manager_initialization);
+    RUN_TEST(test_uart_manager_initialization);
     RUN_TEST(test_uart1_driver_configuration);
     RUN_TEST(test_uart_loopback_functionality);
     RUN_TEST(test_ring_buffer_integration_single_message);

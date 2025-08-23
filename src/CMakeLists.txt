@@ -81,27 +81,29 @@ target_link_libraries(core_modules
     tcp_socket_server
     timer_subsystems
     ringbuffer
-    uart_hardware_manager
+    uart_manager
     pico_stdlib
     pico_multicore
     pico_sync
     hardware_sync
 )
 
-# UART Hardware Manager (Issue #76)
-add_library(uart_hardware_manager
-    uart/uart_hardware_manager.c
-    uart/uart1_driver.c
+# UART Manager - 4-channel UART management
+add_library(uart_manager
+    uart/uart_manager.c
+    uart/pl011_driver.c
+    uart/uart_receive_buffer.c
 )
 
-target_include_directories(uart_hardware_manager PUBLIC ../include)
-target_link_libraries(uart_hardware_manager 
+target_include_directories(uart_manager PUBLIC ../include)
+target_link_libraries(uart_manager 
     ringbuffer
     log_manager
     pico_stdlib
     hardware_uart
     hardware_gpio
     hardware_irq
+    pico_sync
 )
 
 # Add network subdirectory

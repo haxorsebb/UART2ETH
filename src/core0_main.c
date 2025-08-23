@@ -21,11 +21,12 @@
  * - arc42 Chapter 5 - Core 0 UART Subsystem
  */
 
+#include "core0_timer.h"
 #include "state_machine.h"
 #include "shared_memory.h"
 #include "log_manager.h"
 #include "ringbuffer.h"
-#include "uart/uart_hardware_manager.h"
+#include "uart/uart_manager.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/irq.h"
@@ -298,7 +299,7 @@ static void core0_configuration_complete(void) {
  * - ADR-012: Core0 Ringbuffer Processing Separation  
  */
 void core0_process_uart(void) {
-    if (!uart_hardware_manager_is_ready()) {
+    if (!uart_manager_is_ready()) {
         log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 2);
         state_machine_process_core0_event(CORE0_EVENT_UART_ERROR);
         return;
@@ -307,25 +308,27 @@ void core0_process_uart(void) {
     bool work_done = false;
     
     // Process incoming UART data (UART → Ring Buffer → TCP)
-    if (uart_hardware_manager_process_incoming_data()) {
+    if (uart_manager_process_incoming_data()) {
         log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
         work_done = true;
     }
     
+    /*
     // Process outgoing UART data (TCP → Ring Buffer → UART)
-    if (uart_hardware_manager_process_outgoing_data()) {
+    if (uart_manager_process_outgoing_data()) {
         log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_PROCESSING, 1);
         work_done = true;
     }
+    */
     
+
     if (work_done) {
         // Continue processing if more work available
-        if (uart_hardware_manager_has_pending_work()) {
+        if (uart_manager_has_incoming_work()) {
             // Stay in UART_ACTIVE state, will be called again
             return;
         }
     }
-    
     // Work complete - return to IDLE to check for other work
     state_machine_process_core0_event(CORE0_EVENT_UART_WORK_COMPLETE);
 }
@@ -389,7 +392,7 @@ static bool initialize_uart_hardware(void) {
     log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_INIT, 0);
     
     // Initialize UART Hardware Manager (Issue #76)
-    bool result = uart_hardware_manager_init();
+    bool result = uart_manager_init();
     if (result) {
         log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_HW_INIT, 1);
         log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_CHANNELS, 1); // Currently 1 UART (UART1)
@@ -431,10 +434,10 @@ static bool attempt_uart_recovery(void) {
     log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART_RECOVERY, 1);
     
     // Deinitialize and reinitialize UART Hardware Manager
-    uart_hardware_manager_deinit();
+    uart_manager_deinit();
     sleep_ms(100);  // Brief delay
     
-    bool recovery_result = uart_hardware_manager_init();
+    bool recovery_result = uart_manager_init();
     if (recovery_result) {
         log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_RECOVERY, 1);
     } else {
@@ -474,19 +477,18 @@ static bool perform_error_recovery(void) {
  * @return true if work found and event fired, false if no work pending
  */
 bool core0_check_for_pending_work(void) {
-    // For now, only check ringbuffer work to maintain system stability
-    // UART hardware integration will be gradually enabled
+    //check incoming first, incoming is not yet buffered
+    if (uart_manager_has_incoming_work()) {
+        state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
+        return true;
+    }
+
+    //buffered data can be handled later
     if (ringbuffer_get_count(RX_TCP_TO_UART) > 0) {
         state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_DATA_READY);
         return true;
     }
-    
-    // TODO: Enable UART hardware checking once system is stable
-    // if (uart_hardware_manager_is_ready() && uart_hardware_manager_has_pending_work()) {
-    //     state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
-    //     return true;
-    // }
-    
+
     // No work pending
     return false;
 }
@@ -503,7 +505,6 @@ void core0_work_or_idle_wait(void) {
     if (core0_check_for_pending_work()) {
         return; // Work found, event fired, let state machine handle it
     }
-    
     // No work, go to sleep
     core0_idle_wait();
 }
@@ -523,7 +524,7 @@ void core0_process_ringbuffer(void) {
         printf("DEBUG: core0_process_ringbuffer() call #%u\n", call_counter);
     });
 
-    uart_hardware_manager_process_outgoing_data();
+    uart_manager_process_outgoing_data();
     
     DEBUG_ONLY({
         // Ring Buffer Processing: Turn around TCP→UART messages (Issue #68)

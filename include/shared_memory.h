@@ -34,6 +34,19 @@
 #define SRAM_BANK4_BASE     SRAM4_BASE        // Use official SDK constant (0x20040000)
 #define SRAM_BANK4_SIZE     (64 * 1024)      // 64KB (design choice for shared memory)
 
+/**
+ * @brief channel enumeration for typing
+ */
+typedef enum {
+    CHANNEL_0 = 0,  
+    CHANNEL_1,
+    CHANNEL_2,
+    CHANNEL_3,
+    CHANNEL_MAX,
+    CHANNEL_ANY = -1
+} channel_id_t;
+
+
 // System configuration structures
 typedef struct {
     struct {
@@ -42,7 +55,7 @@ typedef struct {
         uint8_t  stop_bits;        // 1-2 bits  
         uint8_t  parity;           // 0=NONE, 1=ODD, 2=EVEN
         bool     enabled;          // Channel enabled
-    } uart_channels[4];
+    } channels[4];
     
     network_config_t network;
     

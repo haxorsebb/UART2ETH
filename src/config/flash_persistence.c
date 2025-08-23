@@ -299,7 +299,7 @@ void flash_persistence_factory_reset(void) {
     shared_memory_layout_t* layout = shared_memory_get_layout();
     if (layout) {
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_REINIT, 
-                  layout->config.uart_channels[0].baud_rate);
+                  layout->config.channels[0].baud_rate);
     }
     
     // Update flash state

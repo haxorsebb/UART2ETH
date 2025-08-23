@@ -91,13 +91,14 @@ class TCPClient:
             raise RuntimeError("Not connected to device")
         
         try:
-            # High-precision timing measurement
-            start_time = time.perf_counter()
             
             # Send message
             wire_data = message.to_wire_format()
+            
+            # High-precision timing measurement
+            start_time = time.perf_counter()
             self.writer.write(wire_data)
-            await self.writer.drain()
+            #await self.writer.drain()
             
             # Wait for response using proper protocol framing
             response = await asyncio.wait_for(
@@ -134,6 +135,7 @@ class TCPClient:
             # Add debug info for timeouts
             print(f"DEBUG: Message timeout after {timeout}s")
             print(f"  Message: {message.to_wire_format()}")
+            print(f"  Received: {response}")
             raise
     
     async def _read_protocol_message(self) -> bytes:

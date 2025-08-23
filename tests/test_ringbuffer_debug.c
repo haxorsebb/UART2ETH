@@ -110,7 +110,7 @@ static bool test_basic_operations(void) {
     printf("  test_basic_operations: setting up message\n");
     const char* test_msg = "#1234Hello!\r\n";
     entry->direction = RX_TCP_TO_UART;
-    entry->uart_channel = 0;
+    entry->channel = 0;
     entry->payload_length = strlen(test_msg);
     memcpy(entry->payload, test_msg, entry->payload_length);
     

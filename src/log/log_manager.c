@@ -492,9 +492,6 @@ bool log_event(event_source_t event_source, log_level_t log_level,
     // Write entry to buffer
     bool ret = write_log_entry(&entry);
 
-    //DEBUGGING!
-    log_manager_format_pending();
-    
     return ret;
 }
 

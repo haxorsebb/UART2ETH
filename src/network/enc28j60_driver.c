@@ -244,7 +244,9 @@ static bool enc28j60_wait_for_osc_ready(void) {
         timeout -= 100;
     }
     
-    DEBUG_ONLY({ printf("ENC28J60: Oscillator timeout\n"); });
+    //DEBUG_ONLY({ 
+        printf("ENC28J60: Oscillator timeout: %d\n", timeout); 
+    //});
     return false;
 }
 

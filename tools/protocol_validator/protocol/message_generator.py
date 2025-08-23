@@ -194,7 +194,7 @@ class MessageGenerator:
         Returns:
             List[ProtocolMessage]: Messages optimized for performance testing
         """
-        target_bytes = target_rate_kbps * 1024 * duration_seconds
+        target_bytes = (target_rate_kbps / 10) * 1024 * duration_seconds    # baud=10 bits per byte
         messages = []
         total_bytes = 0
         
@@ -206,5 +206,6 @@ class MessageGenerator:
             message = self.generate_medium(typical_payload_size)
             messages.append(message)
             total_bytes += len(message.to_wire_format())
-            
+        
+        print("Generated %d messages for test"%(len(messages)))
         return messages

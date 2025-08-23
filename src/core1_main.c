@@ -91,10 +91,7 @@ void core1_main(void) {
     // Get current states once 
     main_state_t main_state = state_machine_get_main_state();
     core1_substate_t sub_state = state_machine_get_core1_substate();
-    
-    // Single debug print - avoid printf flooding
-    printf("DEBUG: Core1 starting main loop - main_state=%d, sub_state=%d\n", main_state, sub_state);
-
+        
     while (sub_state != CORE1_SHUTDOWN) {
         // Increment loop counter for debugging (no printf)
         g_core1_loop_counter++;
@@ -228,17 +225,17 @@ static bool core1_check_for_pending_work(void) {
     enc28j60_process_interrupts(false);
 
     if(network_manager_link_change_pending()) {
-        // DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("network has link change pending\n"); 
-        // });
+        });
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE);
         return true; 
     }
 
     if(network_manager_receive_packets_pending()) {
-        // DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("network has pending receive packets\n"); 
-        // });
+        });
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
         network_manager_check_timeouts();
     
@@ -246,9 +243,9 @@ static bool core1_check_for_pending_work(void) {
     }
     
     if(network_manager_transmit_packets_pending()) {
-        // DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("network has pending transmit packets\n"); 
-        // });
+        });
         //state_machine_process_core1_event(CORE1_EVENT_NETWORK_SENDING_ACTIVE);
         core1_process_packet_tx();
         return true; 
@@ -265,19 +262,19 @@ static bool core1_check_for_pending_work(void) {
 
     // Check for ringbuffer messages to transmit over network (medium priority, messages are cached)
     if(ringbuffer_get_count(RX_UART_TO_TCP) > 0) {
-        // DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("Core1: ringbuffer has %u pending messages for network transmission\n", 
                              ringbuffer_get_count(RX_UART_TO_TCP)); 
-        //                     });
+        });
         state_machine_process_core1_event(CORE1_EVENT_RINGBUFFER_DATA_READY);
         return true;
     }
 
     //low priority tasks
     if(log_manager_get_pending_count()) {
-        // DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("Logmanager has pending count %d\n",log_manager_get_pending_count()); 
-        // );
+        });
         state_machine_process_core1_event(CORE1_EVENT_LOG_START);
         return true;
     }
@@ -571,10 +568,10 @@ static void core1_configuration_complete(void) {
         
         // Force TCP server init if we have IP (regardless of network status)
         DEBUG_ONLY({
-            printf("Core1: Forcing TCP socket server init on port 4001\n");
+            printf("Core1: Forcing TCP socket server init on port 4002\n");
         });
         
-        if (tcp_socket_server_init(4001)) {
+        if (tcp_socket_server_init(4002)) {
             DEBUG_ONLY({
                 printf("Core1: TCP socket server initialized successfully\n");
             });
@@ -728,17 +725,17 @@ static void core1_process_ringbuffer(void) {
     // Process ringbuffer messages - fetch from ringbuffer and send over network
     // Implementation: fetch one message per call to avoid blocking other tasks
     
-    ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
+    ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP, CHANNEL_ANY, ENTRY_STATUS_READY);
     
     if (entry != NULL) {
         
         // Send the message over the network via TCP socket server
-        bool sent = tcp_socket_server_send_to_uart_channel(entry->uart_channel, entry->payload, entry->payload_length);
+        bool sent = tcp_socket_server_send_to_channel(entry->channel, entry->payload, entry->fill_index);
         
         if (sent) {
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, entry->payload_length);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, entry->fill_index);
         } else {
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, entry->uart_channel);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, entry->channel);
         }
         
         // Mark the entry as consumed to return it to the free pool

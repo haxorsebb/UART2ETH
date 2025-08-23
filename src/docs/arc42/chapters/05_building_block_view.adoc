@@ -1297,20 +1297,20 @@ Core API providing the helper functions for ring buffer operations and monitorin
 ----
 // Core buffer operations
 ring_entry_t* find_next_free_block(void);
-ring_entry_t* find_next_ready_block(uint8_t uart_channel, uint8_t direction);
+ring_entry_t* find_next_ready_block(channel_id_t channel, uint8_t direction);
 bool is_buffer_full(void);
 bool is_buffer_empty(void);
 
 // Statistics and monitoring
 uint32_t get_cached_message_count(void);
-uint32_t get_cached_message_count_by_channel(uint8_t uart_channel);
+uint32_t get_cached_message_count_by_channel(channel_id_t channel);
 uint32_t get_cached_message_count_by_direction(uint8_t direction);
 uint32_t get_free_block_count(void);
 uint32_t get_overflow_count(void);          // Dropped messages
 uint32_t get_total_throughput_bytes(void);
 
 // Advanced operations
-ring_entry_t* peek_next_block(uint8_t uart_channel, uint8_t direction);
+ring_entry_t* peek_next_block(channel_id_t channel, uint8_t direction);
 void mark_block_ready(ring_entry_t* entry);
 void mark_block_consumed(ring_entry_t* entry);
 void reset_buffer_statistics(void);
@@ -1351,7 +1351,7 @@ Individual ring buffer entry structure used for both communication directions.
 ----
 typedef struct {
     // Management Data (16 bytes)
-    uint8_t  uart_channel;     // 0-3
+    uint8_t  channel;     // 0-3
     uint8_t  direction;        // RX_UART_TO_TCP / RX_TCP_TO_UART
     uint8_t  status;           // FILLING/DRAINING/FULL/EMPTY
     uint8_t  payload_length;   // Actual data length
@@ -1411,7 +1411,7 @@ DEV <--> U2 : Serial Channel 2\nUART/RS232/RS422
 DEV <--> U3 : Serial Channel 3\nUART/RS232/RS422
 
 MGMT <--> PARAM : Configuration\nuart_config_t
-STATUS --> MGMT : Status Data\nuart_channel_status_t
+STATUS --> MGMT : Status Data\nchannel_status_t
 
 ' Hardware connections
 CH0 <--> U0 : Register Access\nMemory-mapped I/O
@@ -1477,11 +1477,11 @@ Core function interface for UART channel operations.
 [source,c]
 ----
 // Channel operations
-int uart_channel_configure(uint8_t channel, uart_config_t* config);
-int uart_channel_read(uint8_t channel, uint8_t* buffer, size_t length);
-int uart_channel_write(uint8_t channel, const uint8_t* data, size_t length);
-bool uart_channel_is_ready(uint8_t channel);
-uint32_t uart_channel_get_status(uint8_t channel);
+int channel_configure(channel_id_t channel, uart_config_t* config);
+int channel_read(channel_id_t channel, uint8_t* buffer, size_t length);
+int channel_write(channel_id_t channel, const uint8_t* data, size_t length);
+bool channel_is_ready(channel_id_t channel);
+uint32_t channel_get_status(channel_id_t channel);
 ----
 
 ====== Status Monitoring Structure
@@ -1497,7 +1497,7 @@ typedef struct {
     uint32_t tx_errors;
     uint32_t frames_received;
     uint32_t frames_transmitted;
-} uart_channel_status_t;
+} channel_status_t;
 ----
 
 ==== UART Hardware Manager Implementation (Issue #76)
@@ -2066,7 +2066,7 @@ typedef struct {
     char description[64];              // User-friendly name
     bool protocol_filter_enabled;
     char protocol_filter_type[32];     // "SharkNet", "custom", etc.
-} uart_channel_settings_t;
+} channel_settings_t;
 ----
 
 **Network Configuration Structure**

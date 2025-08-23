@@ -31,7 +31,7 @@
 #define TEST_UART_CHANNEL 0
 
 // Test helper functions
-static void setup_test_message(ring_entry_t* entry, const char* message, uint8_t direction, uint8_t uart_channel);
+static void setup_test_message(ring_entry_t* entry, const char* message, uint8_t direction, channel_id_t channel);
 static void verify_message_content(const ring_entry_t* entry, const char* expected_message, uint8_t expected_direction);
 
 void setUp(void) {
@@ -358,12 +358,12 @@ void test_ringbuffer_statistics(void) {
 
 // Test helper function implementations
 
-static void setup_test_message(ring_entry_t* entry, const char* message, uint8_t direction, uint8_t uart_channel) {
+static void setup_test_message(ring_entry_t* entry, const char* message, uint8_t direction, channel_id_t channel) {
     TEST_ASSERT_NOT_NULL_MESSAGE(entry, "Entry should not be NULL");
     TEST_ASSERT_NOT_NULL_MESSAGE(message, "Message should not be NULL");
     
     entry->direction = direction;
-    entry->uart_channel = uart_channel;
+    entry->channel = channel;
     entry->payload_length = strlen(message);
     entry->timestamp = to_ms_since_boot(get_absolute_time());
     

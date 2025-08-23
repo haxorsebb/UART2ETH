@@ -17,7 +17,9 @@
 #include "pico/sync.h"
 #include "pico/multicore.h"
 #include "hardware/sync.h"
+#include "shared_memory.h"
 #include "state_machine.h"
+#include <pico/types.h>
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
@@ -36,6 +38,7 @@ typedef struct {
     uint32_t total_enqueued;
     uint32_t total_dequeued;
     uint32_t overflow_count;
+    uint32_t error_count;
     uint32_t doorbell_wakeups;
     
     bool initialized;
@@ -49,7 +52,7 @@ static uint32_t ringbuffer_mask(uint32_t index);
 static bool ringbuffer_is_full(void);
 static bool ringbuffer_is_empty(void);
 static uint32_t ringbuffer_get_used_count(void);
-static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(uint8_t direction);
+static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(ringbuffer_direction_t direction, channel_id_t channel, entry_status_t status);
 static ring_entry_t* ringbuffer_find_oldest_ready_entry(void);
 static void ringbuffer_secure_clear_entry(ring_entry_t* entry);
 
@@ -80,9 +83,9 @@ bool ringbuffer_init(void) {
 /**
  * @brief Get free ring buffer entry for message production
  * @return Pointer to free entry, NULL if buffer full
- * @note Returned entry has status=FILLING, caller must set direction and payload
+ * @note Returned entry has status=FILLING
  */
-ring_entry_t* ringbuffer_get_free_entry(void) {
+ring_entry_t* ringbuffer_get_free_entry(ringbuffer_direction_t direction, channel_id_t channel) {
     if (!g_ringbuffer.initialized) {
         return NULL;
     }
@@ -97,23 +100,19 @@ ring_entry_t* ringbuffer_get_free_entry(void) {
         if (oldest) {
             // SECURITY: Validate oldest entry before reuse
             if (!ringbuffer_validate_entry(oldest)) {
-                g_ringbuffer.overflow_count++;
-                mutex_exit(&g_ringbuffer.access_mutex);
-                return NULL;
+                g_ringbuffer.error_count++;
             }
             
             // Reuse oldest entry with secure clearing
-            oldest->status = ENTRY_STATUS_FILLING;
             ringbuffer_secure_clear_entry(oldest);
+            oldest->status = ENTRY_STATUS_FILLING;
+            oldest->channel = channel;
+            oldest->direction = direction;
+            
             g_ringbuffer.overflow_count++;
             mutex_exit(&g_ringbuffer.access_mutex);
             return oldest;
-        } else {
-            // No entries available for reuse
-            g_ringbuffer.overflow_count++;
-            mutex_exit(&g_ringbuffer.access_mutex);
-            return NULL;
-        }
+        } 
     }
     
     // Find next free entry
@@ -122,14 +121,16 @@ ring_entry_t* ringbuffer_get_free_entry(void) {
     
     // SECURITY: Validate entry is actually free
     if (entry->status != ENTRY_STATUS_FREE) {
-        // This should not happen - indicates corruption
-        mutex_exit(&g_ringbuffer.access_mutex);
-        return NULL;
+        //should never happen
+        g_ringbuffer.error_count++;
     }
     
     // Mark as filling with secure clearing
     entry->status = ENTRY_STATUS_FILLING;
     ringbuffer_secure_clear_entry(entry);
+    entry->channel = channel;
+    entry->direction = direction;
+            
     
     // Move head forward (with overflow protection)
     g_ringbuffer.head = (g_ringbuffer.head + 1) & 0x7FFFFFFF;
@@ -165,7 +166,7 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
     }
     
     // SECURITY: Validate payload length to prevent buffer overflow
-    if (entry->payload_length > RINGBUFFER_PAYLOAD_MAX_SIZE) {
+    if ((entry->fill_index > RINGBUFFER_PAYLOAD_MAX_SIZE) || (entry->drain_index > RINGBUFFER_PAYLOAD_MAX_SIZE)) {
         mutex_exit(&g_ringbuffer.access_mutex);
         return false;
     }
@@ -177,7 +178,7 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
     }
     
     // SECURITY: Validate UART channel is within expected range
-    if (entry->uart_channel > 3) {
+    if (entry->channel > 3) {
         mutex_exit(&g_ringbuffer.access_mutex);
         return false;
     }
@@ -213,7 +214,7 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
  * @return Pointer to ready entry, NULL if none available
  * @note Returned entry has status=READY, caller must mark CONSUMED when finished
  */
-ring_entry_t* ringbuffer_dequeue_entry(uint8_t direction) {
+ring_entry_t* ringbuffer_dequeue_entry(ringbuffer_direction_t direction, channel_id_t channel, entry_status_t status) {
     if (!g_ringbuffer.initialized) {
         return NULL;
     }
@@ -221,7 +222,7 @@ ring_entry_t* ringbuffer_dequeue_entry(uint8_t direction) {
     mutex_enter_blocking(&g_ringbuffer.access_mutex);
     
     // Find oldest entry with matching direction and READY status
-    ring_entry_t* oldest = ringbuffer_find_oldest_entry_by_direction(direction);
+    ring_entry_t* oldest = ringbuffer_find_oldest_entry_by_direction(direction, channel, status);
     
     if (oldest) {
         // Entry remains READY, caller will mark as CONSUMED when finished
@@ -269,7 +270,7 @@ void ringbuffer_mark_consumed(ring_entry_t* entry) {
  * @param direction Message direction (RX_TCP_TO_UART or RX_UART_TO_TCP)
  * @return Number of entries ready for processing
  */
-uint32_t ringbuffer_get_count(uint8_t direction) {
+uint32_t ringbuffer_get_count(ringbuffer_direction_t direction) {
     if (!g_ringbuffer.initialized) {
         return 0;
     }
@@ -415,7 +416,7 @@ bool ringbuffer_validate_entry(const ring_entry_t* entry) {
     }
     
     // Check entry status is valid
-    if (entry->status > ENTRY_STATUS_CONSUMED) {
+    if (entry->status >= ENTRY_STATUS_MAX) {
         return false;
     }
     
@@ -425,7 +426,7 @@ bool ringbuffer_validate_entry(const ring_entry_t* entry) {
     }
     
     // Check payload length is within bounds
-    if (entry->payload_length > RINGBUFFER_PAYLOAD_MAX_SIZE) {
+    if ((entry->fill_index > RINGBUFFER_PAYLOAD_MAX_SIZE || (entry->drain_index > RINGBUFFER_PAYLOAD_MAX_SIZE))) {
         return false;
     }
     
@@ -478,14 +479,15 @@ static uint32_t ringbuffer_get_used_count(void) {
  * @param direction Message direction to search for
  * @return Pointer to oldest ready entry, NULL if none found
  */
-static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(uint8_t direction) {
+static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(ringbuffer_direction_t direction, channel_id_t channel, entry_status_t status) {
     ring_entry_t* oldest = NULL;
     uint32_t oldest_timestamp = UINT32_MAX;
     
     for (uint32_t i = 0; i < RINGBUFFER_CAPACITY; i++) {
         ring_entry_t* entry = &g_ringbuffer.entries[i];
-        if (entry->status == ENTRY_STATUS_READY && 
+        if (entry->status == status && 
             entry->direction == direction && 
+            ((entry->channel == channel || channel == CHANNEL_ANY)) && 
             entry->timestamp < oldest_timestamp) {
             oldest = entry;
             oldest_timestamp = entry->timestamp;
@@ -531,9 +533,10 @@ static void ringbuffer_secure_clear_entry(ring_entry_t* entry) {
     memset(entry->reserved, 0, sizeof(entry->reserved));
     
     // Reset metadata (but preserve status which is set by caller)
-    entry->uart_channel = 0;
-    entry->direction = 0;
-    entry->payload_length = 0;
+    entry->channel = CHANNEL_ANY;
+    entry->direction = DIRECTION_NONE;
+    entry->fill_index = 0;
+    entry->drain_index = 0;
     entry->timestamp = 0;
     entry->sequence_id = 0;
 }

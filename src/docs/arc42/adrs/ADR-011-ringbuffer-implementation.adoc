@@ -37,7 +37,7 @@ Implement a **minimal echo-based ring buffer system** with the following design:
 ```c
 typedef struct {
     // Management header (64 bytes, cache-aligned)
-    uint8_t  uart_channel;     // 0-3 for UART channels 
+    uint8_t  channel;     // 0-3 for UART channels 
     uint8_t  direction;        // RX_TCP_TO_UART, RX_UART_TO_TCP
     uint8_t  status;           // FILLING, READY, CONSUMED
     uint8_t  payload_length;   // Actual data length (≤1024)
