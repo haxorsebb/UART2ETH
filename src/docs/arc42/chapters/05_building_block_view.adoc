@@ -1607,6 +1607,19 @@ The current implementation processes messages using line-based framing:
 3. Data transmitted via PL011 driver
 4. Entry marked as consumed when transmission complete
 
+===== Recent Refactoring Notes
+
+**Deprecated Components (Removed):**
+- `uart1_driver.c/.h`: Legacy single-channel driver replaced by unified uart_manager
+- Single-channel API replaced with multi-channel manager abstraction
+- Tests updated to use new uart_manager interface
+
+**Current Implementation Status:**
+- Production code tested with 500,000+ messages successfully
+- Channel 1 (UART1/PL011) operational at 500kBaud
+- Ring buffer integration fully functional
+- Line-based protocol ('!\r\n' termination) working correctly
+
 ===== Testing and Validation
 
 **Current Test Coverage:**
@@ -1620,7 +1633,7 @@ The current implementation processes messages using line-based framing:
 - RP2350 UART1 peripheral testing
 - GPIO configuration validation
 - Interrupt-driven I/O verification
-- Performance and reliability testing
+- Performance and reliability testing (500k+ messages verified)
 
 ==== Whitebox Flash Persistence System
 
