@@ -75,13 +75,13 @@ target_link_libraries(uart2eth
     network_manager    # Our network manager library (now with lwIP)
     tcp_socket_server  # all sockets are handled here
     ringbuffer         # Ring buffer for UART-TCP message bridging
+    uart_manager       # New 4-channel UART manager
     core_modules       # Core0 and Core1 main functions
 )
 
-# Enable stdio: USB CDC for debugging, UART0 disabled to avoid SPI0 conflict
-# UART1 is manually configured in main.c for hardware logging (GP12/GP13)
+# Enable stdio: USB CDC for debugging, UART0 for debugging
 pico_enable_stdio_usb(uart2eth 1)
-pico_enable_stdio_uart(uart2eth 1)  # Disable UART0 to avoid SPI0 conflict
+pico_enable_stdio_uart(uart2eth 1) 
 
 # Set UF2 family for RP2350
 pico_set_uf2_family(uart2eth "rp2350-arm-s")

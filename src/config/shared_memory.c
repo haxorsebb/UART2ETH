@@ -58,10 +58,17 @@ bool shared_memory_init(void) {
     g_shared_memory = (shared_memory_layout_t*)SRAM_BANK4_BASE;
     
     // Initialize spinlock for log reservation
-    g_reservation_lock = spin_lock_init(spin_lock_claim_unused(true));
-    if (!g_reservation_lock) {
+    uint lock_num = spin_lock_claim_unused(true);
+    if (lock_num == -1) {
+        printf("ERROR: Failed to claim unused spinlock\n");
         return false;  // Failed to claim spinlock
     }
+    g_reservation_lock = spin_lock_init(lock_num);
+    if (!g_reservation_lock) {
+        printf("ERROR: Failed to initialize spinlock\n");
+        return false;
+    }
+    printf("DEBUG: Spinlock initialized successfully (lock_num=%u)\n", lock_num);
     
     // Initialize shared memory structure
     memset(g_shared_memory, 0, SRAM_BANK4_SIZE);
@@ -80,11 +87,11 @@ bool shared_memory_init(void) {
     
     // Initialize UART channel defaults
     for (int i = 0; i < 4; i++) {
-        g_shared_memory->config.uart_channels[i].baud_rate = 115200;
-        g_shared_memory->config.uart_channels[i].data_bits = 8;
-        g_shared_memory->config.uart_channels[i].stop_bits = 1;
-        g_shared_memory->config.uart_channels[i].parity = 0;  // NONE
-        g_shared_memory->config.uart_channels[i].enabled = false;
+        g_shared_memory->config.channels[i].baud_rate = 115200;
+        g_shared_memory->config.channels[i].data_bits = 8;
+        g_shared_memory->config.channels[i].stop_bits = 1;
+        g_shared_memory->config.channels[i].parity = 0;  // NONE
+        g_shared_memory->config.channels[i].enabled = false;
     }
     
     network_manager_get_default_config(&g_shared_memory->config.network);

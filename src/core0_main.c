@@ -21,10 +21,12 @@
  * - arc42 Chapter 5 - Core 0 UART Subsystem
  */
 
+#include "core0_timer.h"
 #include "state_machine.h"
 #include "shared_memory.h"
 #include "log_manager.h"
 #include "ringbuffer.h"
+#include "uart/uart_manager.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/irq.h"
@@ -79,15 +81,17 @@ static uint32_t g_system_recovery_attempts = 0;
 void core0_main(void) {
     // One-time initialization
 
-    DEBUG_ONLY({
-        printf("ENTERING CORE0 MAIN\n");
-    });
+    printf("DEBUG: ENTERING CORE0 MAIN\n");
 
     core0_initialize();
+    
+    printf("DEBUG: core0_initialize completed\n");
     
     // Get current states
     main_state_t main_state = state_machine_get_main_state();
     core0_substate_t sub_state = state_machine_get_core0_substate();
+
+    printf("DEBUG: Initial states - main_state=%d, sub_state=%d\n", main_state, sub_state);
 
     while (true) {
         // Get current states
@@ -97,30 +101,43 @@ void core0_main(void) {
         // DEBUG: Print states periodically
         static uint32_t debug_counter = 0;
         debug_counter++;
-        DEBUG_ONLY({
-            if (debug_counter % 50000 == 0) {  // Every 50k loops
-                printf("DEBUG: Core0 main_state=%d, sub_state=%d\n", main_state, sub_state);
-            }
-        });
+        
+        if (debug_counter <= 3 || debug_counter % 50000 == 0) {  // First 3 loops and then every 50k loops  
+            printf("DEBUG: Core0 loop #%u - main_state=%d, sub_state=%d\n", debug_counter, main_state, sub_state);
+        }
         
         // Big switch statement for main states
+        if (debug_counter <= 3) {  // Only for first few loops
+            printf("DEBUG: About to enter main state switch with main_state=%d\n", main_state);
+        }
         switch (main_state) {
             case MAIN_STATE_INIT:
+                if (debug_counter <= 3) {  // Only for first few loops
+                    printf("DEBUG: In MAIN_STATE_INIT, sub_state=%d\n", sub_state);
+                }
                 // Initialization phase - set up UART hardware
                 switch (sub_state) {
                     case CORE0_INIT_UART:
+                        if (debug_counter <= 3) printf("DEBUG: Calling core0_init_uart_hardware()\n");
                         core0_init_uart_hardware();
+                        if (debug_counter <= 3) printf("DEBUG: core0_init_uart_hardware() completed\n");
                         break;
                     case CORE0_INIT_COMPLETE:
+                        if (debug_counter <= 3) printf("DEBUG: Calling core0_init_complete()\n");
                         core0_init_complete();
+                        if (debug_counter <= 3) printf("DEBUG: core0_init_complete() completed\n");
                         break;
                     case CORE0_INIT_IDLE:
+                        if (debug_counter <= 3) printf("DEBUG: Calling core0_idle_wait() from INIT\n");
                         core0_idle_wait();  // Universal wait function
+                        if (debug_counter <= 3) printf("DEBUG: core0_idle_wait() returned from INIT\n");
                         break;
                     case CORE0_INIT_ERROR:
+                        printf("DEBUG: Processing MAIN_EVENT_SYSTEM_ERROR\n");
                         state_machine_process_main_event(MAIN_EVENT_SYSTEM_ERROR);
                         break;
                     default:
+                        printf("DEBUG: Unknown sub_state=%d in MAIN_STATE_INIT\n", sub_state);
                         break;
                 }
                 break;
@@ -271,17 +288,49 @@ static void core0_configuration_complete(void) {
 
 
 /**
- * @brief Process UART hardware operations only (ADR-012)
+ * @brief Process UART hardware operations using UART Hardware Manager (Issue #76)
  * 
- * Handles UART hardware processing including data RX/TX, DMA transfers,
- * and interrupt handling. Ringbuffer processing has been moved to
- * core0_process_ringbuffer() per ADR-012 separation of concerns.
+ * Handles UART hardware processing including data RX/TX and interrupt handling.
+ * Uses UART Hardware Manager for bidirectional TCP<->UART communication.
+ * Ringbuffer processing has been moved to core0_process_ringbuffer() per ADR-012.
  * 
  * Documentation Reference:
+ * - Issue #76: Add UART Hardware Manager implementation
  * - ADR-012: Core0 Ringbuffer Processing Separation  
  */
 void core0_process_uart(void) {
-    // TBD: implement after rinbuffer intergration sucessfull
+    if (!uart_manager_is_ready()) {
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 2);
+        state_machine_process_core0_event(CORE0_EVENT_UART_ERROR);
+        return;
+    }
+    
+    bool work_done = false;
+    
+    // Process incoming UART data (UART → Ring Buffer → TCP)
+    if (uart_manager_process_incoming_data()) {
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
+        work_done = true;
+    }
+    
+    /*
+    // Process outgoing UART data (TCP → Ring Buffer → UART)
+    if (uart_manager_process_outgoing_data()) {
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_PROCESSING, 1);
+        work_done = true;
+    }
+    */
+    
+
+    if (work_done) {
+        // Continue processing if more work available
+        if (uart_manager_has_incoming_work()) {
+            // Stay in UART_ACTIVE state, will be called again
+            return;
+        }
+    }
+    // Work complete - return to IDLE to check for other work
+    state_machine_process_core0_event(CORE0_EVENT_UART_WORK_COMPLETE);
 }
 
 /**
@@ -336,18 +385,22 @@ static void core0_handle_error(void) {
 // UART processing helper function implementations
 
 /**
- * Initialize UART hardware
+ * Initialize UART hardware using UART Hardware Manager (Issue #76)
  * @return true if successful, false otherwise
  */
 static bool initialize_uart_hardware(void) {
-    // Real implementation would:
-    // - Initialize all 4 UART channels
-    // - Configure baud rates, data bits, stop bits, parity
-    // - Set up interrupt handlers for UART RX data available
-    // - Configure DMA channels
-    // - Set up interrupt to change substate from UART_IDLE to UART_ACTIVE when data arrives
-    log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_CHANNELS, 4);
-    return true;  // Stub - always succeeds for testing
+    log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_INIT, 0);
+    
+    // Initialize UART Hardware Manager (Issue #76)
+    bool result = uart_manager_init();
+    if (result) {
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_HW_INIT, 1);
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_CHANNELS, 1); // Currently 1 UART (UART1)
+    } else {
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_ERROR, LOG_EVENT_UART0_ERROR, 1);
+    }
+    
+    return result;
 }
 
 /**
@@ -374,22 +427,24 @@ static bool process_uart_data(void) {
 }
 
 /**
- * Attempt UART hardware recovery
+ * Attempt UART hardware recovery using UART Hardware Manager (Issue #76)
  * @return true if recovery successful, false otherwise
  */
 static bool attempt_uart_recovery(void) {
-    // Simulate recovery attempts with success after 3 attempts
-    static uint32_t local_attempts = 0;
-    local_attempts++;
+    log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART_RECOVERY, 1);
     
-    log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART_RECOVERY, local_attempts);
+    // Deinitialize and reinitialize UART Hardware Manager
+    uart_manager_deinit();
+    sleep_ms(100);  // Brief delay
     
-    if (local_attempts >= 3) {
-        local_attempts = 0;  // Reset for next error
-        return true;
+    bool recovery_result = uart_manager_init();
+    if (recovery_result) {
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_INFO, LOG_EVENT_UART_RECOVERY, 1);
+    } else {
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_ERROR, LOG_EVENT_UART_RECOVERY, 0);
     }
     
-    return false;
+    return recovery_result;
 }
 
 /**
@@ -414,7 +469,7 @@ static bool perform_error_recovery(void) {
 // ==================== NEW CORE0 WORK DETECTION FUNCTIONS (ADR-012) ====================
 
 /**
- * @brief Check for pending work and fire appropriate events
+ * @brief Check for pending work and fire appropriate events (Issue #76 integration)
  * 
  * Follows Core1 pattern for work detection. Prioritizes UART work over ringbuffer work
  * because UART has limited FIFO while ringbuffer is already buffered.
@@ -422,19 +477,18 @@ static bool perform_error_recovery(void) {
  * @return true if work found and event fired, false if no work pending
  */
 bool core0_check_for_pending_work(void) {
-    // Priority 1: Check for UART hardware work (limited FIFO, data might be lost)
-    // TODO: Replace with real UART hardware check when available
-    // if (uart_hardware_has_pending_work()) {
-    //     state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
-    //     return true;
-    // }
-    
-    // Priority 2: Check for ringbuffer messages to process (buffered, safer to delay)
+    //check incoming first, incoming is not yet buffered
+    if (uart_manager_has_incoming_work()) {
+        state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
+        return true;
+    }
+
+    //buffered data can be handled later
     if (ringbuffer_get_count(RX_TCP_TO_UART) > 0) {
         state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_DATA_READY);
         return true;
     }
-    
+
     // No work pending
     return false;
 }
@@ -451,7 +505,6 @@ void core0_work_or_idle_wait(void) {
     if (core0_check_for_pending_work()) {
         return; // Work found, event fired, let state machine handle it
     }
-    
     // No work, go to sleep
     core0_idle_wait();
 }
@@ -471,24 +524,27 @@ void core0_process_ringbuffer(void) {
         printf("DEBUG: core0_process_ringbuffer() call #%u\n", call_counter);
     });
 
-    // Ring Buffer Processing: Turn around TCP→UART messages (Issue #68)
-    // Process only ONE message per main loop execution (test requirement #7)
-    ring_entry_t* tcp_to_uart_msg = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
-    if (tcp_to_uart_msg) {
+    uart_manager_process_outgoing_data();
     
-        // "Turn around" the message: change direction from TCP→UART to UART→TCP
-        tcp_to_uart_msg->direction = RX_UART_TO_TCP;
-        tcp_to_uart_msg->status = ENTRY_STATUS_FILLING;
+    DEBUG_ONLY({
+        // Ring Buffer Processing: Turn around TCP→UART messages (Issue #68)
+        // Process only ONE message per main loop execution (test requirement #7)
+        ring_entry_t* tcp_to_uart_msg = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+        if (tcp_to_uart_msg) {
+        
+            // "Turn around" the message: change direction from TCP→UART to UART→TCP
+            tcp_to_uart_msg->direction = RX_UART_TO_TCP;
+            tcp_to_uart_msg->status = ENTRY_STATUS_FILLING;
 
-        // Re-enqueue the message for Core1 to transmit back to TCP client
-        bool enqueue_result = ringbuffer_enqueue_entry(tcp_to_uart_msg);
-        if (enqueue_result) {
-            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
-        } else {
-            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 1);
+            // Re-enqueue the message for Core1 to transmit back to TCP client
+            bool enqueue_result = ringbuffer_enqueue_entry(tcp_to_uart_msg);
+            if (enqueue_result) {
+                log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
+            } else {
+                log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 1);
+            }
         }
-    }
-    
+    });
     // Work complete - return to IDLE to allow main loop to check for more work
     state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_WORK_COMPLETE);
 }

@@ -16,7 +16,9 @@
 #include "hardware/timer.h"
 #include "hardware/irq.h"
 #include "pico/stdlib.h"
+#include <stdio.h>
 #include <string.h>
+#include "state_machine.h"
 
 // Timer state structure
 typedef struct {
@@ -167,6 +169,7 @@ uint32_t core1_timer_get_active_count(void) {
  * @brief Timer interrupt service routine
  */
 void core1_timer_alarm_isr(void) {
+
     // Clear the alarm interrupt
     hw_clear_bits(&timer_hw->intr, 1u << CORE1_TIMER_ALARM_NUM);
     
@@ -175,6 +178,7 @@ void core1_timer_alarm_isr(void) {
     
     // Schedule next alarm
     core1_timer_update_next_alarm();
+
 }
 
 // Internal helper functions

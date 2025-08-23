@@ -44,7 +44,7 @@ typedef struct tcp_connection {
     char line_buffer[TCP_SERVER_LINE_BUFFER_SIZE+1]; // Line assembly buffer
     size_t line_pos;                               // Current position in buffer
     bool active;                                   // Connection active flag
-    uint8_t uart_channel;                          // Associated UART channel (0-3)
+    channel_id_t channel;                          // Associated UART channel (0-3)
     uint32_t bytes_sent;                          // Bytes sent on this connection
     uint32_t bytes_received;                      // Bytes received on this connection
     uint32_t last_activity_ms;                    // For timeout detection
@@ -198,7 +198,7 @@ void tcp_socket_server_deinit(void) {
  * - Ringbuffer processing is handled by Core1 main loop
  * 
  * Note: Ringbuffer message sending is now handled by Core1 main loop
- * via core1_process_ringbuffer() -> tcp_socket_server_send_to_uart_channel()
+ * via core1_process_ringbuffer() -> tcp_socket_server_send_to_channel()
  */
 void tcp_socket_server_process(void) {
     // TCP server processing is primarily handled by lwIP callbacks
@@ -289,7 +289,7 @@ bool check_message_end(const char* buffer, size_t length) {
  * Since we now use single connection policy, this function sends to the
  * currently active connection regardless of UART channel mapping.
  */
-bool tcp_socket_server_send_to_uart_channel(uint8_t uart_channel, const uint8_t* data, size_t length) {
+bool tcp_socket_server_send_to_channel(channel_id_t channel, const uint8_t* data, size_t length) {
     if (!data || length == 0) {
         return false;
     }
@@ -298,7 +298,7 @@ bool tcp_socket_server_send_to_uart_channel(uint8_t uart_channel, const uint8_t*
     for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
         if (g_connections[i].active && g_connections[i].pcb) {
             DEBUG_ONLY({
-                printf("TCP Server: Sending %zu bytes to active connection (UART %u)\n", length, uart_channel);
+                printf("TCP Server: Sending %zu bytes to active connection (UART %u)\n", length, channel);
             });
             
             err_t err = tcp_write(g_connections[i].pcb, data, length, TCP_WRITE_FLAG_COPY);
@@ -317,7 +317,7 @@ bool tcp_socket_server_send_to_uart_channel(uint8_t uart_channel, const uint8_t*
     }
     
     DEBUG_ONLY({
-        printf("TCP Server: No active connection to send to UART %u\n", uart_channel);
+        printf("TCP Server: No active connection to send to UART %u\n", channel);
     });
     return false;
 }
@@ -370,7 +370,7 @@ static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t
     
     // Assign UART channel based on listening port
     // Port 4001 -> UART 0, Port 4002 -> UART 1, etc.
-    conn->uart_channel = (g_listen_port >= 4001 && g_listen_port <= 4004) ? 
+    conn->channel = (g_listen_port >= 4001 && g_listen_port <= 4004) ? 
                          (g_listen_port - 4001) : 0;
     
     // Clear buffer with known pattern for debugging
@@ -592,34 +592,26 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         
         // Ring Buffer Integration (Issue #68): Enqueue TCP messages for Core0 processing
         // Instead of direct echo, enqueue message with direction RX_TCP_TO_UART
-        ring_entry_t* entry = ringbuffer_get_free_entry();
-        if (entry) {
-            // Setup ring buffer entry
-            entry->direction = RX_TCP_TO_UART;
-            entry->uart_channel = conn->uart_channel;  // Use connection's UART channel
-            entry->payload_length = conn->line_pos;
-            
-            // Copy message data to ring buffer
-            if (entry->payload_length > RINGBUFFER_PAYLOAD_MAX_SIZE) {
-                entry->payload_length = RINGBUFFER_PAYLOAD_MAX_SIZE;
-            }
-            memcpy(entry->payload, conn->line_buffer, entry->payload_length);
-            
-            // Enqueue for Core0 processing
-            bool enqueue_result = ringbuffer_enqueue_entry(entry);
-            if (enqueue_result) {
-                g_server_stats.lines_processed++;
-                DEBUG_ONLY({
-                    printf("TCP Server: Message enqueued for Core0 (%zu bytes) - SUCCESS\n", conn->line_pos);
-                });
-            } else {
-                DEBUG_ONLY({
-                    printf("TCP Server: Failed to enqueue message for Core0\n");
-                });
-            }
+        ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART,conn->channel);
+        // Setup ring buffer entry
+        entry->fill_index = conn->line_pos;
+        
+        // Copy message data to ring buffer
+        if (entry->fill_index > RINGBUFFER_PAYLOAD_MAX_SIZE) {
+            entry->fill_index = RINGBUFFER_PAYLOAD_MAX_SIZE;
+        }
+        memcpy(entry->payload, conn->line_buffer, entry->fill_index);
+        
+        // Enqueue for Core0 processing
+        bool enqueue_result = ringbuffer_enqueue_entry(entry);
+        if (enqueue_result) {
+            g_server_stats.lines_processed++;
+            DEBUG_ONLY({
+                printf("TCP Server: Message enqueued for Core0 (%zu bytes) - SUCCESS\n", conn->line_pos);
+            });
         } else {
             DEBUG_ONLY({
-                printf("TCP Server: No free ring buffer entry available\n");
+                printf("TCP Server: Failed to enqueue message for Core0\n");
             });
         }
     }

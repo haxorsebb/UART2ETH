@@ -190,7 +190,7 @@ class PerformanceTestScenario:
             messages_sent += 1
             
             # Small delay to control rate
-            await asyncio.sleep(0.001)
+            # await asyncio.sleep(0.001)
         
         # Stop metrics collection
         self.metrics_collector.stop_collection()

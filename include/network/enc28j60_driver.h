@@ -165,7 +165,16 @@ extern "C" {
 #define ENC28J60_MISTAT_BUSY    0x01  // MII Management Busy
 
 // PHY Status register 2 (PHSTAT2) bits
-#define ENC28J60_PHSTAT2_LSTAT  0x0400  // Link Status (bit 10)
+#define ENC28J60_PHSTAT2_LLSTAT  (1<<2)  // Link Status (bit 2)
+#define ENC28J60_PHSTAT2_JBSTAT  (1<<1)  // Link Status (bit 1)
+#define ENC28J60_PHSTAT2_TXSTAT  (1<<13)  // Link Status (bit 13)
+#define ENC28J60_PHSTAT2_RXSTAT  (1<<12)  // Link Status (bit 12)
+#define ENC28J60_PHSTAT2_COLSTAT  (1<<11)  // Link Status (bit 11)
+#define ENC28J60_PHSTAT2_LSTAT  (1<<10)  // Link Status (bit 13)
+#define ENC28J60_PHSTAT2_DPXSTAT  (1<<9)  // Link Status (bit 9)
+#define ENC28J60_PHSTAT2_PLRITY  (1<<5)  // Link Status (bit 5)
+
+
 
 // SPI command opcodes
 #define ENC28J60_READ_CTRL_REG  0x00

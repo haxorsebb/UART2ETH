@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>     // For memset, memcpy
+#include "shared_memory.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,7 +31,8 @@ extern "C" {
  */
 typedef enum {
     RX_TCP_TO_UART = 0,  // Message from TCP client to UART (to be echoed)
-    RX_UART_TO_TCP = 1   // Message from UART to TCP client (echo response)
+    RX_UART_TO_TCP = 1,   // Message from UART to TCP client (echo response)
+    DIRECTION_NONE = 2
 } ringbuffer_direction_t;
 
 /**
@@ -39,14 +41,11 @@ typedef enum {
 typedef enum {
     ENTRY_STATUS_FREE = 0,      // Entry available for use
     ENTRY_STATUS_FILLING = 1,   // Entry being filled by producer
-    ENTRY_STATUS_READY = 2,     // Entry ready for consumer
-    ENTRY_STATUS_CONSUMED = 3   // Entry consumed, ready for cleanup
+    ENTRY_STATUS_DRAINING = 2,   // Entry being filled by producer
+    ENTRY_STATUS_READY = 3,     // Entry ready for consumer
+    ENTRY_STATUS_MAX = 1,     // status is at end of the line
+    
 } entry_status_t;
-
-#define ENTRY_STATUS_FREE      0  // Entry available for use
-#define ENTRY_STATUS_FILLING   1  // Entry being filled by producer
-#define ENTRY_STATUS_READY     2  // Entry ready for consumer
-#define ENTRY_STATUS_CONSUMED  3  // Entry consumed, ready for cleanup
 
 // Ring buffer configuration
 #define RINGBUFFER_ENTRY_SIZE        1088  // 64-byte header + 1024-byte payload
@@ -61,12 +60,13 @@ typedef enum {
  */
 typedef struct {
     // Management header
-    uint8_t  uart_channel;     // 0-3 for UART channels 
-    uint8_t  direction;        // RX_TCP_TO_UART, RX_UART_TO_TCP
-    uint8_t  status;           // Entry status (FREE, FILLING, READY, CONSUMED)
-    uint32_t  payload_length;   // Actual data length (≤1024)
-    uint32_t timestamp;        // Message timestamp (milliseconds since boot)
-    uint32_t sequence_id;      // For ordering/debugging
+    channel_id_t  channel;              // 0-3 for UART channels 
+    ringbuffer_direction_t  direction;  // RX_TCP_TO_UART, RX_UART_TO_TCP
+    entry_status_t  status;             // Entry status (FREE, FILLING, READY, CONSUMED)
+    uint16_t fill_index;                // length of data already filled into the payload (≤1024)
+    uint16_t drain_index;               // length of data already drained from the payload (≤1024)
+    uint32_t timestamp;                 // Message timestamp (milliseconds since boot)
+    uint32_t sequence_id;               // For ordering/debugging
     uint32_t reserved[11];     
     
     // Payload data (1024 bytes fixed)
@@ -102,7 +102,7 @@ bool ringbuffer_init(void);
  * @return Pointer to free entry, NULL if buffer full
  * @note Returned entry has status=FILLING, caller must set direction and payload
  */
-ring_entry_t* ringbuffer_get_free_entry(void);
+ring_entry_t* ringbuffer_get_free_entry(ringbuffer_direction_t direction, channel_id_t channel);
 
 /**
  * Enqueue filled entry to ring buffer (atomically mark as READY)
@@ -118,7 +118,7 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry);
  * @return Pointer to ready entry, NULL if none available
  * @note Returned entry has status=READY, caller must mark CONSUMED when finished
  */
-ring_entry_t* ringbuffer_dequeue_entry(uint8_t direction);
+ring_entry_t* ringbuffer_dequeue_entry(ringbuffer_direction_t direction, channel_id_t channel, entry_status_t status);
 
 /**
  * Mark entry as consumed (return to free pool)
@@ -136,7 +136,7 @@ void ringbuffer_mark_consumed(ring_entry_t* entry);
  * @param direction Message direction (RX_TCP_TO_UART or RX_UART_TO_TCP)
  * @return Number of entries ready for processing
  */
-uint32_t ringbuffer_get_count(uint8_t direction);
+uint32_t ringbuffer_get_count(ringbuffer_direction_t direction);
 
 /**
  * Get number of free entries available

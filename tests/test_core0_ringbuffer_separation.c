@@ -152,7 +152,7 @@ static void create_test_ringbuffer_entry(uint8_t direction, const char* payload)
     TEST_ASSERT_NOT_NULL_MESSAGE(entry, "Failed to get free ringbuffer entry");
     
     entry->direction = direction;
-    entry->uart_channel = 0; // Use UART0 for testing
+    entry->channel = 0; // Use UART0 for testing
     entry->payload_length = strlen(payload);
     memcpy(entry->payload, payload, entry->payload_length);
     

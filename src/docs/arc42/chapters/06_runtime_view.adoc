@@ -1173,7 +1173,7 @@ alt Configuration Valid
     HTTP -> CFG: apply_uart_configuration()
     activate CFG
     CFG -> CFG: Prepare Configuration Change
-    CFG -> C0: configure_uart_channel_1()
+    CFG -> C0: configure_channel_1()
     activate C0
     C0 -> C0: Stop Current UART1 Operations
     C0 -> C0: Reconfigure Hardware Registers

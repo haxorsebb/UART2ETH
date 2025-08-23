@@ -334,7 +334,7 @@ static bool write_log_entry(const log_entry_t* entry) {
     if (!g_shared_layout || !entry) {
         return false;
     }
-    
+
     // Critical section: protect shared buffer state
     uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
     
@@ -490,7 +490,9 @@ bool log_event(event_source_t event_source, log_level_t log_level,
     };
     
     // Write entry to buffer
-    return write_log_entry(&entry);
+    bool ret = write_log_entry(&entry);
+
+    return ret;
 }
 
 /**

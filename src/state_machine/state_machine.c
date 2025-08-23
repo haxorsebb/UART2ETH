@@ -307,9 +307,7 @@ bool state_machine_process_core0_event(core0_event_t event) {
         case CORE0_IDLE:
             switch (event) {
                 case CORE0_EVENT_UART_DATA_READY:
-                    if (check_uart_data_available()) {
-                        new_state = CORE0_UART_ACTIVE;
-                    }
+                    new_state = CORE0_UART_ACTIVE;
                     break;
                 case CORE0_EVENT_RINGBUFFER_DATA_READY:
                     // Ringbuffer work detected
@@ -327,9 +325,7 @@ bool state_machine_process_core0_event(core0_event_t event) {
         case CORE0_UART_ACTIVE:
             switch (event) {
                 case CORE0_EVENT_UART_WORK_COMPLETE:
-                    if (check_uart_processing_complete()) {
                         new_state = CORE0_IDLE;
-                    }
                     break;
                 case CORE0_EVENT_WORK_IDLE:
                     // Alternative completion event
@@ -381,7 +377,7 @@ bool state_machine_process_core0_event(core0_event_t event) {
         
         // Log Core0 substate change (skip high-frequency UART_ACTIVE state)
         if (true || (old_state != CORE0_UART_ACTIVE && new_state != CORE0_UART_ACTIVE)) {
-            log_event(EVENT_SOURCE_CORE0_SUBSTATE, LOG_LEVEL_INFO, 
+            log_event(EVENT_SOURCE_CORE0_SUBSTATE, LOG_LEVEL_DEBUG, 
                       LOG_CORE0_INIT_UART + new_state, (uint32_t)old_state);
         }
     }
@@ -717,7 +713,7 @@ bool state_machine_process_core1_event(core1_event_t event) {
         if (old_state != CORE1_CONFIG_NET_CHECK_DHCP && new_state != CORE1_CONFIG_NET_CHECK_DHCP &&
             old_state != CORE1_LOG_ACTIVE && new_state != CORE1_LOG_ACTIVE &&
             old_state != CORE1_CONFIG_LOG_ACTIVE && new_state != CORE1_CONFIG_LOG_ACTIVE) {
-            log_event(EVENT_SOURCE_CORE1_SUBSTATE, LOG_LEVEL_INFO, 
+            log_event(EVENT_SOURCE_CORE1_SUBSTATE, LOG_LEVEL_DEBUG, 
                       LOG_CORE1_INIT_PERISTENCE + new_state, (uint32_t)old_state);
         }
     }
