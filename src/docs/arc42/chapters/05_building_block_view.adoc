@@ -218,72 +218,50 @@ The dual-core separation strategy from our solution approach drives this decompo
 
 ==== Whitebox Core 0 UART Subsystem
 
-The Core 0 UART Subsystem specializes in handling all UART communication with dedicated hardware management, interrupt processing, and bidirectional data conversion between stream and packet formats.
+The Core 0 UART Subsystem uses a unified UART Manager that controls multiple UART channels through a common interface abstraction, supporting both PL011 hardware UARTs and PIO-based virtual UARTs.
 
-[plantuml, level2-core0-uart-simple, svg]
+[plantuml, level2-core0-uart-actual, svg]
 ----
 @startuml
 !theme plain
 skinparam backgroundColor transparent
 skinparam componentStyle rectangle
 
-title Level 2 - Core 0 UART Subsystem (Whitebox)
+title Level 2 - Core 0 UART Subsystem (Current Implementation)
 
-cloud "UART0 Hardware" as UART_HW_0
-cloud "UART1 Hardware" as UART_HW_1
-cloud "UART2 Hardware" as UART_HW_2
-cloud "UART3 Hardware" as UART_HW_3
-
+cloud "UART Devices\n4 Serial Channels" as UD
 cloud "Ring Buffer System\nShared Memory" as RBS
 
 package "Core 0 UART Subsystem" {
-    component "UART Hardware Manager\nHardware HAL\n4 channels." as UHM #lightsalmon
-    component "UART configuration" as UART_config #lightsalmon
-    component "UART performance statistcs" as UART_statistics #lightsalmon
+    component "UART Manager\nCentral Coordination\n4-channel management\nRing buffer integration" as UART_MGR #lightgreen
     
-    component "UART Handler UART0" as UART_Handler_0 #lightgreen
-    component "UART Handler UART1" as UART_Handler_1 #lightgreen
-    component "UART Handler UART2" as UART_Handler_2 #lightgreen
-    component "UART Handler UART3" as UART_Handler_3 #lightgreen
-        
-
+    component "UART Interface Layer\nAbstraction API\nCommon operations\nType-agnostic access" as UART_IF #lightyellow
+    
+    component "PL011 Driver\nHardware UART0/1\nInterrupt-driven I/O\nRP2350 peripherals" as PL011_DRV #lightblue
+    
+    component "PIO UART Driver\nSoftware UART2/3\nPIO state machines\nVirtual channels" as PIO_DRV #lightcyan
+    
+    component "UART Instances\nChannel 0-3 contexts\nConfiguration state\nStatistics tracking" as UART_INST #wheat
 }
 
 ' External connections
-UART_HW_0 <--> UART_Handler_0 : Data/Control
-UART_HW_1 <--> UART_Handler_1 : Data/Control
-UART_HW_2 <--> UART_Handler_2 : Data/Control
-UART_HW_3 <--> UART_Handler_3 : Data/Control
-
-UD <--> UHM : Serial Data\nUART/RS232/RS422
-UART_Handler_0 <--> RBS : Bidirectional Packets\nShared Memory
-UART_Handler_1 <--> RBS : Bidirectional Packets\nShared Memory
-UART_Handler_2 <--> RBS : Bidirectional Packets\nShared Memory
-UART_Handler_3 <--> RBS : Bidirectional Packets\nShared Memory
+UD <--> PL011_DRV : Hardware UART0/1\nGP8/9, GP10/11
+UD <--> PIO_DRV : Virtual UART2/3\nPIO channels
+UART_MGR <--> RBS : Bidirectional Packets\nShared Memory
 
 ' Internal connections
-UHM <--> UART_Handler_0 : Data/Control
-UHM <--> UART_Handler_1 : Data/Control
-UHM <--> UART_Handler_2 : Data/Control
-UHM <--> UART_Handler_3 : Data/Control
-
-UART_Handler_0 --> UART_statistics : Update
-UART_Handler_1 --> UART_statistics : Update
-UART_Handler_2 --> UART_statistics : Update
-UART_Handler_3 --> UART_statistics : Update
-
-UHM --> UART_config : Manage
-UART_config --> UART_Handler_0 : Setup
-UART_config --> UART_Handler_1 : Setup
-UART_config --> UART_Handler_2 : Setup
-UART_config --> UART_Handler_3 : Setup
+UART_MGR --> UART_INST : Channel Management\nConfiguration Control
+UART_INST <--> UART_IF : Interface Operations\nCommon API
+UART_IF <--> PL011_DRV : Hardware Operations\nRegister Access
+UART_IF <--> PIO_DRV : Virtual Operations\nPIO Control
+UART_MGR --> UART_IF : Data Processing\nRX/TX Operations
 
 @enduml
 ----
 
 ===== Motivation
 
-Core 0 specialization enables real-time UART processing without interference from network operations. The bidirectional packet conversion allows seamless translation between continuous UART streams and discrete network packets.
+The unified UART Manager architecture provides consistent API across different UART implementations while enabling flexible channel assignment. Channel 0-1 use hardware PL011 peripherals for high-performance requirements, while channels 2-3 can use PIO-based virtual UARTs when additional channels are needed.
 
 ===== Contained Building Blocks
 
@@ -291,23 +269,20 @@ Core 0 specialization enables real-time UART processing without interference fro
 |===
 |Name|Responsibility
 
-|*UART Hardware Manager*
-|Direct control of 4 UART channels with configurable parameters (baud rate, data bits, parity). Manages hardware registers and status monitoring.
+|*UART Manager*
+|Central coordination of all 4 UART channels. Manages channel lifecycle, processes ring buffer integration, handles incoming/outgoing data flow, and provides unified statistics collection.
 
-|*Interrupt Handler*
-|Processes time-critical UART events (RX data available, TX buffer empty) with minimal latency for real-time performance.
+|*UART Interface Layer*
+|Common abstraction API providing type-agnostic access to UART operations. Enables pluggable driver architecture supporting both hardware and virtual UART implementations.
 
-|*DMA Controller*
-|Optimizes bulk data transfers in both directions to reduce CPU load and improve throughput for high-baud applications.
+|*PL011 Driver*
+|Hardware implementation for RP2350 UART0/1 peripherals. Provides interrupt-driven I/O, register management, and optimized performance for hardware channels.
 
-|*Packet Assembler*
-|Converts incoming UART streams into fixed-size packets for ring buffer storage. Handles framing and timestamp metadata.
+|*PIO UART Driver*
+|Software UART implementation using RP2350 PIO state machines. Enables additional virtual channels beyond hardware limitations with configurable timing and protocols.
 
-|*Packet Disassembler*
-|Extracts UART data from ring buffer packets and converts back to continuous streams for transmission.
-
-|*Ring Buffer Interface*
-|Provides producer operations (UART RX data) and consumer operations (UART TX data) with proper synchronization.
+|*UART Instances*
+|Per-channel context management storing configuration state, statistics, and runtime parameters. Provides channel-specific state tracking and diagnostics.
 |===
 
 ==== Whitebox Core 1 Network Subsystem
@@ -1108,82 +1083,69 @@ bool state_machine_process_core1_event(core1_event_t event);
 
 === Level 3
 
-==== Whitebox Core 0 UART Handler Subsystem
+==== Whitebox UART Manager Implementation
 
-The Core 0 UART Subsystem specializes in handling all UART communication with dedicated hardware management, interrupt processing, and bidirectional data conversion between stream and packet formats.
+The UART Manager provides unified management of multiple UART channels through a common interface abstraction, supporting both PL011 hardware UARTs and PIO-based virtual channels.
 
-[plantuml, level3-core0-uart-internal, svg]
+[plantuml, level3-uart-manager-actual, svg]
 ----
 @startuml
 !theme plain
 skinparam backgroundColor transparent
 skinparam componentStyle rectangle
 
-title Level 3 - Core 0 UART Handler Subsystem (Whitebox)
+title Level 3 - UART Manager Implementation (Current Architecture)
 
-cloud "UART Hardware Manager" as UHM
 cloud "Ring Buffer System\nShared Memory" as RBS
-cloud "UART Hardware or PIO UART" as HW
+cloud "RP2350 UART0 Hardware" as UART0_HW
+cloud "RP2350 UART1 Hardware" as UART1_HW
+cloud "RP2350 PIO0/1 Hardware" as PIO_HW
 
-package "Core 0 UART Handler" {
-    component "UART Hardware Manager Interface\nHardware HAL\nRegister control" as UHMI #LightSalmon
+package "UART Manager" {
+    component "UART Manager Core\nChannel coordination\nData processing\nStatistics collection" as MGR_CORE #lightgreen
     
-    component "RX Interrupt Handler\nISR\nTime-critical events\nRX handling" as RXISR #LightBlue
-    component "TX Interrupt Handler\nISR\nTime-critical events\nTX handling" as TXISR #lightgreen
+    component "Channel Configuration\nPer-channel settings\nBaud rate, pins, protocol\nEnabled/disabled state" as CONFIG #lightyellow
     
-    component "DMA Controller\nBulk Transfer\nCPU optimization" as DMA #LightSalmon
+    component "Message Processing\nIncoming data handler\nOutgoing data handler\nLine-based framing" as MSG_PROC #lightcyan
+}
 
-    component "TX DMA Channel\nBulk Transfers" as TXDMA #lightgreen
-    component "RX DMA Channel\nBulk Transfers" as RXDMA #LightBlue
+package "UART Interface Layer" {
+    component "UART Interface API\nCommon operations\ninit(), send_data(), read_data()\nis_ready(), get_state()" as IF_API #wheat
     
-    component "Packet Assembler\nStream → Packet\nTimestamp + metadata" as PA #LightBlue
-    component "Packet Disassembler\nPacket → Stream\nRing buffer data\n" as PD #lightgreen
-    
-    component "Ring Buffer Interface\nProducer/Consumer\nUART RX producer\nUART TX consumer" as RBI #lightyellow
+    component "UART Instance Array\nChannel 0-3 contexts\nDriver pointers\nConfiguration state" as INSTANCES #lightblue
+}
 
-    component "UART TX output registers" as OR #lightgreen
-    component "UART RX input registers" as IR #LightBlue
+package "PL011 Driver" {
+    component "PL011 Implementation\nHardware abstraction\nInterrupt handlers\nContext management" as PL011_IMPL #lightblue
     
+    component "Hardware Contexts\nUART0/1 state\nRX ring buffers\nISR management" as HW_CTX #lightcyan
+}
+
+package "PIO Driver (Placeholder)" {
+    component "PIO UART Implementation\nPIO state machine\nSoftware timing\nVirtual channels" as PIO_IMPL #lightpink
 }
 
 ' External connections
-UHMI <--> UHM : Configuration/Setup
-RBI <--> RBS : Bidirectional Packets\nShared Memory
+MGR_CORE <--> RBS : Message Exchange\nRX/TX Processing
+PL011_IMPL <--> UART0_HW : Register Access\nChannel 0
+PL011_IMPL <--> UART1_HW : Register Access\nChannel 1
+PIO_IMPL <--> PIO_HW : State Machine Control\nChannels 2/3
 
 ' Internal connections
-UHMI --> TXISR : Setup/Control\nHardware IRQ
-UHMI --> RXISR : Setup/Control\nHardware IRQ
-UHMI --> DMA : Setup/Control\nHardware DMA
-DMA --> TXDMA : Setup/Control\nHardware DMA
-DMA --> RXDMA : Setup/Control\nHardware DMA
-
-UHMI --> IR : RX Data Control
-UHMI --> OR : TX Data Control
-PA --> RBI : Packets Ready\nEnqueue Operation
-RBI --> PD : Packets Received\nDequeue Operation
-PD --> TXDMA : TX Data\nStream Output
-TXDMA --> OR : TX Output to wire\nBulk Transfers\nDMA Requests
-IR --> RXDMA : RX Data from wire\nDMA Bulk Transfers
-RXDMA --> PA : RX Data stream input\nDMA Bulk Transfers
-
-HW --> IR : RX
-OR --> HW : TX
-
-OR --> TXISR : HW sets interrupt
-IR --> RXISR : HW sets interrupt
-
-TXISR --> TXDMA : Sets up DMA transfers
-RXISR --> RXDMA : Sets up DMA transfers
-
-TXDMA --> DMA : HW sets interrupt
-RXDMA --> DMA : HW sets interrupt
+MGR_CORE <--> CONFIG : Channel Settings\nConfiguration Access
+MGR_CORE <--> MSG_PROC : Data Processing\nMessage Handling
+MSG_PROC <--> IF_API : UART Operations\nInterface Calls
+IF_API <--> INSTANCES : Instance Access\nChannel Selection
+INSTANCES <--> PL011_IMPL : Hardware Channels\nDriver Interface
+INSTANCES <--> PIO_IMPL : Virtual Channels\nDriver Interface
+PL011_IMPL <--> HW_CTX : Context Management\nState Access
 
 @enduml
 ----
 
 ===== Motivation
 
-UART processing utilizing UART specific ISR and DMA transfers for maximum troughput. 
+The UART Manager architecture provides centralized control while maintaining modular driver implementations. The interface abstraction enables support for different UART types while presenting a unified API to the application layer.
 
 ===== Contained Building Blocks
 
@@ -1191,26 +1153,29 @@ UART processing utilizing UART specific ISR and DMA transfers for maximum trough
 |===
 |Name|Responsibility
 
-|*UART Hardware Manager*
-|Direct control of 4 UART channels with configurable parameters (baud rate, data bits, parity). Manages hardware registers and status monitoring.
+|*UART Manager Core*
+|Central coordination of all UART channels. Processes incoming/outgoing ring buffer data, manages channel lifecycle, and maintains system-wide UART statistics and status.
 
-|*Interrupt Handler*
-|Processes time-critical UART events (RX data available, TX buffer empty) with minimal latency for real-time performance.
+|*Channel Configuration*
+|Per-channel configuration management including baud rates, GPIO pin assignments, protocol settings, and enabled/disabled states. Currently supports channels 0-1 (enabled) and 2-3 (disabled).
 
-|*DMA Controller*
-|Controls bulk data transfers in both directions
+|*Message Processing*
+|Handles bidirectional data conversion between ring buffer packets and UART streams. Implements line-based message framing with '!\r\n' termination detection for protocol compliance.
 
-|*DMA Channel*
-|Optimizes bulk data transfers in both directions to reduce CPU load and improve throughput for high-baud applications.
+|*UART Interface API*
+|Common abstraction layer providing consistent operations across different UART implementations. Supports init(), deinit(), send_data(), read_data(), is_ready(), and get_state() operations.
 
-|*Packet Assembler*
-|Converts incoming UART streams into fixed-size packets for ring buffer storage. Handles framing and timestamp metadata.
+|*UART Instance Array*
+|Per-channel context management storing driver pointers, configuration state, and runtime statistics. Maps channels 0-3 to appropriate driver implementations.
 
-|*Packet Disassembler*
-|Extracts UART data from ring buffer packets and converts back to continuous streams for transmission.
+|*PL011 Implementation*
+|Hardware UART driver for RP2350 UART0/1 peripherals. Provides interrupt-driven I/O with receive ring buffers, ISR management, and optimized performance for real-time operations.
 
-|*Ring Buffer Interface*
-|Provides producer operations (UART RX data) and consumer operations (UART TX data) with proper synchronization.
+|*Hardware Contexts*
+|PL011-specific state management including register access, interrupt handler contexts, and per-channel receive buffers for efficient data processing.
+
+|*PIO UART Implementation*
+|Placeholder for software UART implementation using RP2350 PIO state machines. Enables virtual channels 2-3 when additional UART ports are required beyond hardware limitations.
 |===
 
 ==== Whitebox Ring Buffer System Internal Structure
@@ -1500,183 +1465,162 @@ typedef struct {
 } channel_status_t;
 ----
 
-==== UART Hardware Manager Implementation (Issue #76)
+==== Current UART Manager Implementation
 
-The UART Hardware Manager implementation for Issue #76 provides a minimal, production-ready UART1 interface that integrates with the existing ring buffer system and Core0 state machine architecture.
+The UART Manager provides a unified interface for managing multiple UART channels with support for both hardware PL011 peripherals and PIO-based virtual UARTs.
 
-[plantuml, uart-hardware-manager-implementation, svg]
+[plantuml, uart-manager-current-implementation, svg]
 ----
 @startuml
 !theme plain
 skinparam backgroundColor transparent
 skinparam componentStyle rectangle
 
-title UART Hardware Manager Implementation - Issue #76
+title UART Manager Current Implementation
 
-cloud "Core0 State Machine\nUART Events\nState Coordination" as STATE_MACHINE
 cloud "Ring Buffer System\nBidirectional Communication\nTCP↔UART Bridge" as RING_BUFFER
-cloud "UART1 Hardware\nRP2350 Peripheral\nGP9(RX)/GP10(TX)" as UART_HW
+cloud "RP2350 UART1 Hardware\nChannel 1: GP8(TX)/GP9(RX)\n500kBaud, 8N1" as UART1_HW
 
-package "UART Hardware Manager" {
-    component "UART Manager\nHigh-level Interface\nConfiguration & Control\nIntegration Layer" as UART_MGR #lightgreen
+package "UART Manager Implementation" {
+    component "UART Manager\nCentral Coordination\n4-channel management\nRing buffer integration" as UART_MGR #lightgreen
     
-    component "UART1 Driver\nLow-level Hardware\nInterrupt-driven I/O\nRegister Management" as UART1_DRV #lightblue
+    component "UART Interface\nCommon abstraction\nDriver-agnostic API\nPluggable architecture" as UART_IF #lightyellow
     
-    component "Interrupt Handler\nUART1 IRQ\nRX/TX Events\nReal-time Processing" as INT_HANDLER #lightyellow
+    component "PL011 Driver\nHardware implementation\nInterrupt-driven I/O\nReceive ring buffer" as PL011_DRV #lightblue
     
-    component "Line Buffer\nNewline Detection\nMessage Framing\nPacket Assembly" as LINE_BUFFER #lightcyan
+    component "Message Processor\nLine-based protocol\n'!\r\n' termination\nStream ↔ Packet conversion" as MSG_PROC #lightcyan
 }
 
 ' External connections
-STATE_MACHINE <--> UART_MGR : UART Events\nState Integration
-UART_MGR <--> RING_BUFFER : Message Exchange\nPacket Format
-UART1_DRV <--> UART_HW : Register Access\nPhysical Interface
+UART_MGR <--> RING_BUFFER : Bidirectional Messages\nRX_UART_TO_TCP / RX_TCP_TO_UART
+PL011_DRV <--> UART1_HW : Register Access\nInterrupt Handling
 
 ' Internal connections
-UART_MGR --> UART1_DRV : Configuration\nControl Operations
-UART1_DRV --> INT_HANDLER : IRQ Setup\nEvent Registration
-INT_HANDLER --> LINE_BUFFER : RX Data\nCharacter Assembly
-LINE_BUFFER --> UART_MGR : Complete Lines\nPacket Ready
-UART_MGR --> UART1_DRV : TX Data\nTransmission Request
+UART_MGR --> UART_IF : Channel Operations\nSend/Receive Data
+UART_IF --> PL011_DRV : Hardware Calls\nDriver Implementation
+UART_MGR <--> MSG_PROC : Data Processing\nMessage Conversion
+MSG_PROC --> UART_IF : UART Operations\nData Transmission
 
 @enduml
 ----
 
-===== Implementation Scope and Requirements
+===== Implementation Overview
 
-**Hardware Configuration:**
-- UART1 peripheral on RP2350
-- RX: GPIO9, TX: GPIO10  
-- 230400 baud, 8N1 configuration
-- Hardware loopback for testing (RX+TX connected)
+**Current Configuration:**
+- Channel 1: UART1 (PL011) - Enabled, 500kBaud, GP8(TX)/GP9(RX)
+- Channels 0, 2, 3: Disabled (placeholder configuration)
+- Line-based protocol with '!\r\n' message termination
+- Ring buffer integration for TCP↔UART bridging
 
-**Integration Requirements:**
-- Ring buffer system integration for TCP↔UART bridging
-- Core0 state machine event-driven architecture
-- Interrupt-driven pattern following ENC28J60 implementation
-- Line-based protocol with newline detection
+**Architecture Features:**
+- Unified management through uart_manager API
+- Interface abstraction supporting multiple driver types
+- Message-based processing with line framing
+- Statistics collection and error handling
 
-**Functional Requirements:**
-1. TCP client connects to port 4001
-2. Send line of text to system (ending with newline)
-3. System echoes line back to TCP client
-4. Support multiple sequential messages
-5. Integration with existing HiL testing framework
-
-===== Contained Building Blocks
-
-[options="header",cols="1,3"]
-|===
-|Name|Responsibility
-
-|*UART Manager*
-|High-level interface providing configuration, status monitoring, and integration with Core0 state machine. Manages ring buffer message exchange and coordinates with other system components.
-
-|*UART1 Driver*
-|Low-level hardware abstraction for UART1 peripheral. Handles register configuration, interrupt setup, and direct hardware communication following pico-sdk patterns.
-
-|*Interrupt Handler*
-|Real-time processing of UART1 RX/TX interrupts. Manages character reception, transmission completion, and error handling with minimal latency.
-
-|*Line Buffer*
-|Message framing logic that assembles incoming characters into complete lines. Detects newline characters and creates complete messages for ring buffer transmission.
-|===
-
-===== Important Interfaces
+===== Current API Interface
 
 ====== UART Manager API
-High-level interface for Core0 integration.
+Primary interface for UART system control.
 
 [source,c]
 ----
-// Initialization and control
-bool uart_hardware_manager_init(void);
-void uart_hardware_manager_deinit(void);
-bool uart_hardware_manager_is_ready(void);
+// System lifecycle
+bool uart_manager_init(void);
+void uart_manager_deinit(void);
+bool uart_manager_is_ready(void);
+uart_manager_status_t uart_manager_get_status(void);
 
-// Ring buffer integration
-bool uart_hardware_manager_process_incoming_data(void);
-bool uart_hardware_manager_process_outgoing_data(void);
-bool uart_hardware_manager_has_pending_work(void);
+// Data processing
+bool uart_manager_has_incoming_work(void);
+bool uart_manager_process_incoming_data(void);
+bool uart_manager_process_outgoing_data(void);
 
-// Status and diagnostics
-uart_manager_status_t uart_hardware_manager_get_status(void);
-void uart_hardware_manager_get_stats(uart_manager_stats_t* stats);
+// Statistics and diagnostics
+void uart_manager_get_stats(uart_manager_stats_t* stats);
+void uart_manager_reset_stats(void);
+void uart_manager_set_debug(bool enable);
+int uart_manager_get_diagnostic_info(char* buffer, size_t size);
 ----
 
-====== UART1 Driver API
-Low-level hardware interface following pico-sdk patterns.
+====== UART Interface Layer
+Common abstraction for different UART implementations.
 
 [source,c]
 ----
-// Hardware control
-bool uart1_driver_init(const uart1_config_t* config);
-void uart1_driver_deinit(void);
-bool uart1_driver_is_ready(void);
-
-// Data transmission
-bool uart1_driver_send_char(char c);
-bool uart1_driver_send_data(const uint8_t* data, size_t length);
-bool uart1_driver_is_tx_ready(void);
-
-// Interrupt handling
-void uart1_driver_enable_rx_interrupt(void);
-void uart1_driver_disable_rx_interrupt(void);
-bool uart1_driver_has_rx_data(void);
-char uart1_driver_read_char(void);
+// Interface operations structure
+typedef struct uart_interface {
+    // Lifecycle
+    bool (*init)(void* context, const uart_config_t* config);
+    void (*deinit)(void* context);
+    bool (*is_ready)(void* context);
+    
+    // Data transmission/reception
+    size_t (*send_data)(void* context, const uint8_t* data, size_t len);
+    size_t (*read_data)(void* context, uint8_t* buffer, size_t max_len);
+    bool (*has_rx_data)(void* context);
+    bool (*is_tx_complete)(void* context);
+    
+    // Status and control
+    const uart_state_t* (*get_state)(void* context);
+    void (*clear_rx_buffer)(void* context);
+    void (*reset_stats)(void* context);
+} uart_interface_t;
 ----
 
-====== Configuration Structure
-UART1 hardware configuration parameters.
+====== Channel Configuration
+Per-channel settings and state management.
 
 [source,c]
 ----
+// Channel configuration
 typedef struct {
-    uint32_t baud_rate;        // 230400 for Issue #76
-    uint8_t data_bits;         // 8 bits
-    uint8_t stop_bits;         // 1 bit
-    uart_parity_t parity;      // None
-    uint16_t rx_gpio;          // GPIO9
-    uint16_t tx_gpio;          // GPIO10
-    bool enable_loopback;      // For testing
-} uart1_config_t;
+    bool enabled;
+    uart_type_t type;      // UART_TYPE_PL011 or UART_TYPE_PIO
+    uint32_t baud_rate;
+    uint8_t tx_gpio;
+    uint8_t rx_gpio;
+} channel_config_t;
+
+// Current channel assignments
+static const channel_config_t channel_configs[4] = {
+    {false, UART_TYPE_PL011, 230400, 0, 1},   // Channel 0: disabled
+    {true,  UART_TYPE_PL011, 500000, 8, 9},   // Channel 1: enabled
+    {false, UART_TYPE_PIO,   230400, 4, 5},   // Channel 2: disabled
+    {false, UART_TYPE_PIO,   230400, 6, 7}    // Channel 3: disabled
+};
 ----
 
-====== Message Flow Integration
-Integration with ring buffer system for bidirectional communication.
+===== Message Processing Implementation
 
-**RX Path (UART → TCP):**
-1. UART1 interrupt receives character
-2. Line buffer assembles characters until newline
-3. Complete line converted to ring buffer entry
-4. Ring buffer entry marked as RX_UART_TO_TCP
-5. Core1 processes entry and sends to TCP client
+The current implementation processes messages using line-based framing:
 
-**TX Path (TCP → UART):**
-1. Ring buffer entry arrives as RX_TCP_TO_UART
-2. UART Manager extracts payload data
-3. UART1 Driver transmits characters sequentially
+**RX Processing (UART → TCP):**
+1. PL011 interrupt receives characters into ring buffer
+2. Message processor scans for '!\r\n' termination
+3. Complete messages extracted and converted to ring buffer entries
+4. Entries marked as RX_UART_TO_TCP for Core1 processing
+
+**TX Processing (TCP → UART):**
+1. Ring buffer entries arrive as RX_TCP_TO_UART
+2. Message processor extracts payload data
+3. Data transmitted via PL011 driver
 4. Entry marked as consumed when transmission complete
 
-===== Testing Strategy
+===== Testing and Validation
 
-**Unit Tests:**
-- UART1 driver hardware configuration and loopback
-- Line buffer message framing and newline detection
-- Ring buffer integration and message conversion
-- Interrupt handler timing and reliability
+**Current Test Coverage:**
+- UART Manager initialization and configuration
+- PL011 driver hardware interface
+- Ring buffer integration
+- Message processing and framing
+- Error handling and recovery
 
-**Integration Tests:**
-- End-to-end TCP→UART→TCP message flow
-- Core0 state machine event integration
-- Error recovery and fault tolerance
-- Performance and timing validation
-
-**Hardware-in-the-Loop Tests:**
-- Protocol validator tool verification
-- Real hardware loopback testing
-- Network client integration testing
-- Long-duration stability testing
+**Hardware Integration:**
+- RP2350 UART1 peripheral testing
+- GPIO configuration validation
+- Interrupt-driven I/O verification
+- Performance and reliability testing
 
 ==== Whitebox Flash Persistence System
 
