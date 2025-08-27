@@ -47,7 +47,7 @@ static const channel_config_t channel_configs[UART_MANAGER_MAX_CHANNELS] = {
     // Channel 0: UART0 (PL011) - disabled
     {false, UART_TYPE_PL011, 230400, 0, 1},
     // Channel 1: UART1 (PL011) - enabled
-    {true, UART_TYPE_PL011, 500000, 8, 9},
+    {true, UART_TYPE_PL011, 115200, 4, 5},
     // Channel 2: PIO UART (placeholder) - disabled
     {false, UART_TYPE_PIO, 230400, 4, 5},
     // Channel 3: PIO UART (placeholder) - disabled
@@ -351,7 +351,7 @@ static bool process_channel_incoming_data(channel_id_t channel) {
         for (size_t idx = 0; idx < bytes_read; idx++) {
             uint8_t byte = buffer[idx];
             g_manager.stats.bytes_received++;
-            
+           
             //we process incoming data directly into the ring buffer, using fill_index to track the progress
             entry->payload[entry->fill_index++] = byte;
             if(check_message_end(entry->payload, entry->fill_index)) {

@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LOGS_DIR="$PROJECT_ROOT/logs"
 LOGFILE="$LOGS_DIR/uart_output.log"
-SERIAL_PORT="${SERIAL_PORT:-/dev/ttyUSB0}"
+SERIAL_PORT="${SERIAL_PORT:-/dev/ttyACM0}"
 PIDFILE="$LOGS_DIR/uart_logger.pid"
 
 # Colors for output

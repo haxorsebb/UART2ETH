@@ -73,6 +73,7 @@ typedef enum {
     CORE1_INIT_WAIT_FOR_LINK,   // init is not complete without link
     CORE1_INIT_COMPLETE,        // init complete
     CORE1_INIT_IDLE,            // init complete, sleep until other core finishes init
+
     CORE1_CONFIG_NET,           // (re)-configure net 
     CORE1_CONFIG_COMPLETE,      // (re)-configuration of net successfull
     CORE1_CONFIG_NET_WAIT_FOR_DHCP, // (re)-configuration of net successfull, get dhcp
@@ -80,6 +81,7 @@ typedef enum {
     CORE1_CONFIG_IDLE,          // (re)-configuration of net successfull
     CORE1_CONFIG_LOG_ACTIVE,    //there are logs queued
     CORE1_CONFIG_ERROR,         // (re)-configuration of net NOT successfull
+    
     CORE1_NET_LINK_CHANGE,      // Network interface changing
     CORE1_NET_CONNECTED,        // Network interface up
     CORE1_NET_DISCONNECTED,     // Network interface down

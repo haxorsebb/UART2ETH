@@ -97,19 +97,25 @@ void tearDown(void) {
  * @brief Reset test environment to known state
  */
 static void reset_test_environment(void) {
-    printf("TEST: Initializing shared memory...\n");
+    printf("TEST: Fully resetting all subsystems...\n");
+    
+    // Complete reset - deinitialize everything first
+    uart_manager_deinit();
+    sleep_ms(10);
+    
+    printf("TEST: Re-initializing shared memory...\n");
     shared_memory_init();
     
-    printf("TEST: Initializing log manager...\n");
+    printf("TEST: Re-initializing log manager...\n");
     log_manager_init();
     
-    printf("TEST: Initializing state machine...\n");
+    printf("TEST: Re-initializing state machine...\n");
     state_machine_init();
     
-    printf("TEST: Initializing ringbuffer...\n");
+    printf("TEST: Re-initializing ringbuffer...\n");
     ringbuffer_init();
     
-    // Set system to operational state - proper sequence with timing
+    // Set system to operational state - fresh state machine
     printf("TEST: Processing state machine events...\n");
     bool event_success = true;
     event_success &= state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE0);
