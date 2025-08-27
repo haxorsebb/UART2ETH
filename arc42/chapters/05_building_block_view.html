@@ -711,17 +711,17 @@
 <div class="sect3">
 <h4 id="_whitebox_core_0_uart_subsystem">Whitebox Core 0 UART Subsystem</h4>
 <div class="paragraph">
-<p>The Core 0 UART Subsystem specializes in handling all UART communication with dedicated hardware management, interrupt processing, and bidirectional data conversion between stream and packet formats.</p>
+<p>The Core 0 UART Subsystem uses a unified UART Manager that controls multiple UART channels through a common interface abstraction, supporting both PL011 hardware UARTs and PIO-based virtual UARTs.</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="../../images/level2-core0-uart-simple.svg" alt="level2 core0 uart simple" width="1509" height="681">
+<img src="../../images/level2-core0-uart-actual.svg" alt="level2 core0 uart actual" width="842" height="732">
 </div>
 </div>
 <div class="sect4">
 <h5 id="_motivation_2">Motivation</h5>
 <div class="paragraph">
-<p>Core 0 specialization enables real-time UART processing without interference from network operations. The bidirectional packet conversion allows seamless translation between continuous UART streams and discrete network packets.</p>
+<p>The unified UART Manager architecture provides consistent API across different UART implementations while enabling flexible channel assignment. Channel 0-1 use hardware PL011 peripherals for high-performance requirements, while channels 2-3 can use PIO-based virtual UARTs when additional channels are needed.</p>
 </div>
 </div>
 <div class="sect4">
@@ -739,28 +739,24 @@
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Hardware Manager</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Direct control of 4 UART channels with configurable parameters (baud rate, data bits, parity). Manages hardware registers and status monitoring.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Manager</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Central coordination of all 4 UART channels. Manages channel lifecycle, processes ring buffer integration, handles incoming/outgoing data flow, and provides unified statistics collection.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Interrupt Handler</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Processes time-critical UART events (RX data available, TX buffer empty) with minimal latency for real-time performance.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Interface Layer</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Common abstraction API providing type-agnostic access to UART operations. Enables pluggable driver architecture supporting both hardware and virtual UART implementations.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>DMA Controller</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optimizes bulk data transfers in both directions to reduce CPU load and improve throughput for high-baud applications.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>PL011 Driver</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware implementation for RP2350 UART0/1 peripherals. Provides interrupt-driven I/O, register management, and optimized performance for hardware channels.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Assembler</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Converts incoming UART streams into fixed-size packets for ring buffer storage. Handles framing and timestamp metadata.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>PIO UART Driver</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Software UART implementation using RP2350 PIO state machines. Enables additional virtual channels beyond hardware limitations with configurable timing and protocols.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Disassembler</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Extracts UART data from ring buffer packets and converts back to continuous streams for transmission.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Interface</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Provides producer operations (UART RX data) and consumer operations (UART TX data) with proper synchronization.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Instances</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Per-channel context management storing configuration state, statistics, and runtime parameters. Provides channel-specific state tracking and diagnostics.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1502,19 +1498,19 @@ bool state_machine_process_core1_event(core1_event_t event);</code></pre>
 <div class="sect2">
 <h3 id="_level_3">Level 3</h3>
 <div class="sect3">
-<h4 id="_whitebox_core_0_uart_handler_subsystem">Whitebox Core 0 UART Handler Subsystem</h4>
+<h4 id="_whitebox_uart_manager_implementation">Whitebox UART Manager Implementation</h4>
 <div class="paragraph">
-<p>The Core 0 UART Subsystem specializes in handling all UART communication with dedicated hardware management, interrupt processing, and bidirectional data conversion between stream and packet formats.</p>
+<p>The UART Manager provides unified management of multiple UART channels through a common interface abstraction, supporting both PL011 hardware UARTs and PIO-based virtual channels.</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="../../images/level3-core0-uart-internal.svg" alt="level3 core0 uart internal" width="938" height="1564">
+<img src="../../images/level3-uart-manager-actual.svg" alt="level3 uart manager actual" width="987" height="1134">
 </div>
 </div>
 <div class="sect4">
 <h5 id="_motivation_11">Motivation</h5>
 <div class="paragraph">
-<p>UART processing utilizing UART specific ISR and DMA transfers for maximum troughput.</p>
+<p>The UART Manager architecture provides centralized control while maintaining modular driver implementations. The interface abstraction enables support for different UART types while presenting a unified API to the application layer.</p>
 </div>
 </div>
 <div class="sect4">
@@ -1532,32 +1528,36 @@ bool state_machine_process_core1_event(core1_event_t event);</code></pre>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Hardware Manager</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Direct control of 4 UART channels with configurable parameters (baud rate, data bits, parity). Manages hardware registers and status monitoring.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Manager Core</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Central coordination of all UART channels. Processes incoming/outgoing ring buffer data, manages channel lifecycle, and maintains system-wide UART statistics and status.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Interrupt Handler</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Processes time-critical UART events (RX data available, TX buffer empty) with minimal latency for real-time performance.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Channel Configuration</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Per-channel configuration management including baud rates, GPIO pin assignments, protocol settings, and enabled/disabled states. Currently supports channels 0-1 (enabled) and 2-3 (disabled).</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>DMA Controller</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Controls bulk data transfers in both directions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Message Processing</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles bidirectional data conversion between ring buffer packets and UART streams. Implements line-based message framing with '!\r\n' termination detection for protocol compliance.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>DMA Channel</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optimizes bulk data transfers in both directions to reduce CPU load and improve throughput for high-baud applications.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Interface API</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Common abstraction layer providing consistent operations across different UART implementations. Supports init(), deinit(), send_data(), read_data(), is_ready(), and get_state() operations.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Assembler</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Converts incoming UART streams into fixed-size packets for ring buffer storage. Handles framing and timestamp metadata.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Instance Array</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Per-channel context management storing driver pointers, configuration state, and runtime statistics. Maps channels 0-3 to appropriate driver implementations.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Packet Disassembler</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Extracts UART data from ring buffer packets and converts back to continuous streams for transmission.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>PL011 Implementation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware UART driver for RP2350 UART0/1 peripherals. Provides interrupt-driven I/O with receive ring buffers, ISR management, and optimized performance for real-time operations.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ring Buffer Interface</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Provides producer operations (UART RX data) and consumer operations (UART TX data) with proper synchronization.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hardware Contexts</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PL011-specific state management including register access, interrupt handler contexts, and per-channel receive buffers for efficient data processing.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>PIO UART Implementation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Placeholder for software UART implementation using RP2350 PIO state machines. Enables virtual channels 2-3 when additional UART ports are required beyond hardware limitations.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1760,186 +1760,167 @@ uint32_t channel_get_status(channel_id_t channel);</code></pre>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_uart_hardware_manager_implementation_issue_76">UART Hardware Manager Implementation (Issue #76)</h4>
+<h4 id="_current_uart_manager_implementation">Current UART Manager Implementation</h4>
 <div class="paragraph">
-<p>The UART Hardware Manager implementation for Issue #76 provides a minimal, production-ready UART1 interface that integrates with the existing ring buffer system and Core0 state machine architecture.</p>
+<p>The UART Manager provides a unified interface for managing multiple UART channels with support for both hardware PL011 peripherals and PIO-based virtual UARTs.</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="../../images/uart-hardware-manager-implementation.svg" alt="uart hardware manager implementation" width="701" height="891">
+<img src="../../images/uart-manager-current-implementation.svg" alt="uart manager current implementation" width="744" height="925">
 </div>
 </div>
 <div class="sect4">
-<h5 id="_implementation_scope_and_requirements">Implementation Scope and Requirements</h5>
+<h5 id="_implementation_overview">Implementation Overview</h5>
 <div class="paragraph">
-<p><strong>Hardware Configuration:</strong>
-- UART1 peripheral on RP2350
-- RX: GPIO9, TX: GPIO10
-- 230400 baud, 8N1 configuration
-- Hardware loopback for testing (RX+TX connected)</p>
+<p><strong>Current Configuration:</strong>
+- Channel 1: UART1 (PL011) - Enabled, 500kBaud, GP8(TX)/GP9(RX)
+- Channels 0, 2, 3: Disabled (placeholder configuration)
+- Line-based protocol with '!\r\n' message termination
+- Ring buffer integration for TCP↔UART bridging</p>
 </div>
 <div class="paragraph">
-<p><strong>Integration Requirements:</strong>
-- Ring buffer system integration for TCP↔UART bridging
-- Core0 state machine event-driven architecture
-- Interrupt-driven pattern following ENC28J60 implementation
-- Line-based protocol with newline detection</p>
-</div>
-<div class="paragraph">
-<p><strong>Functional Requirements:</strong>
-1. TCP client connects to port 4001
-2. Send line of text to system (ending with newline)
-3. System echoes line back to TCP client
-4. Support multiple sequential messages
-5. Integration with existing HiL testing framework</p>
+<p><strong>Architecture Features:</strong>
+- Unified management through uart_manager API
+- Interface abstraction supporting multiple driver types
+- Message-based processing with line framing
+- Statistics collection and error handling</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_12">Contained Building Blocks</h5>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 25%;">
-<col style="width: 75%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Responsibility</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Manager</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">High-level interface providing configuration, status monitoring, and integration with Core0 state machine. Manages ring buffer message exchange and coordinates with other system components.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART1 Driver</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Low-level hardware abstraction for UART1 peripheral. Handles register configuration, interrupt setup, and direct hardware communication following pico-sdk patterns.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Interrupt Handler</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Real-time processing of UART1 RX/TX interrupts. Manages character reception, transmission completion, and error handling with minimal latency.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Line Buffer</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Message framing logic that assembles incoming characters into complete lines. Detects newline characters and creates complete messages for ring buffer transmission.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="sect4">
-<h5 id="_important_interfaces_4">Important Interfaces</h5>
+<h5 id="_current_api_interface">Current API Interface</h5>
 <div class="sect5">
 <h6 id="_uart_manager_api">UART Manager API</h6>
 <div class="paragraph">
-<p>High-level interface for Core0 integration.</p>
+<p>Primary interface for UART system control.</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Initialization and control
-bool uart_hardware_manager_init(void);
-void uart_hardware_manager_deinit(void);
-bool uart_hardware_manager_is_ready(void);
+<pre class="prettyprint highlight"><code data-lang="c">// System lifecycle
+bool uart_manager_init(void);
+void uart_manager_deinit(void);
+bool uart_manager_is_ready(void);
+uart_manager_status_t uart_manager_get_status(void);
 
-// Ring buffer integration
-bool uart_hardware_manager_process_incoming_data(void);
-bool uart_hardware_manager_process_outgoing_data(void);
-bool uart_hardware_manager_has_pending_work(void);
+// Data processing
+bool uart_manager_has_incoming_work(void);
+bool uart_manager_process_incoming_data(void);
+bool uart_manager_process_outgoing_data(void);
 
-// Status and diagnostics
-uart_manager_status_t uart_hardware_manager_get_status(void);
-void uart_hardware_manager_get_stats(uart_manager_stats_t* stats);</code></pre>
+// Statistics and diagnostics
+void uart_manager_get_stats(uart_manager_stats_t* stats);
+void uart_manager_reset_stats(void);
+void uart_manager_set_debug(bool enable);
+int uart_manager_get_diagnostic_info(char* buffer, size_t size);</code></pre>
 </div>
 </div>
 </div>
 <div class="sect5">
-<h6 id="_uart1_driver_api">UART1 Driver API</h6>
+<h6 id="_uart_interface_layer">UART Interface Layer</h6>
 <div class="paragraph">
-<p>Low-level hardware interface following pico-sdk patterns.</p>
+<p>Common abstraction for different UART implementations.</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Hardware control
-bool uart1_driver_init(const uart1_config_t* config);
-void uart1_driver_deinit(void);
-bool uart1_driver_is_ready(void);
+<pre class="prettyprint highlight"><code data-lang="c">// Interface operations structure
+typedef struct uart_interface {
+    // Lifecycle
+    bool (*init)(void* context, const uart_config_t* config);
+    void (*deinit)(void* context);
+    bool (*is_ready)(void* context);
 
-// Data transmission
-bool uart1_driver_send_char(char c);
-bool uart1_driver_send_data(const uint8_t* data, size_t length);
-bool uart1_driver_is_tx_ready(void);
+    // Data transmission/reception
+    size_t (*send_data)(void* context, const uint8_t* data, size_t len);
+    size_t (*read_data)(void* context, uint8_t* buffer, size_t max_len);
+    bool (*has_rx_data)(void* context);
+    bool (*is_tx_complete)(void* context);
 
-// Interrupt handling
-void uart1_driver_enable_rx_interrupt(void);
-void uart1_driver_disable_rx_interrupt(void);
-bool uart1_driver_has_rx_data(void);
-char uart1_driver_read_char(void);</code></pre>
+    // Status and control
+    const uart_state_t* (*get_state)(void* context);
+    void (*clear_rx_buffer)(void* context);
+    void (*reset_stats)(void* context);
+} uart_interface_t;</code></pre>
 </div>
 </div>
 </div>
 <div class="sect5">
-<h6 id="_configuration_structure">Configuration Structure</h6>
+<h6 id="_channel_configuration">Channel Configuration</h6>
 <div class="paragraph">
-<p>UART1 hardware configuration parameters.</p>
+<p>Per-channel settings and state management.</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
-    uint32_t baud_rate;        // 230400 for Issue #76
-    uint8_t data_bits;         // 8 bits
-    uint8_t stop_bits;         // 1 bit
-    uart_parity_t parity;      // None
-    uint16_t rx_gpio;          // GPIO9
-    uint16_t tx_gpio;          // GPIO10
-    bool enable_loopback;      // For testing
-} uart1_config_t;</code></pre>
+<pre class="prettyprint highlight"><code data-lang="c">// Channel configuration
+typedef struct {
+    bool enabled;
+    uart_type_t type;      // UART_TYPE_PL011 or UART_TYPE_PIO
+    uint32_t baud_rate;
+    uint8_t tx_gpio;
+    uint8_t rx_gpio;
+} channel_config_t;
+
+// Current channel assignments
+static const channel_config_t channel_configs[4] = {
+    {false, UART_TYPE_PL011, 230400, 0, 1},   // Channel 0: disabled
+    {true,  UART_TYPE_PL011, 500000, 8, 9},   // Channel 1: enabled
+    {false, UART_TYPE_PIO,   230400, 4, 5},   // Channel 2: disabled
+    {false, UART_TYPE_PIO,   230400, 6, 7}    // Channel 3: disabled
+};</code></pre>
 </div>
-</div>
-</div>
-<div class="sect5">
-<h6 id="_message_flow_integration">Message Flow Integration</h6>
-<div class="paragraph">
-<p>Integration with ring buffer system for bidirectional communication.</p>
-</div>
-<div class="paragraph">
-<p><strong>RX Path (UART → TCP):</strong>
-1. UART1 interrupt receives character
-2. Line buffer assembles characters until newline
-3. Complete line converted to ring buffer entry
-4. Ring buffer entry marked as RX_UART_TO_TCP
-5. Core1 processes entry and sends to TCP client</p>
-</div>
-<div class="paragraph">
-<p><strong>TX Path (TCP → UART):</strong>
-1. Ring buffer entry arrives as RX_TCP_TO_UART
-2. UART Manager extracts payload data
-3. UART1 Driver transmits characters sequentially
-4. Entry marked as consumed when transmission complete</p>
 </div>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_testing_strategy">Testing Strategy</h5>
+<h5 id="_message_processing_implementation">Message Processing Implementation</h5>
 <div class="paragraph">
-<p><strong>Unit Tests:</strong>
-- UART1 driver hardware configuration and loopback
-- Line buffer message framing and newline detection
-- Ring buffer integration and message conversion
-- Interrupt handler timing and reliability</p>
+<p>The current implementation processes messages using line-based framing:</p>
 </div>
 <div class="paragraph">
-<p><strong>Integration Tests:</strong>
-- End-to-end TCP→UART→TCP message flow
-- Core0 state machine event integration
-- Error recovery and fault tolerance
-- Performance and timing validation</p>
+<p><strong>RX Processing (UART → TCP):</strong>
+1. PL011 interrupt receives characters into ring buffer
+2. Message processor scans for '!\r\n' termination
+3. Complete messages extracted and converted to ring buffer entries
+4. Entries marked as RX_UART_TO_TCP for Core1 processing</p>
 </div>
 <div class="paragraph">
-<p><strong>Hardware-in-the-Loop Tests:</strong>
-- Protocol validator tool verification
-- Real hardware loopback testing
-- Network client integration testing
-- Long-duration stability testing</p>
+<p><strong>TX Processing (TCP → UART):</strong>
+1. Ring buffer entries arrive as RX_TCP_TO_UART
+2. Message processor extracts payload data
+3. Data transmitted via PL011 driver
+4. Entry marked as consumed when transmission complete</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_recent_refactoring_notes">Recent Refactoring Notes</h5>
+<div class="paragraph">
+<p><strong>Deprecated Components (Removed):</strong>
+- <code>uart1_driver.c/.h</code>: Legacy single-channel driver replaced by unified uart_manager
+- Single-channel API replaced with multi-channel manager abstraction
+- Tests updated to use new uart_manager interface</p>
+</div>
+<div class="paragraph">
+<p><strong>Current Implementation Status:</strong>
+- Production code tested with 500,000+ messages successfully
+- Channel 1 (UART1/PL011) operational at 500kBaud
+- Ring buffer integration fully functional
+- Line-based protocol ('!\r\n' termination) working correctly</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_testing_and_validation">Testing and Validation</h5>
+<div class="paragraph">
+<p><strong>Current Test Coverage:</strong>
+- UART Manager initialization and configuration
+- PL011 driver hardware interface
+- Ring buffer integration
+- Message processing and framing
+- Error handling and recovery</p>
+</div>
+<div class="paragraph">
+<p><strong>Hardware Integration:</strong>
+- RP2350 UART1 peripheral testing
+- GPIO configuration validation
+- Interrupt-driven I/O verification
+- Performance and reliability testing (500k+ messages verified)</p>
 </div>
 </div>
 </div>
@@ -1960,7 +1941,7 @@ char uart1_driver_read_char(void);</code></pre>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_13">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_12">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -2001,7 +1982,7 @@ char uart1_driver_read_char(void);</code></pre>
 </table>
 </div>
 <div class="sect4">
-<h5 id="_important_interfaces_5">Important Interfaces</h5>
+<h5 id="_important_interfaces_4">Important Interfaces</h5>
 <div class="sect5">
 <h6 id="_flash_page_structure">Flash Page Structure</h6>
 <div class="ulist">
@@ -2188,7 +2169,7 @@ void core1_main(void) {
 </div>
 </div>
 <div class="sect5">
-<h6 id="_testing_strategy_2">Testing Strategy</h6>
+<h6 id="_testing_strategy">Testing Strategy</h6>
 <div class="paragraph">
 <p><strong>Real Hardware Testing Approach:</strong>
 - All persistence tests run on actual RP2350 flash hardware
@@ -2372,7 +2353,7 @@ bool validate_session_token(const char* token);</code></pre>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_14">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_13">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -2421,7 +2402,7 @@ bool validate_session_token(const char* token);</code></pre>
 </table>
 </div>
 <div class="sect4">
-<h5 id="_important_interfaces_6">Important Interfaces</h5>
+<h5 id="_important_interfaces_5">Important Interfaces</h5>
 <div class="sect5">
 <h6 id="_main_state_definitions">Main State Definitions</h6>
 <div class="listingblock">
