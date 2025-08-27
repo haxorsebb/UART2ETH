@@ -213,11 +213,11 @@
     <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link " href="../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+                <a class="nav-link " href="../arc42/adrs/ADR-010-external-protocol-validation-tool.html"><span>arc42</span></a>
             </li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link " href="../arc42/adrs/ADR-010-external-protocol-validation-tool.html"><span>arc42</span></a>
+                <a class="nav-link " href="../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
             </li>
 
         </ul>
@@ -6032,6 +6032,9 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 <li>
 <p><a href="../adrs/ADR-002-ethernet-controller-selection.html">ADR-002: Ethernet Controller Selection</a> - Documents the decision to use the ENC28J60 as the Ethernet controller.</p>
 </li>
+<li>
+<p><a href="../adrs/ADR-008-hardware-pin-configuration.html">ADR-008: Hardware Pin Configuration</a> - Documents the current hardware pin configuration for UART channels, Ethernet controller, and debug interfaces on the RP2350.</p>
+</li>
 </ul>
 </div>
 </div>
@@ -6044,6 +6047,9 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 </li>
 <li>
 <p><a href="../adrs/ADR-004-development-ecosystem.html">ADR-004: Development Ecosystem Selection</a> - Documents the decision to use Native Pico SDK + CMake development ecosystem for professional, industrial-grade development.</p>
+</li>
+<li>
+<p><a href="../adrs/ADR-010-external-protocol-validation-tool.html">ADR-010: External Protocol Validation Tool</a> - Documents the decision to implement an external Python-based protocol validation tool for testing TCP-to-UART message processing and performance analysis.</p>
 </li>
 </ul>
 </div>
@@ -6061,6 +6067,15 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 <li>
 <p><a href="../adrs/ADR-007-state-machine-architecture.html">ADR-007: State Machine Architecture</a> - Documents the decision to implement event-driven state machines with atomic main state and ISR-safe sub-states for dual-core coordination and predictable system behavior.</p>
 </li>
+<li>
+<p><a href="../adrs/ADR-009-per-core-timer-subsystem.html">ADR-009: Per Core Timer Subsystem</a> - Documents the decision to implement dedicated timer subsystems for each core, providing precise timing control and inter-core coordination for real-time operations.</p>
+</li>
+<li>
+<p><a href="../adrs/ADR-011-ringbuffer-implementation.html">ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging</a> - Documents the decision to implement lock-free ring buffers with atomic operations for high-performance message bridging between UART and TCP interfaces.</p>
+</li>
+<li>
+<p><a href="../adrs/ADR-012-core0-ringbuffer-separation.html">ADR-012: Core0 Ringbuffer Processing Separation</a> - Documents the decision to separate ring buffer processing responsibilities between cores, with Core0 handling TCP-to-UART direction and Core1 managing UART-to-TCP message flow.</p>
+</li>
 </ul>
 </div>
 </div>
@@ -6069,6 +6084,8 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 <div class="paragraph">
 <p>The ADRs reveal important interdependencies that influence architectural coherence:</p>
 </div>
+<div class="sect3">
+<h4 id="_core_platform_interdependencies">9.4.1. Core Platform Interdependencies</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -6078,10 +6095,36 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 <p><strong>ADR-003 (C Language) reinforces ADR-004 (Native SDK)</strong>: The choice of C programming language aligns optimally with the Native Pico SDK approach, enabling direct application of team expertise.</p>
 </li>
 <li>
+<p><strong>ADR-008 (Pin Configuration) implements ADR-001 (Microcontroller Platform) and ADR-002 (Ethernet Controller)</strong>: The pin configuration realizes the hardware platform decisions, defining the physical interface mapping for RP2350 and ENC28J60 integration.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_memory_and_communication_architecture">9.4.2. Memory and Communication Architecture</h4>
+<div class="ulist">
+<ul>
+<li>
 <p><strong>ADR-005 (Buffer Strategy) supports ADR-003 (C Language)</strong>: Static allocation strategy leverages C&#8217;s deterministic memory model and supports industrial reliability requirements.</p>
 </li>
 <li>
+<p><strong>ADR-011 (Ring Buffer Implementation) refines ADR-005 (Buffer Strategy)</strong>: The lock-free ring buffer implementation provides the specific mechanism for the static allocation strategy, optimizing for dual-core message bridging performance.</p>
+</li>
+<li>
+<p><strong>ADR-012 (Core0 Ringbuffer Separation) coordinates ADR-011 (Ring Buffer Implementation) and ADR-001 (Microcontroller Platform)</strong>: The separation strategy leverages the dual-core RP2350 architecture to optimize ring buffer processing by assigning specific directional responsibilities to each core.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_state_management_and_coordination">9.4.3. State Management and Coordination</h4>
+<div class="ulist">
+<ul>
+<li>
 <p><strong>ADR-007 (State Machine Architecture) enables ADR-001 (Microcontroller Platform)</strong>: Event-driven state machines with atomic operations leverage the dual-core RP2350 architecture for coordinated operation while maintaining deterministic behavior.</p>
+</li>
+<li>
+<p><strong>ADR-009 (Timer Subsystem) supports ADR-007 (State Machine Architecture)</strong>: Per-core timers provide precise timing control required by state machines for coordinated dual-core operations and real-time task scheduling.</p>
 </li>
 <li>
 <p><strong>ADR-007 (State Machine Architecture) coordinates ADR-005 (Buffer Strategy)</strong>: State machines provide the control logic for safe inter-core buffer access, ensuring static allocation strategy works correctly across dual cores.</p>
@@ -6091,7 +6134,21 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 </li>
 </ul>
 </div>
+</div>
+<div class="sect3">
+<h4 id="_development_and_validation">9.4.4. Development and Validation</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>ADR-010 (Protocol Validation Tool) validates ADR-011 (Ring Buffer Implementation) and ADR-012 (Core0 Ringbuffer Separation)</strong>: The external validation tool provides comprehensive testing capabilities for the ring buffer message bridging implementation and core separation strategy.</p>
+</li>
+<li>
+<p><strong>ADR-010 (Protocol Validation Tool) reinforces ADR-003 (C Language) and ADR-004 (Development Ecosystem)</strong>: Python-based external validation complements the C firmware development approach, enabling comprehensive system testing without impacting embedded resource constraints.</p>
+</li>
+</ul>
+</div>
 <div style="page-break-after: always;"></div>
+</div>
 </div>
 </div>
 </div>
