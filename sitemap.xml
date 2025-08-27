@@ -117,6 +117,11 @@
     </url>
 
     <url>
+    	<loc>http://jbake.org/arc42/adrs/ADR-009-per-core-timer-subsystem.html</loc>
+    	<lastmod>2025-08-27</lastmod>
+    </url>
+
+    <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-007-state-machine-architecture.html</loc>
     	<lastmod>2025-08-27</lastmod>
     </url>
