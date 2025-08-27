@@ -9,7 +9,7 @@
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-008: Hardware Pin Configuration Update</title>
+    <title>ADR-008: Hardware Pin Configuration</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -213,11 +213,11 @@
     <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link active" href="../../arc42/adrs/ADR-010-external-protocol-validation-tool.html"><span>arc42</span></a>
+                <a class="nav-link active" href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
             </li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link active" href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+                <a class="nav-link active" href="../../arc42/adrs/ADR-010-external-protocol-validation-tool.html"><span>arc42</span></a>
             </li>
 
         </ul>
@@ -270,7 +270,7 @@
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
-                                   href="../../arc42/adrs/ADR-008-hardware-pin-configuration.html" title="ADR-008: Hardware Pin Configuration Update">ADR-008: Hardware Pin Configuration Update</a>
+                                   href="../../arc42/adrs/ADR-008-hardware-pin-configuration.html" title="ADR-008: Hardware Pin Configuration">ADR-008: Hardware Pin Configuration</a>
                                 
                             </li>
                         </ul></details>
@@ -358,7 +358,7 @@
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-008%3A+Hardware+Pin+Configuration+Update%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-008-hardware-pin-configuration.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-008%3A+Hardware+Pin+Configuration%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-008-hardware-pin-configuration.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -368,16 +368,14 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
-<li><a href="#section-adr-008-hardware-pin-configuration">ADR-008: Hardware Pin Configuration Update</a>
+<li><a href="#section-adr-008-hardware-pin-configuration">ADR-008: Hardware Pin Configuration</a>
 <ul class="sectlevel2">
-<li><a href="#_decision">Decision</a></li>
-<li><a href="#_rationale">Rationale</a></li>
-<li><a href="#_implementation_impact">Implementation Impact</a></li>
-<li><a href="#_implementation_plan">Implementation Plan</a></li>
-<li><a href="#_alternatives_considered">Alternatives Considered</a></li>
-<li><a href="#_decision_outcome">Decision Outcome</a></li>
-<li><a href="#_references">References</a></li>
+<li><a href="#_current_pin_configuration">Current Pin Configuration</a></li>
+<li><a href="#_hardware_design_benefits">Hardware Design Benefits</a></li>
 <li><a href="#_implementation_notes">Implementation Notes</a></li>
+<li><a href="#_pin_assignment_rationale">Pin Assignment Rationale</a></li>
+<li><a href="#_compatibility_notes">Compatibility Notes</a></li>
+<li><a href="#_references">References</a></li>
 </ul>
 </li>
 </ul>
@@ -403,388 +401,438 @@
         <p>
             
 <div class="sect1">
-<h2 id="section-adr-008-hardware-pin-configuration">ADR-008: Hardware Pin Configuration Update</h2>
+<h2 id="section-adr-008-hardware-pin-configuration">ADR-008: Hardware Pin Configuration</h2>
 <div class="sectionbody">
 <div class="paragraph">
 <p><strong>Status:</strong> Accepted</p>
 </div>
 <div class="paragraph">
-<p><strong>Date:</strong> 2025-08-10</p>
+<p><strong>Date:</strong> 2025-08-27</p>
 </div>
 <div class="paragraph">
-<p><strong>Context:</strong> The original hardware pin configuration used SPI0 for the ENC28J60 Ethernet controller and UART1 for debug output. A hardware redesign requires updating the pin configuration to optimize board layout and improve signal routing.</p>
+<p><strong>Context:</strong> This document defines the current hardware pin configuration for the UART2ETH device based on RP2350. The configuration supports up to 4 UART channels exposed as TCP sockets, with dedicated pins for Ethernet communication and system debugging.</p>
 </div>
 <div class="sect2">
-<h3 id="_decision">Decision</h3>
+<h3 id="_current_pin_configuration">Current Pin Configuration</h3>
 <div class="paragraph">
-<p>We will update the hardware pin configuration to use SPI1 for the ENC28J60 Ethernet controller and UART0 for debug output, with the addition of a dedicated reset pin for enhanced hardware control.</p>
+<p>The RP2350 pin assignment is optimized for PCB layout efficiency and signal integrity. The configuration supports up to 4 UART channels exposed as TCP sockets, with dedicated pins for Ethernet communication and system debugging.</p>
 </div>
 <div class="sect3">
-<h4 id="_new_pin_configuration">New Pin Configuration</h4>
+<h4 id="_complete_pin_mapping">Complete Pin Mapping</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
-<col style="width: 20%;">
-<col style="width: 20%;">
-<col style="width: 30%;">
-<col style="width: 30%;">
+<col style="width: 25%;">
+<col style="width: 16.6666%;">
+<col style="width: 25%;">
+<col style="width: 33.3334%;">
 </colgroup>
 <thead>
 <tr>
 <th class="tableblock halign-left valign-top">Function</th>
-<th class="tableblock halign-left valign-top">Pin</th>
-<th class="tableblock halign-left valign-top">Previous</th>
-<th class="tableblock halign-left valign-top">Notes</th>
+<th class="tableblock halign-left valign-top">GPIO Pin</th>
+<th class="tableblock halign-left valign-top">Interface</th>
+<th class="tableblock halign-left valign-top">Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">UART0 TX</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Debug Interface</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Debug TX</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">GP0</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">N/A (was on UART1)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Debug output (115200 baud)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART0</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">UART0 RX</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Printf debug output via USB-CDC (/dev/ttyACM0) at 115200 baud</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Debug RX</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">GP1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">N/A (was on UART1)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Debug input (115200 baud)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART0</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-RESET</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">N/A</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">New dedicated reset pin for ENC28J60</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-INTERRUPT</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP14</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ENC28J60 interrupt signal (active low)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-SCK</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP10</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SPI1 clock signal</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-SI (MOSI)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP11</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SPI1 serial input to ENC28J60</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-SO (MISO)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP12</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Debug input (currently disabled for applications)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Channels</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 1 TX</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">GP4</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SPI1 serial output from ENC28J60</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-CSn</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP13</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 1 transmit (active, 115200 baud)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 1 RX</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">GP5</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SPI1 chip select (active low)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 1 receive (active, 115200 baud)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 2 TX</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP4</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 2 transmit (reserved, disabled)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 2 RX</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP5</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 2 receive (reserved, disabled)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 3 TX</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP6</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 3 transmit (reserved, disabled)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 3 RX</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP7</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 3 receive (reserved, disabled)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ethernet Controller (ENC28J60)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-MISO</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SPI</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Master In Slave Out</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-CS</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP9</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SPI</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Chip select (active low)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-SCK</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP10</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SPI</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SPI clock signal</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-MOSI</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP11</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SPI</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Master Out Slave In</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-RESET</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP12</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Digital Output</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware reset control</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ENC-INTERRUPT</p></td>
 </tr>
 </tbody>
 </table>
 </div>
 <div class="sect3">
-<h4 id="_major_changes">Major Changes</h4>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><strong>SPI Interface Change</strong>: ENC28J60 moves from SPI0 to SPI1</p>
-<div class="ulist">
-<ul>
-<li>
-<p>SCK: GP2 → GP10</p>
-</li>
-<li>
-<p>MOSI: GP3 → GP11</p>
-</li>
-<li>
-<p>MISO: GP4 → GP12</p>
-</li>
-<li>
-<p>CS: GP5 → GP13</p>
-</li>
-</ul>
-</div>
-</li>
-<li>
-<p><strong>Debug UART Change</strong>: Debug output moves from UART1 to UART0</p>
-<div class="ulist">
-<ul>
-<li>
-<p>TX: GP20 → GP0</p>
-</li>
-<li>
-<p>RX: GP21 → GP1</p>
-</li>
-</ul>
-</div>
-</li>
-<li>
-<p><strong>Reset Pin Addition</strong>: Dedicated reset control for ENC28J60</p>
-<div class="ulist">
-<ul>
-<li>
-<p>New pin: GP2 for ENC-RESET</p>
-</li>
-</ul>
-</div>
-</li>
-<li>
-<p><strong>Interrupt Pin Change</strong>: ENC28J60 interrupt signal</p>
-<div class="ulist">
-<ul>
-<li>
-<p>INT: GP14 → GP8</p>
-</li>
-</ul>
-</div>
-</li>
-</ol>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_rationale">Rationale</h3>
-<div class="sect3">
-<h4 id="_hardware_design_benefits">Hardware Design Benefits</h4>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Improved Board Layout</strong>: SPI1 pins (GP10-GP13) are physically adjacent, enabling more compact PCB routing</p>
-</li>
-<li>
-<p><strong>Signal Integrity</strong>: Shorter traces for high-frequency SPI signals reduce noise and electromagnetic interference</p>
-</li>
-<li>
-<p><strong>Reset Control</strong>: Dedicated reset pin provides reliable hardware reset capability for ENC28J60 initialization</p>
-</li>
-<li>
-<p><strong>Debug Accessibility</strong>: UART0 on GP0/GP1 provides easier access for debug connections</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_software_architecture_benefits">Software Architecture Benefits</h4>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Interface Consistency</strong>: SPI1 pins are grouped together in the RP2350 peripheral mapping</p>
-</li>
-<li>
-<p><strong>Hardware Debugging</strong>: UART0 is typically the primary debug interface on RP2350-based systems</p>
-</li>
-<li>
-<p><strong>Reset Reliability</strong>: Software-controlled reset eliminates dependency on power-on reset timing</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_manufacturing_benefits">Manufacturing Benefits</h4>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Component Placement</strong>: More efficient component placement on the PCB</p>
-</li>
-<li>
-<p><strong>Testing Access</strong>: Easier access to debug pins during manufacturing test procedures</p>
-</li>
-<li>
-<p><strong>Cost Reduction</strong>: Optimized routing may reduce PCB layer count requirements</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_implementation_impact">Implementation Impact</h3>
-<div class="sect3">
-<h4 id="_driver_changes_required">Driver Changes Required</h4>
+<h4 id="_uart_channel_configuration">UART Channel Configuration</h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
-<col style="width: 25%;">
-<col style="width: 50%;">
-<col style="width: 25%;">
+<col style="width: 15.3846%;">
+<col style="width: 15.3846%;">
+<col style="width: 15.3846%;">
+<col style="width: 15.3846%;">
+<col style="width: 15.3846%;">
+<col style="width: 23.077%;">
 </colgroup>
 <thead>
 <tr>
-<th class="tableblock halign-left valign-top">Component</th>
-<th class="tableblock halign-left valign-top">Required Changes</th>
-<th class="tableblock halign-left valign-top">Test Impact</th>
+<th class="tableblock halign-left valign-top">Channel</th>
+<th class="tableblock halign-left valign-top">Interface</th>
+<th class="tableblock halign-left valign-top">TX Pin</th>
+<th class="tableblock halign-left valign-top">RX Pin</th>
+<th class="tableblock halign-left valign-top">Baud Rate</th>
+<th class="tableblock halign-left valign-top">Status</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>enc28j60_driver.h</code></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Update pin definitions: <code>ENC28J60_*_PIN</code> constants</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Unit tests</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 0</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART0/PL011</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP0</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">230400</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reserved</strong> (debug interface only)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>enc28j60_driver.c</code></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Change SPI port from <code>spi0</code> to <code>spi1</code>, add reset pin initialization</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Integration tests</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UART1/PL011</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP5</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">115200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Enabled</strong> (active TCP-to-UART bridge)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>test_network_integration.c</code></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Update debug UART from UART1 to UART0</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Functional tests</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP5</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">230400</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Disabled</strong> (future expansion, shares pins with Channel 1)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Hardware documentation</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Update pin mapping diagrams and connection specifications</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Documentation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Channel 3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP6</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP7</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">230400</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Disabled</strong> (future expansion)</p></td>
 </tr>
 </tbody>
 </table>
 </div>
 <div class="sect3">
-<h4 id="_testing_strategy">Testing Strategy</h4>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><strong>Hardware Verification</strong>: Verify SPI1 communication with ENC28J60 using oscilloscope</p>
-</li>
-<li>
-<p><strong>Reset Function Testing</strong>: Verify software-controlled reset pin operation</p>
-</li>
-<li>
-<p><strong>Debug UART Testing</strong>: Confirm UART0 debug output functionality</p>
-</li>
-<li>
-<p><strong>Network Integration Testing</strong>: Run complete network stack tests with new pin configuration</p>
-</li>
-<li>
-<p><strong>Signal Quality Testing</strong>: Verify signal integrity with shorter SPI traces</p>
-</li>
-</ol>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_compatibility_considerations">Compatibility Considerations</h4>
+<h4 id="_interface_details">Interface Details</h4>
+<div class="sect4">
+<h5 id="_debug_interface_uart0">Debug Interface (UART0)</h5>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Breaking Change</strong>: This is a breaking hardware change requiring PCB revision</p>
+<p><strong>Purpose</strong>: System debug output and printf logging</p>
 </li>
 <li>
-<p><strong>Firmware Compatibility</strong>: Firmware compiled for old pin configuration will not work with new hardware</p>
+<p><strong>Configuration</strong>: 115200 baud, 8N1, no flow control</p>
 </li>
 <li>
-<p><strong>Development Tool Update</strong>: Hardware debugger connections must be updated for new UART0 debug interface</p>
+<p><strong>Access</strong>: Available via USB-CDC interface as /dev/ttyACM0</p>
+</li>
+<li>
+<p><strong>Usage</strong>: Core system logging, boot messages, diagnostic output</p>
+</li>
+<li>
+<p><strong>Status</strong>: Reserved for debugging, not available for application use</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_active_uart_channel_channel_1">Active UART Channel (Channel 1)</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Purpose</strong>: Primary TCP-to-UART bridge functionality</p>
+</li>
+<li>
+<p><strong>Configuration</strong>: 115200 baud, 8N1, no flow control</p>
+</li>
+<li>
+<p><strong>TCP Port</strong>: Exposed as TCP socket for network access</p>
+</li>
+<li>
+<p><strong>Protocol</strong>: Custom message framing with '!\r\n' terminators</p>
+</li>
+<li>
+<p><strong>Hardware</strong>: Uses UART1 hardware peripheral for reliable operation</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_ethernet_controller_enc28j60">Ethernet Controller (ENC28J60)</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Interface</strong>: SPI communication for Ethernet packet processing</p>
+</li>
+<li>
+<p><strong>Reset Control</strong>: Software-controlled hardware reset via GP12</p>
+</li>
+<li>
+<p><strong>Interrupt</strong>: Packet reception and link status notifications via GP13</p>
+</li>
+<li>
+<p><strong>Buffer</strong>: 8KB total (4KB RX, 4KB TX)</p>
+</li>
+<li>
+<p><strong>Pin Configuration</strong>: Custom SPI pin mapping optimized for PCB layout</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_future_expansion_channels_2_3">Future Expansion (Channels 2-3)</h5>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Implementation</strong>: Reserved for PIO-based UART implementation</p>
+</li>
+<li>
+<p><strong>Status</strong>: Hardware pins reserved, software implementation pending</p>
+</li>
+<li>
+<p><strong>Channel 2</strong>: Shares pins GP4/GP5 with Channel 1 (alternative configuration)</p>
+</li>
+<li>
+<p><strong>Channel 3</strong>: Independent pins GP6/GP7 ready for implementation</p>
+</li>
+<li>
+<p><strong>Potential</strong>: Up to 4 total UART channels as originally specified</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_hardware_design_benefits">Hardware Design Benefits</h3>
+<div class="sect3">
+<h4 id="_spi_interface_optimization">SPI Interface Optimization</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Custom Pin Mapping</strong>: ENC28J60 uses custom SPI pin assignment for optimal PCB routing</p>
+</li>
+<li>
+<p><strong>Signal Integrity</strong>: Pin selection minimizes trace lengths and reduces EMI</p>
+</li>
+<li>
+<p><strong>Interrupt Handling</strong>: Dedicated interrupt pin enables efficient packet processing</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_uart_interface_distribution">UART Interface Distribution</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Separation of Concerns</strong>: Debug UART (UART0) separate from application UARTs</p>
+</li>
+<li>
+<p><strong>Hardware UART Usage</strong>: Channel 1 uses UART1 hardware for reliable high-speed operation</p>
+</li>
+<li>
+<p><strong>PIO Expansion</strong>: Channels 2-3 reserved for PIO implementation enabling additional UART channels</p>
+</li>
+<li>
+<p><strong>Pin Sharing</strong>: Channel 2 can share pins with Channel 1 for alternative configurations</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_debug_and_development">Debug and Development</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Standard Debug Interface</strong>: UART0 on GP0/GP1 follows RP2350 conventions</p>
+</li>
+<li>
+<p><strong>USB-CDC Integration</strong>: Seamless debug access via USB connection without external UART adapter</p>
+</li>
+<li>
+<p><strong>Manufacturing Support</strong>: Easy access to debug pins during production testing</p>
+</li>
+<li>
+<p><strong>Development Tools</strong>: Compatible with VS Code Pico extension and OpenOCD debugging</p>
 </li>
 </ul>
 </div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_implementation_plan">Implementation Plan</h3>
+<h3 id="_implementation_notes">Implementation Notes</h3>
 <div class="sect3">
-<h4 id="_phase_1_documentation_update">Phase 1: Documentation Update</h4>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>Update ADR-008 (this document) with complete pin mapping</p>
-</li>
-<li>
-<p>Update Chapter 05 Building Block View with new hardware interface specifications</p>
-</li>
-<li>
-<p>Update any hardware interface diagrams</p>
-</li>
-</ol>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_phase_2_driver_implementation">Phase 2: Driver Implementation</h4>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>Update pin definitions in <code>enc28j60_driver.h</code></p>
-</li>
-<li>
-<p>Modify SPI initialization and reset pin handling in <code>enc28j60_driver.c</code></p>
-</li>
-<li>
-<p>Update test files to use UART0 for debug output</p>
-</li>
-<li>
-<p>Add reset pin control functions</p>
-</li>
-</ol>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_phase_3_testing_and_validation">Phase 3: Testing and Validation</h4>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>Hardware bring-up testing with new pin configuration</p>
-</li>
-<li>
-<p>Run complete test suite to verify functionality</p>
-</li>
-<li>
-<p>Performance testing to ensure no degradation</p>
-</li>
-<li>
-<p>Hardware validation with signal integrity measurements</p>
-</li>
-</ol>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_alternatives_considered">Alternatives Considered</h3>
-<div class="sect3">
-<h4 id="_alternative_1_keep_current_pin_configuration">Alternative 1: Keep Current Pin Configuration</h4>
+<h4 id="_driver_configuration">Driver Configuration</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Pros</strong>: No software changes required, existing hardware continues to work</p>
+<p><strong>ENC28J60 Driver</strong>: Pin definitions in <code>include/network/enc28j60_driver.h</code> lines 31-36</p>
 </li>
 <li>
-<p><strong>Cons</strong>: Suboptimal PCB layout, missed opportunity for hardware improvements</p>
+<p><strong>UART Manager</strong>: Channel configurations in <code>src/uart/uart_manager.c</code> lines 46-55</p>
+</li>
+<li>
+<p><strong>Debug Output</strong>: Configured in CMakeLists.txt with both USB-CDC and UART0 enabled</p>
+</li>
+<li>
+<p><strong>SPI Configuration</strong>: Custom pin mapping requires manual SPI initialization</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_alternative_2_use_different_spi_port_assignment">Alternative 2: Use Different SPI Port Assignment</h4>
+<h4 id="_development_environment">Development Environment</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Pros</strong>: Different pin groupings might be available</p>
+<p><strong>Flashing</strong>: Uses OpenOCD with CMSIS-DAP interface via VS Code extension</p>
 </li>
 <li>
-<p><strong>Cons</strong>: SPI1 GP10-GP13 grouping is optimal for PCB layout</p>
+<p><strong>Debugging</strong>: GDB multiarch with OpenOCD server on port 3333</p>
+</li>
+<li>
+<p><strong>Serial Logging</strong>: Persistent UART logger monitors /dev/ttyACM0 for debug output</p>
+</li>
+<li>
+<p><strong>Build System</strong>: CMAKE with Pico SDK 2.2.0+ supporting RP2350 target</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_alternative_3_keep_uart1_for_debug">Alternative 3: Keep UART1 for Debug</h4>
+<h4 id="_testing_considerations">Testing Considerations</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Pros</strong>: No change to existing debug interface</p>
+<p><strong>Hardware Verification</strong>: All interfaces tested during firmware flashing process</p>
 </li>
 <li>
-<p><strong>Cons</strong>: UART0 is more standard for primary debug interface on RP2350</p>
+<p><strong>Signal Quality</strong>: Custom SPI configuration verified for reliable Ethernet communication</p>
+</li>
+<li>
+<p><strong>UART Channel Testing</strong>: Channel 1 verified at 115200 baud operation</p>
+</li>
+<li>
+<p><strong>Debug Interface</strong>: UART0 confirmed functional for system diagnostics</p>
 </li>
 </ul>
 </div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_decision_outcome">Decision Outcome</h3>
+<h3 id="_pin_assignment_rationale">Pin Assignment Rationale</h3>
 <div class="paragraph">
-<p>The pin configuration update provides significant hardware design benefits with manageable software implementation complexity. The change aligns with industry best practices for RP2350-based designs and enables more efficient PCB manufacturing.</p>
+<p>The current pin assignment prioritizes:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Manufacturing Efficiency</strong>: Ethernet pins grouped to minimize PCB complexity</p>
+</li>
+<li>
+<p><strong>Signal Quality</strong>: Custom SPI mapping optimized for the specific PCB layout</p>
+</li>
+<li>
+<p><strong>Development Support</strong>: Standard debug interfaces for easy development access</p>
+</li>
+<li>
+<p><strong>Future Expansion</strong>: Reserved pins for additional UART channels with PIO implementation</p>
+</li>
+<li>
+<p><strong>System Reliability</strong>: Hardware reset and interrupt capabilities for Ethernet controller</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_compatibility_notes">Compatibility Notes</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Hardware Dependency</strong>: Pin configuration is hardware-specific and cannot be changed via software</p>
+</li>
+<li>
+<p><strong>Firmware Binding</strong>: Compiled firmware is tied to this specific pin configuration</p>
+</li>
+<li>
+<p><strong>Development Tools</strong>: Debug tools must connect to UART0 (GP0/GP1) via USB-CDC for system access</p>
+</li>
+<li>
+<p><strong>Network Integration</strong>: Ethernet functionality depends on correct custom SPI pin configuration</p>
+</li>
+<li>
+<p><strong>Channel Expansion</strong>: Additional UART channels require PIO implementation and are currently disabled</p>
+</li>
+</ul>
 </div>
 </div>
 <div class="sect2">
@@ -792,35 +840,19 @@
 <div class="ulist">
 <ul>
 <li>
-<p>RP2350 Datasheet: GPIO Pin Functions and SPI Interface Specifications</p>
+<p>RP2350 Datasheet: GPIO and Peripheral Pin Mapping</p>
 </li>
 <li>
-<p>ENC28J60 Datasheet: SPI Interface Requirements and Reset Pin Specifications</p>
+<p>ENC28J60 Datasheet: SPI Interface and Reset Requirements</p>
 </li>
 <li>
-<p>ADR-001: Microcontroller Platform Selection (RP2350 selection rationale)</p>
+<p>Pico SDK 2.2.0: UART and SPI Configuration Examples</p>
 </li>
 <li>
-<p>ADR-002: Ethernet Controller Selection (ENC28J60 selection rationale)</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_implementation_notes">Implementation Notes</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>All pin changes must be implemented atomically to prevent hardware/software mismatch</p>
+<p>Source Code: <code>include/network/enc28j60_driver.h</code>, <code>src/uart/uart_manager.c</code></p>
 </li>
 <li>
-<p>Hardware documentation must be updated before hardware production</p>
-</li>
-<li>
-<p>Test procedures must be validated with new pin configuration before production deployment</p>
-</li>
-<li>
-<p>Development team must be notified of debug interface change (UART1 → UART0)</p>
+<p>VS Code Pico Extension: Development and debugging tools integration</p>
 </li>
 </ul>
 </div>
@@ -854,11 +886,11 @@
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-008%3A+Hardware+Pin+Configuration+Update%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-008-hardware-pin-configuration.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-008%3A+Hardware+Pin+Configuration%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-008-hardware-pin-configuration.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-008%3A+Hardware+Pin+Configuration+Update%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-008-hardware-pin-configuration.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-008%3A+Hardware+Pin+Configuration%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-008-hardware-pin-configuration.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
