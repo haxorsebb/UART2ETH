@@ -664,7 +664,7 @@ static void enc28j60_interrupt_handler(uint gpio, uint32_t events) {
     }
     return;
 }
-
+ 
 /**
  * @brief Initialize GPIO pins (RP2350-specific)
  */

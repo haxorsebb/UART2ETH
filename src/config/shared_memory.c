@@ -87,7 +87,7 @@ bool shared_memory_init(void) {
     
     // Initialize UART channel defaults
     for (int i = 0; i < 4; i++) {
-        g_shared_memory->config.channels[i].baud_rate = 115200;
+        g_shared_memory->config.channels[i].baud_rate = 230400;
         g_shared_memory->config.channels[i].data_bits = 8;
         g_shared_memory->config.channels[i].stop_bits = 1;
         g_shared_memory->config.channels[i].parity = 0;  // NONE

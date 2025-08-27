@@ -25,6 +25,7 @@ bool uart_receive_buffer_put(uart_receive_buffer_t* rb, uint8_t byte) {
         printf("UART_DEBUG: RX BUFFER FULL!\n");
         return false; // Buffer full
     }
+        
     
     rb->buffer[rb->head] = byte;
     rb->head = next_head;

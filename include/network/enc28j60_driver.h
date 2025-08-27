@@ -28,12 +28,12 @@ extern "C" {
 #endif
 
 // Hardware pin configuration
-#define ENC28J60_RESET_PIN      3 
-#define ENC28J60_INTERRUPT_PIN  2
+#define ENC28J60_RESET_PIN      12 
+#define ENC28J60_INTERRUPT_PIN  13
 #define ENC28J60_SCK_PIN        10 
 #define ENC28J60_MOSI_PIN       11    
-#define ENC28J60_MISO_PIN       12      
-#define ENC28J60_CS_PIN         13 
+#define ENC28J60_MISO_PIN       8      
+#define ENC28J60_CS_PIN         9 
 
 // Register Bank definitions
 #define ENC28J60_BANK0          0x00

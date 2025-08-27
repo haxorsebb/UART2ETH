@@ -616,7 +616,7 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         }
     }
     else {
-        //message end not yes detected, this is normal, there is a tcp window, we will probably not receive messages > 538 bytes at once    
+        //message end not yet detected, this is normal, there is a tcp window, we will probably not receive messages > 538 bytes at once    
     }
     
     if(message_complete || (conn->line_pos >= TCP_SERVER_LINE_BUFFER_SIZE)) {
