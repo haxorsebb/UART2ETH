@@ -1,14 +1,11 @@
 :jbake-title: ADR-008: Hardware Pin Configuration
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: arc42
-:jbake-order: 808
+:jbake-menu: adrs
+:jbake-order: 8
 :filename: /adrs/ADR-008-hardware-pin-configuration.adoc
 ifndef::imagesdir[:imagesdir: ../../images]
 
-:toc:
-
-[[section-adr-008-hardware-pin-configuration]]
 == ADR-008: Hardware Pin Configuration
 
 **Status:** Accepted
@@ -23,15 +20,16 @@ The RP2350 pin assignment is optimized for PCB layout efficiency and signal inte
 
 ==== Complete Pin Mapping
 
+.Hardware Pin Configuration
 [cols="3,2,3,4"]
 |===
 |Function |GPIO Pin |Interface |Description
 
-|**Debug Interface**
+4+^.^h|*Debug Interface*
 |Debug TX |GP0 |UART0 |Printf debug output via USB-CDC (/dev/ttyACM0) at 115200 baud
 |Debug RX |GP1 |UART0 |Debug input (currently disabled for applications)
 
-|**UART Channels**
+4+^.^h|*UART Channels*
 |Channel 1 TX |GP4 |UART1 |UART Channel 1 transmit (active, 115200 baud)
 |Channel 1 RX |GP5 |UART1 |UART Channel 1 receive (active, 115200 baud)
 |Channel 2 TX |GP4 |PIO |UART Channel 2 transmit (reserved, disabled)
@@ -39,7 +37,7 @@ The RP2350 pin assignment is optimized for PCB layout efficiency and signal inte
 |Channel 3 TX |GP6 |PIO |UART Channel 3 transmit (reserved, disabled)
 |Channel 3 RX |GP7 |PIO |UART Channel 3 receive (reserved, disabled)
 
-|**Ethernet Controller (ENC28J60)**
+4+^.^h|*Ethernet Controller (ENC28J60)*
 |ENC-MISO |GP8 |SPI |Master In Slave Out
 |ENC-CS |GP9 |SPI |Chip select (active low)
 |ENC-SCK |GP10 |SPI |SPI clock signal
@@ -90,25 +88,6 @@ The RP2350 pin assignment is optimized for PCB layout efficiency and signal inte
 - **Channel 3**: Independent pins GP6/GP7 ready for implementation
 - **Potential**: Up to 4 total UART channels as originally specified
 
-=== Hardware Design Benefits
-
-==== SPI Interface Optimization
-* **Custom Pin Mapping**: ENC28J60 uses custom SPI pin assignment for optimal PCB routing
-* **Signal Integrity**: Pin selection minimizes trace lengths and reduces EMI
-* **Interrupt Handling**: Dedicated interrupt pin enables efficient packet processing
-
-==== UART Interface Distribution  
-* **Separation of Concerns**: Debug UART (UART0) separate from application UARTs
-* **Hardware UART Usage**: Channel 1 uses UART1 hardware for reliable high-speed operation
-* **PIO Expansion**: Channels 2-3 reserved for PIO implementation enabling additional UART channels
-* **Pin Sharing**: Channel 2 can share pins with Channel 1 for alternative configurations
-
-==== Debug and Development
-* **Standard Debug Interface**: UART0 on GP0/GP1 follows RP2350 conventions
-* **USB-CDC Integration**: Seamless debug access via USB connection without external UART adapter
-* **Manufacturing Support**: Easy access to debug pins during production testing
-* **Development Tools**: Compatible with VS Code Pico extension and OpenOCD debugging
-
 === Implementation Notes
 
 ==== Driver Configuration
@@ -116,18 +95,6 @@ The RP2350 pin assignment is optimized for PCB layout efficiency and signal inte
 * **UART Manager**: Channel configurations in `src/uart/uart_manager.c` lines 46-55  
 * **Debug Output**: Configured in CMakeLists.txt with both USB-CDC and UART0 enabled
 * **SPI Configuration**: Custom pin mapping requires manual SPI initialization
-
-==== Development Environment
-* **Flashing**: Uses OpenOCD with CMSIS-DAP interface via VS Code extension
-* **Debugging**: GDB multiarch with OpenOCD server on port 3333
-* **Serial Logging**: Persistent UART logger monitors /dev/ttyACM0 for debug output
-* **Build System**: CMAKE with Pico SDK 2.2.0+ supporting RP2350 target
-
-==== Testing Considerations
-* **Hardware Verification**: All interfaces tested during firmware flashing process
-* **Signal Quality**: Custom SPI configuration verified for reliable Ethernet communication
-* **UART Channel Testing**: Channel 1 verified at 115200 baud operation  
-* **Debug Interface**: UART0 confirmed functional for system diagnostics
 
 === Pin Assignment Rationale
 

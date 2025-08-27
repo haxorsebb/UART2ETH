@@ -1,12 +1,10 @@
 :jbake-title: ADR-010: External Protocol Validation Tool
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: arc42
+:jbake-menu: adrs
 :jbake-order: 10
 :filename: /adrs/ADR-010-external-protocol-validation-tool.adoc
 ifndef::imagesdir[:imagesdir: ../../images]
-
-:toc:
 
 == ADR-010: External Protocol Validation Tool
 

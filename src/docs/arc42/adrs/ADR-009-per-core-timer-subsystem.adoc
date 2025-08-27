@@ -1,3 +1,11 @@
+:jbake-title: ADR-009: Per Core Timer Subsystem
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 9
+:filename: /adrs/ADR-009-per-core-timer-subsystem.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
 = ADR-009: Per-Core Timer Subsystem Architecture
 
 == Status
