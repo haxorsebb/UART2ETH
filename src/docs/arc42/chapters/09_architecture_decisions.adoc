@@ -24,32 +24,57 @@ This section references the Architecture Decision Records (ADRs) that document k
 
 * link:../adrs/ADR-001-microcontroller-selection.html[ADR-001: Microcontroller Platform Selection] - Documents the decision to use the Raspberry Pi RP2350 as the core microcontroller platform.
 * link:../adrs/ADR-002-ethernet-controller-selection.html[ADR-002: Ethernet Controller Selection] - Documents the decision to use the ENC28J60 as the Ethernet controller.
+* link:../adrs/ADR-008-hardware-pin-configuration.html[ADR-008: Hardware Pin Configuration] - Documents the current hardware pin configuration for UART channels, Ethernet controller, and debug interfaces on the RP2350.
 
 === Software Platform Decisions
 
 * link:../adrs/ADR-003-programming-language-selection.html[ADR-003: Programming Language Selection] - Documents the decision to use C programming language for firmware development, considering team expertise, delivery timeline, and memory model constraints.
 * link:../adrs/ADR-004-development-ecosystem.html[ADR-004: Development Ecosystem Selection] - Documents the decision to use Native Pico SDK + CMake development ecosystem for professional, industrial-grade development.
+* link:../adrs/ADR-010-external-protocol-validation-tool.html[ADR-010: External Protocol Validation Tool] - Documents the decision to implement an external Python-based protocol validation tool for testing TCP-to-UART message processing and performance analysis.
 
 === Implementation Strategy Decisions
 
 * link:../adrs/ADR-005-buffer-allocation-strategy.html[ADR-005: Ring Buffer Memory Allocation Strategy] - Documents the decision to use static worst-case allocation for inter-core communication buffers, prioritizing reliability and determinism over memory efficiency.
 * link:../adrs/ADR-006-flash-persistence-strategy.html[ADR-006: Flash Persistence Strategy] - Documents the decision to use 4-page ring buffer for configuration persistence, providing wear leveling and power-loss safety through deferred write-back with SHA256 integrity verification.
 * link:../adrs/ADR-007-state-machine-architecture.html[ADR-007: State Machine Architecture] - Documents the decision to implement event-driven state machines with atomic main state and ISR-safe sub-states for dual-core coordination and predictable system behavior.
+* link:../adrs/ADR-009-per-core-timer-subsystem.html[ADR-009: Per Core Timer Subsystem] - Documents the decision to implement dedicated timer subsystems for each core, providing precise timing control and inter-core coordination for real-time operations.
+* link:../adrs/ADR-011-ringbuffer-implementation.html[ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging] - Documents the decision to implement lock-free ring buffers with atomic operations for high-performance message bridging between UART and TCP interfaces.
+* link:../adrs/ADR-012-core0-ringbuffer-separation.html[ADR-012: Core0 Ringbuffer Processing Separation] - Documents the decision to separate ring buffer processing responsibilities between cores, with Core0 handling TCP-to-UART direction and Core1 managing UART-to-TCP message flow.
 
 
 === Decision Interdependencies
 
 The ADRs reveal important interdependencies that influence architectural coherence:
 
+==== Core Platform Interdependencies
+
 * *ADR-004 (Development Ecosystem) challenges ADR-002 (Ethernet Controller)*: The ecosystem analysis revealed that ENC28J60 lacks mature RP2350 SDK integration, potentially requiring significant custom development effort and impacting industrial reliability goals.
 
 * *ADR-003 (C Language) reinforces ADR-004 (Native SDK)*: The choice of C programming language aligns optimally with the Native Pico SDK approach, enabling direct application of team expertise.
 
+* *ADR-008 (Pin Configuration) implements ADR-001 (Microcontroller Platform) and ADR-002 (Ethernet Controller)*: The pin configuration realizes the hardware platform decisions, defining the physical interface mapping for RP2350 and ENC28J60 integration.
+
+==== Memory and Communication Architecture
+
 * *ADR-005 (Buffer Strategy) supports ADR-003 (C Language)*: Static allocation strategy leverages C's deterministic memory model and supports industrial reliability requirements.
 
+* *ADR-011 (Ring Buffer Implementation) refines ADR-005 (Buffer Strategy)*: The lock-free ring buffer implementation provides the specific mechanism for the static allocation strategy, optimizing for dual-core message bridging performance.
+
+* *ADR-012 (Core0 Ringbuffer Separation) coordinates ADR-011 (Ring Buffer Implementation) and ADR-001 (Microcontroller Platform)*: The separation strategy leverages the dual-core RP2350 architecture to optimize ring buffer processing by assigning specific directional responsibilities to each core.
+
+==== State Management and Coordination
+
 * *ADR-007 (State Machine Architecture) enables ADR-001 (Microcontroller Platform)*: Event-driven state machines with atomic operations leverage the dual-core RP2350 architecture for coordinated operation while maintaining deterministic behavior.
+
+* *ADR-009 (Timer Subsystem) supports ADR-007 (State Machine Architecture)*: Per-core timers provide precise timing control required by state machines for coordinated dual-core operations and real-time task scheduling.
 
 * *ADR-007 (State Machine Architecture) coordinates ADR-005 (Buffer Strategy)*: State machines provide the control logic for safe inter-core buffer access, ensuring static allocation strategy works correctly across dual cores.
 
 * *ADR-007 (State Machine Architecture) supports ADR-006 (Flash Persistence)*: The Core1 sub-state machine provides the execution context for deferred write-back persistence operations integrated into the main loop.
+
+==== Development and Validation
+
+* *ADR-010 (Protocol Validation Tool) validates ADR-011 (Ring Buffer Implementation) and ADR-012 (Core0 Ringbuffer Separation)*: The external validation tool provides comprehensive testing capabilities for the ring buffer message bridging implementation and core separation strategy.
+
+* *ADR-010 (Protocol Validation Tool) reinforces ADR-003 (C Language) and ADR-004 (Development Ecosystem)*: Python-based external validation complements the C firmware development approach, enabling comprehensive system testing without impacting embedded resource constraints.
 
