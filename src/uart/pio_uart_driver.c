@@ -129,12 +129,16 @@ void pio_destroy_context(void* context) {
 
 // Setup PIO programs
 bool pio_uart_setup_programs(pio_uart_context_t* ctx) {
-    if (!ctx) {
-        printf("ERROR: NULL context provided to pio_uart_setup_programs\n");
+    if (!ctx || !ctx->pio_instance) {
+        printf("ERROR: Invalid context or PIO instance provided to pio_uart_setup_programs\n");
         return false;
     }
     
     printf("PIO UART: Setting up PIO programs...\n");
+    
+    // Initialize offsets to invalid
+    ctx->tx_offset = PIO_PROGRAM_OFFSET_INVALID;
+    ctx->rx_offset = PIO_PROGRAM_OFFSET_INVALID;
     
     // Load TX program
     if (!pio_can_add_program(ctx->pio_instance, &pio_uart_tx_program)) {
@@ -150,7 +154,7 @@ bool pio_uart_setup_programs(pio_uart_context_t* ctx) {
         printf("ERROR: Cannot add PIO RX program - insufficient space\n");
         // Clean up TX program on failure
         pio_remove_program(ctx->pio_instance, &pio_uart_tx_program, ctx->tx_offset);
-        ctx->tx_offset = 0;
+        ctx->tx_offset = PIO_PROGRAM_OFFSET_INVALID;
         return false;
     }
     
@@ -161,15 +165,35 @@ bool pio_uart_setup_programs(pio_uart_context_t* ctx) {
 }
 
 void pio_uart_cleanup_programs(pio_uart_context_t* ctx) {
+    if (!ctx) {
+        printf("WARNING: NULL context provided to pio_uart_cleanup_programs\n");
+        return;
+    }
+
+    if (!ctx->pio_instance) {
+        printf("WARNING: Invalid PIO instance in cleanup\n");
+        return;
+    }
+    
     printf("PIO UART: Cleaning up PIO programs...\n");
     
     // Disable state machines first
-    pio_sm_set_enabled(ctx->pio_instance, ctx->tx_sm, false);
-    pio_sm_set_enabled(ctx->pio_instance, ctx->rx_sm, false);
+    if (ctx->tx_offset > PIO_PROGRAM_OFFSET_INVALID) {
+        pio_sm_set_enabled(ctx->pio_instance, ctx->tx_sm, false);
+    }
+    if (ctx->rx_offset > PIO_PROGRAM_OFFSET_INVALID) {
+        pio_sm_set_enabled(ctx->pio_instance, ctx->rx_sm, false);
+    }
     
     // Remove programs
-    pio_remove_program(ctx->pio_instance, &pio_uart_tx_program, ctx->tx_offset);
-    pio_remove_program(ctx->pio_instance, &pio_uart_rx_program, ctx->rx_offset);
+    if (ctx->tx_offset > PIO_PROGRAM_OFFSET_INVALID) {
+        pio_remove_program(ctx->pio_instance, &pio_uart_tx_program, ctx->tx_offset);
+        ctx->tx_offset = PIO_PROGRAM_OFFSET_INVALID;
+    }
+    if (ctx->rx_offset > PIO_PROGRAM_OFFSET_INVALID) {
+        pio_remove_program(ctx->pio_instance, &pio_uart_rx_program, ctx->rx_offset);
+        ctx->rx_offset = PIO_PROGRAM_OFFSET_INVALID;
+    }
     
     printf("PIO UART: PIO programs cleanup complete\n");
 }
@@ -182,20 +206,25 @@ bool pio_uart_setup_dma(pio_uart_context_t* ctx) {
     }
     
     printf("PIO UART: Setting up DMA channels...\n");
-    
+
+    // Initialize DMA channels to invalid
+    ctx->tx_dma_chan = PIO_UART_INVALID_DMA_CHANNEL;
+    ctx->rx_dma_chan = PIO_UART_INVALID_DMA_CHANNEL;
+    ctx->dma_channels_claimed = false;
+
     // Claim TX DMA channel
     ctx->tx_dma_chan = dma_claim_unused_channel(false);
-    if (ctx->tx_dma_chan == (uint)-1) {
+    if (ctx->tx_dma_chan == PIO_UART_INVALID_DMA_CHANNEL) {
         printf("ERROR: Failed to claim TX DMA channel\n");
         return false;
     }
     
     // Claim RX DMA channel
     ctx->rx_dma_chan = dma_claim_unused_channel(false);
-    if (ctx->rx_dma_chan == (uint)-1) {
+    if (ctx->rx_dma_chan == PIO_UART_INVALID_DMA_CHANNEL) {
         printf("ERROR: Failed to claim RX DMA channel\n");
         dma_channel_unclaim(ctx->tx_dma_chan);
-        ctx->tx_dma_chan = (uint)-1;
+        ctx->tx_dma_chan = PIO_UART_INVALID_DMA_CHANNEL;
         return false;
     }
     
@@ -553,12 +582,20 @@ static void pio_uart_pio_rx_irq_handler(void) {
     // Check if our RX SM triggered the interrupt
     if (pio_interrupt_get(ctx->pio_instance, pis_sm0_rx_fifo_not_empty + ctx->rx_sm)) {
         
-        // Process all available bytes from PIO RX FIFO
-        while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm)) {
+        // Limit processing to prevent interrupt from running too long
+        int max_bytes = 32;  // Prevent unbounded interrupt processing
+        
+        // Process available bytes from PIO RX FIFO with interrupt protection
+        while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm) && max_bytes-- > 0) {
             uint32_t word = pio_sm_get(ctx->pio_instance, ctx->rx_sm);
             uint8_t byte = (uint8_t)(word >> 24);  // Extract byte from left-justified data
             
-            if (!uart_receive_buffer_put(&ctx->rx_ring, byte)) {
+            // Use critical section to protect shared ring buffer access
+            uint32_t irq_status = save_and_disable_interrupts();
+            bool success = uart_receive_buffer_put(&ctx->rx_ring, byte);
+            restore_interrupts(irq_status);
+            
+            if (!success) {
                 ctx->state.overrun_errors++;
                 break;  // Buffer full
             }

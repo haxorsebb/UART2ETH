@@ -36,6 +36,10 @@
 #define PIO_UART_RX_BUFFER_SIZE 512    // Receive ring buffer size
 #define PIO_UART_DMA_BUFFER_SIZE 256   // DMA staging buffer size
 
+// Constants for resource management
+#define PIO_PROGRAM_OFFSET_INVALID 0   // Invalid/uninitialized PIO program offset
+#define PIO_UART_INVALID_DMA_CHANNEL ((uint)-1)  // Invalid DMA channel marker
+
 /**
  * @brief PIO UART context structure
  * 
