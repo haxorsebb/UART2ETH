@@ -213,11 +213,11 @@
     <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link " href="../../arc42/chapters/00_architecture_communication_canvas.html"><span>arc42</span></a>
+                <a class="nav-link active" href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
             </li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link active" href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+                <a class="nav-link " href="../../arc42/chapters/00_architecture_communication_canvas.html"><span>arc42</span></a>
             </li>
 
         </ul>
@@ -446,25 +446,25 @@
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Channel 2 TX</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP22</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 2 transmit (reserved, disabled)</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Channel 2 RX</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP5</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP23</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 2 receive (reserved, disabled)</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Channel 3 TX</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP6</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP24</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 3 transmit (reserved, disabled)</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Channel 3 RX</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP7</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP25</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">UART Channel 3 receive (reserved, disabled)</p></td>
 </tr>
@@ -551,16 +551,16 @@
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Channel 2</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP4</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP5</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP22</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP23</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">230400</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Disabled</strong> (future expansion, shares pins with Channel 1)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Disabled</strong> (future expansion)</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Channel 3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PIO</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP6</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GP7</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP24</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GP25</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">230400</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Disabled</strong> (future expansion)</p></td>
 </tr>
@@ -646,10 +646,10 @@
 <p><strong>Status</strong>: Hardware pins reserved, software implementation pending</p>
 </li>
 <li>
-<p><strong>Channel 2</strong>: Shares pins GP4/GP5 with Channel 1 (alternative configuration)</p>
+<p><strong>Channel 2</strong>: Independent pins GP22/GP23 ready for implementation</p>
 </li>
 <li>
-<p><strong>Channel 3</strong>: Independent pins GP6/GP7 ready for implementation</p>
+<p><strong>Channel 3</strong>: Independent pins GP24/GP25 ready for implementation</p>
 </li>
 <li>
 <p><strong>Potential</strong>: Up to 4 total UART channels as originally specified</p>
