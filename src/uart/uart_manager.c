@@ -17,6 +17,11 @@ extern const uart_interface_t pl011_uart_interface;
 extern void* pl011_create_context(uint8_t hw_uart_num);
 extern void pl011_destroy_context(void* context);
 
+// PIO UART interface (Issue #82)
+extern const uart_interface_t pio_uart_interface;
+extern void* pio_create_context(uint8_t pio_num, uint8_t sm_num);
+extern void pio_destroy_context(void* context);
+
 // Line assembly for incoming data
 #define MINIMUM_MESSAGE_LENGTH 8  // '#0000!\r\n' minimum
 
@@ -48,10 +53,10 @@ static const channel_config_t channel_configs[UART_MANAGER_MAX_CHANNELS] = {
     {false, UART_TYPE_PL011, 230400, 0, 1},
     // Channel 1: UART1 (PL011) - enabled
     {true, UART_TYPE_PL011, 115200, 4, 5},
-    // Channel 2: PIO UART (placeholder) - disabled
-    {false, UART_TYPE_PIO, 230400, 4, 5},
+    // Channel 2: PIO UART - enabled (Issue #82, ADR-013)
+    {true, UART_TYPE_PIO, 230400, 14, 15},
     // Channel 3: PIO UART (placeholder) - disabled
-    {false, UART_TYPE_PIO, 230400, 6, 7}
+    {false, UART_TYPE_PIO, 230400, 16, 17}
 };
 
 // Forward declarations
@@ -247,6 +252,14 @@ const char* uart_manager_status_to_string(uart_manager_status_t status) {
     }
 }
 
+uart_instance_t* uart_manager_get_channel_instance(channel_id_t channel) {
+    if (!g_manager.initialized || channel >= UART_MANAGER_MAX_CHANNELS) {
+        return NULL;
+    }
+    
+    return &g_manager.uarts[channel];
+}
+
 // Private function implementations
 
 static bool init_channel(channel_id_t channel) {
@@ -271,11 +284,13 @@ static bool init_channel(channel_id_t channel) {
         // For PL011: channel 0 -> hw_uart 0, channel 1 -> hw_uart 1
         uart->driver_context = pl011_create_context(channel);
         uart->ops = &pl011_uart_interface;
+    } else if (config->type == UART_TYPE_PIO) {
+        // PIO UART implementation (Issue #82)
+        uart->driver_context = pio_create_context(0, 0);  // PIO0, SM0/SM1
+        uart->ops = &pio_uart_interface;
     } else {
-        // PIO UART - placeholder for now
-        uart->driver_context = NULL;
-        uart->ops = NULL;
-        return true; // Skip PIO initialization for now
+        printf("ERROR: Unknown UART type for channel %u\n", channel);
+        return false;
     }
     
     if (!uart->driver_context || !uart->ops) {
@@ -321,6 +336,8 @@ static void deinit_channel(channel_id_t channel) {
     
     if (uart->type == UART_TYPE_PL011 && uart->driver_context) {
         pl011_destroy_context(uart->driver_context);
+    } else if (uart->type == UART_TYPE_PIO && uart->driver_context) {
+        pio_destroy_context(uart->driver_context);
     }
     
     memset(uart, 0, sizeof(uart_instance_t));

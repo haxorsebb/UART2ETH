@@ -1,0 +1,173 @@
+:jbake-title: ADR-013: PIO UART Implementation for Channel 2
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 13
+:filename: /adrs/ADR-013-pio-uart-implementation.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+== ADR-013: PIO UART Implementation for Channel 2
+
+**Status:** Accepted
+
+**Date:** 2025-08-28
+
+**Context:** The UART2ETH system requires implementation of Channel 2 UART functionality using RP2350 PIO (Programmable I/O) hardware to extend beyond the two hardware UART peripherals. Channel 2 must provide equivalent functionality to hardware UARTs while integrating seamlessly with the existing UART Manager architecture.
+
+=== Decision
+
+We will implement a full-featured PIO UART driver for Channel 2 using the following approach:
+
+1. **PIO Resource Allocation**: Use PIO0 with two state machines (SM0 for TX, SM1 for RX)
+2. **Pin Assignment**: GP14 (TX) and GP15 (RX) as documented in ADR-008
+3. **Implementation Pattern**: Follow the existing `uart_interface_t` pattern from PL011 driver
+4. **DMA Integration**: Implement DMA transfers following the uart_dma reference example
+5. **Interrupt Handling**: Use the same interrupt handling pattern as PL011 driver, adapted for PIO
+6. **Error Handling**: Implement robust error detection and recovery using PIO error reporting features
+
+=== Implementation Architecture
+
+==== PIO Program Selection
+- **TX Program**: Use `uart_tx` program from pico-examples for reliable transmission
+- **RX Program**: Use `uart_rx` program with built-in framing error detection and break condition handling
+- **Baud Rate**: Support 230400 baud as required for testing, with configurable rates
+
+==== Memory and Buffering Strategy
+- **Receive Buffer**: Implement ring buffer similar to PL011 driver for consistency
+- **DMA Buffers**: Allocate separate TX/RX DMA buffers for efficient data transfer
+- **Buffer Sizes**: Match PL011 buffer sizes for consistent behavior
+
+==== Integration Points
+- **UART Manager**: Register via `pio_uart_interface` and channel configuration
+- **Ring Buffer System**: Full integration with existing TCP↔UART message bridge
+- **State Machine**: Integrate with Core0 UART subsystem states
+- **TCP Port**: Expose as port 4002 for network connectivity
+
+=== Technical Specifications
+
+==== PIO Configuration
+```c
+// PIO0 State Machine allocation
+#define PIO_UART_PIO_INSTANCE    pio0
+#define PIO_UART_TX_SM          0      // State machine 0 for TX
+#define PIO_UART_RX_SM          1      // State machine 1 for RX
+#define PIO_UART_DEFAULT_BAUD   230400 // Default test baud rate
+
+// GPIO Pin Configuration
+#define PIO_UART_TX_GPIO        14     // As per ADR-008
+#define PIO_UART_RX_GPIO        15     // As per ADR-008
+```
+
+==== DMA Channel Allocation
+- **TX DMA Channel**: Dynamically allocated channel for transmit operations
+- **RX DMA Channel**: Dynamically allocated channel for receive operations  
+- **Interrupt Priority**: Follow existing DMA interrupt priority scheme
+
+==== Interface Implementation
+The PIO UART driver implements the complete `uart_interface_t`:
+
+```c
+typedef struct pio_uart_context {
+    // PIO hardware references
+    PIO pio_instance;
+    uint tx_sm;
+    uint rx_sm;
+    uint tx_offset;
+    uint rx_offset;
+    
+    // DMA channels
+    uint tx_dma_chan;
+    uint rx_dma_chan;
+    
+    // Buffers
+    uart_receive_buffer_t rx_ring;
+    uint8_t rx_buffer[RX_BUFFER_SIZE];
+    
+    // State tracking
+    uart_state_t state;
+    uart_config_t current_config;
+} pio_uart_context_t;
+```
+
+=== Testing Strategy
+
+==== Unit Tests
+1. **Hardware Configuration**: Verify PIO state machine setup and GPIO configuration
+2. **Loopback Testing**: Hardware loopback with GP14↔GP15 connection
+3. **Message Processing**: Single line and multi-line message transmission
+4. **DMA Operations**: Verify DMA transfer completion and error handling
+5. **Integration Testing**: Ring buffer integration and TCP echo functionality
+
+==== Integration Tests
+1. **TCP Connectivity**: Port 4002 accepts connections and processes messages
+2. **Echo Functionality**: Messages sent to port 4002 echo back correctly
+3. **Performance Testing**: Verify 230400 baud operation under load
+4. **Error Recovery**: Test error conditions and recovery mechanisms
+
+=== Rationale
+
+==== Why PIO0?
+- Available state machines for both TX/RX operations
+- No conflicts with existing peripheral allocations
+- Optimal for real-time UART operations on Core0
+
+==== Why Full-Featured Implementation?
+- Provides robust error handling equivalent to hardware UARTs
+- Enables comprehensive diagnostics and monitoring
+- Supports future expansion to additional PIO UART channels
+- Maintains consistency with PL011 driver capabilities
+
+==== Why DMA Integration?
+- Reduces CPU overhead for data transfers
+- Enables higher throughput and lower latency
+- Consistent with modern embedded system practices
+- Follows proven pattern from pico-examples uart_dma
+
+=== Consequences
+
+==== Positive
+- Channel 2 provides equivalent functionality to hardware UART channels
+- Scalable architecture supports future PIO UART channel additions (Channel 3)
+- High-performance operation through DMA and interrupt-driven design
+- Seamless integration with existing UART Manager and ring buffer system
+
+==== Negative  
+- Consumes 2 of 4 available PIO state machines on PIO0
+- Additional complexity compared to simple polling-based PIO implementation
+- Requires careful timing validation for reliable 230400 baud operation
+
+==== Neutral
+- Code size increases moderately due to PIO program compilation
+- Development effort equivalent to implementing additional hardware UART driver
+- Testing complexity similar to existing PL011 driver validation
+
+=== Implementation Dependencies
+
+==== Required Components
+- PIO program compilation support in CMake build system
+- DMA channel allocation and management functions
+- Integration with existing interrupt handling infrastructure
+- Update to UART Manager channel configuration table
+
+==== Documentation Updates
+- Update Chapter 5 Building Block View to reflect PIO UART implementation
+- Update hardware pin configuration documentation if needed
+- Add PIO UART driver to API documentation
+
+=== Future Extensions
+
+==== Channel 3 Implementation
+This ADR establishes the pattern for implementing Channel 3 using PIO0 SM2/SM3 or PIO1 resources.
+
+==== Advanced Features
+- Flow control support (RTS/CTS) using additional GPIO pins
+- Protocol-specific optimizations (RS485 half-duplex mode)
+- Adaptive baud rate detection for auto-configuration
+
+=== References
+
+- Issue #82: PIO UART Driver Implementation
+- ADR-008: Hardware Pin Configuration  
+- pico-examples: pio/uart_dma reference implementation
+- RP2350 Datasheet: PIO (Programmable I/O) documentation
+- arc42 Chapter 5: Core 0 UART Subsystem Implementation

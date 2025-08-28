@@ -246,7 +246,7 @@ package "Core 0 UART Subsystem" {
 
 ' External connections
 UD <--> PL011_DRV : Hardware UART0/1\nGP8/9, GP10/11
-UD <--> PIO_DRV : Virtual UART2/3\nPIO channels
+UD <--> PIO_DRV : PIO UART Channel 2\nGP14/GP15
 UART_MGR <--> RBS : Bidirectional Packets\nShared Memory
 
 ' Internal connections
@@ -279,7 +279,7 @@ The unified UART Manager architecture provides consistent API across different U
 |Hardware implementation for RP2350 UART0/1 peripherals. Provides interrupt-driven I/O, register management, and optimized performance for hardware channels.
 
 |*PIO UART Driver*
-|Software UART implementation using RP2350 PIO state machines. Enables additional virtual channels beyond hardware limitations with configurable timing and protocols.
+|Software UART implementation using RP2350 PIO0 state machines for Channel 2 (GP14/GP15). Provides DMA-accelerated transfers, interrupt-driven I/O, robust error handling, and full integration with TCP port 4002. Implements uart_interface_t for seamless UART Manager integration.
 
 |*UART Instances*
 |Per-channel context management storing configuration state, statistics, and runtime parameters. Provides channel-specific state tracking and diagnostics.
@@ -1634,6 +1634,189 @@ The current implementation processes messages using line-based framing:
 - GPIO configuration validation
 - Interrupt-driven I/O verification
 - Performance and reliability testing (500k+ messages verified)
+
+==== Whitebox PIO UART Driver Implementation
+
+The PIO UART Driver provides software-based UART functionality for Channel 2 using RP2350 PIO0 state machines with DMA acceleration and robust error handling, following the same interface pattern as the PL011 driver.
+
+[plantuml, level3-pio-uart-implementation, svg]
+----
+@startuml
+!theme plain
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+title Level 3 - PIO UART Driver Implementation (Channel 2)
+
+cloud "UART Device\nChannel 2 Serial" as UART_DEV
+cloud "RP2350 PIO0 Hardware" as PIO0_HW
+cloud "DMA Controller" as DMA
+cloud "Interrupt Controller" as IRQ
+
+package "PIO UART Driver" {
+    component "PIO UART Interface\nuart_interface_t implementation\nContext management\nLifecycle control" as PIO_IF #lightgreen
+    
+    component "PIO Context Manager\nState machine allocation\nGPIO configuration\nResource management" as CONTEXT #lightyellow
+    
+    component "TX State Machine\nPIO0 SM0\nDMA-driven transmission\nHardware flow control" as TX_SM #lightblue
+    
+    component "RX State Machine\nPIO0 SM1\nInterrupt-driven reception\nError detection" as RX_SM #lightcyan
+    
+    component "DMA Manager\nTX/RX channel allocation\nTransfer setup\nCompletion handling" as DMA_MGR #lightpink
+    
+    component "Receive Buffer\nRing buffer implementation\nInterrupt-safe access\nOverflow protection" as RX_BUF #wheat
+    
+    component "Error Handler\nFraming error detection\nBreak condition handling\nRecovery procedures" as ERROR #lightsalmon
+}
+
+' External connections
+UART_DEV <--> TX_SM : GP14 TX\nSerial Output
+UART_DEV <--> RX_SM : GP15 RX\nSerial Input
+TX_SM <--> PIO0_HW : PIO0 SM0\nState Machine
+RX_SM <--> PIO0_HW : PIO0 SM1\nState Machine
+DMA_MGR <--> DMA : TX/RX Channels\nData Transfer
+RX_SM --> IRQ : RX Data Available\nFIFO Not Empty
+
+' Internal connections
+PIO_IF --> CONTEXT : Resource Control\nPIO/GPIO Setup
+CONTEXT --> TX_SM : TX Configuration\nBaud Rate/Pins
+CONTEXT --> RX_SM : RX Configuration\nBaud Rate/Pins
+PIO_IF <--> DMA_MGR : Transfer Control\nData Operations
+TX_SM <--> DMA_MGR : TX Data Flow\nFIFO Management
+RX_SM --> RX_BUF : Received Data\nInterrupt Handler
+RX_BUF <--> PIO_IF : Data Access\nApplication Interface
+RX_SM --> ERROR : Error Events\nFraming/Break Detection
+ERROR --> PIO_IF : Error Reporting\nStatus Updates
+
+@enduml
+----
+
+===== Motivation
+
+The PIO UART implementation provides equivalent functionality to hardware UARTs while extending channel capacity beyond the RP2350's two hardware UART peripherals. DMA acceleration ensures high throughput with minimal CPU overhead, while robust error handling maintains reliability equivalent to hardware implementations.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*PIO UART Interface*
+|Implements complete uart_interface_t API for seamless integration with UART Manager. Provides lifecycle management, data transmission/reception, and status reporting identical to PL011 driver.
+
+|*PIO Context Manager*
+|Manages PIO0 state machine allocation, GPIO pin configuration, and resource cleanup. Handles PIO program compilation and loading, baud rate configuration, and hardware resource coordination.
+
+|*TX State Machine*
+|PIO0 SM0 implementation for serial data transmission using uart_tx PIO program. Integrates with DMA for efficient data transfer with minimal CPU intervention and automatic flow control.
+
+|*RX State Machine*
+|PIO0 SM1 implementation for serial data reception using uart_rx PIO program with built-in error detection. Generates interrupts on data availability and handles framing errors gracefully.
+
+|*DMA Manager*
+|Coordinates DMA channel allocation and transfer operations for both TX and RX directions. Handles DMA completion interrupts, buffer management, and error recovery for reliable high-speed operation.
+
+|*Receive Buffer*
+|Ring buffer implementation matching PL011 driver behavior for consistent application interface. Provides interrupt-safe data access with overflow protection and statistics tracking.
+
+|*Error Handler*
+|Processes PIO-generated error conditions including framing errors, break conditions, and FIFO overflows. Implements recovery procedures and error logging for diagnostic purposes.
+|===
+
+===== Implementation Details
+
+====== PIO Resource Configuration
+```c
+// PIO0 State Machine allocation
+#define PIO_UART_PIO_INSTANCE    pio0
+#define PIO_UART_TX_SM          0      // State machine 0 for TX
+#define PIO_UART_RX_SM          1      // State machine 1 for RX
+
+// GPIO Pin Configuration (as per ADR-008)
+#define PIO_UART_TX_GPIO        14     // Channel 2 TX
+#define PIO_UART_RX_GPIO        15     // Channel 2 RX
+
+// Default configuration
+#define PIO_UART_DEFAULT_BAUD   230400 // Test requirement baud rate
+#define PIO_UART_DATA_BITS      8      // 8N1 configuration
+#define PIO_UART_STOP_BITS      1
+#define PIO_UART_PARITY         UART_PARITY_NONE
+```
+
+====== DMA Configuration Strategy
+```c
+typedef struct {
+    // DMA channel allocation
+    uint tx_dma_chan;              // Dynamically allocated TX channel
+    uint rx_dma_chan;              // Dynamically allocated RX channel
+    
+    // Transfer buffers
+    uint8_t tx_dma_buffer[256];    // TX staging buffer
+    uint8_t rx_dma_buffer[256];    // RX staging buffer
+    
+    // Transfer state
+    volatile bool tx_in_progress;   // TX transfer active flag
+    volatile size_t rx_bytes_ready; // RX bytes available
+} pio_dma_state_t;
+```
+
+====== Interface Implementation Pattern
+The PIO driver follows the exact same pattern as PL011 driver:
+
+```c
+const uart_interface_t pio_uart_interface = {
+    .init = pio_uart_init,
+    .deinit = pio_uart_deinit,
+    .is_ready = pio_uart_is_ready,
+    .send_byte = pio_uart_send_byte,
+    .send_data = pio_uart_send_data,
+    .is_tx_ready = pio_uart_is_tx_ready,
+    .is_tx_complete = pio_uart_is_tx_complete,
+    .has_rx_data = pio_uart_has_rx_data,
+    .read_byte = pio_uart_read_byte,
+    .read_data = pio_uart_read_data,
+    .get_rx_count = pio_uart_get_rx_count,
+    .clear_rx_buffer = pio_uart_clear_rx_buffer,
+    .get_state = pio_uart_get_state,
+    .reset_stats = pio_uart_reset_stats
+};
+```
+
+====== Error Handling Implementation
+The PIO UART driver implements comprehensive error detection:
+
+- **Framing Errors**: Detected by uart_rx PIO program and reported via IRQ
+- **Break Conditions**: Handled gracefully with line state recovery
+- **FIFO Overflows**: Monitored and reported with automatic recovery
+- **DMA Transfer Errors**: Detected via DMA interrupt handling with retry logic
+
+====== Integration with UART Manager
+Channel 2 configuration updated to enable PIO UART:
+
+```c
+// Updated channel assignments for Channel 2 implementation
+static const channel_config_t channel_configs[4] = {
+    {false, UART_TYPE_PL011, 230400, 0, 1},   // Channel 0: disabled
+    {true,  UART_TYPE_PL011, 500000, 8, 9},   // Channel 1: enabled (existing)
+    {true,  UART_TYPE_PIO,   230400, 14, 15}, // Channel 2: enabled (NEW)
+    {false, UART_TYPE_PIO,   230400, 16, 17}  // Channel 3: disabled
+};
+```
+
+====== Testing Strategy
+1. **PIO Program Validation**: Verify uart_tx and uart_rx program compilation and loading
+2. **Hardware Loopback**: GP14↔GP15 connection for echo testing at 230400 baud
+3. **DMA Transfer Testing**: Verify DMA channel allocation and transfer completion
+4. **TCP Integration**: Validate port 4002 connectivity and message echo functionality
+5. **Error Condition Testing**: Simulate framing errors and verify recovery procedures
+6. **Performance Validation**: Verify throughput and latency comparable to PL011 implementation
+
+===== Dependencies
+- RP2350 PIO0 hardware availability (state machines 0 and 1)
+- DMA controller channels for TX/RX operations
+- GPIO pins 14 and 15 configured for PIO function
+- Integration with existing interrupt handling infrastructure
+- CMake build system support for PIO program compilation
 
 ==== Whitebox Flash Persistence System
 

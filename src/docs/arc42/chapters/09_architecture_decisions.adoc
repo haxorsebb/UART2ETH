@@ -40,6 +40,7 @@ This section references the Architecture Decision Records (ADRs) that document k
 * link:../adrs/ADR-009-per-core-timer-subsystem.html[ADR-009: Per Core Timer Subsystem] - Documents the decision to implement dedicated timer subsystems for each core, providing precise timing control and inter-core coordination for real-time operations.
 * link:../adrs/ADR-011-ringbuffer-implementation.html[ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging] - Documents the decision to implement lock-free ring buffers with atomic operations for high-performance message bridging between UART and TCP interfaces.
 * link:../adrs/ADR-012-core0-ringbuffer-separation.html[ADR-012: Core0 Ringbuffer Processing Separation] - Documents the decision to separate ring buffer processing responsibilities between cores, with Core0 handling TCP-to-UART direction and Core1 managing UART-to-TCP message flow.
+* link:../adrs/ADR-013-pio-uart-implementation.html[ADR-013: PIO UART Implementation for Channel 2] - Documents the decision to implement Channel 2 UART functionality using RP2350 PIO hardware with DMA integration, following the full-featured approach with robust error handling and seamless UART Manager integration.
 
 
 === Decision Interdependencies

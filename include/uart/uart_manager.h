@@ -9,10 +9,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "shared_memory.h"  // For channel_id_t
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Forward declaration
+struct uart_instance;
 
 #define UART_MANAGER_MAX_CHANNELS 4
 
@@ -99,6 +103,13 @@ int uart_manager_get_diagnostic_info(char* info_buffer, size_t buffer_size);
  * Convert status to string
  */
 const char* uart_manager_status_to_string(uart_manager_status_t status);
+
+/**
+ * Get channel instance for testing/debugging
+ * @param channel Channel ID (0-3)
+ * @return Pointer to uart_instance_t or NULL if invalid channel
+ */
+struct uart_instance* uart_manager_get_channel_instance(channel_id_t channel);
 
 #ifdef __cplusplus
 }

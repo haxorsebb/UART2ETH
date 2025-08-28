@@ -88,12 +88,17 @@ target_link_libraries(core_modules
     hardware_sync
 )
 
-# UART Manager - 4-channel UART management
+# UART Manager - 4-channel UART management (includes PIO UART for Issue #82)
 add_library(uart_manager
     uart/uart_manager.c
     uart/pl011_driver.c
+    uart/pio_uart_driver.c
     uart/uart_receive_buffer.c
 )
+
+# Generate PIO headers for PIO UART implementation
+pico_generate_pio_header(uart_manager ${CMAKE_CURRENT_LIST_DIR}/uart/pio_uart_tx.pio)
+pico_generate_pio_header(uart_manager ${CMAKE_CURRENT_LIST_DIR}/uart/pio_uart_rx.pio)
 
 target_include_directories(uart_manager PUBLIC ../include)
 target_link_libraries(uart_manager 
@@ -103,6 +108,8 @@ target_link_libraries(uart_manager
     hardware_uart
     hardware_gpio
     hardware_irq
+    hardware_pio
+    hardware_dma
     pico_sync
 )
 

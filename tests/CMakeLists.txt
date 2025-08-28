@@ -361,6 +361,49 @@ pico_enable_stdio_uart(test_uart_minimal 1)
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_uart_minimal)
 
+# Test for PIO UART Driver (Issue #82)
+add_executable(test_pio_uart_driver
+    test_pio_uart_driver.c
+    ../src/state_machine/state_machine.c
+    ../src/config/shared_memory.c
+    ../src/log/log_manager.c
+    ../src/ringbuffer/ringbuffer.c
+    ../src/uart/uart_manager.c
+    ../src/uart/pl011_driver.c
+    ../src/uart/pio_uart_driver.c
+    ../src/uart/uart_receive_buffer.c
+)
+
+# Generate PIO headers for PIO UART test
+pico_generate_pio_header(test_pio_uart_driver ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_tx.pio)
+pico_generate_pio_header(test_pio_uart_driver ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_rx.pio)
+
+target_include_directories(test_pio_uart_driver PRIVATE 
+    ../include
+    ../include/uart
+)
+
+target_link_libraries(test_pio_uart_driver
+    unity
+    network_manager     # Added: needed for shared_memory.c dependency
+    pico_stdlib
+    pico_sync
+    pico_multicore      # Dual core support for state machine and ringbuffer
+    hardware_sync       # Atomic operations and mutex
+    hardware_gpio       # GPIO configuration for UART pins
+    hardware_pio        # PIO hardware support
+    hardware_dma        # DMA support for PIO UART
+    hardware_irq        # Interrupt support
+    hardware_watchdog   # Watchdog for stability
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_pio_uart_driver 1)
+pico_enable_stdio_uart(test_pio_uart_driver 1)
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_pio_uart_driver)
+
 # Add network tests subdirectory
 add_subdirectory(network)
 
