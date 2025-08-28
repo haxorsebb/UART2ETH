@@ -266,6 +266,7 @@ static bool verify_pio_uart_configuration(void) {
  */
 static bool send_and_verify_loopback(const char* message) {
     printf("TEST: Testing loopback with message: '%s'\n", message);
+    fflush(stdout);
     
     // Create TCP-to-UART message in ring buffer
     create_tcp_to_uart_message(message);
@@ -273,6 +274,9 @@ static bool send_and_verify_loopback(const char* message) {
     // Process outgoing data (TCP -> UART)
     bool processed = false;
     absolute_time_t timeout = make_timeout_time_ms(TEST_TIMEOUT_MS);
+    
+    printf("TEST: Processing outgoing data...\n");
+    fflush(stdout);
     
     while (!time_reached(timeout)) {
         if (uart_manager_process_outgoing_data()) {
@@ -284,20 +288,29 @@ static bool send_and_verify_loopback(const char* message) {
     
     if (!processed) {
         printf("ERROR: Failed to process outgoing data within timeout\n");
+        fflush(stdout);
         return false;
     }
     
     printf("TEST: Outgoing data processed successfully\n");
+    fflush(stdout);
     
     // Wait for loopback response
+    printf("TEST: Waiting for hardware loopback...\n");
+    fflush(stdout);
     sleep_ms(100); // Allow time for hardware loopback
     
     // Process incoming data (UART -> TCP)
     bool incoming_processed = false;
     timeout = make_timeout_time_ms(TEST_TIMEOUT_MS);
     
+    printf("TEST: Processing incoming loopback data...\n");
+    fflush(stdout);
+    
     while (!time_reached(timeout)) {
         if (uart_manager_has_incoming_work()) {
+            printf("TEST: Found incoming work, processing...\n");
+            fflush(stdout);
             if (uart_manager_process_incoming_data()) {
                 incoming_processed = true;
                 break;
@@ -307,9 +320,13 @@ static bool send_and_verify_loopback(const char* message) {
     }
     
     if (!incoming_processed) {
-        printf("ERROR: Failed to process incoming loopback data\n");
+        printf("ERROR: Failed to process incoming loopback data - timeout reached\n");
+        fflush(stdout);
         return false;
     }
+    
+    printf("TEST: Incoming data processed, verifying response...\n");
+    fflush(stdout);
     
     // Verify response message
     return verify_uart_to_tcp_response(message);
@@ -385,6 +402,128 @@ static bool verify_uart_to_tcp_response(const char* expected_payload) {
 // ============================================================================
 // UNIT TESTS
 // ============================================================================
+
+/**
+ * @brief Test GPIO loopback connection GP14↔GP15
+ */
+void test_gpio_loopback_connection(void) {
+    printf("\n=== TEST: GPIO Loopback Connection ===\n");
+    fflush(stdout);
+    
+    // Test GP14 output → GP15 input
+    gpio_init(PIO_UART_TX_GPIO);
+    gpio_init(PIO_UART_RX_GPIO);
+    gpio_set_dir(PIO_UART_TX_GPIO, GPIO_OUT);
+    gpio_set_dir(PIO_UART_RX_GPIO, GPIO_IN);
+    gpio_pull_down(PIO_UART_RX_GPIO);
+    
+    sleep_ms(10);
+    
+    // Test high signal
+    gpio_put(PIO_UART_TX_GPIO, 1);
+    sleep_ms(10);
+    bool rx_high = gpio_get(PIO_UART_RX_GPIO);
+    printf("GP14=HIGH → GP15=%s\n", rx_high ? "HIGH" : "LOW");
+    fflush(stdout);
+    
+    // Test low signal  
+    gpio_put(PIO_UART_TX_GPIO, 0);
+    sleep_ms(10);
+    bool rx_low = gpio_get(PIO_UART_RX_GPIO);
+    printf("GP14=LOW → GP15=%s\n", rx_low ? "HIGH" : "LOW");
+    fflush(stdout);
+    
+    // Test GP15 output → GP14 input
+    gpio_set_dir(PIO_UART_TX_GPIO, GPIO_IN);
+    gpio_set_dir(PIO_UART_RX_GPIO, GPIO_OUT);
+    gpio_pull_down(PIO_UART_TX_GPIO);
+    
+    sleep_ms(10);
+    
+    // Test high signal reverse
+    gpio_put(PIO_UART_RX_GPIO, 1);
+    sleep_ms(10);
+    bool tx_high = gpio_get(PIO_UART_TX_GPIO);
+    printf("GP15=HIGH → GP14=%s\n", tx_high ? "HIGH" : "LOW");
+    fflush(stdout);
+    
+    // Test low signal reverse
+    gpio_put(PIO_UART_RX_GPIO, 0);
+    sleep_ms(10);
+    bool tx_low = gpio_get(PIO_UART_TX_GPIO);
+    printf("GP15=LOW → GP14=%s\n", tx_low ? "HIGH" : "LOW");
+    fflush(stdout);
+    
+    // Verify loopback works both ways
+    bool loopback_works = rx_high && !rx_low && tx_high && !tx_low;
+    
+    if (loopback_works) {
+        printf("PASS: GPIO loopback connection verified\n");
+    } else {
+        printf("FAIL: GPIO loopback connection not working\n");
+        printf("Check GP14↔GP15 wire connection!\n");
+    }
+    fflush(stdout);
+    
+    TEST_ASSERT_TRUE_MESSAGE(loopback_works, "GPIO loopback connection failed");
+}
+
+/**
+ * @brief Test GPIO connectivity between GP14 and GP15
+ * 
+ * Simple test to verify physical wire connection exists before PIO UART tests
+ */
+void test_gpio_connectivity(void) {
+    printf("\n=== TEST: GPIO Connectivity GP14<->GP15 ===\n");
+    
+    // Initialize GPIOs
+    gpio_init(PIO_UART_TX_GPIO);  // GP14
+    gpio_init(PIO_UART_RX_GPIO);  // GP15
+    
+    // Test 1: GP14 high, GP15 should read high
+    printf("TEST: Setting GP14 HIGH, reading GP15...\n");
+    gpio_set_dir(PIO_UART_TX_GPIO, GPIO_OUT);
+    gpio_set_dir(PIO_UART_RX_GPIO, GPIO_IN);
+    gpio_put(PIO_UART_TX_GPIO, 1);
+    sleep_ms(10);  // Allow signal to settle
+    bool high_test = gpio_get(PIO_UART_RX_GPIO);
+    printf("GP14=HIGH -> GP15=%s\n", high_test ? "HIGH" : "LOW");
+    
+    // Test 2: GP14 low, GP15 should read low  
+    printf("TEST: Setting GP14 LOW, reading GP15...\n");
+    gpio_put(PIO_UART_TX_GPIO, 0);
+    sleep_ms(10);  // Allow signal to settle
+    bool low_test = gpio_get(PIO_UART_RX_GPIO);
+    printf("GP14=LOW -> GP15=%s\n", low_test ? "HIGH" : "LOW");
+    
+    // Test 3: Reverse direction - GP15 out, GP14 in
+    printf("TEST: Setting GP15 HIGH, reading GP14...\n");
+    gpio_set_dir(PIO_UART_TX_GPIO, GPIO_IN);
+    gpio_set_dir(PIO_UART_RX_GPIO, GPIO_OUT);
+    gpio_put(PIO_UART_RX_GPIO, 1);
+    sleep_ms(10);
+    bool reverse_high_test = gpio_get(PIO_UART_TX_GPIO);
+    printf("GP15=HIGH -> GP14=%s\n", reverse_high_test ? "HIGH" : "LOW");
+    
+    // Test 4: GP15 low, GP14 should read low
+    printf("TEST: Setting GP15 LOW, reading GP14...\n");
+    gpio_put(PIO_UART_RX_GPIO, 0);
+    sleep_ms(10);
+    bool reverse_low_test = gpio_get(PIO_UART_TX_GPIO);
+    printf("GP15=LOW -> GP14=%s\n", reverse_low_test ? "HIGH" : "LOW");
+    
+    // Verify connectivity
+    bool connectivity_ok = high_test && !low_test && reverse_high_test && !reverse_low_test;
+    
+    if (connectivity_ok) {
+        printf("PASS: GPIO connectivity verified - GP14 and GP15 are connected\n");
+    } else {
+        printf("FAIL: GPIO connectivity failed - check wire connection between GP14 and GP15\n");
+        printf("Expected: HIGH->HIGH, LOW->LOW in both directions\n");
+    }
+    
+    TEST_ASSERT_TRUE_MESSAGE(connectivity_ok, "GPIO connectivity test failed - check GP14<->GP15 wire");
+}
 
 /**
  * @brief Test PIO UART hardware configuration to 230400 baud, 8N1, interrupt
@@ -555,6 +694,7 @@ int main(void) {
     UNITY_BEGIN();
     
     // Run all tests
+    RUN_TEST(test_gpio_connectivity);
     RUN_TEST(test_pio_uart_configuration);
     RUN_TEST(test_pio_uart_loopback_configuration);  
     RUN_TEST(test_pio_uart_single_line_transmission);
@@ -574,6 +714,18 @@ int main(void) {
         printf("Review test output and fix implementation.\n");
     }
     printf("========================================\n");
+    fflush(stdout);
+    
+    // Keepalive loop to show target is responsive and flush debug output
+    printf("Test complete - entering keepalive mode...\n");
+    fflush(stdout);
+    
+    int keepalive_count = 0;
+    while (true) {
+        printf("Keepalive %d - Target OK\n", ++keepalive_count);
+        fflush(stdout);
+        sleep_ms(2000);
+    }
     
     return result;
 }

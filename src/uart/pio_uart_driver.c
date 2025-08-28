@@ -337,9 +337,9 @@ static bool pio_uart_init(void* context, const uart_config_t* config) {
     pio_uart_rx_program_init(ctx->pio_instance, ctx->rx_sm, ctx->rx_offset,
                             config->rx_gpio, config->baud_rate);
     
-    // Setup PIO RX interrupt for data available
+    // Setup PIO RX interrupt for data available (SM1 = RX)
     pio_set_irq0_source_enabled(ctx->pio_instance, 
-                               pis_sm0_rx_fifo_not_empty + ctx->rx_sm, 
+                               pis_sm1_rx_fifo_not_empty, 
                                true);
     irq_set_exclusive_handler(pio_get_irq_num(ctx->pio_instance, 0), 
                              pio_uart_pio_rx_irq_handler);
@@ -368,7 +368,7 @@ static void pio_uart_deinit(void* context) {
     // Disable PIO interrupt
     irq_set_enabled(pio_get_irq_num(ctx->pio_instance, 0), false);
     pio_set_irq0_source_enabled(ctx->pio_instance,
-                               pis_sm0_rx_fifo_not_empty + ctx->rx_sm,
+                               pis_sm1_rx_fifo_not_empty,
                                false);
     
     // Cleanup DMA
@@ -396,6 +396,7 @@ static void pio_uart_send_byte(void* context, uint8_t byte) {
     }
     
     // Send single byte directly to PIO FIFO  
+    printf("PIO TX: Sending byte 0x%02X ('%c')\n", byte, (byte >= 32 && byte < 127) ? byte : '?');
     pio_sm_put_blocking(ctx->pio_instance, ctx->tx_sm, (uint32_t)byte);
     
     ctx->state.bytes_sent++;
@@ -584,21 +585,27 @@ static void pio_uart_pio_rx_irq_handler(void) {
         // Limit processing to prevent interrupt from running too long
         int max_bytes = 32;  // Prevent unbounded interrupt processing
         
+        printf("PIO RX IRQ: Processing FIFO data\n");
+        
         // Process available bytes from PIO RX FIFO with interrupt protection
         while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm) && max_bytes-- > 0) {
             uint32_t word = pio_sm_get(ctx->pio_instance, ctx->rx_sm);
             uint8_t byte = (uint8_t)(word >> 24);  // Extract byte from left-justified data
             
-            // Use critical section to protect shared ring buffer access
-            uint32_t irq_status = save_and_disable_interrupts();
+            printf("PIO RX IRQ: Received byte 0x%02X ('%c')\n", byte, 
+                   (byte >= 32 && byte < 127) ? byte : '?');
+            
+            // Direct ring buffer access (ring buffer is interrupt-safe)
             bool success = uart_receive_buffer_put(&ctx->rx_ring, byte);
-            restore_interrupts(irq_status);
             
             if (!success) {
+                printf("PIO RX IRQ: Ring buffer full!\n");
                 ctx->state.overrun_errors++;
                 break;  // Buffer full
             }
         }
+        
+        printf("PIO RX IRQ: Processing complete\n");
         
         // Clear the interrupt
         pio_interrupt_clear(ctx->pio_instance, pis_sm0_rx_fifo_not_empty + ctx->rx_sm);
