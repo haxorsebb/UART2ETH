@@ -218,7 +218,7 @@ int uart_manager_get_diagnostic_info(char* info_buffer, size_t buffer_size) {
     
     update_manager_stats();
     
-    return snprintf(info_buffer, buffer_size,
+    int len = snprintf(info_buffer, buffer_size,
         "UART Manager Diagnostics:\n"
         "  Status: %s\n"
         "  Uptime: %lu seconds\n"
@@ -239,6 +239,19 @@ int uart_manager_get_diagnostic_info(char* info_buffer, size_t buffer_size) {
         g_manager.stats.ring_buffer_overflows,
         UART_MANAGER_MAX_CHANNELS
     );
+    
+    // Add per-channel information
+    for (int i = 0; i < UART_MANAGER_MAX_CHANNELS && len < buffer_size - 1; i++) {
+        if (channel_configs[i].enabled) {
+            const char* type_str = (channel_configs[i].type == UART_TYPE_PL011) ? "PL011" : "PIO";
+            len += snprintf(info_buffer + len, buffer_size - len,
+                "  Channel %d: %s UART, %u baud, GP%u/GP%u\n",
+                i, type_str, channel_configs[i].baud_rate,
+                channel_configs[i].tx_gpio, channel_configs[i].rx_gpio);
+        }
+    }
+    
+    return len;
 }
 
 const char* uart_manager_status_to_string(uart_manager_status_t status) {

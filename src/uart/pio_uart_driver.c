@@ -414,9 +414,8 @@ static size_t pio_uart_send_data(void* context, const uint8_t* data, size_t len)
         memcpy(ctx->tx_dma_buffer, data, transfer_len);
         
         // Configure and start DMA transfer
-        dma_channel_transfer_from_buffer_now(ctx->tx_dma_chan, 
-                                           ctx->tx_dma_buffer, 
-                                           transfer_len);
+        dma_channel_set_trans_count(ctx->tx_dma_chan, transfer_len, false);
+        dma_channel_set_read_addr(ctx->tx_dma_chan, ctx->tx_dma_buffer, true);
         
         ctx->tx_in_progress = true;
         ctx->state.bytes_sent += transfer_len;

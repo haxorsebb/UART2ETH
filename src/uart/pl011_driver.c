@@ -129,8 +129,8 @@ static void pl011_deinit(void* context) {
     // Deinitialize UART
     uart_deinit(ctx->hw_uart);
     
-    // Clear lookup table
-    pl011_destroy_context(&pl011_contexts[ctx->hw_uart_num]);
+    // Clear lookup table entry
+    pl011_contexts[ctx->hw_uart_num].state.initialized = false;
     
     // Reset state
     memset(&ctx->state, 0, sizeof(uart_state_t));
