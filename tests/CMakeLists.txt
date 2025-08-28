@@ -404,6 +404,115 @@ pico_enable_stdio_uart(test_pio_uart_driver 1)
 # Create UF2 output for flashing to device
 pico_add_extra_outputs(test_pio_uart_driver)
 
+# Minimal PIO UART test - direct driver testing
+add_executable(test_pio_uart_minimal
+    test_pio_uart_minimal.c
+    ../src/uart/pio_uart_driver.c
+    ../src/uart/uart_receive_buffer.c
+)
+
+# Generate PIO headers for minimal test
+pico_generate_pio_header(test_pio_uart_minimal ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_tx.pio)
+pico_generate_pio_header(test_pio_uart_minimal ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_rx.pio)
+
+target_include_directories(test_pio_uart_minimal PRIVATE
+    ../include
+    ../include/uart
+)
+
+target_link_libraries(test_pio_uart_minimal
+    unity
+    pico_stdlib
+    hardware_pio
+    hardware_dma
+    hardware_gpio
+)
+
+pico_enable_stdio_usb(test_pio_uart_minimal 1)
+pico_enable_stdio_uart(test_pio_uart_minimal 1)
+
+pico_add_extra_outputs(test_pio_uart_minimal)
+
+# Direct PIO UART test - bypassing all UART manager logic
+add_executable(test_pio_direct
+    test_pio_direct.c
+)
+
+# Generate PIO headers for direct test
+pico_generate_pio_header(test_pio_direct ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_tx.pio)
+pico_generate_pio_header(test_pio_direct ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_rx.pio)
+
+target_link_libraries(test_pio_direct
+    pico_stdlib
+    hardware_pio
+    hardware_gpio
+)
+
+pico_enable_stdio_usb(test_pio_direct 1)
+pico_enable_stdio_uart(test_pio_direct 1)
+
+pico_add_extra_outputs(test_pio_direct)
+
+# PIO UART Integration test - through UART manager but bypassing ring buffer
+add_executable(test_pio_uart_integration
+    test_pio_uart_integration.c
+    ../src/state_machine/state_machine.c
+    ../src/config/shared_memory.c
+    ../src/log/log_manager.c
+    ../src/ringbuffer/ringbuffer.c
+    ../src/uart/uart_manager.c
+    ../src/uart/pl011_driver.c
+    ../src/uart/pio_uart_driver.c
+    ../src/uart/uart_receive_buffer.c
+)
+
+# Generate PIO headers for integration test
+pico_generate_pio_header(test_pio_uart_integration ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_tx.pio)
+pico_generate_pio_header(test_pio_uart_integration ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_rx.pio)
+
+target_include_directories(test_pio_uart_integration PRIVATE 
+    ../include
+    ../include/uart
+)
+
+target_link_libraries(test_pio_uart_integration
+    network_manager
+    pico_stdlib
+    pico_sync
+    pico_multicore
+    hardware_sync
+    hardware_gpio
+    hardware_pio
+    hardware_dma
+    hardware_irq
+    hardware_watchdog
+)
+
+pico_enable_stdio_usb(test_pio_uart_integration 1)
+pico_enable_stdio_uart(test_pio_uart_integration 1)
+
+pico_add_extra_outputs(test_pio_uart_integration)
+
+# PIO Interrupt test - verify RX interrupt triggering
+add_executable(test_pio_interrupt
+    test_pio_interrupt.c
+)
+
+pico_generate_pio_header(test_pio_interrupt ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_tx.pio)
+pico_generate_pio_header(test_pio_interrupt ${CMAKE_CURRENT_LIST_DIR}/../src/uart/pio_uart_rx.pio)
+
+target_link_libraries(test_pio_interrupt
+    pico_stdlib
+    hardware_pio
+    hardware_gpio
+    hardware_irq
+)
+
+pico_enable_stdio_usb(test_pio_interrupt 1)
+pico_enable_stdio_uart(test_pio_interrupt 1)
+
+pico_add_extra_outputs(test_pio_interrupt)
+
 # Add network tests subdirectory
 add_subdirectory(network)
 

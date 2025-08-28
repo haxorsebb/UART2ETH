@@ -337,9 +337,9 @@ static bool pio_uart_init(void* context, const uart_config_t* config) {
     pio_uart_rx_program_init(ctx->pio_instance, ctx->rx_sm, ctx->rx_offset,
                             config->rx_gpio, config->baud_rate);
     
-    // Setup PIO RX interrupt for data available (SM1 = RX)
+    // Setup PIO RX interrupt for data available  
     pio_set_irq0_source_enabled(ctx->pio_instance, 
-                               pis_sm1_rx_fifo_not_empty, 
+                               pis_sm0_rx_fifo_not_empty + ctx->rx_sm, 
                                true);
     irq_set_exclusive_handler(pio_get_irq_num(ctx->pio_instance, 0), 
                              pio_uart_pio_rx_irq_handler);
@@ -368,7 +368,7 @@ static void pio_uart_deinit(void* context) {
     // Disable PIO interrupt
     irq_set_enabled(pio_get_irq_num(ctx->pio_instance, 0), false);
     pio_set_irq0_source_enabled(ctx->pio_instance,
-                               pis_sm1_rx_fifo_not_empty,
+                               pis_sm0_rx_fifo_not_empty + ctx->rx_sm,
                                false);
     
     // Cleanup DMA
@@ -397,9 +397,20 @@ static void pio_uart_send_byte(void* context, uint8_t byte) {
     
     // Send single byte directly to PIO FIFO  
     printf("PIO TX: Sending byte 0x%02X ('%c')\n", byte, (byte >= 32 && byte < 127) ? byte : '?');
-    pio_sm_put_blocking(ctx->pio_instance, ctx->tx_sm, (uint32_t)byte);
+    
+    // Check if FIFO is full before sending
+    if (pio_sm_is_tx_fifo_full(ctx->pio_instance, ctx->tx_sm)) {
+        printf("PIO TX: FIFO is FULL - cannot send\n");
+        return;
+    }
+    
+    printf("PIO TX: FIFO ready, sending...\n");
+    pio_sm_put(ctx->pio_instance, ctx->tx_sm, (uint32_t)byte);
+    printf("PIO TX: Byte sent to FIFO\n");
     
     ctx->state.bytes_sent++;
+    // Direct PIO send is complete immediately
+    ctx->tx_in_progress = false;
 }
 
 static size_t pio_uart_send_data(void* context, const uint8_t* data, size_t len) {
@@ -451,11 +462,20 @@ static bool pio_uart_is_tx_ready(void* context) {
 static bool pio_uart_is_tx_complete(void* context) {
     pio_uart_context_t* ctx = (pio_uart_context_t*)context;
     if (!ctx || !ctx->state.initialized) {
+        printf("PIO TX Complete: context invalid/uninitialized\n");
         return true;
     }
     
-    return !ctx->tx_in_progress && 
-           pio_sm_is_tx_fifo_empty(ctx->pio_instance, ctx->tx_sm);
+    bool tx_not_in_progress = !ctx->tx_in_progress;
+    bool fifo_empty = pio_sm_is_tx_fifo_empty(ctx->pio_instance, ctx->tx_sm);
+    bool complete = tx_not_in_progress && fifo_empty;
+    
+    printf("PIO TX Complete check: tx_in_progress=%s, fifo_empty=%s, complete=%s\n",
+           ctx->tx_in_progress ? "true" : "false",
+           fifo_empty ? "true" : "false", 
+           complete ? "true" : "false");
+    
+    return complete;
 }
 
 static bool pio_uart_has_rx_data(void* context) {
@@ -579,36 +599,23 @@ static void pio_uart_pio_rx_irq_handler(void) {
     
     pio_uart_context_t* ctx = &pio_uart_context;
     
-    // Check if our RX SM triggered the interrupt
-    if (pio_interrupt_get(ctx->pio_instance, pis_sm0_rx_fifo_not_empty + ctx->rx_sm)) {
+    // Clear interrupt first to prevent runaway condition
+    pio_interrupt_clear(ctx->pio_instance, pis_sm0_rx_fifo_not_empty + ctx->rx_sm);
+    
+    // Process available data from FIFO
+    int max_bytes = 32;  // Prevent unbounded interrupt processing
+    
+    while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm) && max_bytes-- > 0) {
+        uint32_t word = pio_sm_get(ctx->pio_instance, ctx->rx_sm);
+        uint8_t byte = (uint8_t)(word >> 24);  // Extract byte from left-justified data
         
-        // Limit processing to prevent interrupt from running too long
-        int max_bytes = 32;  // Prevent unbounded interrupt processing
+        // Put byte into ring buffer (interrupt-safe)
+        bool success = uart_receive_buffer_put(&ctx->rx_ring, byte);
         
-        printf("PIO RX IRQ: Processing FIFO data\n");
-        
-        // Process available bytes from PIO RX FIFO with interrupt protection
-        while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm) && max_bytes-- > 0) {
-            uint32_t word = pio_sm_get(ctx->pio_instance, ctx->rx_sm);
-            uint8_t byte = (uint8_t)(word >> 24);  // Extract byte from left-justified data
-            
-            printf("PIO RX IRQ: Received byte 0x%02X ('%c')\n", byte, 
-                   (byte >= 32 && byte < 127) ? byte : '?');
-            
-            // Direct ring buffer access (ring buffer is interrupt-safe)
-            bool success = uart_receive_buffer_put(&ctx->rx_ring, byte);
-            
-            if (!success) {
-                printf("PIO RX IRQ: Ring buffer full!\n");
-                ctx->state.overrun_errors++;
-                break;  // Buffer full
-            }
+        if (!success) {
+            ctx->state.overrun_errors++;
+            break;  // Buffer full, stop processing
         }
-        
-        printf("PIO RX IRQ: Processing complete\n");
-        
-        // Clear the interrupt
-        pio_interrupt_clear(ctx->pio_instance, pis_sm0_rx_fifo_not_empty + ctx->rx_sm);
     }
 }
 

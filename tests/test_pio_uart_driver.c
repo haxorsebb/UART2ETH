@@ -98,6 +98,21 @@ void tearDown(void) {
     // Clean up hardware loopback
     cleanup_hardware_loopback();
     
+    // Clear all ring buffers to prevent test contamination
+    ring_entry_t* entry;
+    int cleanup_count = 0;
+    while ((entry = ringbuffer_dequeue_entry(RX_TCP_TO_UART, CHANNEL_2, ENTRY_STATUS_READY)) != NULL) {
+        ringbuffer_mark_consumed(entry);
+        cleanup_count++;
+        if (cleanup_count > 100) break; // Prevent infinite loop
+    }
+    cleanup_count = 0;
+    while ((entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP, CHANNEL_2, ENTRY_STATUS_READY)) != NULL) {
+        ringbuffer_mark_consumed(entry);
+        cleanup_count++;
+        if (cleanup_count > 100) break; // Prevent infinite loop
+    }
+    
     // Deinitialize UART manager if initialized
     uart_manager_deinit();
     g_pio_uart_initialized = false;
