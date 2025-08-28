@@ -32,10 +32,10 @@ The RP2350 pin assignment is optimized for PCB layout efficiency and signal inte
 4+^.^h|*UART Channels*
 |Channel 1 TX |GP4 |UART1 |UART Channel 1 transmit (active, 115200 baud)
 |Channel 1 RX |GP5 |UART1 |UART Channel 1 receive (active, 115200 baud)
-|Channel 2 TX |GP22 |PIO |UART Channel 2 transmit (reserved, disabled)
-|Channel 2 RX |GP23 |PIO |UART Channel 2 receive (reserved, disabled)
-|Channel 3 TX |GP24 |PIO |UART Channel 3 transmit (reserved, disabled)
-|Channel 3 RX |GP25 |PIO |UART Channel 3 receive (reserved, disabled)
+|Channel 2 TX |GP14 |PIO |UART Channel 2 transmit (reserved, disabled)
+|Channel 2 RX |GP15 |PIO |UART Channel 2 receive (reserved, disabled)
+|Channel 3 TX |GP16 |PIO |UART Channel 3 transmit (reserved, disabled)
+|Channel 3 RX |GP17 |PIO |UART Channel 3 receive (reserved, disabled)
 
 4+^.^h|*Ethernet Controller (ENC28J60)*
 |ENC-MISO |GP8 |SPI |Master In Slave Out
@@ -54,8 +54,8 @@ The RP2350 pin assignment is optimized for PCB layout efficiency and signal inte
 
 |Channel 0 |UART0/PL011 |GP0 |GP1 |230400 |**Reserved** (debug interface only)
 |Channel 1 |UART1/PL011 |GP4 |GP5 |115200 |**Enabled** (active TCP-to-UART bridge)
-|Channel 2 |PIO |GP22 |GP23 |230400 |**Disabled** (future expansion)
-|Channel 3 |PIO |GP24 |GP25 |230400 |**Disabled** (future expansion)
+|Channel 2 |PIO |GP14 |GP15 |230400 |**Disabled** (future expansion)
+|Channel 3 |PIO |GP16 |GP17 |230400 |**Disabled** (future expansion)
 |===
 
 ==== Interface Details
@@ -84,8 +84,8 @@ The RP2350 pin assignment is optimized for PCB layout efficiency and signal inte
 ===== Future Expansion (Channels 2-3)
 - **Implementation**: Reserved for PIO-based UART implementation
 - **Status**: Hardware pins reserved, software implementation pending
-- **Channel 2**: Independent pins GP22/GP23 ready for implementation
-- **Channel 3**: Independent pins GP24/GP25 ready for implementation
+- **Channel 2**: Independent pins GP14/GP15 ready for implementation
+- **Channel 3**: Independent pins GP16/GP17 ready for implementation
 - **Potential**: Up to 4 total UART channels as originally specified
 
 === Implementation Notes
