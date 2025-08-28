@@ -89,9 +89,10 @@ static bool pl011_init(void* context, const uart_config_t* config) {
     pl011_context_t* ctx = context;
     if (!ctx || ctx->state.initialized) return false;
     
+    
     // Configure GPIO pins
-    gpio_set_function(config->tx_gpio, GPIO_FUNC_UART);
-    gpio_set_function(config->rx_gpio, GPIO_FUNC_UART);
+    gpio_set_function(config->tx_gpio, UART_FUNCSEL_NUM(ctx->hw_uart, config->tx_gpio));
+    gpio_set_function(config->rx_gpio, UART_FUNCSEL_NUM(ctx->hw_uart, config->rx_gpio));
     
     // Initialize UART hardware
     uart_init(ctx->hw_uart, config->baud_rate);
