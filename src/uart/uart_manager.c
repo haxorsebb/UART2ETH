@@ -411,7 +411,7 @@ static bool process_channel_outgoing_data(channel_id_t channel) {
     }
     
     //check if ready to send or busy
-    if(!uart->ops->is_tx_complete)
+    if (!uart->ops->is_tx_complete(uart->driver_context))
     {
         printf("UART DEBUG: trying to send on channel %d, BUT TX BUSY!\n", channel );
         return false;

@@ -344,6 +344,7 @@ static void create_tcp_to_uart_message(const char* payload) {
     entry->channel = CHANNEL_2;
     entry->direction = RX_TCP_TO_UART;
     entry->fill_index = strlen(payload);
+    entry->status = ENTRY_STATUS_READY;  // Mark as ready for processing
     memcpy(entry->payload, payload, entry->fill_index);
     
     ringbuffer_enqueue_entry(entry);
