@@ -41,7 +41,7 @@ We will implement a full-featured PIO UART driver for Channel 2 using the follow
 - **UART Manager**: Register via `pio_uart_interface` and channel configuration
 - **Ring Buffer System**: Full integration with existing TCP↔UART message bridge
 - **State Machine**: Integrate with Core0 UART subsystem states
-- **TCP Port**: Expose as port 4002 for network connectivity
+- **TCP Port**: Expose as port 4003 for network connectivity
 
 === Technical Specifications
 

@@ -9,7 +9,7 @@
  * 1. Successful configuring of hardware uart to 230400 baud, 8N1, and interrupt
  * 2. Successful testing of loopback configuration of uart channel 2  
  * 3. Sending and receiving of a single line of text (ending with newline)
- * 4. Loops of (2) always returning what was sent from port 4002 to port 4002
+ * 4. Loops of (2) always returning what was sent from port 4003 to port 4003
  * 
  * Documentation Reference:
  * - Issue #82: PIO UART Driver Implementation
@@ -438,7 +438,7 @@ void test_pio_uart_single_line_transmission(void) {
 /**
  * @brief Test multiple message loops returning sent data
  * 
- * Requirement: Loops of (2) always returning what was sent from port 4002 to port 4002.
+ * Requirement: Loops of (2) always returning what was sent from port 4003 to port 4003.
  */
 void test_pio_uart_multiple_message_loops(void) {
     printf("\n=== TEST: PIO UART Multiple Message Loops ===\n");
