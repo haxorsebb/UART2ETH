@@ -110,6 +110,18 @@ void pio_destroy_context(void* context) {
         if (pio_uart_context.state.initialized) {
             pio_uart_deinit(context);
         }
+        
+        // Release DMA channels if they were claimed
+        if (pio_uart_context.dma_channels_claimed) {
+            if (pio_uart_context.tx_dma_chan != (uint)-1) {
+                dma_channel_unclaim(pio_uart_context.tx_dma_chan);
+            }
+            if (pio_uart_context.rx_dma_chan != (uint)-1) {
+                dma_channel_unclaim(pio_uart_context.rx_dma_chan);
+            }
+            pio_uart_context.dma_channels_claimed = false;
+        }
+        
         pio_uart_context_initialized = false;
         printf("PIO UART context destroyed\n");
     }
@@ -117,6 +129,11 @@ void pio_destroy_context(void* context) {
 
 // Setup PIO programs
 bool pio_uart_setup_programs(pio_uart_context_t* ctx) {
+    if (!ctx) {
+        printf("ERROR: NULL context provided to pio_uart_setup_programs\n");
+        return false;
+    }
+    
     printf("PIO UART: Setting up PIO programs...\n");
     
     // Load TX program
@@ -131,7 +148,9 @@ bool pio_uart_setup_programs(pio_uart_context_t* ctx) {
     // Load RX program
     if (!pio_can_add_program(ctx->pio_instance, &pio_uart_rx_program)) {
         printf("ERROR: Cannot add PIO RX program - insufficient space\n");
+        // Clean up TX program on failure
         pio_remove_program(ctx->pio_instance, &pio_uart_tx_program, ctx->tx_offset);
+        ctx->tx_offset = 0;
         return false;
     }
     
@@ -157,20 +176,26 @@ void pio_uart_cleanup_programs(pio_uart_context_t* ctx) {
 
 // Setup DMA channels
 bool pio_uart_setup_dma(pio_uart_context_t* ctx) {
+    if (!ctx) {
+        printf("ERROR: NULL context provided to pio_uart_setup_dma\n");
+        return false;
+    }
+    
     printf("PIO UART: Setting up DMA channels...\n");
     
     // Claim TX DMA channel
     ctx->tx_dma_chan = dma_claim_unused_channel(false);
-    if (ctx->tx_dma_chan < 0) {
+    if (ctx->tx_dma_chan == (uint)-1) {
         printf("ERROR: Failed to claim TX DMA channel\n");
         return false;
     }
     
     // Claim RX DMA channel
     ctx->rx_dma_chan = dma_claim_unused_channel(false);
-    if (ctx->rx_dma_chan < 0) {
+    if (ctx->rx_dma_chan == (uint)-1) {
         printf("ERROR: Failed to claim RX DMA channel\n");
         dma_channel_unclaim(ctx->tx_dma_chan);
+        ctx->tx_dma_chan = (uint)-1;
         return false;
     }
     
@@ -202,18 +227,20 @@ bool pio_uart_setup_dma(pio_uart_context_t* ctx) {
     dma_channel_configure(
         ctx->rx_dma_chan,
         &rx_config,
-        NULL,  // Write address set later
+        ctx->rx_buffer,                       // Destination buffer
         &ctx->pio_instance->rxf[ctx->rx_sm],  // Read from RX FIFO
-        0,     // Transfer count set later
+        PIO_UART_RX_BUFFER_SIZE,              // Transfer count
         false  // Don't start yet
     );
     
     // Set up DMA interrupts
     dma_channel_set_irq0_enabled(ctx->tx_dma_chan, true);
-    dma_channel_set_irq0_enabled(ctx->rx_dma_chan, true);
+    dma_channel_set_irq1_enabled(ctx->rx_dma_chan, true);
     
     irq_set_exclusive_handler(DMA_IRQ_0, pio_uart_dma_tx_irq_handler);
+    irq_set_exclusive_handler(DMA_IRQ_1, pio_uart_dma_rx_irq_handler);
     irq_set_enabled(DMA_IRQ_0, true);
+    irq_set_enabled(DMA_IRQ_1, true);
     
     printf("PIO UART: DMA setup complete - TX:%u RX:%u\n", 
            ctx->tx_dma_chan, ctx->rx_dma_chan);
@@ -230,8 +257,9 @@ void pio_uart_cleanup_dma(pio_uart_context_t* ctx) {
     
     // Disable DMA interrupts
     irq_set_enabled(DMA_IRQ_0, false);
+    irq_set_enabled(DMA_IRQ_1, false);
     dma_channel_set_irq0_enabled(ctx->tx_dma_chan, false);
-    dma_channel_set_irq0_enabled(ctx->rx_dma_chan, false);
+    dma_channel_set_irq1_enabled(ctx->rx_dma_chan, false);
     
     // Abort any ongoing transfers
     dma_channel_abort(ctx->tx_dma_chan);
