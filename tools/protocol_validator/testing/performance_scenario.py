@@ -112,45 +112,53 @@ class PerformanceTestScenario:
         if not self.tcp_client:
             raise RuntimeError("Not connected to device")
         
-        # Generate test messages (mix of valid and invalid)
-        test_messages = []
+        # Start metrics collection to track statistics properly
+        self.metrics_collector.start_collection()
         
-        # Add valid minimal messages
-        minimal_messages = self.message_generator.generate_minimal_set()
-        test_messages.extend(minimal_messages[:message_count // 2])
-        
-        # Add medium-sized messages
-        for _ in range(message_count // 4):
-            test_messages.append(self.message_generator.generate_medium(128))
-        
-        # Add maximum-size messages
-        for _ in range(message_count // 4):
-            test_messages.append(self.message_generator.generate_maximum())
-        
-        # Run tests
-        successful_messages = 0
-        failed_messages = 0
-        
-        for message in test_messages:
-            if message.is_valid():
-                success = await self.send_test_message(message, self.target_ports[0])
-                if success:
-                    successful_messages += 1
+        try:
+            # Generate test messages (mix of valid and invalid)
+            test_messages = []
+            
+            # Add valid minimal messages
+            minimal_messages = self.message_generator.generate_minimal_set()
+            test_messages.extend(minimal_messages[:message_count // 2])
+            
+            # Add medium-sized messages
+            for _ in range(message_count // 4):
+                test_messages.append(self.message_generator.generate_medium(128))
+            
+            # Add maximum-size messages
+            for _ in range(message_count // 4):
+                test_messages.append(self.message_generator.generate_maximum())
+            
+            # Run tests
+            successful_messages = 0
+            failed_messages = 0
+            
+            for message in test_messages:
+                if message.is_valid():
+                    success = await self.send_test_message(message, self.target_ports[0])
+                    if success:
+                        successful_messages += 1
+                    else:
+                        failed_messages += 1
                 else:
+                    # Invalid messages should be rejected
                     failed_messages += 1
-            else:
-                # Invalid messages should be rejected
-                failed_messages += 1
-        
-        total_messages = len(test_messages)
-        compliance_rate = (successful_messages / total_messages) * 100 if total_messages > 0 else 0
-        
-        return {
-            'total_messages': total_messages,
-            'successful_messages': successful_messages,
-            'failed_messages': failed_messages,
-            'compliance_rate': compliance_rate
-        }
+            
+            total_messages = len(test_messages)
+            compliance_rate = (successful_messages / total_messages) * 100 if total_messages > 0 else 0
+            
+            return {
+                'total_messages': total_messages,
+                'successful_messages': successful_messages,
+                'failed_messages': failed_messages,
+                'compliance_rate': compliance_rate
+            }
+            
+        finally:
+            # Stop metrics collection
+            self.metrics_collector.stop_collection()
     
     async def run_performance_test(self, duration: int = None) -> Dict[str, Any]:
         """

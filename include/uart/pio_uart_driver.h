@@ -33,8 +33,8 @@
 #define PIO_UART_RX_GPIO        15     // Channel 2 RX
 
 // Buffer configuration
-#define PIO_UART_RX_BUFFER_SIZE 512    // Receive ring buffer size
-#define PIO_UART_DMA_BUFFER_SIZE 256   // DMA staging buffer size
+#define PIO_UART_RX_BUFFER_SIZE 1536   // Receive ring buffer size (increased for long messages)
+#define PIO_UART_DMA_BUFFER_SIZE 1024  // DMA staging buffer size (increased for large messages)
 
 // Constants for resource management
 #define PIO_PROGRAM_OFFSET_INVALID 0   // Invalid/uninitialized PIO program offset

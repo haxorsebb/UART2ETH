@@ -419,11 +419,13 @@ static size_t pio_uart_send_data(void* context, const uint8_t* data, size_t len)
         return 0;
     }
     
-    // For large transfers, use DMA
-    if (len > 8 && !ctx->tx_in_progress) {
+    // For large transfers, use DMA  
+    if (len > 16 && !ctx->tx_in_progress) {
         // Copy to DMA buffer (limit to buffer size)
         size_t transfer_len = len > PIO_UART_DMA_BUFFER_SIZE ? PIO_UART_DMA_BUFFER_SIZE : len;
         memcpy(ctx->tx_dma_buffer, data, transfer_len);
+        
+        printf("PIO TX: Using DMA for %zu bytes (requested %zu)\n", transfer_len, len);
         
         // Configure and start DMA transfer
         dma_channel_set_trans_count(ctx->tx_dma_chan, transfer_len, false);
@@ -435,6 +437,7 @@ static size_t pio_uart_send_data(void* context, const uint8_t* data, size_t len)
         return transfer_len;
     } else {
         // Use direct PIO FIFO for small transfers or if DMA busy
+        printf("PIO TX: Using FIFO for %zu bytes (DMA busy=%s)\n", len, ctx->tx_in_progress ? "yes" : "no");
         size_t sent = 0;
         for (size_t i = 0; i < len; i++) {
             if (!pio_sm_is_tx_fifo_full(ctx->pio_instance, ctx->tx_sm)) {
@@ -445,6 +448,7 @@ static size_t pio_uart_send_data(void* context, const uint8_t* data, size_t len)
                 break;  // FIFO full, return partial send
             }
         }
+        printf("PIO TX: FIFO sent %zu/%zu bytes\n", sent, len);
         return sent;
     }
 }

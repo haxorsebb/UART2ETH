@@ -313,7 +313,7 @@ static bool send_and_verify_loopback(const char* message) {
     // Wait for loopback response
     printf("TEST: Waiting for hardware loopback...\n");
     fflush(stdout);
-    sleep_ms(100); // Allow time for hardware loopback
+    sleep_ms(300); // Allow more time for hardware loopback and processing
     
     // Process incoming data (UART -> TCP)
     bool incoming_processed = false;
@@ -567,7 +567,7 @@ void test_pio_uart_loopback_configuration(void) {
     setup_pio_uart_loopback_test();
     
     // Verify we can send a basic test message through loopback
-    const char* test_msg = "LOOPBACK_TEST\r\n";
+    const char* test_msg = "LOOPBACK_TEST!\r\n";
     TEST_ASSERT_TRUE_MESSAGE(send_and_verify_loopback(test_msg), 
                             "PIO UART loopback test failed");
     

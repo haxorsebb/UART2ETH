@@ -50,22 +50,30 @@ typedef struct tcp_connection {
     uint32_t last_activity_ms;                    // For timeout detection
 } tcp_connection_t;
 
-// Server state
-static struct tcp_pcb* g_server_pcb = NULL;
-static tcp_connection_t g_connections[TCP_SERVER_MAX_CONNECTIONS];
-static tcp_server_stats_t g_server_stats;
-static bool g_server_initialized = false;
-static uint16_t g_listen_port = 0;
+#define MAX_TCP_SERVERS 4  // Support up to 4 UART channels
+
+/**
+ * @brief TCP server instance structure
+ */
+typedef struct {
+    struct tcp_pcb* server_pcb;
+    tcp_connection_t connections[TCP_SERVER_MAX_CONNECTIONS];
+    tcp_server_stats_t stats;
+    uint16_t listen_port;
+    channel_id_t channel;
+    bool initialized;
+} tcp_server_instance_t;
+
+// Multi-server state
+static tcp_server_instance_t g_servers[MAX_TCP_SERVERS];
+static bool g_multi_server_initialized = false;
 
 // Forward declarations
 static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t err);
 static err_t tcp_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, struct pbuf* p, err_t err);
 static void tcp_connection_error_callback(void* arg, err_t err);
 static err_t tcp_connection_sent_callback(void* arg, struct tcp_pcb* tpcb, u16_t len);
-static tcp_connection_t* find_free_connection(void);
-static tcp_connection_t* find_connection_by_pcb(struct tcp_pcb* pcb);
 static void close_connection(tcp_connection_t* conn);
-static void close_all_connections(void);
 static int process_received_data(tcp_connection_t* conn, const char* data, size_t len);
 
 /**
@@ -74,14 +82,31 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
  * @return true if initialization successful, false otherwise
  * @note Requires network manager to be initialized (not ERROR/UNINITIALIZED)
  */
-bool tcp_socket_server_init(uint16_t port) {
-    if (g_server_initialized) {
+bool tcp_socket_server_init(uint16_t port, channel_id_t channel) {
+    // Initialize multi-server system on first call
+    if (!g_multi_server_initialized) {
+        memset(g_servers, 0, sizeof(g_servers));
+        g_multi_server_initialized = true;
         DEBUG_ONLY({
-            printf("TCP Server: Already initialized\n");
+            printf("TCP Multi-Server: System initialized\n");
         });
-        return true;
     }
     
+    // Find free server slot
+    tcp_server_instance_t* server = NULL;
+    for (int i = 0; i < MAX_TCP_SERVERS; i++) {
+        if (!g_servers[i].initialized) {
+            server = &g_servers[i];
+            break;
+        }
+    }
+    
+    if (!server) {
+        DEBUG_ONLY({
+            printf("TCP Server: No free server slots available\n");
+        });
+        return false;
+    }
     
     // Check network is initialized (allow non-READY states for unit testing)
     network_status_t status = network_manager_get_status();
@@ -93,58 +118,60 @@ bool tcp_socket_server_init(uint16_t port) {
     }
     
     DEBUG_ONLY({
-        printf("TCP Server: Initializing on port %u\n", port);
+        printf("TCP Server: Initializing on port %u for channel %u\n", port, channel);
     });
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, port);
     
     // Create new TCP PCB
-    g_server_pcb = tcp_new();
-    if (!g_server_pcb) {
+    server->server_pcb = tcp_new();
+    if (!server->server_pcb) {
         DEBUG_ONLY({
-            printf("TCP Server: Failed to create PCB\n");
+            printf("TCP Server: Failed to create PCB for port %u\n", port);
         });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, TCP_ERROR_PCB_CREATION_FAILED);
         return false;
     }
     
     // Bind to port
-    err_t err = tcp_bind(g_server_pcb, IP_ADDR_ANY, port);
+    err_t err = tcp_bind(server->server_pcb, IP_ADDR_ANY, port);
     if (err != ERR_OK) {
         DEBUG_ONLY({
             printf("TCP Server: Failed to bind to port %u (error %d)\n", port, err);
         });
-        tcp_close(g_server_pcb);
-        g_server_pcb = NULL;
+        tcp_close(server->server_pcb);
+        server->server_pcb = NULL;
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, TCP_ERROR_BIND_FAILED);
         return false;
     }
     
     // Start listening
-    g_server_pcb = tcp_listen(g_server_pcb);
-    if (!g_server_pcb) {
+    server->server_pcb = tcp_listen(server->server_pcb);
+    if (!server->server_pcb) {
         DEBUG_ONLY({
-            printf("TCP Server: Failed to listen\n");
+            printf("TCP Server: Failed to listen on port %u\n", port);
         });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, TCP_ERROR_LISTEN_FAILED);
         return false;
     }
     
-    // Set accept callback
-    tcp_accept(g_server_pcb, tcp_server_accept_callback);
+    // Set accept callback with server instance as argument
+    tcp_arg(server->server_pcb, server);
+    tcp_accept(server->server_pcb, tcp_server_accept_callback);
     
     // Initialize connection pool
-    memset(g_connections, 0, sizeof(g_connections));
+    memset(server->connections, 0, sizeof(server->connections));
     
     // Initialize statistics
-    memset(&g_server_stats, 0, sizeof(tcp_server_stats_t));
-    g_server_stats.listen_port = port;
-    g_server_stats.max_connections = TCP_SERVER_MAX_CONNECTIONS;
+    memset(&server->stats, 0, sizeof(tcp_server_stats_t));
+    server->stats.listen_port = port;
+    server->stats.max_connections = TCP_SERVER_MAX_CONNECTIONS;
     
-    g_listen_port = port;
-    g_server_initialized = true;
+    server->listen_port = port;
+    server->channel = channel;
+    server->initialized = true;
     
     DEBUG_ONLY({
-        printf("TCP Server: Listening on port %u\n", port);
+        printf("TCP Server: Listening on port %u for channel %u\n", port, channel);
     });
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port);
     
@@ -152,40 +179,105 @@ bool tcp_socket_server_init(uint16_t port) {
 }
 
 /**
- * @brief Deinitialize TCP socket server and cleanup all resources
- * @note Closes all active connections and resets server state
+ * @brief Deinitialize all TCP socket servers and cleanup all resources
+ * @note Closes all active connections and resets all server state
  */
 void tcp_socket_server_deinit(void) {
-    if (!g_server_initialized) {
+    if (!g_multi_server_initialized) {
         return;
     }
     
     DEBUG_ONLY({
-        printf("TCP Server: Deinitializing\n");
+        printf("TCP Multi-Server: Deinitializing all servers\n");
     });
-    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, g_listen_port);
     
-    // Close all active connections
+    // Close all servers
+    for (int srv = 0; srv < MAX_TCP_SERVERS; srv++) {
+        tcp_server_instance_t* server = &g_servers[srv];
+        if (!server->initialized) {
+            continue;
+        }
+        
+        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, server->listen_port);
+        
+        // Close all active connections for this server
+        for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
+            if (server->connections[i].active) {
+                close_connection(&server->connections[i]);
+            }
+        }
+        
+        // Close server PCB
+        if (server->server_pcb) {
+            tcp_close(server->server_pcb);
+            server->server_pcb = NULL;
+        }
+        
+        // Reset server state
+        memset(server->connections, 0, sizeof(server->connections));
+        memset(&server->stats, 0, sizeof(tcp_server_stats_t));
+        server->initialized = false;
+        server->listen_port = 0;
+        server->channel = CHANNEL_MAX;
+    }
+    
+    g_multi_server_initialized = false;
+    
+    DEBUG_ONLY({
+        printf("TCP Multi-Server: All servers deinitialized\n");
+    });
+}
+
+/**
+ * @brief Deinitialize specific TCP socket server by port
+ * @param port TCP port to deinitialize
+ */
+void tcp_socket_server_deinit_port(uint16_t port) {
+    if (!g_multi_server_initialized) {
+        return;
+    }
+    
+    // Find server by port
+    tcp_server_instance_t* server = NULL;
+    for (int i = 0; i < MAX_TCP_SERVERS; i++) {
+        if (g_servers[i].initialized && g_servers[i].listen_port == port) {
+            server = &g_servers[i];
+            break;
+        }
+    }
+    
+    if (!server) {
+        return;
+    }
+    
+    DEBUG_ONLY({
+        printf("TCP Server: Deinitializing port %d\n", port);
+    });
+    
+    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, port);
+    
+    // Close all active connections for this server
     for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
-        if (g_connections[i].active) {
-            close_connection(&g_connections[i]);
+        if (server->connections[i].active) {
+            close_connection(&server->connections[i]);
         }
     }
     
     // Close server PCB
-    if (g_server_pcb) {
-        tcp_close(g_server_pcb);
-        g_server_pcb = NULL;
+    if (server->server_pcb) {
+        tcp_close(server->server_pcb);
+        server->server_pcb = NULL;
     }
     
-    // Reset all state
-    memset(g_connections, 0, sizeof(g_connections));
-    memset(&g_server_stats, 0, sizeof(tcp_server_stats_t));
-    g_server_initialized = false;
-    g_listen_port = 0;
+    // Reset server state
+    memset(server->connections, 0, sizeof(server->connections));
+    memset(&server->stats, 0, sizeof(tcp_server_stats_t));
+    server->initialized = false;
+    server->listen_port = 0;
+    server->channel = CHANNEL_MAX;
     
     DEBUG_ONLY({
-        printf("TCP Server: Deinitialized\n");
+        printf("TCP Server: Port %d deinitialized\n", port);
     });
 }
 
@@ -214,41 +306,82 @@ void tcp_socket_server_process(void) {
 }
 
 /**
- * @brief Check if server is listening
+ * @brief Check if any server is listening
  */
 bool tcp_socket_server_is_listening(void) {
-    return g_server_initialized && (g_server_pcb != NULL);
+    if (!g_multi_server_initialized) {
+        return false;
+    }
+    
+    for (int i = 0; i < MAX_TCP_SERVERS; i++) {
+        if (g_servers[i].initialized && g_servers[i].server_pcb != NULL) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
- * @brief Get server statistics
+ * @brief Get aggregated server statistics from all servers
  */
 void tcp_socket_server_get_stats(tcp_server_stats_t* stats) {
-    if (!stats) {
+    if (!stats || !g_multi_server_initialized) {
         return;
     }
     
-    // Update active connections count
-    g_server_stats.active_connections = 0;
-    for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
-        if (g_connections[i].active) {
-            g_server_stats.active_connections++;
+    memset(stats, 0, sizeof(tcp_server_stats_t));
+    
+    // Aggregate stats from all servers
+    for (int srv = 0; srv < MAX_TCP_SERVERS; srv++) {
+        tcp_server_instance_t* server = &g_servers[srv];
+        if (!server->initialized) {
+            continue;
+        }
+        
+        // Update active connections count for this server
+        server->stats.active_connections = 0;
+        for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
+            if (server->connections[i].active) {
+                server->stats.active_connections++;
+            }
+        }
+        
+        // Aggregate stats
+        stats->active_connections += server->stats.active_connections;
+        stats->total_connections += server->stats.total_connections;
+        if (server->stats.max_connections > stats->max_connections) {
+            stats->max_connections = server->stats.max_connections;
+        }
+        stats->bytes_sent += server->stats.bytes_sent;
+        stats->bytes_received += server->stats.bytes_received;
+        stats->lines_processed += server->stats.lines_processed;
+        stats->connection_errors += server->stats.connection_errors;
+        
+        // Use port from first initialized server
+        if (stats->listen_port == 0) {
+            stats->listen_port = server->listen_port;
         }
     }
-    
-    memcpy(stats, &g_server_stats, sizeof(tcp_server_stats_t));
 }
 
 /**
- * @brief Reset server statistics
+ * @brief Reset all server statistics
  */
 void tcp_socket_server_reset_stats(void) {
-    uint16_t port = g_server_stats.listen_port;
-    uint32_t max_conn = g_server_stats.max_connections;
+    if (!g_multi_server_initialized) {
+        return;
+    }
     
-    memset(&g_server_stats, 0, sizeof(tcp_server_stats_t));
-    g_server_stats.listen_port = port;
-    g_server_stats.max_connections = max_conn;
+    for (int i = 0; i < MAX_TCP_SERVERS; i++) {
+        if (g_servers[i].initialized) {
+            uint16_t port = g_servers[i].stats.listen_port;
+            uint32_t max_conn = g_servers[i].stats.max_connections;
+            
+            memset(&g_servers[i].stats, 0, sizeof(tcp_server_stats_t));
+            g_servers[i].stats.listen_port = port;
+            g_servers[i].stats.max_connections = max_conn;
+        }
+    }
     
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, 0);
 }
@@ -294,18 +427,34 @@ bool tcp_socket_server_send_to_channel(channel_id_t channel, const uint8_t* data
         return false;
     }
     
-    // Find the currently active connection (should be only one due to single connection policy)
+    // Find server instance for this channel
+    tcp_server_instance_t* server = NULL;
+    for (int i = 0; i < MAX_TCP_SERVERS; i++) {
+        if (g_servers[i].initialized && g_servers[i].channel == channel) {
+            server = &g_servers[i];
+            break;
+        }
+    }
+    
+    if (!server) {
+        DEBUG_ONLY({
+            printf("TCP Server: No server found for channel %u\n", channel);
+        });
+        return false;
+    }
+    
+    // Find active connection for this server
     for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
-        if (g_connections[i].active && g_connections[i].pcb) {
+        if (server->connections[i].active && server->connections[i].pcb) {
             DEBUG_ONLY({
-                printf("TCP Server: Sending %zu bytes to active connection (UART %u)\n", length, channel);
+                printf("TCP Server: Sending %zu bytes to channel %u (port %u)\n", length, channel, server->listen_port);
             });
             
-            err_t err = tcp_write(g_connections[i].pcb, data, length, TCP_WRITE_FLAG_COPY);
+            err_t err = tcp_write(server->connections[i].pcb, data, length, TCP_WRITE_FLAG_COPY);
             if (err == ERR_OK) {
-                tcp_output(g_connections[i].pcb);
-                g_connections[i].bytes_sent += length;
-                g_server_stats.bytes_sent += length;
+                tcp_output(server->connections[i].pcb);
+                server->connections[i].bytes_sent += length;
+                server->stats.bytes_sent += length;
                 return true;
             } else {
                 DEBUG_ONLY({
@@ -317,7 +466,7 @@ bool tcp_socket_server_send_to_channel(channel_id_t channel, const uint8_t* data
     }
     
     DEBUG_ONLY({
-        printf("TCP Server: No active connection to send to UART %u\n", channel);
+        printf("TCP Server: No active connection for channel %u\n", channel);
     });
     return false;
 }
@@ -333,30 +482,37 @@ bool tcp_socket_server_send_to_channel(channel_id_t channel, const uint8_t* data
  * - This ensures one server handles all connections sequentially
  */
 static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t err) {
-    LWIP_UNUSED_ARG(arg);
+    tcp_server_instance_t* server = (tcp_server_instance_t*)arg;
     
-    if (err != ERR_OK || !newpcb) {
+    if (err != ERR_OK || !newpcb || !server) {
         return ERR_VAL;
     }
     
     DEBUG_ONLY({
-        printf("TCP Server: New connection attempt\n");
+        printf("TCP Server: New connection on port %u (channel %u)\n", server->listen_port, server->channel);
     });
     
-    // Single Connection Policy: Close all existing connections
-    close_all_connections();
+    // Single Connection Policy: Close all existing connections for this server
+    for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
+        if (server->connections[i].active) {
+            close_connection(&server->connections[i]);
+        }
+    }
     
-    DEBUG_ONLY({
-        printf("TCP Server: All existing connections closed, accepting new connection\n");
-    });
+    // Find free connection slot
+    tcp_connection_t* conn = NULL;
+    for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
+        if (!server->connections[i].active) {
+            conn = &server->connections[i];
+            break;
+        }
+    }
     
-    // Find free connection slot (should always succeed after closing all)
-    tcp_connection_t* conn = find_free_connection();
     if (!conn) {
         DEBUG_ONLY({
-            printf("TCP Server: No free connection slots after cleanup\n");
+            printf("TCP Server: No free connection slots for port %u\n", server->listen_port);
         });
-        g_server_stats.connection_errors++;
+        server->stats.connection_errors++;
         tcp_close(newpcb);
         return ERR_MEM;
     }
@@ -367,11 +523,7 @@ static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t
     conn->active = true;
     conn->bytes_sent = 0;
     conn->bytes_received = 0;
-    
-    // Assign UART channel based on listening port
-    // Port 4001 -> UART 0, Port 4002 -> UART 1, etc.
-    conn->channel = (g_listen_port >= 4001 && g_listen_port <= 4004) ? 
-                         (g_listen_port - 4001) : 0;
+    conn->channel = server->channel;  // Use server's channel mapping
     
     // Clear buffer with known pattern for debugging
     memset(conn->line_buffer, 0xAA, sizeof(conn->line_buffer));
@@ -384,10 +536,10 @@ static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t
     tcp_sent(newpcb, tcp_connection_sent_callback);
     
     // Update statistics
-    g_server_stats.total_connections++;
+    server->stats.total_connections++;
     
     DEBUG_ONLY({
-        printf("TCP Server: Connection accepted\n");
+        printf("TCP Server: Connection accepted on port %u -> channel %u\n", server->listen_port, server->channel);
     });
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 1);
     
@@ -426,9 +578,15 @@ static err_t tcp_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, struc
         // Extract data from q->payload, length q->len
         processed += process_received_data(conn, (const char*)q->payload, q->len);
 
-        if (processed> 0) {
+        if (processed > 0) {
             conn->bytes_received += processed;
-            g_server_stats.bytes_received += processed;
+            // Update server stats - need to find server by channel
+            for (int srv = 0; srv < MAX_TCP_SERVERS; srv++) {
+                if (g_servers[srv].initialized && g_servers[srv].channel == conn->channel) {
+                    g_servers[srv].stats.bytes_received += processed;
+                    break;
+                }
+            }
         }
         q = q->next;
     }
@@ -454,7 +612,13 @@ static void tcp_connection_error_callback(void* arg, err_t err) {
     if (conn) {
         conn->pcb = NULL; // PCB already deallocated by lwIP
         conn->active = false;
-        g_server_stats.connection_errors++;
+        // Update server stats - need to find server by channel
+        for (int srv = 0; srv < MAX_TCP_SERVERS; srv++) {
+            if (g_servers[srv].initialized && g_servers[srv].channel == conn->channel) {
+                g_servers[srv].stats.connection_errors++;
+                break;
+            }
+        }
     }
     
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, err);
@@ -470,59 +634,21 @@ static err_t tcp_connection_sent_callback(void* arg, struct tcp_pcb* tpcb, u16_t
     
     if (conn) {
         conn->bytes_sent += len;
-        g_server_stats.bytes_sent += len;
+        // Update server stats - need to find server by channel
+        for (int srv = 0; srv < MAX_TCP_SERVERS; srv++) {
+            if (g_servers[srv].initialized && g_servers[srv].channel == conn->channel) {
+                g_servers[srv].stats.bytes_sent += len;
+                break;
+            }
+        }
     }
     
     return ERR_OK;
 }
 
-/**
- * @brief Find free connection slot
- */
-static tcp_connection_t* find_free_connection(void) {
-    for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
-        if (!g_connections[i].active) {
-            return &g_connections[i];
-        }
-    }
-    return NULL;
-}
-
-/**
- * @brief Find connection by PCB
- */
-static tcp_connection_t* find_connection_by_pcb(struct tcp_pcb* pcb) {
-    for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
-        if (g_connections[i].active && g_connections[i].pcb == pcb) {
-            return &g_connections[i];
-        }
-    }
-    return NULL;
-}
-
-/**
- * @brief Close all active connections
- * 
- * Used to implement single connection policy - close all existing
- * connections when a new one arrives.
- */
-static void close_all_connections(void) {
-    int closed_count = 0;
-    
-    for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
-        if (g_connections[i].active) {
-            close_connection(&g_connections[i]);
-            closed_count++;
-        }
-    }
-    
-    if (closed_count > 0) {
-        DEBUG_ONLY({
-            printf("TCP Server: Closed %d existing connections\n", closed_count);
-        });
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, closed_count);
-    }
-}
+// NOTE: The helper functions find_free_connection, find_connection_by_pcb, 
+// and close_all_connections have been integrated into the server-specific 
+// logic since each server now manages its own connections array.
 
 /**
  * @brief Close connection
@@ -605,7 +731,13 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         // Enqueue for Core0 processing
         bool enqueue_result = ringbuffer_enqueue_entry(entry);
         if (enqueue_result) {
-            g_server_stats.lines_processed++;
+            // Update server stats - need to find server by channel
+            for (int srv = 0; srv < MAX_TCP_SERVERS; srv++) {
+                if (g_servers[srv].initialized && g_servers[srv].channel == conn->channel) {
+                    g_servers[srv].stats.lines_processed++;
+                    break;
+                }
+            }
             DEBUG_ONLY({
                 printf("TCP Server: Message enqueued for Core0 (%zu bytes) - SUCCESS\n", conn->line_pos);
             });

@@ -52,7 +52,7 @@ static const channel_config_t channel_configs[UART_MANAGER_MAX_CHANNELS] = {
     // Channel 0: UART0 (PL011) - disabled
     {false, UART_TYPE_PL011, 230400, 0, 1},
     // Channel 1: UART1 (PL011) - enabled
-    {true, UART_TYPE_PL011, 115200, 4, 5},
+    {true, UART_TYPE_PL011, 230400, 4, 5},
     // Channel 2: PIO UART - enabled (Issue #82, ADR-013)
     {true, UART_TYPE_PIO, 230400, 14, 15},
     // Channel 3: PIO UART (placeholder) - disabled
@@ -410,39 +410,30 @@ static bool process_channel_outgoing_data(channel_id_t channel) {
         return false;
     }
     
-    //check if ready to send or busy
-    if (!uart->ops->is_tx_complete(uart->driver_context))
-    {
-        printf("UART DEBUG: trying to send on channel %d, BUT TX BUSY!\n", channel );
-        return false;
+    // Check if ready to send or busy
+    if (!uart->ops->is_tx_complete(uart->driver_context)) {
+        return false; // TX busy, try again later
     }
 
-    // Get active draining message from ring buffer for this channel
-    ring_entry_t* entry = ringbuffer_dequeue_entry(RX_TCP_TO_UART, channel,ENTRY_STATUS_DRAINING);
-    //is this TX COMPLETE?
-    if(entry)
-    {
-        //mark done
-        entry->status = ENTRY_STATUS_READY;
-        //mark free
-        ringbuffer_mark_consumed(entry);
-    }
+    // Get a ready message to send
+    ring_entry_t* entry = ringbuffer_dequeue_entry(RX_TCP_TO_UART, channel, ENTRY_STATUS_READY);
     
-    //check if there are any other messages waiting for draining
-    entry = ringbuffer_dequeue_entry(RX_TCP_TO_UART, channel,ENTRY_STATUS_READY);
-    if(entry)
-    {
-        // Send data via UART
+    if (entry) {
+        // Send data via UART - send as much as possible in one go
         const uint8_t* data = entry->payload;
-        size_t remaining = entry->fill_index - entry->drain_index;
-        entry->status = ENTRY_STATUS_DRAINING;
-        size_t sent = uart->ops->send_data(uart->driver_context, data + entry->drain_index, remaining);
+        size_t data_len = entry->fill_index;
+        
+        size_t sent = uart->ops->send_data(uart->driver_context, data, data_len);
         g_manager.stats.bytes_transmitted += sent;
+        
+        // Mark message as consumed regardless of how much was sent
+        // The PIO driver will handle partial sends via DMA/FIFO as needed
+        ringbuffer_mark_consumed(entry);
         
         return true;
     }
     
-    //there was not entry ready for some work
+    // No entries ready for work
     return false;
 }
 

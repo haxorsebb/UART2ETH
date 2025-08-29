@@ -41,16 +41,23 @@ typedef struct {
  */
 
 /**
- * Initialize TCP socket server
+ * Initialize TCP socket server for specific channel
  * @param port TCP port to listen on (e.g., 4001)
+ * @param channel UART channel this server maps to (0-3)
  * @return true if initialization successful, false otherwise
  */
-bool tcp_socket_server_init(uint16_t port);
+bool tcp_socket_server_init(uint16_t port, channel_id_t channel);
 
 /**
- * Deinitialize TCP socket server
+ * Deinitialize all TCP socket servers
  */
 void tcp_socket_server_deinit(void);
+
+/**
+ * Deinitialize specific TCP socket server
+ * @param port TCP port to deinitialize
+ */
+void tcp_socket_server_deinit_port(uint16_t port);
 
 /**
  * Process TCP server tasks (call from Core1 main loop)

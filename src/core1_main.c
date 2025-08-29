@@ -570,25 +570,19 @@ static void core1_configuration_complete(void) {
         network_config_t net_config;
         network_manager_get_default_config(&net_config);
         
-        for (int channel = 0; channel < 4; channel++) {
-            // Check if channel is enabled (Channel 1 and 2 are enabled by default)
-            if (channel == 1 || channel == 2) {
-                uint16_t port = net_config.tcp_ports[channel];
-                DEBUG_ONLY({
-                    printf("Core1: Initializing TCP socket server for Channel %d on port %u\n", channel, port);
-                });
+        printf("Core1: Initializing multi-port TCP servers for all enabled channels\n");
+        
+        // Initialize TCP servers for enabled channels (Channel 1 and 2)
+        for (int channel = 1; channel <= 2; channel++) {
+            uint16_t port = net_config.tcp_ports[channel];
+            printf("Core1: Initializing TCP server for Channel %d on port %u\n", channel, port);
 
-                if (tcp_socket_server_init(port)) {
-                    DEBUG_ONLY({
-                        printf("Core1: TCP socket server initialized successfully on port %u\n", port);
-                    });
-                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port);
-                } else {
-                    DEBUG_ONLY({
-                        printf("Core1: TCP socket server initialization failed on port %u\n", port);
-                    });
-                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port);
-                }
+            if (tcp_socket_server_init(port, channel)) {
+                printf("Core1: TCP server initialized successfully for Channel %d on port %u\n", channel, port);
+                log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port);
+            } else {
+                printf("Core1: TCP server initialization FAILED for Channel %d on port %u\n", channel, port);
+                log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port);
             }
         }
     } else {
