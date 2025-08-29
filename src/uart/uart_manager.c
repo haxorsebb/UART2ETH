@@ -52,7 +52,7 @@ static const channel_config_t channel_configs[UART_MANAGER_MAX_CHANNELS] = {
     // Channel 0: UART0 (PL011) - disabled
     {false, UART_TYPE_PL011, 230400, 0, 1},
     // Channel 1: UART1 (PL011) - enabled
-    {true, UART_TYPE_PL011, 230400, 4, 5},
+    {true, UART_TYPE_PL011, 115200, 4, 5},
     // Channel 2: PIO UART - enabled (Issue #82, ADR-013)
     {true, UART_TYPE_PIO, 230400, 14, 15},
     // Channel 3: PIO UART (placeholder) - disabled
