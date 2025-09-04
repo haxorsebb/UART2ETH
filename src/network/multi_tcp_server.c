@@ -1,9 +1,10 @@
 /**
  * @file multi_tcp_server.c
- * @brief Multi-Port TCP Server Manager Implementation
+ * @brief Multi-Port TCP Server Manager Implementation (TRUE MULTI-INSTANCE)
  * 
  * Manages multiple TCP socket servers simultaneously, one per UART channel.
  * Each server listens on its own port (4001-4004) and maps to UART channels 0-3.
+ * Now supports true concurrent operation with the multi-instance TCP server.
  * 
  * Documentation Reference:
  * - Issue #82: Multi-channel TCP server support
@@ -29,9 +30,6 @@ typedef struct {
 static tcp_server_instance_t tcp_servers[MAX_TCP_SERVERS];
 static bool multi_tcp_server_initialized = false;
 
-// Forward declarations
-static void multi_tcp_server_deinit_all_internal(void);
-
 /**
  * Initialize multi-port TCP server system
  */
@@ -49,7 +47,7 @@ static bool multi_tcp_server_init_system(void) {
     }
     
     multi_tcp_server_initialized = true;
-    printf("Multi-TCP Server: System initialized\n");
+    printf("Multi-TCP Server: TRUE MULTI-INSTANCE system initialized\n");
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 0);
     
     return true;
@@ -80,11 +78,7 @@ bool multi_tcp_server_init_channel(channel_id_t channel, uint16_t port) {
     
     printf("Multi-TCP Server: Initializing channel %u on port %u\n", channel, port);
     
-    // Since we're using the singleton tcp_socket_server, we need to deinitialize
-    // any existing server first, then initialize the new one
-    tcp_socket_server_deinit();
-    
-    // Initialize the TCP server for this channel
+    // Initialize the TCP server for this channel (no deinitialization needed!)
     bool result = tcp_socket_server_init(port, channel);
     
     if (result) {
@@ -120,15 +114,13 @@ void multi_tcp_server_deinit_channel(channel_id_t channel) {
     printf("Multi-TCP Server: Deinitializing channel %u (port %u)\n", 
            channel, tcp_servers[channel].port);
     
-    // Since we're using singleton, deinit the current server if it matches this channel
-    if (tcp_servers[channel].active) {
-        tcp_socket_server_deinit_port(tcp_servers[channel].port);
-        tcp_servers[channel].active = false;
-    }
+    // Deinitialize the specific server instance
+    tcp_socket_server_deinit_port(tcp_servers[channel].port);
     
     tcp_servers[channel].initialized = false;
     tcp_servers[channel].port = 0;
     tcp_servers[channel].channel = CHANNEL_MAX;
+    tcp_servers[channel].active = false;
     
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, channel);
 }
@@ -146,7 +138,7 @@ bool multi_tcp_server_send_to_channel(channel_id_t channel, const uint8_t* data,
         return false;
     }
     
-    // Use the singleton server's send function
+    // Use the multi-instance server's send function
     return tcp_socket_server_send_to_channel(channel, data, length);
 }
 
@@ -159,8 +151,9 @@ void multi_tcp_server_get_all_stats(void) {
         return;
     }
     
-    printf("=== Multi-TCP Server Status ===\n");
+    printf("=== Multi-TCP Server Status (TRUE MULTI-INSTANCE) ===\n");
     
+    int active_count = 0;
     for (int i = 0; i < MAX_TCP_SERVERS; i++) {
         if (tcp_servers[i].initialized) {
             printf("Channel %d: Port %u, %s\n", 
@@ -168,18 +161,18 @@ void multi_tcp_server_get_all_stats(void) {
                    tcp_servers[i].active ? "ACTIVE" : "INACTIVE");
             
             if (tcp_servers[i].active) {
-                tcp_server_stats_t stats;
-                tcp_socket_server_get_stats(&stats);
-                printf("  - Active connections: %u\n", stats.active_connections);
-                printf("  - Total connections: %u\n", stats.total_connections);
-                printf("  - Bytes sent: %llu\n", stats.bytes_sent);
-                printf("  - Bytes received: %llu\n", stats.bytes_received);
+                active_count++;
+                // Note: Getting individual server stats would require 
+                // extending the tcp_socket_server API to get stats by channel
+                printf("  - Status: LISTENING\n");
             }
         } else {
             printf("Channel %d: Not initialized\n", i);
         }
     }
-    printf("===============================\n");
+    
+    printf("Total active servers: %d/%d\n", active_count, MAX_TCP_SERVERS);
+    printf("=====================================================\n");
 }
 
 /**
@@ -192,9 +185,7 @@ bool multi_tcp_server_is_any_listening(void) {
     
     for (int i = 0; i < MAX_TCP_SERVERS; i++) {
         if (tcp_servers[i].initialized && tcp_servers[i].active) {
-            if (tcp_socket_server_is_listening()) {
-                return true;
-            }
+            return true;
         }
     }
     
@@ -202,71 +193,47 @@ bool multi_tcp_server_is_any_listening(void) {
 }
 
 /**
- * Switch active server to a different channel
- * This is a workaround for the singleton limitation
+ * Get number of active channels
  */
-bool multi_tcp_server_switch_active_channel(channel_id_t new_channel) {
-    if (new_channel >= MAX_TCP_SERVERS || !multi_tcp_server_initialized) {
-        return false;
+int multi_tcp_server_get_active_count(void) {
+    if (!multi_tcp_server_initialized) {
+        return 0;
     }
     
-    if (!tcp_servers[new_channel].initialized) {
-        printf("Multi-TCP Server: Cannot switch to uninitialized channel %u\n", new_channel);
-        return false;
-    }
-    
-    // Find current active channel
-    channel_id_t current_active = CHANNEL_MAX;
+    int count = 0;
     for (int i = 0; i < MAX_TCP_SERVERS; i++) {
-        if (tcp_servers[i].active) {
-            current_active = i;
-            break;
+        if (tcp_servers[i].initialized && tcp_servers[i].active) {
+            count++;
         }
     }
     
-    if (current_active == new_channel) {
-        printf("Multi-TCP Server: Channel %u already active\n", new_channel);
-        return true;  // Already active
-    }
-    
-    printf("Multi-TCP Server: Switching from channel %u to channel %u\n", 
-           current_active, new_channel);
-    
-    // Deactivate current server
-    if (current_active != CHANNEL_MAX) {
-        tcp_socket_server_deinit();
-        tcp_servers[current_active].active = false;
-    }
-    
-    // Activate new server
-    bool result = tcp_socket_server_init(tcp_servers[new_channel].port, new_channel);
-    
-    if (result) {
-        tcp_servers[new_channel].active = true;
-        printf("Multi-TCP Server: Successfully switched to channel %u (port %u)\n", 
-               new_channel, tcp_servers[new_channel].port);
-        return true;
-    } else {
-        printf("Multi-TCP Server: Failed to switch to channel %u\n", new_channel);
-        return false;
-    }
+    return count;
 }
 
 /**
- * Get currently active channel
+ * Check if specific channel is active
  */
-channel_id_t multi_tcp_server_get_active_channel(void) {
-    if (!multi_tcp_server_initialized) {
-        return CHANNEL_MAX;
+bool multi_tcp_server_is_channel_active(channel_id_t channel) {
+    if (channel >= MAX_TCP_SERVERS || !multi_tcp_server_initialized) {
+        return false;
     }
     
-    for (int i = 0; i < MAX_TCP_SERVERS; i++) {
-        if (tcp_servers[i].active) {
-            return i;
-        }
+    return tcp_servers[channel].initialized && tcp_servers[channel].active;
+}
+
+/**
+ * Get port for specific channel
+ */
+uint16_t multi_tcp_server_get_channel_port(channel_id_t channel) {
+    if (channel >= MAX_TCP_SERVERS || !multi_tcp_server_initialized) {
+        return 0;
     }
     
-    return CHANNEL_MAX;
+    if (tcp_servers[channel].initialized) {
+        return tcp_servers[channel].port;
+    }
+    
+    return 0;
 }
 
 /**
@@ -277,21 +244,21 @@ void multi_tcp_server_process(void) {
         return;
     }
     
-    // Since we're using singleton, just process the active server
+    // Process all active servers - the multi-instance TCP server handles this internally
     tcp_socket_server_process();
 }
 
 /**
- * Internal function to deinitialize all servers
+ * Deinitialize all TCP servers
  */
-static void multi_tcp_server_deinit_all_internal(void) {
+void multi_tcp_server_deinit_all(void) {
     if (!multi_tcp_server_initialized) {
         return;
     }
     
     printf("Multi-TCP Server: Deinitializing all servers\n");
     
-    // Deinitialize the singleton server
+    // Deinitialize all servers
     tcp_socket_server_deinit();
     
     // Reset all server states
@@ -306,4 +273,46 @@ static void multi_tcp_server_deinit_all_internal(void) {
     
     printf("Multi-TCP Server: All servers deinitialized\n");
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, 0);
+}
+
+/**
+ * LEGACY FUNCTIONS - No longer needed with true multi-instance support
+ */
+
+/**
+ * Switch active server (LEGACY - no longer needed)
+ */
+bool multi_tcp_server_switch_active_channel(channel_id_t new_channel) {
+    // With true multi-instance support, all channels can be active simultaneously
+    // This function now just checks if the requested channel is active
+    
+    if (new_channel >= MAX_TCP_SERVERS || !multi_tcp_server_initialized) {
+        return false;
+    }
+    
+    if (tcp_servers[new_channel].initialized && tcp_servers[new_channel].active) {
+        printf("Multi-TCP Server: Channel %u is already active (no switching needed)\n", new_channel);
+        return true;
+    } else {
+        printf("Multi-TCP Server: Channel %u is not active\n", new_channel);
+        return false;
+    }
+}
+
+/**
+ * Get active channel (LEGACY - returns first active channel)
+ */
+channel_id_t multi_tcp_server_get_active_channel(void) {
+    if (!multi_tcp_server_initialized) {
+        return CHANNEL_MAX;
+    }
+    
+    // Return the first active channel (for compatibility)
+    for (int i = 0; i < MAX_TCP_SERVERS; i++) {
+        if (tcp_servers[i].initialized && tcp_servers[i].active) {
+            return i;
+        }
+    }
+    
+    return CHANNEL_MAX;
 }

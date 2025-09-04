@@ -90,9 +90,9 @@ static bool pl011_init(void* context, const uart_config_t* config) {
     if (!ctx || ctx->state.initialized) return false;
     
     
-    // Configure GPIO pins
-    gpio_set_function(config->tx_gpio, UART_FUNCSEL_NUM(ctx->hw_uart, config->tx_gpio));
-    gpio_set_function(config->rx_gpio, UART_FUNCSEL_NUM(ctx->hw_uart, config->rx_gpio));
+    // Configure GPIO pins for UART function (function 2 for both UART0 and UART1)
+    gpio_set_function(config->tx_gpio, GPIO_FUNC_UART);
+    gpio_set_function(config->rx_gpio, GPIO_FUNC_UART);
     
     // Initialize UART hardware
     uart_init(ctx->hw_uart, config->baud_rate);
@@ -152,6 +152,8 @@ static size_t pl011_send_data(void* context, const uint8_t* data, size_t len) {
     pl011_context_t* ctx = context;
     if (!ctx || !ctx->state.ready || !data || len == 0) return 0;
     
+    // Debug removed from potential interrupt context
+    
     size_t sent = 0;
     
     // Send directly to FIFO if space available
@@ -161,11 +163,14 @@ static size_t pl011_send_data(void* context, const uint8_t* data, size_t len) {
         ctx->state.bytes_sent++;
     }
     
+    // Debug removed from potential interrupt context
+    
     // If not all data sent, set up TX buffer for ISR
     if (sent < len) {
         ctx->tx_buffer_ptr = data + sent;
         ctx->tx_buffer_remaining = len - sent;
         uart_set_irq_enables(ctx->hw_uart, true, true); // RX and TX interrupts
+        // Debug removed from potential interrupt context
     }
     else {
         //already sent in one go!
@@ -245,8 +250,11 @@ static void pl011_handle_interrupt(pl011_context_t* ctx) {
     if (!ctx) return;
     
     // Handle RX interrupt
+    int rx_bytes = 0;
     while (uart_is_readable(ctx->hw_uart)) {
         uint8_t byte = uart_getc(ctx->hw_uart);
+        rx_bytes++;
+        
         if (!uart_receive_buffer_put(&ctx->rx_ring, byte)) {
             ctx->state.overrun_errors++;
             
@@ -255,19 +263,26 @@ static void pl011_handle_interrupt(pl011_context_t* ctx) {
         }
     }
     
+    // Debug removed from interrupt service routine
+    
     // Handle TX interrupt
     if (ctx->tx_buffer_ptr) {
+        int tx_bytes = 0;
         while (ctx->tx_buffer_remaining > 0 && uart_is_writable(ctx->hw_uart)) {
             uart_putc_raw(ctx->hw_uart, *ctx->tx_buffer_ptr);
             ctx->tx_buffer_ptr++;
             ctx->tx_buffer_remaining--;
             ctx->state.bytes_sent++;
+            tx_bytes++;
         }
+        
+        // Debug removed from interrupt service routine
         
         // Clear TX buffer pointer when complete
         if (ctx->tx_buffer_remaining == 0) {
             ctx->tx_buffer_ptr = NULL;
             uart_set_irq_enables(ctx->hw_uart, true, false); // RX and TX interrupts
+            // Debug removed from interrupt service routine
         }
     }
 }

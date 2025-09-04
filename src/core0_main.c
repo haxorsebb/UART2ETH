@@ -520,31 +520,33 @@ void core0_process_ringbuffer(void) {
     static uint32_t call_counter = 0;
     call_counter++;
 
-    DEBUG_ONLY({
-        printf("DEBUG: core0_process_ringbuffer() call #%u\n", call_counter);
-    });
+    if (call_counter <= 5 || call_counter % 1000 == 0) {
+        printf("[CORE0-RING] Processing call #%u\n", call_counter);
+    }
 
     uart_manager_process_outgoing_data();
     
-    DEBUG_ONLY({
-        // Ring Buffer Processing: Turn around TCP→UART messages (Issue #68)
-        // Process only ONE message per main loop execution (test requirement #7)
-        ring_entry_t* tcp_to_uart_msg = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
-        if (tcp_to_uart_msg) {
+    // Ring Buffer Processing: Turn around TCP→UART messages (Issue #68)
+    // Process only ONE message per main loop execution (test requirement #7)
+    ring_entry_t* tcp_to_uart_msg = ringbuffer_dequeue_entry(RX_TCP_TO_UART, CHANNEL_ANY, ENTRY_STATUS_READY);
+    if (tcp_to_uart_msg) {
+        printf("[CORE0-RING] Processing TCP->UART message: Channel %u, %u bytes\n", 
+               tcp_to_uart_msg->channel, tcp_to_uart_msg->fill_index);
         
-            // "Turn around" the message: change direction from TCP→UART to UART→TCP
-            tcp_to_uart_msg->direction = RX_UART_TO_TCP;
-            tcp_to_uart_msg->status = ENTRY_STATUS_FILLING;
+        // "Turn around" the message: change direction from TCP→UART to UART→TCP
+        tcp_to_uart_msg->direction = RX_UART_TO_TCP;
+        tcp_to_uart_msg->status = ENTRY_STATUS_FILLING;
 
-            // Re-enqueue the message for Core1 to transmit back to TCP client
-            bool enqueue_result = ringbuffer_enqueue_entry(tcp_to_uart_msg);
-            if (enqueue_result) {
-                log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
-            } else {
-                log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 1);
-            }
+        // Re-enqueue the message for Core1 to transmit back to TCP client
+        bool enqueue_result = ringbuffer_enqueue_entry(tcp_to_uart_msg);
+        if (enqueue_result) {
+            printf("[CORE0-RING] Re-enqueued message for Core1 - SUCCESS\n");
+            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
+        } else {
+            printf("[CORE0-RING] Re-enqueue FAILED for Core1\n");
+            log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 1);
         }
-    });
+    }
     // Work complete - return to IDLE to allow main loop to check for more work
     state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_WORK_COMPLETE);
 }

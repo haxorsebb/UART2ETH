@@ -571,20 +571,27 @@ static void core1_configuration_complete(void) {
         network_config_t net_config;
         network_manager_get_default_config(&net_config);
         
-        printf("Core1: Initializing MULTI-PORT TCP servers for enabled channels\n");
+        printf("Core1: Initializing TRUE MULTI-INSTANCE TCP servers for enabled channels\n");
+        
+        int successful_channels = 0;
+        int failed_channels = 0;
         
         // Initialize TCP servers for Channel 1 (UART1) and Channel 2 (PIO UART)
+        // Both channels will be active simultaneously!
+        
         // Channel 1: Standard UART1 on port 4002
         int channel1 = 1;
         uint16_t port1 = net_config.tcp_ports[channel1];
         printf("Core1: Initializing TCP server for Channel %d (UART1) on port %u\n", channel1, port1);
 
         if (multi_tcp_server_init_channel(channel1, port1)) {
-            printf("Core1: TCP server initialized successfully for Channel %d on port %u\n", channel1, port1);
+            printf("Core1: ✅ Channel %d (UART1) initialized successfully on port %u\n", channel1, port1);
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port1);
+            successful_channels++;
         } else {
-            printf("Core1: TCP server initialization FAILED for Channel %d on port %u\n", channel1, port1);
+            printf("Core1: ❌ Channel %d (UART1) initialization FAILED on port %u\n", channel1, port1);
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port1);
+            failed_channels++;
         }
 
         // Channel 2: PIO UART on port 4003 (Issue #82 requirement)
@@ -593,19 +600,21 @@ static void core1_configuration_complete(void) {
         printf("Core1: Initializing TCP server for Channel %d (PIO UART) on port %u\n", channel2, port2);
 
         if (multi_tcp_server_init_channel(channel2, port2)) {
-            printf("Core1: TCP server initialized successfully for Channel %d on port %u\n", channel2, port2);
+            printf("Core1: ✅ Channel %d (PIO UART) initialized successfully on port %u\n", channel2, port2);
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port2);
+            successful_channels++;
         } else {
-            printf("Core1: TCP server initialization FAILED for Channel %d on port %u\n", channel2, port2);
+            printf("Core1: ❌ Channel %d (PIO UART) initialization FAILED on port %u\n", channel2, port2);
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port2);
+            failed_channels++;
         }
         
-        // Start with Channel 2 (PIO UART) as the active channel for Issue #82 testing
-        if (multi_tcp_server_switch_active_channel(channel2)) {
-            printf("Core1: Channel %d (PIO UART) set as active channel\n", channel2);
-        }
+        // Both channels are now active simultaneously - no switching needed!
+        printf("Core1: 🚀 BOTH channels are now active simultaneously!\n");
+        printf("Core1: Multi-instance initialization complete: %d successful, %d failed\n", 
+               successful_channels, failed_channels);
         
-        // Print multi-server status
+        // Print comprehensive multi-server status
         multi_tcp_server_get_all_stats();
     } else {
         DEBUG_ONLY({

@@ -513,6 +513,21 @@ pico_enable_stdio_uart(test_pio_interrupt 1)
 
 pico_add_extra_outputs(test_pio_interrupt)
 
+# GPIO Loopback Connectivity Test - diagnose hardware connections
+add_executable(test_gpio_loopback
+    test_gpio_loopback.c
+)
+
+target_link_libraries(test_gpio_loopback
+    pico_stdlib
+    hardware_gpio
+)
+
+pico_enable_stdio_usb(test_gpio_loopback 1)
+pico_enable_stdio_uart(test_gpio_loopback 1)
+
+pico_add_extra_outputs(test_gpio_loopback)
+
 # Add network tests subdirectory
 add_subdirectory(network)
 

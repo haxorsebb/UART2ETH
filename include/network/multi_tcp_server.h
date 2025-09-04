@@ -75,6 +75,31 @@ void multi_tcp_server_get_all_stats(void);
  */
 bool multi_tcp_server_is_any_listening(void);
 
+/**
+ * Get number of active channels
+ * @return Number of active channels
+ */
+int multi_tcp_server_get_active_count(void);
+
+/**
+ * Check if specific channel is active
+ * @param channel Channel to check
+ * @return true if channel is active
+ */
+bool multi_tcp_server_is_channel_active(channel_id_t channel);
+
+/**
+ * Get port for specific channel
+ * @param channel Channel to query
+ * @return Port number or 0 if not active
+ */
+uint16_t multi_tcp_server_get_channel_port(channel_id_t channel);
+
+/**
+ * Deinitialize all TCP servers
+ */
+void multi_tcp_server_deinit_all(void);
+
 #ifdef __cplusplus
 }
 #endif

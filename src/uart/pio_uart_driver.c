@@ -27,7 +27,7 @@
 #include "pio_uart_tx.pio.h"
 #include "pio_uart_rx.pio.h"
 
-// Static context for Channel 2 (single instance)
+// Static single PIO UART instance context  
 static pio_uart_context_t pio_uart_context;
 static bool pio_uart_context_initialized = false;
 
