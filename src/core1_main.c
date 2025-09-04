@@ -576,8 +576,8 @@ static void core1_configuration_complete(void) {
         int successful_channels = 0;
         int failed_channels = 0;
         
-        // Initialize TCP servers for Channel 1 (UART1) and Channel 2 (PIO UART)
-        // Both channels will be active simultaneously!
+        // Initialize TCP servers for Channel 1, 2, and 3 (all PIO UART channels)
+        // All channels will be active simultaneously!
         
         // Channel 1: Standard UART1 on port 4002
         int channel1 = 1;
@@ -608,9 +608,25 @@ static void core1_configuration_complete(void) {
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port2);
             failed_channels++;
         }
+
         
-        // Both channels are now active simultaneously - no switching needed!
-        printf("Core1: 🚀 BOTH channels are now active simultaneously!\n");
+        // Channel 3: PIO UART on port 4004 (Channel 3 expansion - using PIO1)
+        int channel3 = 3;
+        uint16_t port3 = net_config.tcp_ports[channel3];
+        printf("Core1: Initializing TCP server for Channel %d (PIO UART Ch3) on port %u\n", channel3, port3);
+
+        if (multi_tcp_server_init_channel(channel3, port3)) {
+            printf("Core1: ✅ Channel %d (PIO UART Ch3) initialized successfully on port %u\n", channel3, port3);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port3);
+            successful_channels++;
+        } else {
+            printf("Core1: ❌ Channel %d (PIO UART Ch3) initialization FAILED on port %u\n", channel3, port3);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port3);
+            failed_channels++;
+        }
+        
+        // All three channels are now active simultaneously - no switching needed!
+        printf("Core1: 🚀 ALL THREE channels are now active simultaneously!\n");
         printf("Core1: Multi-instance initialization complete: %d successful, %d failed\n", 
                successful_channels, failed_channels);
         

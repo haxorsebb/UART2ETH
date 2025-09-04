@@ -22,6 +22,11 @@ extern const uart_interface_t pio_uart_interface;
 extern void* pio_create_context(uint8_t pio_num, uint8_t sm_num);
 extern void pio_destroy_context(void* context);
 
+// PIO UART Channel 3 interface
+extern const uart_interface_t pio_uart_ch3_interface;
+extern void* pio_ch3_create_context(uint8_t pio_num, uint8_t sm_num);
+extern void pio_ch3_destroy_context(void* context);
+
 // Line assembly for incoming data
 #define MINIMUM_MESSAGE_LENGTH 8  // '#0000!\r\n' minimum
 
@@ -55,8 +60,8 @@ static const channel_config_t channel_configs[UART_MANAGER_MAX_CHANNELS] = {
     {true, UART_TYPE_PL011, 115200, 4, 5},
     // Channel 2: PIO UART on GPIO 14,15 - enabled for Issue #82
     {true, UART_TYPE_PIO, 230400, 14, 15},
-    // Channel 3: PIO UART (placeholder) - disabled
-    {false, UART_TYPE_PIO, 230400, 16, 17}
+    // Channel 3: PIO UART on GPIO 16,17 - enabled with PIO1 for Channel 3 expansion
+    {true, UART_TYPE_PIO, 115200, 16, 17}
 };
 
 // Forward declarations
@@ -306,9 +311,19 @@ static bool init_channel(channel_id_t channel) {
         uart->driver_context = pl011_create_context(channel);
         uart->ops = &pl011_uart_interface;
     } else if (config->type == UART_TYPE_PIO) {
-        // PIO UART implementation (Issue #82)
-        uart->driver_context = pio_create_context(0, 0);  // PIO0, SM0/SM1
-        uart->ops = &pio_uart_interface;
+        // PIO UART implementation - different drivers for different channels
+        if (channel == 2) {
+            // Channel 2: Use general PIO UART driver (Issue #82)
+            uart->driver_context = pio_create_context(0, 0);  // PIO0, SM0/SM1
+            uart->ops = &pio_uart_interface;
+        } else if (channel == 3) {
+            // Channel 3: Use dedicated Channel 3 PIO UART driver
+            uart->driver_context = pio_ch3_create_context(0, 0);  // PIO0, SM4/SM5
+            uart->ops = &pio_uart_ch3_interface;
+        } else {
+            printf("ERROR: PIO UART not supported for channel %u\n", channel);
+            return false;
+        }
     } else {
         printf("ERROR: Unknown UART type for channel %u\n", channel);
         return false;
@@ -358,7 +373,13 @@ static void deinit_channel(channel_id_t channel) {
     if (uart->type == UART_TYPE_PL011 && uart->driver_context) {
         pl011_destroy_context(uart->driver_context);
     } else if (uart->type == UART_TYPE_PIO && uart->driver_context) {
-        pio_destroy_context(uart->driver_context);
+        if (uart->channel_id == 2) {
+            // Channel 2: Use general PIO UART destroy
+            pio_destroy_context(uart->driver_context);
+        } else if (uart->channel_id == 3) {
+            // Channel 3: Use dedicated Channel 3 PIO UART destroy
+            pio_ch3_destroy_context(uart->driver_context);
+        }
     }
     
     memset(uart, 0, sizeof(uart_instance_t));

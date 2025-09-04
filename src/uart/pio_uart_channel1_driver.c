@@ -94,12 +94,11 @@ void* pio_ch1_create_context(uint8_t pio_num, uint8_t sm_num) {
     // Initialize receive buffer
     uart_receive_buffer_init(&pio_uart_ch1_context.rx_ring, 
                            pio_uart_ch1_context.rx_buffer, 
-                           PIO_UART_RX_BUFFER_SIZE);
+                           PIO_UART_CH1_RX_BUFFER_SIZE);
     
     // Initialize state
     pio_uart_ch1_context.state.initialized = false;
     pio_uart_ch1_context.state.ready = false;
-    pio_uart_ch1_context.state.error = false;
     pio_uart_ch1_context.tx_in_progress = false;
     pio_uart_ch1_context.rx_bytes_ready = 0;
     
@@ -122,11 +121,11 @@ void pio_ch1_destroy_context(void* context) {
 // Setup PIO programs for Channel 1
 static bool pio_uart_ch1_setup_programs(pio_uart_context_t* ctx) {
     // Add TX program
-    ctx->tx_offset = pio_add_program(ctx->pio_instance, &uart_tx_program);
+    ctx->tx_offset = pio_add_program(ctx->pio_instance, &pio_uart_tx_program);
     printf("PIO UART Ch1: TX program loaded at offset %u\n", ctx->tx_offset);
     
     // Add RX program  
-    ctx->rx_offset = pio_add_program(ctx->pio_instance, &uart_rx_program);
+    ctx->rx_offset = pio_add_program(ctx->pio_instance, &pio_uart_rx_program);
     printf("PIO UART Ch1: RX program loaded at offset %u\n", ctx->rx_offset);
     
     return true;
@@ -188,29 +187,16 @@ static bool pio_uart_ch1_init(void* context, const uart_config_t* config) {
     pio_gpio_init(ctx->pio_instance, ctx->rx_gpio);
     gpio_set_inover(ctx->rx_gpio, GPIO_OVERRIDE_NORMAL);
     
-    // Calculate clock dividers for baud rate
-    float div = (float)clock_get_hz(clk_sys) / (8 * config->baud_rate);
+    // Initialize PIO UART programs with proper init functions
+    pio_uart_tx_program_init(ctx->pio_instance, ctx->tx_sm, ctx->tx_offset,
+                            ctx->tx_gpio, config->baud_rate);
     
-    // Initialize TX state machine
-    pio_sm_config tx_config = uart_tx_program_get_default_config(ctx->tx_offset);
-    sm_config_set_out_pins(&tx_config, ctx->tx_gpio, 1);
-    sm_config_set_fifo_join(&tx_config, PIO_FIFO_JOIN_TX);
-    sm_config_set_clkdiv(&tx_config, div);
-    pio_sm_init(ctx->pio_instance, ctx->tx_sm, ctx->tx_offset, &tx_config);
-    pio_sm_set_enabled(ctx->pio_instance, ctx->tx_sm, true);
-    
-    // Initialize RX state machine  
-    pio_sm_config rx_config = uart_rx_program_get_default_config(ctx->rx_offset);
-    sm_config_set_in_pins(&rx_config, ctx->rx_gpio);
-    sm_config_set_fifo_join(&rx_config, PIO_FIFO_JOIN_RX);
-    sm_config_set_clkdiv(&rx_config, div);
-    pio_sm_init(ctx->pio_instance, ctx->rx_sm, ctx->rx_offset + uart_rx_offset_wait, &rx_config);
-    pio_sm_set_enabled(ctx->pio_instance, ctx->rx_sm, true);
+    pio_uart_rx_program_init(ctx->pio_instance, ctx->rx_sm, ctx->rx_offset,
+                            ctx->rx_gpio, config->baud_rate);
     
     // Mark as initialized
     ctx->state.initialized = true;
     ctx->state.ready = true;
-    ctx->state.error = false;
     
     printf("PIO UART Ch1: Initialization complete\n");
     return true;
@@ -237,8 +223,7 @@ static size_t pio_uart_ch1_send_data(void* context, const uint8_t* data, size_t 
     }
     
     if (sent > 0) {
-        ctx->state.tx_count++;
-        ctx->state.tx_bytes += sent;
+        ctx->state.bytes_sent += sent;
         printf("PIO UART Ch1: Sent %zu bytes to FIFO\n", sent);
     }
     
@@ -258,8 +243,7 @@ static bool pio_uart_ch1_has_rx_data(void* context) {
         uint8_t byte = (uint8_t)(data & 0xFF);
         
         if (uart_receive_buffer_put(&ctx->rx_ring, byte)) {
-            ctx->state.rx_count++;
-            ctx->state.rx_bytes++;
+            ctx->state.bytes_received++;
         } else {
             ctx->state.overrun_errors++;
         }
@@ -279,16 +263,7 @@ static size_t pio_uart_ch1_read_data(void* context, uint8_t* buffer, size_t max_
     pio_uart_ch1_has_rx_data(context);
     
     // Read from ring buffer
-    size_t read = 0;
-    for (size_t i = 0; i < max_len; i++) {
-        uint8_t byte;
-        if (uart_receive_buffer_get(&ctx->rx_ring, &byte)) {
-            buffer[i] = byte;
-            read++;
-        } else {
-            break;
-        }
-    }
+    size_t read = uart_receive_buffer_read(&ctx->rx_ring, buffer, max_len);
     
     if (read > 0) {
         printf("PIO UART Ch1: Read %zu bytes from buffer\n", read);
@@ -356,10 +331,10 @@ static const uart_state_t* pio_uart_ch1_get_state(void* context) {
 static void pio_uart_ch1_reset_stats(void* context) {
     pio_uart_context_t* ctx = (pio_uart_context_t*)context;
     if (ctx) {
-        ctx->state.tx_count = 0;
-        ctx->state.tx_bytes = 0;
-        ctx->state.rx_count = 0;
-        ctx->state.rx_bytes = 0;
+        ctx->state.bytes_sent = 0;
+        ctx->state.bytes_received = 0;
+        ctx->state.tx_errors = 0;
+        ctx->state.rx_errors = 0;
         ctx->state.overrun_errors = 0;
         ctx->pio_errors = 0;
         ctx->dma_errors = 0;

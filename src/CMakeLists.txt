@@ -88,11 +88,13 @@ target_link_libraries(core_modules
     hardware_sync
 )
 
-# UART Manager - 4-channel UART management (includes PIO UART for Issue #82)
+# UART Manager - 4-channel UART management (includes PIO UART for Issue #82 and Channel 3)
 add_library(uart_manager
     uart/uart_manager.c
     uart/pl011_driver.c
     uart/pio_uart_driver.c
+    uart/pio_uart_channel1_driver.c
+    uart/pio_uart_channel3_driver.c
     uart/uart_receive_buffer.c
 )
 
