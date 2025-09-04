@@ -46,6 +46,35 @@ void multi_tcp_server_deinit_channel(channel_id_t channel);
  */
 bool multi_tcp_server_send_to_channel(channel_id_t channel, const uint8_t* data, size_t length);
 
+/**
+ * Switch the active server to a different channel (singleton mode workaround)
+ * @param new_channel Channel to make active
+ * @return true if switch successful
+ */
+bool multi_tcp_server_switch_active_channel(channel_id_t new_channel);
+
+/**
+ * Get currently active channel
+ * @return Currently active channel ID or CHANNEL_MAX if none
+ */
+channel_id_t multi_tcp_server_get_active_channel(void);
+
+/**
+ * Process all active TCP servers (call from Core1 main loop)
+ */
+void multi_tcp_server_process(void);
+
+/**
+ * Get statistics for all active servers and print to console
+ */
+void multi_tcp_server_get_all_stats(void);
+
+/**
+ * Check if any server is listening
+ * @return true if any server is listening
+ */
+bool multi_tcp_server_is_any_listening(void);
+
 #ifdef __cplusplus
 }
 #endif

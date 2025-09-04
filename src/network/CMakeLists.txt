@@ -24,6 +24,7 @@ target_include_directories(network_manager PUBLIC
 # Create TCP socket server library
 add_library(tcp_socket_server
     tcp_socket_server.c
+    multi_tcp_server.c
 )
 
 # Link required libraries including lwIP

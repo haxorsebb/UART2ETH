@@ -28,6 +28,7 @@
 #include "network/network_manager.h"
 #include "network/enc28j60_driver.h"
 #include "network/tcp_socket_server.h"
+#include "network/multi_tcp_server.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/timer.h"
@@ -570,21 +571,42 @@ static void core1_configuration_complete(void) {
         network_config_t net_config;
         network_manager_get_default_config(&net_config);
         
-        printf("Core1: Initializing multi-port TCP servers for all enabled channels\n");
+        printf("Core1: Initializing MULTI-PORT TCP servers for enabled channels\n");
         
-        // Initialize TCP servers for enabled channels (Channel 1 and 2)
-        for (int channel = 1; channel <= 2; channel++) {
-            uint16_t port = net_config.tcp_ports[channel];
-            printf("Core1: Initializing TCP server for Channel %d on port %u\n", channel, port);
+        // Initialize TCP servers for Channel 1 (UART1) and Channel 2 (PIO UART)
+        // Channel 1: Standard UART1 on port 4002
+        int channel1 = 1;
+        uint16_t port1 = net_config.tcp_ports[channel1];
+        printf("Core1: Initializing TCP server for Channel %d (UART1) on port %u\n", channel1, port1);
 
-            if (tcp_socket_server_init(port, channel)) {
-                printf("Core1: TCP server initialized successfully for Channel %d on port %u\n", channel, port);
-                log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port);
-            } else {
-                printf("Core1: TCP server initialization FAILED for Channel %d on port %u\n", channel, port);
-                log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port);
-            }
+        if (multi_tcp_server_init_channel(channel1, port1)) {
+            printf("Core1: TCP server initialized successfully for Channel %d on port %u\n", channel1, port1);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port1);
+        } else {
+            printf("Core1: TCP server initialization FAILED for Channel %d on port %u\n", channel1, port1);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port1);
         }
+
+        // Channel 2: PIO UART on port 4003 (Issue #82 requirement)
+        int channel2 = 2;
+        uint16_t port2 = net_config.tcp_ports[channel2];
+        printf("Core1: Initializing TCP server for Channel %d (PIO UART) on port %u\n", channel2, port2);
+
+        if (multi_tcp_server_init_channel(channel2, port2)) {
+            printf("Core1: TCP server initialized successfully for Channel %d on port %u\n", channel2, port2);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port2);
+        } else {
+            printf("Core1: TCP server initialization FAILED for Channel %d on port %u\n", channel2, port2);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port2);
+        }
+        
+        // Start with Channel 2 (PIO UART) as the active channel for Issue #82 testing
+        if (multi_tcp_server_switch_active_channel(channel2)) {
+            printf("Core1: Channel %d (PIO UART) set as active channel\n", channel2);
+        }
+        
+        // Print multi-server status
+        multi_tcp_server_get_all_stats();
     } else {
         DEBUG_ONLY({
             printf("Core1: No IP address available, skipping TCP server init\n");
@@ -666,8 +688,8 @@ static void core1_process_network(void) {
     });
     network_manager_process();
     
-    // Process TCP socket server (handle connections, data)
-    tcp_socket_server_process();
+    // Process multi-port TCP socket servers (handle connections, data)
+    multi_tcp_server_process();
     
     // Debug TCP server status periodically
     tcp_debug_counter++;
@@ -723,6 +745,9 @@ static void core1_process_logs(void) {
  * This implements the Core1 side of the UART→ringbuffer→network pipeline.
  */
 static void core1_process_ringbuffer(void) {
+    static uint32_t call_counter = 0;
+    call_counter++;
+    
     log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_DEBUG, LOG_EVENT_RINGBUFFER_WORK_START, 1);
     
     // Process ringbuffer messages - fetch from ringbuffer and send over network
@@ -731,18 +756,24 @@ static void core1_process_ringbuffer(void) {
     ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP, CHANNEL_ANY, ENTRY_STATUS_READY);
     
     if (entry != NULL) {
+        printf("[CORE1-RING] Processing UART->TCP message: Channel %u, %u bytes\n", 
+               entry->channel, entry->fill_index);
         
         // Send the message over the network via TCP socket server
         bool sent = tcp_socket_server_send_to_channel(entry->channel, entry->payload, entry->fill_index);
         
         if (sent) {
+            printf("[CORE1-RING] Message sent to TCP - SUCCESS\n");
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, entry->fill_index);
         } else {
+            printf("[CORE1-RING] Message send to TCP - FAILED\n");
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, entry->channel);
         }
         
         // Mark the entry as consumed to return it to the free pool
         ringbuffer_mark_consumed(entry);
+    } else if (call_counter <= 5 || call_counter % 1000 == 0) {
+        printf("[CORE1-RING] No UART->TCP messages to process (call #%u)\n", call_counter);
     }
         
     // Complete ringbuffer processing and return to idle for next work check

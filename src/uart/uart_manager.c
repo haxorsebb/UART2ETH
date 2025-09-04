@@ -51,9 +51,9 @@ typedef struct {
 static const channel_config_t channel_configs[UART_MANAGER_MAX_CHANNELS] = {
     // Channel 0: UART0 (PL011) - disabled
     {false, UART_TYPE_PL011, 230400, 0, 1},
-    // Channel 1: UART1 (PL011) - enabled
+    // Channel 1: PIO UART on GPIO 4,5 - enabled (using working PIO UART implementation for testing)
     {true, UART_TYPE_PL011, 115200, 4, 5},
-    // Channel 2: PIO UART - enabled (Issue #82, ADR-013)
+    // Channel 2: PIO UART on GPIO 14,15 - enabled for Issue #82
     {true, UART_TYPE_PIO, 230400, 14, 15},
     // Channel 3: PIO UART (placeholder) - disabled
     {false, UART_TYPE_PIO, 230400, 16, 17}
@@ -165,16 +165,24 @@ bool uart_manager_process_incoming_data(void) {
 }
 
 bool uart_manager_process_outgoing_data(void) {
+    static uint32_t call_counter = 0;
+    call_counter++;
+    
     if (!uart_manager_is_ready()) {
         return false;
     }
     
     bool data_processed = false;
     
+    if (call_counter <= 5 || call_counter % 1000 == 0) {
+        printf("[UART-MGR] Processing outgoing data (call #%u)\n", call_counter);
+    }
+    
     for (channel_id_t channel = 0; channel < CHANNEL_MAX; channel++) {
         if (!channel_configs[channel].enabled) continue;
         
         if (process_channel_outgoing_data(channel)) {
+            printf("[UART-MGR] Data processed for channel %u\n", channel);
             data_processed = true;
         }
     }
@@ -366,10 +374,27 @@ static bool process_channel_incoming_data(channel_id_t channel) {
     uint8_t buffer[32];
     
     
+    // Try to reuse an existing FILLING entry for this channel
     ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP, channel, ENTRY_STATUS_FILLING);
 
+    // Validate the existing entry or get a new one
+    if (!entry || entry->fill_index >= RINGBUFFER_PAYLOAD_MAX_SIZE) {
+        if (entry && entry->fill_index >= RINGBUFFER_PAYLOAD_MAX_SIZE) {
+            printf("[UART-MGR] Existing FILLING entry is full, getting new entry\n");
+        }
+        entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
+        
+        // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
+        if (entry) {
+            memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
+            entry->fill_index = 0;
+            printf("[UART-MGR] Channel %u: Cleared payload buffer for new entry\n", channel);
+        }
+    }
+    
     if (!entry) {
-        entry = ringbuffer_get_free_entry( RX_UART_TO_TCP, channel);
+        printf("[UART-MGR] CRITICAL: Cannot allocate ring buffer entry for channel %u\n", channel);
+        return false;
     }
             
     // Read data from UART
@@ -378,23 +403,80 @@ static bool process_channel_incoming_data(channel_id_t channel) {
     do {
         bytes_read = uart->ops->read_data(uart->driver_context, buffer, sizeof(buffer));
         
+        if (bytes_read > 0) {
+            printf("[UART-MGR] Channel %u: Read %zu bytes from UART: ", channel, bytes_read);
+            for (size_t i = 0; i < bytes_read; i++) {
+                printf("%02X ", buffer[i]);
+            }
+            printf("\n");
+        }
+        
         for (size_t idx = 0; idx < bytes_read; idx++) {
             uint8_t byte = buffer[idx];
             g_manager.stats.bytes_received++;
            
+            // Ensure we have a valid entry (critical bug fix)
+            if (!entry) {
+                entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
+                if (!entry) {
+                    printf("[UART-MGR] CRITICAL: No free ring buffer entries available\n");
+                    return false; // Stop processing if no buffers available
+                }
+                // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
+                memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
+                entry->fill_index = 0;
+                printf("[UART-MGR] Channel %u: Allocated and cleared new ring buffer entry\n", channel);
+            }
+           
             //we process incoming data directly into the ring buffer, using fill_index to track the progress
             entry->payload[entry->fill_index++] = byte;
+            
             if(check_message_end(entry->payload, entry->fill_index)) {
+                printf("[UART-MGR] Complete message detected, enqueuing %u bytes\n", entry->fill_index);
+                printf("[UART-MGR] Message content: ");
+                for (size_t i = 0; i < entry->fill_index && i < 50; i++) {
+                    printf("%02X ", entry->payload[i]);
+                }
+                printf("\n");
+                
                 ringbuffer_enqueue_entry(entry);
-                // still data left
-                if(idx < bytes_read) {
-                    entry = ringbuffer_get_free_entry( RX_UART_TO_TCP, channel);
+                entry = NULL; // CRITICAL FIX: Clear entry pointer to force new allocation
+                
+                // BUFFER PADDING FIX: Clear UART receive buffer after processing complete message
+                // This prevents old data from accumulating and causing buffer padding issues
+                if (uart->ops->clear_rx_buffer) {
+                    uart->ops->clear_rx_buffer(uart->driver_context);
+                    printf("[UART-MGR] Channel %u: Cleared UART RX buffer after complete message\n", channel);
+                }
+                
+                // If there's more data to process, get a new entry immediately
+                if(idx < bytes_read - 1) {
+                    entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
+                    // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
+                    if (entry) {
+                        memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
+                        entry->fill_index = 0;
+                        printf("[UART-MGR] Channel %u: Mid-loop new entry allocated and cleared\n", channel);
+                    }
                 }
             }
-            if (entry->fill_index >= RINGBUFFER_PAYLOAD_MAX_SIZE) {
-                entry = ringbuffer_get_free_entry( RX_UART_TO_TCP, channel);
+            else if (entry->fill_index >= RINGBUFFER_PAYLOAD_MAX_SIZE) {
+                printf("[UART-MGR] Buffer full, getting new entry\n");
+                entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
             }
         }
+        
+        // Ensure we have an entry for the next iteration if we're continuing
+        if(bytes_read == sizeof(buffer) && !entry) {
+            entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
+            // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
+            if (entry) {
+                memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
+                entry->fill_index = 0;
+                printf("[UART-MGR] Channel %u: Loop continuation entry allocated and cleared\n", channel);
+            }
+        }
+        
         rounds++;
     } while(bytes_read == sizeof(buffer));
 
@@ -419,11 +501,13 @@ static bool process_channel_outgoing_data(channel_id_t channel) {
     ring_entry_t* entry = ringbuffer_dequeue_entry(RX_TCP_TO_UART, channel, ENTRY_STATUS_READY);
     
     if (entry) {
+        printf("[UART-MGR] Sending %u bytes to UART channel %u\n", entry->fill_index, channel);
         // Send data via UART - send as much as possible in one go
         const uint8_t* data = entry->payload;
         size_t data_len = entry->fill_index;
         
         size_t sent = uart->ops->send_data(uart->driver_context, data, data_len);
+        printf("[UART-MGR] UART channel %u sent %zu/%zu bytes\n", channel, sent, data_len);
         g_manager.stats.bytes_transmitted += sent;
         
         // Mark message as consumed regardless of how much was sent
