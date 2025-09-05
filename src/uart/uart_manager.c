@@ -318,7 +318,7 @@ static bool init_channel(channel_id_t channel) {
             uart->ops = &pio_uart_interface;
         } else if (channel == 3) {
             // Channel 3: Use dedicated Channel 3 PIO UART driver
-            uart->driver_context = pio_ch3_create_context(0, 0);  // PIO0, SM4/SM5
+            uart->driver_context = pio_ch3_create_context(0, 0);  // PIO0, SM2/SM3
             uart->ops = &pio_uart_ch3_interface;
         } else {
             printf("ERROR: PIO UART not supported for channel %u\n", channel);

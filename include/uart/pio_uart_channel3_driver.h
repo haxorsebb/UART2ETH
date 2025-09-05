@@ -3,9 +3,9 @@
  * @brief PIO UART driver header for Channel 3 (GPIO 16,17)
  * 
  * Dedicated PIO UART implementation for Channel 3 testing.
- * Uses GPIO 16 (TX) and GPIO 17 (RX) with PIO0 state machines 4,5.
+ * Uses GPIO 16 (TX) and GPIO 17 (RX) with PIO0 state machines 2,3.
  * 
- * Based on the working Channel 1 implementation but configured for Channel 3.
+ * Based on the working Channel 2 implementation but configured for Channel 3.
  * 
  * Documentation Reference:
  * - Expansion for Channel 3 support
@@ -23,10 +23,10 @@
 #include "uart/uart_interface.h"
 #include "uart/uart_receive_buffer.h"
 
-// PIO Configuration for Channel 3 - Use PIO1 with state machines 0,1
-#define PIO_UART_CH3_PIO_INSTANCE    pio1
-#define PIO_UART_CH3_TX_SM          0      // State machine 0 for TX
-#define PIO_UART_CH3_RX_SM          1      // State machine 1 for RX
+// PIO Configuration for Channel 3 - Use PIO0 with state machines 2,3
+#define PIO_UART_CH3_PIO_INSTANCE    pio0
+#define PIO_UART_CH3_TX_SM          2      // State machine 2 for TX
+#define PIO_UART_CH3_RX_SM          3      // State machine 3 for RX
 #define PIO_UART_CH3_DEFAULT_BAUD   115200 // Default baud rate
 
 // GPIO Pin Configuration for Channel 3

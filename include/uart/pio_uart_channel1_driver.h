@@ -3,7 +3,7 @@
  * @brief PIO UART driver header for Channel 1 (GPIO 4,5)
  * 
  * Dedicated PIO UART implementation for Channel 1 testing.
- * Uses GPIO 4 (TX) and GPIO 5 (RX) with PIO0 state machines 2,3.
+ * Uses GPIO 4 (TX) and GPIO 5 (RX) with PIO1 state machines 0,1.
  * 
  * Based on the working Channel 2 implementation but configured for Channel 1.
  */
@@ -20,9 +20,9 @@
 #include "uart/uart_receive_buffer.h"
 
 // PIO Configuration for Channel 1
-#define PIO_UART_CH1_PIO_INSTANCE    pio0
-#define PIO_UART_CH1_TX_SM          2      // State machine 2 for TX
-#define PIO_UART_CH1_RX_SM          3      // State machine 3 for RX
+#define PIO_UART_CH1_PIO_INSTANCE    pio1
+#define PIO_UART_CH1_TX_SM          0      // State machine 0 for TX
+#define PIO_UART_CH1_RX_SM          1      // State machine 1 for RX
 #define PIO_UART_CH1_DEFAULT_BAUD   115200 // Default baud rate
 
 // GPIO Pin Configuration for Channel 1

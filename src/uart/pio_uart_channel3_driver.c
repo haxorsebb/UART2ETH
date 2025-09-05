@@ -3,9 +3,9 @@
  * @brief PIO UART driver implementation for Channel 3 (GPIO 16,17)
  * 
  * Dedicated PIO UART implementation for Channel 3 testing.
- * Uses GPIO 16 (TX) and GPIO 17 (RX) with PIO0 state machines 4,5.
+ * Uses GPIO 16 (TX) and GPIO 17 (RX) with PIO0 state machines 2,3.
  * 
- * Based on the working Channel 1 implementation but configured for Channel 3.
+ * Based on the working Channel 2 implementation but configured for Channel 3.
  */
 
 #include "uart/pio_uart_channel3_driver.h"
@@ -70,7 +70,7 @@ const uart_interface_t pio_uart_ch3_interface = {
 // Context management for Channel 3
 void* pio_ch3_create_context(uint8_t pio_num, uint8_t sm_num) {
     (void)pio_num;  // We use fixed PIO0
-    (void)sm_num;   // We use fixed state machines 4,5
+    (void)sm_num;   // We use fixed state machines 2,3
     
     if (pio_uart_ch3_context_initialized) {
         printf("ERROR: PIO UART Channel 3 context already initialized\n");
@@ -79,10 +79,10 @@ void* pio_ch3_create_context(uint8_t pio_num, uint8_t sm_num) {
     
     memset(&pio_uart_ch3_context, 0, sizeof(pio_uart_ch3_context_t));
     
-    // Configure PIO settings for Channel 3 - Use PIO1 to avoid conflicts
-    pio_uart_ch3_context.pio_instance = pio1;
-    pio_uart_ch3_context.tx_sm = 0;  // Use state machine 0 for TX (on PIO1)
-    pio_uart_ch3_context.rx_sm = 1;  // Use state machine 1 for RX (on PIO1)
+    // Configure PIO settings for Channel 3 - Use PIO0 SM2/SM3
+    pio_uart_ch3_context.pio_instance = pio0;
+    pio_uart_ch3_context.tx_sm = 2;  // Use state machine 2 for TX (on PIO0)
+    pio_uart_ch3_context.rx_sm = 3;  // Use state machine 3 for RX (on PIO0)
     pio_uart_ch3_context.tx_gpio = 16;  // GPIO 16 for Channel 3 TX
     pio_uart_ch3_context.rx_gpio = 17;  // GPIO 17 for Channel 3 RX
     
@@ -194,13 +194,13 @@ static bool pio_uart_ch3_init(void* context, const uart_config_t* config) {
     pio_uart_rx_program_init(ctx->pio_instance, ctx->rx_sm, ctx->rx_offset,
                             ctx->rx_gpio, config->baud_rate);
     
-    // Setup PIO RX interrupt for data available (CRITICAL FIX)
-    pio_set_irq0_source_enabled(ctx->pio_instance, 
+    // Setup PIO RX interrupt for data available - Use IRQ 1 to avoid conflict with Channel 2
+    pio_set_irq1_source_enabled(ctx->pio_instance, 
                                pis_sm0_rx_fifo_not_empty + ctx->rx_sm, 
                                true);
-    irq_set_exclusive_handler(pio_get_irq_num(ctx->pio_instance, 0), 
+    irq_set_exclusive_handler(pio_get_irq_num(ctx->pio_instance, 1), 
                              pio_uart_ch3_pio_rx_irq_handler);
-    irq_set_enabled(pio_get_irq_num(ctx->pio_instance, 0), true);
+    irq_set_enabled(pio_get_irq_num(ctx->pio_instance, 1), true);
     
     printf("PIO UART Ch3: RX interrupt setup complete\n");
     
@@ -317,9 +317,9 @@ static void pio_uart_ch3_deinit(void* context) {
     
     printf("PIO UART Ch3: Deinitializing...\n");
     
-    // Disable PIO interrupt (CRITICAL FIX)
-    irq_set_enabled(pio_get_irq_num(ctx->pio_instance, 0), false);
-    pio_set_irq0_source_enabled(ctx->pio_instance,
+    // Disable PIO interrupt - Use IRQ 1 to match initialization
+    irq_set_enabled(pio_get_irq_num(ctx->pio_instance, 1), false);
+    pio_set_irq1_source_enabled(ctx->pio_instance,
                                pis_sm0_rx_fifo_not_empty + ctx->rx_sm,
                                false);
     

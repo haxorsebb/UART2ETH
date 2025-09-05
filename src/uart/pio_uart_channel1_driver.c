@@ -3,7 +3,7 @@
  * @brief PIO UART driver implementation for Channel 1 (GPIO 4,5)
  * 
  * Dedicated PIO UART implementation for Channel 1 testing.
- * Uses GPIO 4 (TX) and GPIO 5 (RX) with PIO0 state machines 2,3.
+ * Uses GPIO 4 (TX) and GPIO 5 (RX) with PIO1 state machines 0,1.
  * 
  * Based on the working Channel 2 implementation but configured for Channel 1.
  */
@@ -80,9 +80,9 @@ void* pio_ch1_create_context(uint8_t pio_num, uint8_t sm_num) {
     memset(&pio_uart_ch1_context, 0, sizeof(pio_uart_context_t));
     
     // Configure PIO settings for Channel 1
-    pio_uart_ch1_context.pio_instance = pio0;
-    pio_uart_ch1_context.tx_sm = 2;  // Use state machine 2 for TX
-    pio_uart_ch1_context.rx_sm = 3;  // Use state machine 3 for RX
+    pio_uart_ch1_context.pio_instance = pio1;
+    pio_uart_ch1_context.tx_sm = 0;  // Use state machine 0 for TX
+    pio_uart_ch1_context.rx_sm = 1;  // Use state machine 1 for RX
     pio_uart_ch1_context.tx_gpio = 4;  // GPIO 4 for Channel 1 TX
     pio_uart_ch1_context.rx_gpio = 5;  // GPIO 5 for Channel 1 RX
     
@@ -133,17 +133,59 @@ static bool pio_uart_ch1_setup_programs(pio_uart_context_t* ctx) {
 
 // Setup DMA for Channel 1
 static bool pio_uart_ch1_setup_dma(pio_uart_context_t* ctx) {
-    // Claim DMA channels
-    ctx->tx_dma_chan = dma_claim_unused_channel(true);
-    ctx->rx_dma_chan = dma_claim_unused_channel(true);
+    if (!ctx) {
+        printf("ERROR: NULL context provided to pio_uart_ch1_setup_dma\n");
+        return false;
+    }
     
-    if (ctx->tx_dma_chan == (uint)-1 || ctx->rx_dma_chan == (uint)-1) {
-        printf("PIO UART Ch1: Failed to claim DMA channels\n");
+    printf("PIO UART Ch1: Setting up DMA channels...\n");
+
+    // Initialize DMA channels to invalid
+    ctx->tx_dma_chan = (uint)-1;
+    ctx->rx_dma_chan = (uint)-1;
+    ctx->dma_channels_claimed = false;
+
+    // Claim TX DMA channel
+    ctx->tx_dma_chan = dma_claim_unused_channel(false);
+    if (ctx->tx_dma_chan == (uint)-1) {
+        printf("ERROR: Failed to claim TX DMA channel for Ch1\n");
+        return false;
+    }
+    
+    // Claim RX DMA channel
+    ctx->rx_dma_chan = dma_claim_unused_channel(false);
+    if (ctx->rx_dma_chan == (uint)-1) {
+        printf("ERROR: Failed to claim RX DMA channel for Ch1\n");
+        dma_channel_unclaim(ctx->tx_dma_chan);
+        ctx->tx_dma_chan = (uint)-1;
         return false;
     }
     
     ctx->dma_channels_claimed = true;
-    printf("PIO UART Ch1: DMA setup complete - TX:%u RX:%u\n", ctx->tx_dma_chan, ctx->rx_dma_chan);
+    
+    // Configure TX DMA channel
+    dma_channel_config tx_config = dma_channel_get_default_config(ctx->tx_dma_chan);
+    channel_config_set_transfer_data_size(&tx_config, DMA_SIZE_8);
+    channel_config_set_dreq(&tx_config, pio_get_dreq(ctx->pio_instance, ctx->tx_sm, true));
+    channel_config_set_read_increment(&tx_config, true);
+    channel_config_set_write_increment(&tx_config, false);
+    
+    dma_channel_configure(
+        ctx->tx_dma_chan,
+        &tx_config,
+        &ctx->pio_instance->txf[ctx->tx_sm],  // Write to TX FIFO
+        NULL,  // Read address set later
+        0,     // Transfer count set later
+        false  // Don't start yet
+    );
+    
+    // Set up DMA TX interrupt - Use IRQ1 for Channel 1 to avoid conflicts with Channel 2
+    dma_channel_set_irq1_enabled(ctx->tx_dma_chan, true);
+    irq_set_exclusive_handler(DMA_IRQ_1, pio_uart_ch1_dma_tx_irq_handler);
+    irq_set_enabled(DMA_IRQ_1, true);
+    
+    printf("PIO UART Ch1: DMA setup complete - TX:%u RX:%u\n", 
+           ctx->tx_dma_chan, ctx->rx_dma_chan);
     
     return true;
 }
@@ -194,6 +236,16 @@ static bool pio_uart_ch1_init(void* context, const uart_config_t* config) {
     pio_uart_rx_program_init(ctx->pio_instance, ctx->rx_sm, ctx->rx_offset,
                             ctx->rx_gpio, config->baud_rate);
     
+    // Setup PIO RX interrupt for data available - Use IRQ 0 for PIO1 to avoid conflicts
+    pio_set_irq0_source_enabled(ctx->pio_instance, 
+                               pis_sm0_rx_fifo_not_empty + ctx->rx_sm, 
+                               true);
+    irq_set_exclusive_handler(pio_get_irq_num(ctx->pio_instance, 0), 
+                             pio_uart_ch1_pio_rx_irq_handler);
+    irq_set_enabled(pio_get_irq_num(ctx->pio_instance, 0), true);
+    
+    printf("PIO UART Ch1: RX interrupt setup complete\n");
+    
     // Mark as initialized
     ctx->state.initialized = true;
     ctx->state.ready = true;
@@ -202,7 +254,7 @@ static bool pio_uart_ch1_init(void* context, const uart_config_t* config) {
     return true;
 }
 
-// Send data implementation for Channel 1
+// Send data implementation for Channel 1 (IMPROVED for large transfers)
 static size_t pio_uart_ch1_send_data(void* context, const uint8_t* data, size_t len) {
     pio_uart_context_t* ctx = (pio_uart_context_t*)context;
     if (!ctx || !ctx->state.ready || !data || len == 0) {
@@ -211,23 +263,51 @@ static size_t pio_uart_ch1_send_data(void* context, const uint8_t* data, size_t 
     
     printf("PIO UART Ch1: Sending %zu bytes\n", len);
     
-    // For simplicity, send data directly to PIO FIFO
-    size_t sent = 0;
-    for (size_t i = 0; i < len; i++) {
-        if (!pio_sm_is_tx_fifo_full(ctx->pio_instance, ctx->tx_sm)) {
-            pio_sm_put(ctx->pio_instance, ctx->tx_sm, data[i]);
-            sent++;
-        } else {
-            break;
+    // For large transfers, use DMA buffer approach (like Channel 3)
+    if (len > 16 && !ctx->tx_in_progress) {
+        // Copy to DMA buffer (limit to buffer size)
+        size_t transfer_len = len > PIO_UART_CH1_DMA_BUFFER_SIZE ? PIO_UART_CH1_DMA_BUFFER_SIZE : len;
+        memcpy(ctx->tx_dma_buffer, data, transfer_len);
+        
+        printf("PIO UART Ch1: Using DMA buffer for %zu bytes (requested %zu)\n", transfer_len, len);
+        
+        // Configure and start DMA transfer
+        dma_channel_config tx_config = dma_channel_get_default_config(ctx->tx_dma_chan);
+        channel_config_set_transfer_data_size(&tx_config, DMA_SIZE_8);
+        channel_config_set_dreq(&tx_config, pio_get_dreq(ctx->pio_instance, ctx->tx_sm, true));
+        channel_config_set_read_increment(&tx_config, true);
+        channel_config_set_write_increment(&tx_config, false);
+        
+        dma_channel_configure(
+            ctx->tx_dma_chan,
+            &tx_config,
+            &ctx->pio_instance->txf[ctx->tx_sm],  // Write to TX FIFO
+            ctx->tx_dma_buffer,                   // Read from buffer
+            transfer_len,                         // Transfer count
+            true                                  // Start now
+        );
+        
+        ctx->tx_in_progress = true;
+        ctx->state.bytes_sent += transfer_len;
+        
+        printf("PIO UART Ch1: DMA transfer started for %zu bytes\n", transfer_len);
+        return transfer_len;
+    } else {
+        // Use direct PIO FIFO for small transfers or if DMA busy
+        printf("PIO UART Ch1: Using FIFO for %zu bytes (DMA busy=%s)\n", len, ctx->tx_in_progress ? "yes" : "no");
+        size_t sent = 0;
+        for (size_t i = 0; i < len; i++) {
+            if (!pio_sm_is_tx_fifo_full(ctx->pio_instance, ctx->tx_sm)) {
+                pio_sm_put(ctx->pio_instance, ctx->tx_sm, (uint32_t)data[i]);
+                sent++;
+                ctx->state.bytes_sent++;
+            } else {
+                break;  // FIFO full, return partial send
+            }
         }
+        printf("PIO UART Ch1: FIFO sent %zu/%zu bytes\n", sent, len);
+        return sent;
     }
-    
-    if (sent > 0) {
-        ctx->state.bytes_sent += sent;
-        printf("PIO UART Ch1: Sent %zu bytes to FIFO\n", sent);
-    }
-    
-    return sent;
 }
 
 // Check if RX data available for Channel 1
@@ -276,6 +356,34 @@ static size_t pio_uart_ch1_read_data(void* context, uint8_t* buffer, size_t max_
 static void pio_uart_ch1_deinit(void* context) {
     pio_uart_context_t* ctx = (pio_uart_context_t*)context;
     if (!ctx) return;
+    
+    printf("PIO UART Ch1: Deinitializing...\n");
+    
+    // Disable PIO interrupt - Use IRQ 0 for PIO1 to match initialization
+    irq_set_enabled(pio_get_irq_num(ctx->pio_instance, 0), false);
+    pio_set_irq0_source_enabled(ctx->pio_instance,
+                               pis_sm0_rx_fifo_not_empty + ctx->rx_sm,
+                               false);
+    
+    // Cleanup DMA if initialized
+    if (ctx->dma_channels_claimed) {
+        printf("PIO UART Ch1: Cleaning up DMA channels...\n");
+        
+        // Disable DMA interrupts
+        irq_set_enabled(DMA_IRQ_1, false);
+        dma_channel_set_irq1_enabled(ctx->tx_dma_chan, false);
+        
+        // Abort any ongoing transfers
+        dma_channel_abort(ctx->tx_dma_chan);
+        dma_channel_abort(ctx->rx_dma_chan);
+        
+        // Unclaim channels
+        dma_channel_unclaim(ctx->tx_dma_chan);
+        dma_channel_unclaim(ctx->rx_dma_chan);
+        
+        ctx->dma_channels_claimed = false;
+        printf("PIO UART Ch1: DMA cleanup complete\n");
+    }
     
     ctx->state.initialized = false;
     ctx->state.ready = false;
@@ -341,7 +449,53 @@ static void pio_uart_ch1_reset_stats(void* context) {
     }
 }
 
-// Placeholder interrupt handlers (not used in simplified implementation)
-static void pio_uart_ch1_dma_tx_irq_handler(void) {}
-static void pio_uart_ch1_dma_rx_irq_handler(void) {}
-static void pio_uart_ch1_pio_rx_irq_handler(void) {}
+// Interrupt handlers - with proper RX interrupt support
+static void pio_uart_ch1_dma_tx_irq_handler(void) {
+    if (pio_uart_ch1_context_initialized && 
+        dma_channel_get_irq1_status(pio_uart_ch1_context.tx_dma_chan)) {
+        
+        dma_channel_acknowledge_irq1(pio_uart_ch1_context.tx_dma_chan);
+        pio_uart_ch1_context.tx_in_progress = false;
+        pio_uart_ch1_context.tx_dma_completions++;
+        
+        printf("PIO UART Ch1: DMA TX transfer complete\n");
+    }
+}
+
+static void pio_uart_ch1_dma_rx_irq_handler(void) {
+    // Placeholder for future DMA RX support  
+}
+
+static void pio_uart_ch1_pio_rx_irq_handler(void) {
+    if (!pio_uart_ch1_context_initialized) {
+        return;
+    }
+    
+    pio_uart_context_t* ctx = &pio_uart_ch1_context;
+    
+    // Clear interrupt first to prevent runaway condition
+    pio_interrupt_clear(ctx->pio_instance, pis_sm0_rx_fifo_not_empty + ctx->rx_sm);
+    
+    // Process available data from FIFO
+    int max_bytes = 32;  // Prevent unbounded interrupt processing
+    
+    printf("PIO UART Ch1: RX interrupt - processing FIFO data\n");
+    
+    while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm) && max_bytes-- > 0) {
+        uint32_t word = pio_sm_get(ctx->pio_instance, ctx->rx_sm);
+        uint8_t byte = (uint8_t)(word >> 24);  // Extract byte from left-justified data
+        
+        printf("PIO UART Ch1: Received byte 0x%02X ('%c')\n", byte, (byte >= 32 && byte < 127) ? byte : '?');
+        
+        // Put byte into ring buffer (interrupt-safe)
+        bool success = uart_receive_buffer_put(&ctx->rx_ring, byte);
+        
+        if (!success) {
+            ctx->state.overrun_errors++;
+            printf("PIO UART Ch1: Ring buffer overrun!\n");
+            break;  // Buffer full, stop processing
+        }
+    }
+    
+    printf("PIO UART Ch1: RX interrupt processing complete\n");
+}
