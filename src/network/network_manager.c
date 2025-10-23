@@ -25,6 +25,7 @@
 #include "lwip/prot/dhcp.h"  // For DHCP_STATE_OFF and other DHCP states
 #include "lwip/timeouts.h"
 #include "lwip/ip4_addr.h"
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -190,15 +191,7 @@ bool network_manager_transmit_packets_pending(void) {
  */
 
 void network_manager_process(void) {
-    static uint32_t debug_counter = 0;
-    debug_counter++;
-    
-    DEBUG_ONLY({
-        if (debug_counter % 10000 == 0) {  // Print every 10000 calls
-            printf("DEBUG: network_manager_process() call #%u, status=%d\n", debug_counter, g_network_status);
-        }
-    });
-    
+
     if (!g_network_initialized) {
         DEBUG_ONLY({
             printf("DEBUG: network_manager_process() - not initialized!\n");
@@ -343,24 +336,7 @@ void network_manager_get_default_config(network_config_t* config) {
     IP4_ADDR(&config->static_ip, 192, 168, 1, 100);
     IP4_ADDR(&config->static_gateway, 192, 168, 1, 100);
     IP4_ADDR(&config->static_netmask, 255, 255, 255, 0);
-/*    
-    // Initialize network defaults (using safe string copy)
-    strncpy(config->static_ip, "192.168.1.100", 
-            sizeof(config->static_ip) - 1);
-    config->static_ip[sizeof(config->static_ip) - 1] = '\0';
 
-    strncpy(config->.subnet_mask, "255.255.255.0", 
-            sizeof(config->static_netmask) - 1);
-    config->static_netmask[sizeof(config->static_netmask) - 1] = '\0';
-    
-    strncpy(config->static_gateway, "192.168.1.1", 
-            sizeof(config->static_gateway) - 1);
-    config->static_gateway[sizeof(config->static_gateway) - 1] = '\0';
- */   
-    config->tcp_ports[0] = 4001;
-    config->tcp_ports[1] = 4002;
-    config->tcp_ports[2] = 4003;
-    config->tcp_ports[3] = 4004;
     config->management_port = 80;
 }
 
@@ -417,7 +393,8 @@ void network_manager_link_change(void) {
 void network_manager_check_timeouts(void) {
     /* Cyclic lwIP timers check */
     sys_check_timeouts();
-    core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, sys_timeouts_sleeptime());
+    uint32_t next_timeout = sys_timeouts_sleeptime();
+    core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, next_timeout);    
 }
 
 

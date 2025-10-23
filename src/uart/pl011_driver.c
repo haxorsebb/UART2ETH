@@ -3,18 +3,19 @@
  * @brief PL011 UART driver implementation
  */
 
-#include "uart/pl011_driver.h"
-
-#include "uart/uart_interface.h"
-#include "pico/stdlib.h"
-#include "hardware/uart.h"
-#include "hardware/gpio.h"
-#include "hardware/irq.h"
-#include "pico/multicore.h"
-#include "uart/uart_receive_buffer.h"
+#include <pico/time.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
+
+#include "uart/pl011_driver.h"
+
+#include "uart/uart_interface.h"
+#include "hardware/uart.h"
+#include "hardware/gpio.h"
+#include "hardware/irq.h"
+#include "uart/uart_receive_buffer.h"
 
 // Static lookup table for ISR context resolution
 static pl011_context_t pl011_contexts[2];

@@ -15,6 +15,11 @@ endif()
 cmake_minimum_required(VERSION 3.13)
 
 # Set board before initializing SDK
+# OPTION 1: Original custom board with 12MHz external clock (comment out for testing)
+# set(PICO_BOARD uart2eth_board)
+# OPTION 2: Test board with internal oscillator (uncomment for debugging)
+#set(PICO_BOARD uart2eth_board_rosc)
+#set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards)
 set(PICO_BOARD pico2)
 
 # Pull in SDK (must be before project)
@@ -70,16 +75,32 @@ add_subdirectory(tests)
 
 # Create main executable target
 add_executable(uart2eth
+    # OPTION 1: Full application (use when XOSC issue is resolved)
     src/main.c
+    # OPTION 2: Minimal test for crt0.S debugging
+    # src/main_minimal.c
+    # DISABLED FOR TESTING - only enable when using uart2eth_board (not uart2eth_board_rosc)
+    # src/xosc_workaround.c
+    # src/xosc_test.c
 )
 
-# Link libraries
+# Add linker flags to wrap XOSC functions (prevent hanging on boards without crystal)
+# DISABLED FOR TESTING - only enable when using uart2eth_board (not uart2eth_board_rosc)
+# target_link_options(uart2eth PRIVATE 
+#     "LINKER:--wrap=xosc_init"
+#     "LINKER:--wrap=xosc_disable" 
+#     "LINKER:--wrap=xosc_dormant"
+#     "LINKER:--wrap=xosc_hz"
+# )
+
+# Link libraries  
 target_link_libraries(uart2eth 
-    pico_stdlib
+    pico_stdlib        # Basic functionality
+    hardware_gpio      # For LED control
+    hardware_clocks    # For clock testing
     pico_multicore     # Dual core support
     pico_sync          # Synchronization primitives
     hardware_uart
-    hardware_gpio
     hardware_spi
     hardware_watchdog  # Watchdog for stability
     pico_lwip_nosys    # lwIP NO_SYS implementation for raw API
@@ -94,7 +115,7 @@ target_link_libraries(uart2eth
 )
 
 # Enable stdio: USB CDC for debugging, UART0 for debugging
-pico_enable_stdio_usb(uart2eth 1)
+# pico_enable_stdio_usb(uart2eth 1)
 pico_enable_stdio_uart(uart2eth 1) 
 
 # Set UF2 family for RP2350

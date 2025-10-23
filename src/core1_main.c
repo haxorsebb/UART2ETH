@@ -19,6 +19,12 @@
  * - ADR-007: Event-Driven State Machine Architecture
  * - arc42 Chapter 5 - Core 1 Network Subsystem
  */
+#include <stdio.h>
+#include <pico/stdlib.h>
+#include <pico/multicore.h>
+#include <hardware/timer.h>
+#include <hardware/irq.h>
+
 #include "debug.h"
 #include "core1_timer.h"
 #include "state_machine.h"
@@ -29,11 +35,8 @@
 #include "network/enc28j60_driver.h"
 #include "network/tcp_socket_server.h"
 #include "network/multi_tcp_server.h"
-#include "pico/stdlib.h"
-#include "pico/multicore.h"
-#include "hardware/timer.h"
-#include "hardware/irq.h"
-#include <stdio.h>
+
+
 
 // Forward declarations for Core1 state functions
 static void core1_initialize(void);
@@ -104,8 +107,7 @@ void core1_main(void) {
         
         // Minimal debug output - only every 10000 loops to avoid printf floods
         if (g_core1_loop_counter % 10000 == 0) {
-            printf("DEBUG: Core1 loop=%u, states=%u, main=%d, sub=%d\n", 
-                   g_core1_loop_counter, g_core1_state_reads, main_state, sub_state);
+            printf("DEBUG: Core1 loop=%u, states=%u, main=%d, sub=%d\n", g_core1_loop_counter, g_core1_state_reads, main_state, sub_state);
         }
         
         // Big switch statement for main states
@@ -226,65 +228,63 @@ static bool core1_check_for_pending_work(void) {
     enc28j60_process_interrupts(false);
 
     if(network_manager_link_change_pending()) {
-        DEBUG_ONLY({ 
+        //DEBUG_ONLY({ 
             printf("network has link change pending\n"); 
-        });
+        //});
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE);
         return true; 
     }
 
     if(network_manager_receive_packets_pending()) {
-        DEBUG_ONLY({ 
-            printf("network has pending receive packets\n"); 
-        });
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
-        network_manager_check_timeouts();
-    
         return true; 
     }
     
     if(network_manager_transmit_packets_pending()) {
-        DEBUG_ONLY({ 
+        //DEBUG_ONLY({ 
             printf("network has pending transmit packets\n"); 
-        });
-        //state_machine_process_core1_event(CORE1_EVENT_NETWORK_SENDING_ACTIVE);
+        //});
+        state_machine_process_core1_event(CORE1_EVENT_NETWORK_SENDING_ACTIVE);
         core1_process_packet_tx();
         return true; 
     }
 
     if(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT))
     {
-        DEBUG_ONLY({ 
-            printf("network timer expired\n"); 
-        });
+        //DEBUG_ONLY({ 
+            printf("."); 
+        //});
         network_manager_check_timeouts();
         return true;
     }
 
     // Check for ringbuffer messages to transmit over network (medium priority, messages are cached)
     if(ringbuffer_get_count(RX_UART_TO_TCP) > 0) {
-        DEBUG_ONLY({ 
+        //DEBUG_ONLY({ 
             printf("Core1: ringbuffer has %u pending messages for network transmission\n", 
                              ringbuffer_get_count(RX_UART_TO_TCP)); 
-        });
+        //});
         state_machine_process_core1_event(CORE1_EVENT_RINGBUFFER_DATA_READY);
         return true;
     }
 
     //low priority tasks
     if(log_manager_get_pending_count()) {
-        DEBUG_ONLY({ 
+        //DEBUG_ONLY({ 
             printf("Logmanager has pending count %d\n",log_manager_get_pending_count()); 
-        });
+        //});
         state_machine_process_core1_event(CORE1_EVENT_LOG_START);
         return true;
     }
     if(false && flash_persistence_save_needed()) {
-        DEBUG_ONLY({ printf("persistence needed\n"); });
+        //DEBUG_ONLY({ 
+            printf("persistence needed\n"); 
+        //});
         state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_START);
-        return false;
+        return true;
     }
 
+    core1_timer_set(CORE1_TIMER_WATCHDOG_FEED, 500);
     return false;
 }
 
@@ -317,7 +317,9 @@ static void core1_idle_wait(void) {
 
     // Wait for interrupt - power efficient
     __wfi();
-    DEBUG_ONLY({printf("wfi elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - get_interrupt_ms());});
+    DEBUG_ONLY({
+        printf("wfi elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - get_interrupt_ms());
+    });
 
 }
 
@@ -576,62 +578,33 @@ static void core1_configuration_complete(void) {
         int successful_channels = 0;
         int failed_channels = 0;
         
-        // Initialize TCP servers for Channel 1, 2, and 3 (all PIO UART channels)
-        // All channels will be active simultaneously!
+        // Initialize TCP servers for Channels (all PIO UART channels)
         
-        // Channel 1: Standard UART1 on port 4002
-        int channel1 = 1;
-        uint16_t port1 = net_config.tcp_ports[channel1];
-        printf("Core1: Initializing TCP server for Channel %d (UART1) on port %u\n", channel1, port1);
+        for(int channel_idx=CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++)
+        {
+            // Channel 1: Standard UART1 on port 4002
+            channel_config_t channel_config = shared_memory_get_layout()->config.channels[channel_idx];
+            if(channel_config.enabled)
+            {
+                uint16_t port = channel_config.tcp_port;
+                printf("Core1: Initializing TCP server for Channel %d (UART1) on port %u\n", channel_idx, port);
 
-        if (multi_tcp_server_init_channel(channel1, port1)) {
-            printf("Core1: ✅ Channel %d (UART1) initialized successfully on port %u\n", channel1, port1);
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port1);
-            successful_channels++;
-        } else {
-            printf("Core1: ❌ Channel %d (UART1) initialization FAILED on port %u\n", channel1, port1);
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port1);
-            failed_channels++;
-        }
+                if (multi_tcp_server_init_channel(channel_idx, port)) {
+                    printf("Core1: ✅ Channel %d (UART1) initialized successfully on port %u\n", channel_idx, port);
+                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port);
+                    successful_channels++;
+                } else {
+                    printf("Core1: ❌ Channel %d (UART1) initialization FAILED on port %u\n", channel_idx, port);
+                    log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port);
+                    failed_channels++;
+                }
+            }
+        }            
+        // All channels are now active simultaneously - no switching needed!
+//        DEBUG_ONLY({
+            printf("Core1: Multi-instance initialization complete: %d successful, %d failed\n", successful_channels, failed_channels);
+//        });
 
-        // Channel 2: PIO UART on port 4003 (Issue #82 requirement)
-        int channel2 = 2;
-        uint16_t port2 = net_config.tcp_ports[channel2];
-        printf("Core1: Initializing TCP server for Channel %d (PIO UART) on port %u\n", channel2, port2);
-
-        if (multi_tcp_server_init_channel(channel2, port2)) {
-            printf("Core1: ✅ Channel %d (PIO UART) initialized successfully on port %u\n", channel2, port2);
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port2);
-            successful_channels++;
-        } else {
-            printf("Core1: ❌ Channel %d (PIO UART) initialization FAILED on port %u\n", channel2, port2);
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port2);
-            failed_channels++;
-        }
-
-        
-        // Channel 3: PIO UART on port 4004 (Channel 3 expansion - using PIO1)
-        int channel3 = 3;
-        uint16_t port3 = net_config.tcp_ports[channel3];
-        printf("Core1: Initializing TCP server for Channel %d (PIO UART Ch3) on port %u\n", channel3, port3);
-
-        if (multi_tcp_server_init_channel(channel3, port3)) {
-            printf("Core1: ✅ Channel %d (PIO UART Ch3) initialized successfully on port %u\n", channel3, port3);
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port3);
-            successful_channels++;
-        } else {
-            printf("Core1: ❌ Channel %d (PIO UART Ch3) initialization FAILED on port %u\n", channel3, port3);
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port3);
-            failed_channels++;
-        }
-        
-        // All three channels are now active simultaneously - no switching needed!
-        printf("Core1: 🚀 ALL THREE channels are now active simultaneously!\n");
-        printf("Core1: Multi-instance initialization complete: %d successful, %d failed\n", 
-               successful_channels, failed_channels);
-        
-        // Print comprehensive multi-server status
-        multi_tcp_server_get_all_stats();
     } else {
         DEBUG_ONLY({
             printf("Core1: No IP address available, skipping TCP server init\n");
@@ -703,38 +676,18 @@ static void core1_process_network_connectivity_down(void) {
  */
 static void core1_process_network(void) {
     static uint32_t call_counter = 0;
-    static uint32_t tcp_debug_counter = 0;
     call_counter++;
-    
-    DEBUG_ONLY({
-        if (call_counter % 10000 == 0) {  // Print every 10k calls
-            printf("DEBUG: core1_process_network() call #%u\n", call_counter);
-        }
-    });
+    printf("?");
     network_manager_process();
     
     // Process multi-port TCP socket servers (handle connections, data)
     multi_tcp_server_process();
     
-    // Debug TCP server status periodically
-    tcp_debug_counter++;
-    if (tcp_debug_counter % 50000 == 0) {
-        bool listening = tcp_socket_server_is_listening();
-        DEBUG_ONLY({
-            printf("DEBUG: TCP server listening = %d\n", listening);
-        });
-        if (listening) {
-            tcp_server_stats_t stats;
-            tcp_socket_server_get_stats(&stats);
-            DEBUG_ONLY({
-                printf("DEBUG: TCP port=%u, active=%u, total=%u\n", stats.listen_port, stats.active_connections, stats.total_connections);
-            });
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_STATUS, stats.active_connections);
-        }
-    }
-    
+    network_manager_check_timeouts();
+
     if(!network_manager_receive_packets_pending())
     {
+        printf("!");
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_FINISHED);
     }
 }

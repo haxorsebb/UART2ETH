@@ -55,9 +55,9 @@ void test_initialized_ringbuffer_is_empty(void) {
                                      "UART→TCP queue should be empty after init");
     
     // Verify no entries can be dequeued from empty buffer
-    TEST_ASSERT_NULL_MESSAGE(ringbuffer_dequeue_entry(RX_TCP_TO_UART), 
+    TEST_ASSERT_NULL_MESSAGE(ringbuffer_dequeue_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL, ENTRY_STATUS_READY), 
                              "Should not dequeue from empty TCP→UART queue");
-    TEST_ASSERT_NULL_MESSAGE(ringbuffer_dequeue_entry(RX_UART_TO_TCP), 
+    TEST_ASSERT_NULL_MESSAGE(ringbuffer_dequeue_entry(RX_UART_TO_TCP, TEST_UART_CHANNEL, ENTRY_STATUS_READY), 
                              "Should not dequeue from empty UART→TCP queue");
     
     // Verify full capacity is available
@@ -74,7 +74,7 @@ void test_initialized_ringbuffer_is_empty(void) {
  */
 void test_message_can_be_put_into_ringbuffer(void) {
     // Get free entry
-    ring_entry_t* entry = ringbuffer_get_free_entry();
+    ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL_MESSAGE(entry, "Should get free entry from empty buffer");
     TEST_ASSERT_EQUAL_UINT8_MESSAGE(ENTRY_STATUS_FILLING, entry->status, 
                                    "Free entry should have FILLING status");
@@ -97,7 +97,7 @@ void test_message_can_be_put_into_ringbuffer(void) {
  */
 void test_ringbuffer_reports_length_1_after_message_added(void) {
     // Add one message
-    ring_entry_t* entry = ringbuffer_get_free_entry();
+    ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry);
     setup_test_message(entry, TEST_MESSAGE_1, RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry));
@@ -126,7 +126,7 @@ void test_overflow_overwrites_oldest_message(void) {
     
     // Fill buffer to capacity
     for (uint32_t i = 0; i < capacity; i++) {
-        ring_entry_t* entry = ringbuffer_get_free_entry();
+        ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
         TEST_ASSERT_NOT_NULL_MESSAGE(entry, "Should get free entry while filling buffer");
         
         // Create unique message for each entry
@@ -143,7 +143,7 @@ void test_overflow_overwrites_oldest_message(void) {
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(capacity, ringbuffer_get_count(RX_TCP_TO_UART), "All entries should be queued");
     
     // Attempt to add one more message (should trigger overflow)
-    ring_entry_t* overflow_entry = ringbuffer_get_free_entry();
+    ring_entry_t* overflow_entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
     
     if (overflow_entry != NULL) {
         // If we got an entry, it means drop-oldest policy is working
@@ -156,7 +156,7 @@ void test_overflow_overwrites_oldest_message(void) {
                                                "Overflow count should increase");
         
         // Verify oldest message (sequence_id = 0) is no longer in buffer
-        ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+        ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL, ENTRY_STATUS_READY);
         TEST_ASSERT_NOT_NULL_MESSAGE(dequeued, "Should be able to dequeue message");
         TEST_ASSERT_NOT_EQUAL_UINT32_MESSAGE(0, dequeued->sequence_id, 
                                             "Oldest message should have been dropped");
@@ -172,13 +172,13 @@ void test_overflow_overwrites_oldest_message(void) {
  */
 void test_message_can_be_removed_from_ringbuffer(void) {
     // Add a message first
-    ring_entry_t* entry = ringbuffer_get_free_entry();
+    ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry);
     setup_test_message(entry, TEST_MESSAGE_1, RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry));
     
     // Remove the message
-    ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+    ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL, ENTRY_STATUS_READY);
     TEST_ASSERT_NOT_NULL_MESSAGE(dequeued, "Should be able to dequeue message");
     TEST_ASSERT_EQUAL_PTR_MESSAGE(entry, dequeued, "Dequeued entry should be same as enqueued");
     TEST_ASSERT_EQUAL_UINT8_MESSAGE(ENTRY_STATUS_READY, dequeued->status, 
@@ -199,12 +199,12 @@ void test_message_can_be_removed_from_ringbuffer(void) {
  */
 void test_length_decrements_after_message_removed(void) {
     // Add two messages
-    ring_entry_t* entry1 = ringbuffer_get_free_entry();
+    ring_entry_t* entry1 = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry1);
     setup_test_message(entry1, TEST_MESSAGE_1, RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry1));
     
-    ring_entry_t* entry2 = ringbuffer_get_free_entry();
+    ring_entry_t* entry2 = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry2);
     setup_test_message(entry2, TEST_MESSAGE_2, RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry2));
@@ -214,7 +214,7 @@ void test_length_decrements_after_message_removed(void) {
                                      "Should have 2 messages before removal");
     
     // Remove one message
-    ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+    ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL, ENTRY_STATUS_READY);
     TEST_ASSERT_NOT_NULL(dequeued);
     ringbuffer_mark_consumed(dequeued);
     
@@ -235,14 +235,14 @@ void test_length_decrements_after_message_removed(void) {
  */
 void test_core0_turns_around_oldest_tcp_to_uart_message(void) {
     // Add multiple TCP→UART messages with different timestamps
-    ring_entry_t* entry1 = ringbuffer_get_free_entry();
+    ring_entry_t* entry1 = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry1);
     setup_test_message(entry1, TEST_MESSAGE_1, RX_TCP_TO_UART, TEST_UART_CHANNEL);
     entry1->timestamp = 1000;  // Older message
     entry1->sequence_id = 1;
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry1));
     
-    ring_entry_t* entry2 = ringbuffer_get_free_entry();
+    ring_entry_t* entry2 = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry2);
     setup_test_message(entry2, TEST_MESSAGE_2, RX_TCP_TO_UART, TEST_UART_CHANNEL);
     entry2->timestamp = 2000;  // Newer message
@@ -250,7 +250,7 @@ void test_core0_turns_around_oldest_tcp_to_uart_message(void) {
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry2));
     
     // Simulate Core0 main loop execution: process only one message
-    ring_entry_t* to_turn_around = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+    ring_entry_t* to_turn_around = ringbuffer_dequeue_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL, ENTRY_STATUS_READY);
     TEST_ASSERT_NOT_NULL_MESSAGE(to_turn_around, "Should dequeue oldest message");
     
     // Verify it's the oldest message (entry1)
@@ -273,7 +273,7 @@ void test_core0_turns_around_oldest_tcp_to_uart_message(void) {
  */
 void test_core1_adds_uart_to_tcp_messages(void) {
     // Simulate Core1 adding UART→TCP message (from UART hardware or echo response)
-    ring_entry_t* entry = ringbuffer_get_free_entry();
+    ring_entry_t* entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry);
     setup_test_message(entry, TEST_MESSAGE_1, RX_UART_TO_TCP, TEST_UART_CHANNEL);
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry));
@@ -285,7 +285,7 @@ void test_core1_adds_uart_to_tcp_messages(void) {
                                      "Should have 0 messages in TCP→UART queue");
     
     // Verify message content and direction
-    ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
+    ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_UART_TO_TCP, TEST_UART_CHANNEL, ENTRY_STATUS_READY);
     TEST_ASSERT_NOT_NULL(dequeued);
     verify_message_content(dequeued, TEST_MESSAGE_1, RX_UART_TO_TCP);
     ringbuffer_mark_consumed(dequeued);
@@ -297,14 +297,14 @@ void test_core1_adds_uart_to_tcp_messages(void) {
  */
 void test_core1_removes_oldest_uart_to_tcp_message(void) {
     // Add multiple UART→TCP messages with different timestamps
-    ring_entry_t* entry1 = ringbuffer_get_free_entry();
+    ring_entry_t* entry1 = ringbuffer_get_free_entry(RX_UART_TO_TCP, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry1);
     setup_test_message(entry1, TEST_MESSAGE_1, RX_UART_TO_TCP, TEST_UART_CHANNEL);
     entry1->timestamp = 1000;  // Older message
     entry1->sequence_id = 1;
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry1));
     
-    ring_entry_t* entry2 = ringbuffer_get_free_entry();
+    ring_entry_t* entry2 = ringbuffer_get_free_entry(RX_UART_TO_TCP, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry2);
     setup_test_message(entry2, TEST_MESSAGE_2, RX_UART_TO_TCP, TEST_UART_CHANNEL);
     entry2->timestamp = 2000;  // Newer message
@@ -312,7 +312,7 @@ void test_core1_removes_oldest_uart_to_tcp_message(void) {
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry2));
     
     // Simulate Core1 main loop execution: process only one message for transmission
-    ring_entry_t* to_transmit = ringbuffer_dequeue_entry(RX_UART_TO_TCP);
+    ring_entry_t* to_transmit = ringbuffer_dequeue_entry(RX_UART_TO_TCP, TEST_UART_CHANNEL, ENTRY_STATUS_READY);
     TEST_ASSERT_NOT_NULL_MESSAGE(to_transmit, "Should dequeue oldest message");
     
     // Verify it's the oldest message (entry1)
@@ -341,12 +341,12 @@ void test_ringbuffer_statistics(void) {
     TEST_ASSERT_GREATER_THAN_UINT32_MESSAGE(0, stats.total_entries, "Should have non-zero capacity");
     
     // Add and remove a message
-    ring_entry_t* entry = ringbuffer_get_free_entry();
+    ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_NOT_NULL(entry);
     setup_test_message(entry, TEST_MESSAGE_1, RX_TCP_TO_UART, TEST_UART_CHANNEL);
     TEST_ASSERT_TRUE(ringbuffer_enqueue_entry(entry));
     
-    ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_TCP_TO_UART);
+    ring_entry_t* dequeued = ringbuffer_dequeue_entry(RX_TCP_TO_UART, TEST_UART_CHANNEL, ENTRY_STATUS_READY);
     TEST_ASSERT_NOT_NULL(dequeued);
     ringbuffer_mark_consumed(dequeued);
     
@@ -364,14 +364,14 @@ static void setup_test_message(ring_entry_t* entry, const char* message, uint8_t
     
     entry->direction = direction;
     entry->channel = channel;
-    entry->payload_length = strlen(message);
+    entry->fill_index = strlen(message);
     entry->timestamp = to_ms_since_boot(get_absolute_time());
     
-    TEST_ASSERT_LESS_OR_EQUAL_MESSAGE(RINGBUFFER_PAYLOAD_MAX_SIZE, entry->payload_length, 
+    TEST_ASSERT_LESS_OR_EQUAL_MESSAGE(RINGBUFFER_PAYLOAD_MAX_SIZE, entry->fill_index, 
                                      "Message too long for payload");
     
-    memcpy(entry->payload, message, entry->payload_length);
-    entry->payload[entry->payload_length] = '\0';  // Null terminate for safety
+    memcpy(entry->payload, message, entry->fill_index);
+    entry->payload[entry->fill_index] = '\0';  // Null terminate for safety
 }
 
 static void verify_message_content(const ring_entry_t* entry, const char* expected_message, uint8_t expected_direction) {
@@ -380,9 +380,9 @@ static void verify_message_content(const ring_entry_t* entry, const char* expect
     
     TEST_ASSERT_EQUAL_UINT8_MESSAGE(expected_direction, entry->direction, 
                                    "Message direction should match");
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(strlen(expected_message), entry->payload_length, 
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(strlen(expected_message), entry->fill_index, 
                                     "Message length should match");
-    TEST_ASSERT_EQUAL_STRING_LEN_MESSAGE(expected_message, (char*)entry->payload, entry->payload_length,
+    TEST_ASSERT_EQUAL_STRING_LEN_MESSAGE(expected_message, (char*)entry->payload, entry->fill_index,
                                         "Message content should match");
 }
 

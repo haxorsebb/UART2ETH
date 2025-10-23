@@ -410,7 +410,6 @@ bool tcp_socket_server_send_to_channel(channel_id_t channel, const uint8_t* data
     // Find server for this channel
     tcp_server_instance_t* server = find_server_by_channel(channel);
     if (!server || !server->active) {
-        printf("[TCP-SEND] No active server for channel %u\n", channel);
         return false;
     }
     
@@ -418,23 +417,17 @@ bool tcp_socket_server_send_to_channel(channel_id_t channel, const uint8_t* data
     for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
         tcp_connection_t* conn = &server->connections[i];
         if (conn->active && conn->pcb) {
-            printf("[TCP-SEND] Channel %u: Sending %zu bytes\n", channel, length);
-            
             err_t err = tcp_write(conn->pcb, data, length, TCP_WRITE_FLAG_COPY);
             if (err == ERR_OK) {
                 tcp_output(conn->pcb);
                 conn->bytes_sent += length;
                 server->stats.bytes_sent += length;
-                printf("[TCP-SEND] SUCCESS: %zu bytes sent to channel %u\n", length, channel);
                 return true;
             } else {
-                printf("[TCP-SEND] FAILED: Error %d for channel %u\n", err, channel);
                 return false;
             }
         }
     }
-    
-    printf("[TCP-SEND] No active connection for channel %u\n", channel);
     return false;
 }
 
@@ -518,11 +511,10 @@ static err_t tcp_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, struc
     
     // Connection closed by remote
     if (!p) {
-        printf("TCP Server: Connection closed by client on channel %u\n", conn->channel);
         close_connection(conn);
         return ERR_OK;
     }
-    
+        
     // Process received data
     struct pbuf *q = p;
     uint16_t total_len = p->tot_len;
@@ -603,14 +595,13 @@ static void close_connection(tcp_connection_t* conn) {
     conn->active = false;
     conn->line_pos = 0;
     memset(conn->line_buffer, 0, sizeof(conn->line_buffer));
-    
-    printf("TCP Server: Connection closed on channel %u\n", conn->channel);
 }
 
 /**
  * @brief Process received data for line-based protocol
  */
 static int process_received_data(tcp_connection_t* conn, const char* data, size_t len) {
+    
     if (!conn || !data || len == 0) {
         return 0;
     }
@@ -618,7 +609,6 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
     // Update activity timestamp
     conn->last_activity_ms = to_ms_since_boot(get_absolute_time());
     
-    printf("[TCP-RECV] Channel %u: %zu bytes received\n", conn->channel, len);
     
     int processed = 0;
     
@@ -635,8 +625,6 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
     if (message_complete) {
         processed = len;
         
-        printf("[TCP-RECV] Message complete! Channel %u, length: %zu\n", conn->channel, conn->line_pos);
-        
         // Ring Buffer Integration: Enqueue TCP messages for Core0 processing
         ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, conn->channel);
         
@@ -649,12 +637,10 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
             entry->fill_index = RINGBUFFER_PAYLOAD_MAX_SIZE;
         }
         memcpy(entry->payload, conn->line_buffer, entry->fill_index);
-        printf("[TCP-RECV] Cleared payload buffer and copied %zu bytes\n", entry->fill_index);
         
         // Enqueue for Core0 processing
         bool enqueue_result = ringbuffer_enqueue_entry(entry);
         if (enqueue_result) {
-            printf("[TCP-RECV] Message enqueued for Core0 - Channel %u, %zu bytes - SUCCESS\n", conn->channel, conn->line_pos);
             if (conn->server_instance) {
                 conn->server_instance->stats.lines_processed++;
             }
@@ -664,7 +650,6 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
     }
     
     if(message_complete || (conn->line_pos >= TCP_SERVER_LINE_BUFFER_SIZE)) {
-        printf("[TCP-RECV] Buffer reset\n");
         // Reset line buffer for next message
         conn->line_pos = 0;
         memset(conn->line_buffer, 0, sizeof(conn->line_buffer));

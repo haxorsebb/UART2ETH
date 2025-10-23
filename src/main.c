@@ -20,6 +20,7 @@
 #include "pico/multicore.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
+#include "hardware/clocks.h"
 #include "shared_memory.h"
 #include "state_machine.h"
 #include "log_manager.h"
@@ -38,21 +39,64 @@ void core1_main(void);
  * This function is called when Core1 is launched. It performs
  * Core1-specific initialization and then calls the main Core1 loop.
  */
+// Minimal Core1 entry point for debugging hard fault
 void core1_entry() {
-    printf("DEBUG: Core1 entry point reached\n");
+    // ABSOLUTE MINIMAL - no printf, no shared memory, no complex operations
     
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
-    printf("DEBUG: Core1 logged starting event\n");
+    // Simple infinite loop with basic operations to test Core1 viability
+    volatile uint32_t core1_alive_counter = 0;
+    volatile bool core1_basic_test_passed = false;
     
-    // Core1 runs the network, persistence, and log processing
-    printf("DEBUG: Core1 about to call core1_main()\n");
-    core1_main();
-    printf("DEBUG: Core1 core1_main() returned (should never happen!)\n");
+    // Test 1: Basic arithmetic and memory access
+    for (volatile int i = 0; i < 1000; i++) {
+        core1_alive_counter++;
+    }
+    
+    // Test 2: Simple GPIO toggle for oscilloscope (GPIO 21)
+    // Note: This might conflict with Core0, but it's a simple test
+    gpio_init(21);
+    gpio_set_dir(21, GPIO_OUT);
+    
+    // Test 3: Basic timer access  
+    absolute_time_t start_time = get_absolute_time();
+    (void)start_time;  // Suppress unused variable warning
+    
+    // If we reach here, basic Core1 functionality works
+    core1_basic_test_passed = true;
+    
+    // Simple toggle pattern for oscilloscope to indicate Core1 is alive
+    while (true) {
+        gpio_put(21, 1);
+        busy_wait_us(100000);  // 100ms - using busy wait instead of sleep_ms
+        gpio_put(21, 0);
+        busy_wait_us(100000);  // 100ms
+        
+        core1_alive_counter++;
+        
+        // After basic tests pass, try to enable printf
+        if (core1_basic_test_passed && (core1_alive_counter % 10 == 0)) {
+            // Try printf only after basic operations prove stable
+            printf("DEBUG: Core1 alive counter: %u\n", core1_alive_counter);
+            
+            // If printf works, try more complex operations
+            if (core1_alive_counter > 50) {
+                printf("DEBUG: Core1 basic tests passed, attempting core1_main()\n");
+                break;  // Exit to try core1_main()
+            }
+        }
+    }
+    
+    // Only call core1_main() if basic tests pass
+    if (core1_basic_test_passed) {
+        core1_main();
+    }
     
     // Should never reach here
     while (true) {
-        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_CORE_EXIT_ERROR, 1);
-        sleep_ms(1000);
+        gpio_put(21, 1);
+        busy_wait_us(1000000);  // 1 second
+        gpio_put(21, 0);
+        busy_wait_us(1000000);  // 1 second - error pattern: slow toggle
     }
 }
 
@@ -65,10 +109,10 @@ void core1_entry() {
 int main() {
 
     // Initialize dual stdio like production system
-    stdio_usb_init();
+    //stdio_usb_init();
     
     // Initialize UART0 for debug output
-    stdio_uart_init_full(uart0, 115200, 0, 1);
+    stdio_uart_init_full(uart0, 115200, 16, 17);
     
     // Wait for USB-serial connection for debugging
     sleep_ms(2000);
@@ -117,37 +161,34 @@ int main() {
     }
     printf("DEBUG: Log manager init completed\n");
     
-    // Now we can use log_event() safely - add debug around this critical point
-    printf("DEBUG: About to call first log_event...\n");
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_BOOT, 0);
-    printf("DEBUG: First log_event completed\n");
-    printf("DEBUG: About to call second batch of log_events...\n");
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SHARED_MEMORY_INIT, 0);
-    printf("DEBUG: Log event 2 completed\n");
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
-    printf("DEBUG: Log event 3 completed\n");
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_STATE_MACHINE_INIT, 0);
-    printf("DEBUG: Log event 4 completed\n");
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_LOG_MANAGER_INIT, 0);
-    printf("DEBUG: All log_events completed, about to launch Core1...\n");
+    // Ensure all memory operations are complete before launching Core1
+    __dsb();  // Data Synchronization Barrier
+    __isb();  // Instruction Synchronization Barrier
+    
+    // RP2350 specific: Ensure clocks are stable before Core1 launch
+    printf("DEBUG: Verifying system clocks are stable...\n");
+    uint32_t sys_clk = clock_get_hz(clk_sys);
+    printf("DEBUG: System clock: %u Hz\n", sys_clk);
+    
+    if (sys_clk < 1000000) {  // Less than 1MHz indicates clock issues
+        printf("ERROR: System clock too low (%u Hz), multicore unsafe\n", sys_clk);
+        while(1) sleep_ms(1000);
+    }
+    
+    printf("DEBUG: Clocks stable, launching Core1...\n");
+    fflush(stdout);
     
     // Launch Core1 with network and maintenance processing
+    // Note: On RP2350, this should automatically handle stack allocation
     multicore_launch_core1(core1_entry);
-    printf("DEBUG: Core1 launch call completed\n");
     
-    // Give Core1 a moment to initialize
-    printf("DEBUG: About to sleep 100ms for Core1 init...\n");
-    sleep_ms(100);
-    printf("DEBUG: Sleep completed, about to log events...\n");
+    printf("DEBUG: multicore_launch_core1() call completed\n");
+    fflush(stdout);
     
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_LAUNCHED, 0);
-    printf("DEBUG: LOG_EVENT_CORE1_LAUNCHED completed\n");
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE0_STARTING, 0);
-    printf("DEBUG: LOG_EVENT_CORE0_STARTING completed\n");
-    
-    // Log dual-core launch completion
-    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
-    printf("DEBUG: LOG_EVENT_SYSTEM_READY completed\n");
+    // Small delay to let any immediate hard fault surface
+    sleep_ms(1);
+    printf("DEBUG: No immediate hard fault detected\n");
+    fflush(stdout);
     
     // Core0 runs the UART processing with event-driven state machine
     printf("DEBUG: About to call core0_main()...\n");

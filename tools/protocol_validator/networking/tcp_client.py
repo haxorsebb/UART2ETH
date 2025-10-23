@@ -69,7 +69,7 @@ class TCPClient:
             # In case of mocks or other objects without is_closing method
             return True
     
-    async def send_message(self, message: ProtocolMessage, timeout: float = 30.0) -> float:
+    async def send_message(self, message: ProtocolMessage, timeout: float = 5.0) -> float:
         """
         Send protocol message and measure round-trip time.
         
@@ -100,12 +100,15 @@ class TCPClient:
             self.writer.write(wire_data)
             #await self.writer.drain()
             
+            print(f"  Sent: {wire_data}")
+                
             # Wait for response using proper protocol framing
             response = await asyncio.wait_for(
                 self._read_protocol_message(),
                 timeout=timeout
             )
-            
+            print(f"  Received: {response}")
+                
             end_time = time.perf_counter()
             
             # Validate that we received a response

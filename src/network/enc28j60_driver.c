@@ -1108,7 +1108,7 @@ uint8_t enc28j60_has_rx_packet(void) {
         g_last_interrupt_status |= ENC28J60_EIR_PKTIF;
         g_interrupt_pending = true;
     }
-
+    
     return pktcnt;
 }
 

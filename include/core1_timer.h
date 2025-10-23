@@ -117,4 +117,9 @@ uint32_t core1_timer_get_active_count(void);
  */
 void core1_timer_alarm_isr(void);
 
+/**
+ * @brief check if next timer expiration has already passed
+ */
+bool core1_timer_no_next_alarm(void);
+
 #endif // CORE1_TIMER_H

@@ -157,7 +157,7 @@ void test_main_state_system_error_event(void) {
 void test_core0_state_uart_data_ready_event(void) {
     // ARRANGE: Initialize and ensure Core0 is in UART_IDLE
     state_machine_init();
-    TEST_ASSERT_EQUAL(CORE0_UART_IDLE, state_machine_get_core0_substate());
+    TEST_ASSERT_EQUAL(CORE0_INIT_UART, state_machine_get_core0_substate());
     
     // ACT: Process UART_DATA_READY event
     bool result = state_machine_process_core0_event(CORE0_EVENT_UART_DATA_READY);
@@ -174,7 +174,7 @@ void test_core0_state_uart_data_ready_event(void) {
 /**
  * Test: Core0 state machine should process UART_IDLE event
  * 
- * When UART processing is complete, CORE0_EVENT_UART_IDLE should
+ * When UART processing is complete, CORE0_EVENT_WORK_IDLE should
  * transition from UART_ACTIVE back to UART_IDLE.
  */
 void test_core0_state_uart_idle_event(void) {
@@ -184,14 +184,14 @@ void test_core0_state_uart_idle_event(void) {
     TEST_ASSERT_EQUAL(CORE0_UART_ACTIVE, state_machine_get_core0_substate());
     
     // ACT: Process UART_IDLE event
-    bool result = state_machine_process_core0_event(CORE0_EVENT_UART_IDLE);
+    bool result = state_machine_process_core0_event(CORE0_EVENT_WORK_IDLE);
     
     // ASSERT: Event processing should succeed
     TEST_ASSERT_TRUE_MESSAGE(result, "UART_IDLE event processing should succeed");
     
     // ASSERT: Core0 sub-state should transition back to UART_IDLE
     core0_substate_t new_state = state_machine_get_core0_substate();
-    TEST_ASSERT_EQUAL_MESSAGE(CORE0_UART_IDLE, new_state,
+    TEST_ASSERT_EQUAL_MESSAGE(CORE0_INIT_UART, new_state,
         "Core0 sub-state should transition from UART_ACTIVE to UART_IDLE on UART_IDLE event");
 }
 
@@ -204,7 +204,7 @@ void test_core0_state_uart_idle_event(void) {
 void test_core1_state_network_up_event(void) {
     // ARRANGE: Initialize and ensure Core1 is in NET_DISCONNECTED
     state_machine_init();
-    TEST_ASSERT_EQUAL(CORE1_NET_DISCONNECTED, state_machine_get_core1_substate());
+    TEST_ASSERT_EQUAL(CORE1_INIT_PERISTENCE, state_machine_get_core1_substate());
     
     // ACT: Process NETWORK_UP event
     bool result = state_machine_process_core1_event(CORE1_EVENT_NETWORK_UP);
@@ -282,8 +282,8 @@ void test_state_queries_non_blocking(void) {
     
     // These should be valid enum values
     TEST_ASSERT_TRUE(main_state >= MAIN_STATE_INIT && main_state <= MAIN_STATE_ERROR);
-    TEST_ASSERT_TRUE(core0_state >= CORE0_UART_IDLE && core0_state <= CORE0_UART_ERROR);
-    TEST_ASSERT_TRUE(core1_state >= CORE1_NET_DISCONNECTED && core1_state <= CORE1_LOG_ACTIVE);
+    TEST_ASSERT_TRUE(core0_state >= CORE0_INIT_UART && core0_state <= CORE0_UART_ERROR);
+    TEST_ASSERT_TRUE(core1_state >= CORE1_INIT_PERISTENCE && core1_state <= CORE1_SHUTDOWN);
 }
 
 // Test runner

@@ -109,16 +109,21 @@ pico_add_extra_outputs(test_flash_persistence)
 add_executable(test_state_machine
     test_state_machine.c
     ../src/state_machine/state_machine.c
+    ../src/config/shared_memory.c
+    ../src/log/log_manager.c
 )
 
 target_include_directories(test_state_machine PRIVATE ../include)
 
 target_link_libraries(test_state_machine
     unity
+    network_manager     # Added: needed for shared_memory.c dependency
     pico_stdlib
     pico_sync
     pico_multicore      # Dual core support for state machine coordination
     hardware_sync       # Atomic operations for state transitions
+    hardware_gpio       # Added: needed for network_manager
+    hardware_spi        # Added: needed for network_manager
     hardware_watchdog   # Watchdog for stability
 )
 
@@ -177,16 +182,23 @@ pico_add_extra_outputs(test_core1_timer)
 add_executable(test_ringbuffer
     test_ringbuffer.c
     ../src/ringbuffer/ringbuffer.c
+    ../src/state_machine/state_machine.c
+    ../src/config/shared_memory.c
+    ../src/log/log_manager.c
 )
 
 target_include_directories(test_ringbuffer PRIVATE ../include)
 
 target_link_libraries(test_ringbuffer
     unity
+    network_manager     # Added: needed for shared_memory.c dependency
     pico_stdlib
     pico_sync
     pico_multicore      # Dual core support for doorbell testing
     hardware_sync       # Mutex operations
+    hardware_gpio       # Added: needed for network_manager
+    hardware_spi        # Added: needed for network_manager
+    hardware_watchdog   # Watchdog for stability
 )
 
 # Enable dual stdio for test output

@@ -1,0 +1,56 @@
+{
+    "configurations": [
+        {
+            "name": "Pico-Debug",
+            "generator": "Ninja",
+            "configurationType": "Debug",
+            "buildRoot": "${workspaceRoot}/build",
+            "installRoot": "${env.HOME}/.local",
+            "cmakeCommandArgs": "",
+            "buildCommandArgs": "",
+            "ctestCommandArgs": "",
+            "cmakeToolchain": "${env.HOME}/.pico-sdk/sdk/2.2.0/cmake/pico_sdk_init.cmake",
+            "inheritEnvironments": ["gcc-arm"],
+            "variables": [
+                {
+                    "name": "PICO_SDK_PATH",
+                    "value": "${env.HOME}/.pico-sdk/sdk/2.2.0"
+                },
+                {
+                    "name": "PICO_TOOLCHAIN_PATH", 
+                    "value": "${env.HOME}/.pico-sdk/toolchain/14_2_Rel1"
+                },
+                {
+                    "name": "PICO_BOARD",
+                    "value": "pico2"
+                }
+            ]
+        },
+        {
+            "name": "Pico-Release",
+            "generator": "Ninja",
+            "configurationType": "Release",
+            "buildRoot": "${workspaceRoot}/build",
+            "installRoot": "${env.HOME}/.local",
+            "cmakeCommandArgs": "",
+            "buildCommandArgs": "",
+            "ctestCommandArgs": "",
+            "cmakeToolchain": "${env.HOME}/.pico-sdk/sdk/2.2.0/cmake/pico_sdk_init.cmake",
+            "inheritEnvironments": ["gcc-arm"],
+            "variables": [
+                {
+                    "name": "PICO_SDK_PATH",
+                    "value": "${env.HOME}/.pico-sdk/sdk/2.2.0"
+                },
+                {
+                    "name": "PICO_TOOLCHAIN_PATH",
+                    "value": "${env.HOME}/.pico-sdk/toolchain/14_2_Rel1"
+                },
+                {
+                    "name": "PICO_BOARD",
+                    "value": "pico2"
+                }
+            ]
+        }
+    ]
+}

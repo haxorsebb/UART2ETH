@@ -12,11 +12,6 @@
 #include "hardware/uart.h"
 #include "shared_memory.h"
 
-typedef enum {
-    UART_TYPE_PL011,    // Hardware UART (uart0, uart1)
-    UART_TYPE_PIO       // PIO-based UART
-} uart_type_t;
-
 typedef struct {
     uint32_t baud_rate;
     uint8_t data_bits;

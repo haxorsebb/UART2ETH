@@ -16,6 +16,7 @@
 #include "hardware/timer.h"
 #include "hardware/irq.h"
 #include "pico/stdlib.h"
+
 #include <stdio.h>
 #include <string.h>
 #include "state_machine.h"
@@ -39,6 +40,8 @@ typedef struct {
 
 // Global timer subsystem state
 static core1_timer_subsystem_t g_core1_timers = {0};
+static uint64_t core1_next_expiration = UINT64_MAX;
+    
 
 // Hardware timer alarm number for Core1
 #define CORE1_TIMER_ALARM_NUM 1
@@ -47,6 +50,8 @@ static core1_timer_subsystem_t g_core1_timers = {0};
 static void core1_timer_update_next_alarm(void);
 static void core1_timer_scan_for_expired(void);
 static bool core1_timer_id_valid(core1_timer_id_t timer_id);
+    
+
 
 /**
  * @brief Initialize the Core1 timer subsystem
@@ -102,7 +107,7 @@ void core1_timer_set(core1_timer_id_t timer_id, uint32_t interval_ms) {
     
     // Set up new timer
     timer->interval_ms = interval_ms;
-    timer->expiration_time_us = time_us_64() + (interval_ms * 1000ULL);
+    timer->expiration_time_us = timer_time_us_64(timer_hw) + (interval_ms * 1000ULL);
     timer->active = true;
     timer->expired = (interval_ms == 0);  // Zero interval = immediately expired
     
@@ -194,7 +199,7 @@ static bool core1_timer_id_valid(core1_timer_id_t timer_id) {
  * @brief Scan all active timers for expiration
  */
 static void core1_timer_scan_for_expired(void) {
-    uint64_t current_time = time_us_64();
+    uint64_t current_time = timer_time_us_64(timer_hw);
     
     for (int i = 0; i < CORE1_MAX_TIMERS; i++) {
         timer_entry_t* timer = &g_core1_timers.timers[i];
@@ -213,16 +218,16 @@ static void core1_timer_scan_for_expired(void) {
  * @brief Update hardware alarm for next timer expiration
  */
 static void core1_timer_update_next_alarm(void) {
-    uint64_t next_expiration = UINT64_MAX;
     bool found_active_timer = false;
-    
+    core1_next_expiration = UINT64_MAX;
+
     // Find the earliest expiration time among active timers
     for (int i = 0; i < CORE1_MAX_TIMERS; i++) {
         timer_entry_t* timer = &g_core1_timers.timers[i];
         
         if (timer->active && !timer->expired) {
-            if (timer->expiration_time_us < next_expiration) {
-                next_expiration = timer->expiration_time_us;
+            if (timer->expiration_time_us < core1_next_expiration) {
+                core1_next_expiration = timer->expiration_time_us;
                 found_active_timer = true;
             }
         }
@@ -230,7 +235,17 @@ static void core1_timer_update_next_alarm(void) {
     
     // Set hardware alarm if we have active timers
     if (found_active_timer) {
-        g_core1_timers.next_alarm_time_us = next_expiration;
-        timer_hw->alarm[CORE1_TIMER_ALARM_NUM] = (uint32_t)next_expiration;
+        g_core1_timers.next_alarm_time_us = core1_next_expiration;
+        if(timer_hardware_alarm_set_target(timer_hw, CORE1_TIMER_ALARM_NUM, (absolute_time_t)core1_next_expiration))
+        {
+            printf("CORE1: TIMER WAS MISSED!\n");
+        }
     }
+}
+
+/**
+ * @brief check if next timer expiration has already passed
+ */
+bool core1_timer_no_next_alarm(void) {
+    return(timer_time_us_64(timer_hw) > core1_next_expiration);
 }

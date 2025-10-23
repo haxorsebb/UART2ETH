@@ -44,26 +44,6 @@ typedef struct {
 
 static uart_manager_t g_manager = {0};
 
-// Channel configuration
-typedef struct {
-    bool enabled;
-    uart_type_t type;
-    uint32_t baud_rate;
-    uint8_t tx_gpio;
-    uint8_t rx_gpio;
-} channel_config_t;
-
-static const channel_config_t channel_configs[UART_MANAGER_MAX_CHANNELS] = {
-    // Channel 0: UART0 (PL011) - disabled
-    {false, UART_TYPE_PL011, 230400, 0, 1},
-    // Channel 1: PIO UART on GPIO 4,5 - enabled (using working PIO UART implementation for testing)
-    {true, UART_TYPE_PL011, 115200, 4, 5},
-    // Channel 2: PIO UART on GPIO 14,15 - enabled for Issue #82
-    {true, UART_TYPE_PIO, 230400, 14, 15},
-    // Channel 3: PIO UART on GPIO 16,17 - enabled with PIO1 for Channel 3 expansion
-    {true, UART_TYPE_PIO, 115200, 16, 17}
-};
-
 // Forward declarations
 static bool init_channel(channel_id_t channel);
 static void deinit_channel(channel_id_t channel);
@@ -138,10 +118,10 @@ bool uart_manager_has_incoming_work(void) {
     }
     
     // Check if any channel has incoming data
-    for (channel_id_t channel = 0; channel < UART_MANAGER_MAX_CHANNELS; channel++) {
-        if (!channel_configs[channel].enabled) continue;
+    for (channel_id_t channel_idx = CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++) {
+        if (!shared_memory_get_layout()->config.channels[channel_idx].enabled) continue;
         
-        uart_instance_t* uart = &g_manager.uarts[channel];
+        uart_instance_t* uart = &g_manager.uarts[channel_idx];
         if (uart->ops && uart->ops->has_rx_data(uart->driver_context)) {
             return true;
         }
@@ -154,10 +134,10 @@ bool uart_manager_process_incoming_data(void) {
     
     bool data_processed = false;
     
-    for (channel_id_t channel = 0; channel < UART_MANAGER_MAX_CHANNELS; channel++) {
-        if (!channel_configs[channel].enabled) continue;
+    for (channel_id_t channel_idx = CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++) {
+        if (!shared_memory_get_layout()->config.channels[channel_idx].enabled) continue;
         
-        if (process_channel_incoming_data(channel)) {
+        if (process_channel_incoming_data(channel_idx)) {
             data_processed = true;
         }
     }
@@ -178,16 +158,11 @@ bool uart_manager_process_outgoing_data(void) {
     }
     
     bool data_processed = false;
-    
-    if (call_counter <= 5 || call_counter % 1000 == 0) {
-        printf("[UART-MGR] Processing outgoing data (call #%u)\n", call_counter);
-    }
-    
-    for (channel_id_t channel = 0; channel < CHANNEL_MAX; channel++) {
-        if (!channel_configs[channel].enabled) continue;
+ 
+    for (channel_id_t channel_idx = CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++) {
+        if (!shared_memory_get_layout()->config.channels[channel_idx].enabled) continue;
         
-        if (process_channel_outgoing_data(channel)) {
-            printf("[UART-MGR] Data processed for channel %u\n", channel);
+        if (process_channel_outgoing_data(channel_idx)) {
             data_processed = true;
         }
     }
@@ -252,15 +227,15 @@ int uart_manager_get_diagnostic_info(char* info_buffer, size_t buffer_size) {
         g_manager.stats.ring_buffer_overflows,
         UART_MANAGER_MAX_CHANNELS
     );
-    
     // Add per-channel information
-    for (int i = 0; i < UART_MANAGER_MAX_CHANNELS && len < buffer_size - 1; i++) {
-        if (channel_configs[i].enabled) {
-            const char* type_str = (channel_configs[i].type == UART_TYPE_PL011) ? "PL011" : "PIO";
+    for (channel_id_t channel_idx = CHANNEL_0; ((channel_idx < CHANNEL_MAX) && (len < buffer_size - 1)); channel_idx++) {
+        channel_config_t channel = shared_memory_get_layout()->config.channels[channel_idx];
+        if(channel.enabled) {
+            const char* type_str = (channel.type == UART_TYPE_PL011) ? "PL011" : "PIO";
             len += snprintf(info_buffer + len, buffer_size - len,
                 "  Channel %d: %s UART, %u baud, GP%u/GP%u\n",
-                i, type_str, channel_configs[i].baud_rate,
-                channel_configs[i].tx_gpio, channel_configs[i].rx_gpio);
+                channel_idx, type_str, channel.baud_rate,
+                channel.tx_gpio, channel.rx_gpio);
         }
     }
     
@@ -288,44 +263,44 @@ uart_instance_t* uart_manager_get_channel_instance(channel_id_t channel) {
 
 // Private function implementations
 
-static bool init_channel(channel_id_t channel) {
-    if (channel >= UART_MANAGER_MAX_CHANNELS) {
+static bool init_channel(channel_id_t channel_id) {
+    if (channel_id >= UART_MANAGER_MAX_CHANNELS) {
         return false;
     }
     
-    const channel_config_t* config = &channel_configs[channel];
+    channel_config_t channel = shared_memory_get_layout()->config.channels[channel_id];
     
     // Skip disabled channels
-    if (!config->enabled) {
+    if (!channel.enabled) {
         return true;
     }
     
-    uart_instance_t* uart = &g_manager.uarts[channel];
+    uart_instance_t* uart = &g_manager.uarts[channel_id];
     
-    uart->channel_id = channel;
-    uart->type = config->type;
+    uart->channel_id = channel_id;
+    uart->type = channel.type;
     
     // Create context and set interface based on type
-    if (config->type == UART_TYPE_PL011) {
+    if (channel.type == UART_TYPE_PL011) {
         // For PL011: channel 0 -> hw_uart 0, channel 1 -> hw_uart 1
-        uart->driver_context = pl011_create_context(channel);
+        uart->driver_context = pl011_create_context(channel_id);
         uart->ops = &pl011_uart_interface;
-    } else if (config->type == UART_TYPE_PIO) {
+    } else if (channel.type == UART_TYPE_PIO) {
         // PIO UART implementation - different drivers for different channels
-        if (channel == 2) {
+        if (channel_id == 2) {
             // Channel 2: Use general PIO UART driver (Issue #82)
             uart->driver_context = pio_create_context(0, 0);  // PIO0, SM0/SM1
             uart->ops = &pio_uart_interface;
-        } else if (channel == 3) {
+        } else if (channel_id == 3) {
             // Channel 3: Use dedicated Channel 3 PIO UART driver
             uart->driver_context = pio_ch3_create_context(0, 0);  // PIO0, SM2/SM3
             uart->ops = &pio_uart_ch3_interface;
         } else {
-            printf("ERROR: PIO UART not supported for channel %u\n", channel);
+            printf("ERROR: PIO UART not supported for channel %u\n", channel_id);
             return false;
         }
     } else {
-        printf("ERROR: Unknown UART type for channel %u\n", channel);
+        printf("ERROR: Unknown UART type for channel %u\n", channel_id);
         return false;
     }
     
@@ -335,18 +310,18 @@ static bool init_channel(channel_id_t channel) {
     
     // Configure UART
     uart_config_t uart_config = {
-        .baud_rate = config->baud_rate,
+        .baud_rate = channel.baud_rate,
         .data_bits = 8,
         .stop_bits = 1,
         .parity = UART_PARITY_NONE,
-        .tx_gpio = config->tx_gpio,
-        .rx_gpio = config->rx_gpio,
+        .tx_gpio = channel.tx_gpio,
+        .rx_gpio = channel.rx_gpio,
         .enable_flow_control = false
     };
     
     // Initialize the UART
     if (!uart->ops->init(uart->driver_context, &uart_config)) {
-        if (config->type == UART_TYPE_PL011) {
+        if (channel.type == UART_TYPE_PL011) {
             pl011_destroy_context(uart->driver_context);
         }
         uart->driver_context = NULL;
@@ -400,21 +375,16 @@ static bool process_channel_incoming_data(channel_id_t channel) {
 
     // Validate the existing entry or get a new one
     if (!entry || entry->fill_index >= RINGBUFFER_PAYLOAD_MAX_SIZE) {
-        if (entry && entry->fill_index >= RINGBUFFER_PAYLOAD_MAX_SIZE) {
-            printf("[UART-MGR] Existing FILLING entry is full, getting new entry\n");
-        }
         entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
         
         // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
         if (entry) {
             memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
             entry->fill_index = 0;
-            printf("[UART-MGR] Channel %u: Cleared payload buffer for new entry\n", channel);
         }
     }
     
     if (!entry) {
-        printf("[UART-MGR] CRITICAL: Cannot allocate ring buffer entry for channel %u\n", channel);
         return false;
     }
             
@@ -424,14 +394,6 @@ static bool process_channel_incoming_data(channel_id_t channel) {
     do {
         bytes_read = uart->ops->read_data(uart->driver_context, buffer, sizeof(buffer));
         
-        if (bytes_read > 0) {
-            printf("[UART-MGR] Channel %u: Read %zu bytes from UART: ", channel, bytes_read);
-            for (size_t i = 0; i < bytes_read; i++) {
-                printf("%02X ", buffer[i]);
-            }
-            printf("\n");
-        }
-        
         for (size_t idx = 0; idx < bytes_read; idx++) {
             uint8_t byte = buffer[idx];
             g_manager.stats.bytes_received++;
@@ -440,26 +402,17 @@ static bool process_channel_incoming_data(channel_id_t channel) {
             if (!entry) {
                 entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
                 if (!entry) {
-                    printf("[UART-MGR] CRITICAL: No free ring buffer entries available\n");
                     return false; // Stop processing if no buffers available
                 }
                 // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
                 memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
                 entry->fill_index = 0;
-                printf("[UART-MGR] Channel %u: Allocated and cleared new ring buffer entry\n", channel);
             }
            
             //we process incoming data directly into the ring buffer, using fill_index to track the progress
             entry->payload[entry->fill_index++] = byte;
             
             if(check_message_end(entry->payload, entry->fill_index)) {
-                printf("[UART-MGR] Complete message detected, enqueuing %u bytes\n", entry->fill_index);
-                printf("[UART-MGR] Message content: ");
-                for (size_t i = 0; i < entry->fill_index && i < 50; i++) {
-                    printf("%02X ", entry->payload[i]);
-                }
-                printf("\n");
-                
                 ringbuffer_enqueue_entry(entry);
                 entry = NULL; // CRITICAL FIX: Clear entry pointer to force new allocation
                 
@@ -467,7 +420,6 @@ static bool process_channel_incoming_data(channel_id_t channel) {
                 // This prevents old data from accumulating and causing buffer padding issues
                 if (uart->ops->clear_rx_buffer) {
                     uart->ops->clear_rx_buffer(uart->driver_context);
-                    printf("[UART-MGR] Channel %u: Cleared UART RX buffer after complete message\n", channel);
                 }
                 
                 // If there's more data to process, get a new entry immediately
@@ -477,12 +429,10 @@ static bool process_channel_incoming_data(channel_id_t channel) {
                     if (entry) {
                         memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
                         entry->fill_index = 0;
-                        printf("[UART-MGR] Channel %u: Mid-loop new entry allocated and cleared\n", channel);
                     }
                 }
             }
             else if (entry->fill_index >= RINGBUFFER_PAYLOAD_MAX_SIZE) {
-                printf("[UART-MGR] Buffer full, getting new entry\n");
                 entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
             }
         }
@@ -494,7 +444,6 @@ static bool process_channel_incoming_data(channel_id_t channel) {
             if (entry) {
                 memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
                 entry->fill_index = 0;
-                printf("[UART-MGR] Channel %u: Loop continuation entry allocated and cleared\n", channel);
             }
         }
         
@@ -522,13 +471,11 @@ static bool process_channel_outgoing_data(channel_id_t channel) {
     ring_entry_t* entry = ringbuffer_dequeue_entry(RX_TCP_TO_UART, channel, ENTRY_STATUS_READY);
     
     if (entry) {
-        printf("[UART-MGR] Sending %u bytes to UART channel %u\n", entry->fill_index, channel);
         // Send data via UART - send as much as possible in one go
         const uint8_t* data = entry->payload;
         size_t data_len = entry->fill_index;
         
         size_t sent = uart->ops->send_data(uart->driver_context, data, data_len);
-        printf("[UART-MGR] UART channel %u sent %zu/%zu bytes\n", channel, sent, data_len);
         g_manager.stats.bytes_transmitted += sent;
         
         // Mark message as consumed regardless of how much was sent

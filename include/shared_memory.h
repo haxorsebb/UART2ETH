@@ -18,14 +18,12 @@
 #ifndef SHARED_MEMORY_H
 #define SHARED_MEMORY_H
 
-#include <stdatomic.h>
+#include <hardware/sync/spin_lock.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "pico/sync.h"
 #include "hardware/regs/addressmap.h"
 #include "log_manager.h"  // For log_entry_t definition
 #include "network/network_manager.h"  // For log_entry_t definition
-
 
 // SRAM Bank 4 base address and size (RP2350)
 // Note: RP2350 has non-contiguous SRAM banks: SRAM0, SRAM4, SRAM8, SRAM9
@@ -46,19 +44,27 @@ typedef enum {
     CHANNEL_ANY = -1
 } channel_id_t;
 
+typedef enum {
+    UART_TYPE_PL011,    // Hardware UART (uart0, uart1)
+    UART_TYPE_PIO       // PIO-based UART
+} uart_type_t;
+
+typedef struct {
+    uint32_t    baud_rate;        // 300-500000 bps
+    uint8_t     data_bits;        // 5-8 bits
+    uint8_t     stop_bits;        // 1-2 bits  
+    uint8_t     parity;           // 0=NONE, 1=ODD, 2=EVEN
+    uint8_t     tx_gpio;          // the tx pin (GPIO, not chip-pin)
+    uint8_t     rx_gpio;          // the rx pin (GPIO, not chip-pin)
+    uart_type_t type;             // the UART hardware implementation PL011/PIO
+    uint16_t    tcp_port;         // 4001-4004 default
+    bool        enabled;          // Channel enabled
+} channel_config_t;
 
 // System configuration structures
 typedef struct {
-    struct {
-        uint32_t baud_rate;        // 300-500000 bps
-        uint8_t  data_bits;        // 5-8 bits
-        uint8_t  stop_bits;        // 1-2 bits  
-        uint8_t  parity;           // 0=NONE, 1=ODD, 2=EVEN
-        bool     enabled;          // Channel enabled
-    } channels[4];
-    
+    channel_config_t channels[4];
     network_config_t network;
-    
     uint8_t log_level;             // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
     uint32_t watchdog_timeout_ms;  // Default 200ms
 } system_config_t;

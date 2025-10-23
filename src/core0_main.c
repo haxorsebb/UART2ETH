@@ -21,15 +21,12 @@
  * - arc42 Chapter 5 - Core 0 UART Subsystem
  */
 
-#include "core0_timer.h"
 #include "state_machine.h"
 #include "shared_memory.h"
 #include "log_manager.h"
 #include "ringbuffer.h"
 #include "uart/uart_manager.h"
-#include "pico/stdlib.h"
-#include "pico/multicore.h"
-#include "hardware/irq.h"
+#include <pico/time.h>
 #include <stdio.h>
 #include "debug.h"
 
@@ -530,9 +527,6 @@ void core0_process_ringbuffer(void) {
     // Process only ONE message per main loop execution (test requirement #7)
     ring_entry_t* tcp_to_uart_msg = ringbuffer_dequeue_entry(RX_TCP_TO_UART, CHANNEL_ANY, ENTRY_STATUS_READY);
     if (tcp_to_uart_msg) {
-        printf("[CORE0-RING] Processing TCP->UART message: Channel %u, %u bytes\n", 
-               tcp_to_uart_msg->channel, tcp_to_uart_msg->fill_index);
-        
         // "Turn around" the message: change direction from TCP→UART to UART→TCP
         tcp_to_uart_msg->direction = RX_UART_TO_TCP;
         tcp_to_uart_msg->status = ENTRY_STATUS_FILLING;
@@ -540,10 +534,8 @@ void core0_process_ringbuffer(void) {
         // Re-enqueue the message for Core1 to transmit back to TCP client
         bool enqueue_result = ringbuffer_enqueue_entry(tcp_to_uart_msg);
         if (enqueue_result) {
-            printf("[CORE0-RING] Re-enqueued message for Core1 - SUCCESS\n");
             log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
         } else {
-            printf("[CORE0-RING] Re-enqueue FAILED for Core1\n");
             log_event(EVENT_SOURCE_UART0, LOG_LEVEL_WARN, LOG_EVENT_UART0_ERROR, 1);
         }
     }

@@ -12,7 +12,6 @@
  */
 
 #include "shared_memory.h"
-#include "pico/stdlib.h"
 #include "hardware/sync.h"
 #include <string.h>
 #include <stddef.h>  // For offsetof
@@ -85,14 +84,32 @@ bool shared_memory_init(void) {
     g_shared_memory->log_mgmt.core1_sequence = 0;
     g_shared_memory->log_mgmt.entry_lock = g_reservation_lock;
     
-    // Initialize UART channel defaults
-    for (int i = 0; i < 4; i++) {
-        g_shared_memory->config.channels[i].baud_rate = 230400;
-        g_shared_memory->config.channels[i].data_bits = 8;
-        g_shared_memory->config.channels[i].stop_bits = 1;
-        g_shared_memory->config.channels[i].parity = 0;  // NONE
-        g_shared_memory->config.channels[i].enabled = false;
+    // Initialize communication channel defaults
+    for (int channel_idx = CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++) {
+        g_shared_memory->config.channels[channel_idx].baud_rate = 230400;
+        g_shared_memory->config.channels[channel_idx].data_bits = 8;
+        g_shared_memory->config.channels[channel_idx].stop_bits = 1;
+        g_shared_memory->config.channels[channel_idx].parity = 0;  // NONE
+        g_shared_memory->config.channels[channel_idx].enabled = false;
+        g_shared_memory->config.channels[channel_idx].tcp_port = 4001+channel_idx;
     }
+    //channel specific config
+    g_shared_memory->config.channels[CHANNEL_0].tx_gpio = 0;
+    g_shared_memory->config.channels[CHANNEL_0].rx_gpio = 1;
+    g_shared_memory->config.channels[CHANNEL_0].type = UART_TYPE_PL011;
+    
+    g_shared_memory->config.channels[CHANNEL_1].tx_gpio = 4;
+    g_shared_memory->config.channels[CHANNEL_1].rx_gpio = 5;
+    g_shared_memory->config.channels[CHANNEL_1].type = UART_TYPE_PL011;
+    g_shared_memory->config.channels[CHANNEL_1].enabled = true;
+    
+    g_shared_memory->config.channels[CHANNEL_2].tx_gpio = 14;
+    g_shared_memory->config.channels[CHANNEL_2].rx_gpio = 15;
+    g_shared_memory->config.channels[CHANNEL_2].type = UART_TYPE_PIO;
+    
+    g_shared_memory->config.channels[CHANNEL_3].tx_gpio = 16;
+    g_shared_memory->config.channels[CHANNEL_3].rx_gpio = 17;
+    g_shared_memory->config.channels[CHANNEL_3].type = UART_TYPE_PIO;
     
     network_manager_get_default_config(&g_shared_memory->config.network);
     // Initialize system settings

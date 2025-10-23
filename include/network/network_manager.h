@@ -56,7 +56,6 @@ typedef struct {
     simple_ip_addr_t static_gateway;    // Static gateway (if DHCP disabled)
     uint32_t dhcp_timeout_ms;           // DHCP timeout in milliseconds
     uint8_t mac_address[6];             // MAC address (auto-generated if all zeros)
-    uint16_t tcp_ports[4];              // 4001-4004 default
     uint16_t management_port;           // 80 default
     bool use_dhcp;                      // Enable DHCP client 
     
