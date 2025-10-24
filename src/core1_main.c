@@ -106,8 +106,9 @@ void core1_main(void) {
         g_core1_state_reads++;
         
         // Minimal debug output - only every 10000 loops to avoid printf floods
-        if (g_core1_loop_counter % 10000 == 0) {
+        if (g_core1_loop_counter % 200000 == 0) {
             printf("DEBUG: Core1 loop=%u, states=%u, main=%d, sub=%d\n", g_core1_loop_counter, g_core1_state_reads, main_state, sub_state);
+            //enc28j60_dump_signal_quality_registers();
         }
         
         // Big switch statement for main states
@@ -241,9 +242,9 @@ static bool core1_check_for_pending_work(void) {
     }
     
     if(network_manager_transmit_packets_pending()) {
-        //DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("network has pending transmit packets\n"); 
-        //});
+        });
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_SENDING_ACTIVE);
         core1_process_packet_tx();
         return true; 
@@ -251,9 +252,6 @@ static bool core1_check_for_pending_work(void) {
 
     if(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT))
     {
-        //DEBUG_ONLY({ 
-            printf("."); 
-        //});
         network_manager_check_timeouts();
         return true;
     }
@@ -269,7 +267,7 @@ static bool core1_check_for_pending_work(void) {
     }
 
     //low priority tasks
-    if(log_manager_get_pending_count()) {
+    if(false && log_manager_get_pending_count()) {
         //DEBUG_ONLY({ 
             printf("Logmanager has pending count %d\n",log_manager_get_pending_count()); 
         //});
@@ -284,7 +282,7 @@ static bool core1_check_for_pending_work(void) {
         return true;
     }
 
-    core1_timer_set(CORE1_TIMER_WATCHDOG_FEED, 500);
+    //core1_timer_set(CORE1_TIMER_WATCHDOG_FEED, 500);
     return false;
 }
 
@@ -677,7 +675,7 @@ static void core1_process_network_connectivity_down(void) {
 static void core1_process_network(void) {
     static uint32_t call_counter = 0;
     call_counter++;
-    printf("?");
+    //printf("?");
     network_manager_process();
     
     // Process multi-port TCP socket servers (handle connections, data)
@@ -687,7 +685,7 @@ static void core1_process_network(void) {
 
     if(!network_manager_receive_packets_pending())
     {
-        printf("!");
+        //printf("!");
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_FINISHED);
     }
 }

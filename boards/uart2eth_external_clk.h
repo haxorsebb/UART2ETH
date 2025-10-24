@@ -26,11 +26,11 @@
 #endif
 
 #ifndef PICO_DEFAULT_UART_TX_PIN
-#define PICO_DEFAULT_UART_TX_PIN 27
+#define PICO_DEFAULT_UART_TX_PIN 16
 #endif
 
 #ifndef PICO_DEFAULT_UART_RX_PIN
-#define PICO_DEFAULT_UART_RX_PIN 28
+#define PICO_DEFAULT_UART_RX_PIN 17
 #endif
 
 // --- LED ---

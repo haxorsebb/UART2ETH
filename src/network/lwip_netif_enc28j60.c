@@ -126,9 +126,10 @@ void lwip_netif_enc28j60_process(void) {
         }
     });
     
+    
     // Check for incoming packets and process them
     int packets_processed = 0;
-    while (enc28j60_has_rx_packet() && packets_processed < 255) {  // Limit to prevent infinite loop
+    while (enc28j60_has_rx_packet() && packets_processed < 2) {  // Limit to prevent infinite loop
         enc28j60_packet_t packet;
         packet.data = g_rx_buffer;
         packet.length = 0;
@@ -146,9 +147,9 @@ void lwip_netif_enc28j60_process(void) {
                     
                     // Feed packet to lwIP
                     if (g_enc28j60_netif.input(p, &g_enc28j60_netif) != ERR_OK) {
-                        DEBUG_ONLY({ 
+                        //DEBUG_ONLY({ 
                             printf("lwIP netif: Failed to input packet to lwIP\n"); 
-                        });
+                        //});
                         pbuf_free(p);
                     }
                     else { 
@@ -157,9 +158,9 @@ void lwip_netif_enc28j60_process(void) {
                         });
                     }
                 } else {
-                    DEBUG_ONLY({ 
+                    //DEBUG_ONLY({ 
                         printf("lwIP netif: Failed to allocate pbuf for incoming packet (length=%u)\n", packet.length); 
-                    });
+                    //});
                 }
                 packets_processed++;
             }
