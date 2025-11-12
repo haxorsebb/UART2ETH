@@ -51,7 +51,7 @@ async def run_compliance_test(scenario: PerformanceTestScenario, args: argparse.
     
     try:
         # Run compliance test
-        results = await scenario.run_compliance_test(message_count=200)
+        results = await scenario.run_compliance_test(message_count=10000)
         print(f"Compliance test completed:")
         print(f"  Total messages: {results['total_messages']}")
         print(f"  Successful: {results['successful_messages']}")

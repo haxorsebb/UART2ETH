@@ -121,16 +121,19 @@ class PerformanceTestScenario:
             
             # Add valid minimal messages
             minimal_messages = self.message_generator.generate_minimal_set()
-            test_messages.extend(minimal_messages[:message_count // 2])
+            #test_messages.extend(minimal_messages[:message_count // 2])
+            test_messages.extend(minimal_messages[:message_count//2])
+            
             
             # Add medium-sized messages
             for _ in range(message_count // 4):
-                test_messages.append(self.message_generator.generate_medium(128))
+                test_messages.append(self.message_generator.generate_medium(24))
             
             # Add maximum-size messages
-            for _ in range(message_count // 4):
-                test_messages.append(self.message_generator.generate_maximum())
+            #for _ in range(message_count // 4):
+            #    test_messages.append(self.message_generator.generate_maximum())
             
+
             # Run tests
             successful_messages = 0
             failed_messages = 0

@@ -314,7 +314,8 @@ static void core1_work_or_idle_wait(void) {
 static void core1_idle_wait(void) {
 
     // Wait for interrupt - power efficient
-    __wfi();
+    //__wfi();
+    sleep_us(500);
     DEBUG_ONLY({
         printf("wfi elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - get_interrupt_ms());
     });

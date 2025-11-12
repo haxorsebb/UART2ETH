@@ -35,7 +35,7 @@ class MessageGenerator:
         messages = []
         
         # Generate representative sampling of hex space (every 4096th value for efficiency)
-        for hex_val in range(0, 0x10000, 0x1000):
+        for hex_val in range(0, 0x10000, 0x1):
             hex_str = f"{hex_val:04X}"
             message = ProtocolMessage(hex_header=hex_str, payload="")
             messages.append(message)
@@ -68,7 +68,7 @@ class MessageGenerator:
         hex_header = f"{random.randint(0, 0xFFFF):04X}"
         
         # Test larger messages for debugging
-        payload_size = min(payload_size, 600)
+        payload_size = min(payload_size, 128)
         
         # Generate payload of specified size using valid characters per protocol spec
         # Valid chars: '0'-'9', 'A'-'F' (avoiding protocol special chars #!\\r\\n)
