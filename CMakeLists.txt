@@ -18,11 +18,11 @@ set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards)
 
 # Set board before initializing SDK
 # OPTION 1: Original custom board with 12MHz external clock (comment out for testing)
-#set(PICO_BOARD uart2eth_board)
+set(PICO_BOARD uart2eth_board)
 # OPTION 2: Test board with internal oscillator (uncomment for debugging)
 #set(PICO_BOARD uart2eth_board_rosc)
 #set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards)
-set(PICO_BOARD pico2)
+#set(PICO_BOARD pico2)
 
 
 # Pull in SDK (must be before project)
@@ -47,7 +47,7 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 # Debug build option (can be set with -DDEBUG=ON)
-option(DEBUG "Enable debug mode" OFF)
+option(DEBUG "Enable debug mode" ON)
 
 # Configure compiler flags based on debug mode
 if(DEBUG)

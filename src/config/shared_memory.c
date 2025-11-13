@@ -106,10 +106,12 @@ bool shared_memory_init(void) {
     g_shared_memory->config.channels[CHANNEL_2].tx_gpio = 14;
     g_shared_memory->config.channels[CHANNEL_2].rx_gpio = 15;
     g_shared_memory->config.channels[CHANNEL_2].type = UART_TYPE_PIO;
+    g_shared_memory->config.channels[CHANNEL_2].enabled = true;
     
-    g_shared_memory->config.channels[CHANNEL_3].tx_gpio = 16;
-    g_shared_memory->config.channels[CHANNEL_3].rx_gpio = 17;
+    g_shared_memory->config.channels[CHANNEL_3].tx_gpio = 22;
+    g_shared_memory->config.channels[CHANNEL_3].rx_gpio = 23;
     g_shared_memory->config.channels[CHANNEL_3].type = UART_TYPE_PIO;
+    g_shared_memory->config.channels[CHANNEL_3].enabled = true;
     
     network_manager_get_default_config(&g_shared_memory->config.network);
     // Initialize system settings

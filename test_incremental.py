@@ -18,7 +18,7 @@ def send_message(size):
         
         # Connect and send
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(('10.10.10.10', 4001))
+        sock.connect(('10.10.10.19', 4002))
         sock.send(msg.encode())
         
         # Receive response (no timeout)

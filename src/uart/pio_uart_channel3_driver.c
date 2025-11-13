@@ -83,9 +83,13 @@ void* pio_ch3_create_context(uint8_t pio_num, uint8_t sm_num) {
     pio_uart_ch3_context.pio_instance = pio0;
     pio_uart_ch3_context.tx_sm = 2;  // Use state machine 2 for TX (on PIO0)
     pio_uart_ch3_context.rx_sm = 3;  // Use state machine 3 for RX (on PIO0)
-    pio_uart_ch3_context.tx_gpio = 16;  // GPIO 16 for Channel 3 TX
-    pio_uart_ch3_context.rx_gpio = 17;  // GPIO 17 for Channel 3 RX
+//    pio_uart_ch3_context.tx_gpio = 16;  // GPIO 16 for Channel 3 TX
+//    pio_uart_ch3_context.rx_gpio = 17;  // GPIO 17 for Channel 3 RX
+    //the following configuration will be overwritten in pio_uart_ch3_init
+    pio_uart_ch3_context.tx_gpio = 99;  // GPIO 16 for Channel 3 TX
+    pio_uart_ch3_context.rx_gpio = 99;  // GPIO 17 for Channel 3 RX
     
+
     // Initialize DMA channels as unclaimed
     pio_uart_ch3_context.tx_dma_chan = (uint)-1;
     pio_uart_ch3_context.rx_dma_chan = (uint)-1;
@@ -161,9 +165,9 @@ static bool pio_uart_ch3_init(void* context, const uart_config_t* config) {
     // Store configuration
     ctx->current_config = *config;
     
-    // Override GPIO pins to ensure Channel 3 uses GPIO 16,17
-    ctx->tx_gpio = 16;
-    ctx->rx_gpio = 17;
+    // Use configuration pins instead of hardcoded override
+    ctx->tx_gpio = config->tx_gpio;
+    ctx->rx_gpio = config->rx_gpio;
     
     printf("PIO UART Ch3: Setting up PIO programs...\n");
     if (!pio_uart_ch3_setup_programs(ctx)) {
