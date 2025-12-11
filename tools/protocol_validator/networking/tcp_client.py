@@ -98,7 +98,7 @@ class TCPClient:
             # High-precision timing measurement
             start_time = time.perf_counter()
             self.writer.write(wire_data)
-            #await self.writer.drain()
+            await self.writer.drain()  # FIXED: Actually send the data!
             
             print(f"  Sent: {wire_data}")
                 
@@ -138,37 +138,35 @@ class TCPClient:
             # Add debug info for timeouts
             print(f"DEBUG: Message timeout after {timeout}s")
             print(f"  Message: {message.to_wire_format()}")
-            print(f"  Received: {response}")
+            # Note: response variable not available in timeout case
             raise
     
     async def _read_protocol_message(self) -> bytes:
         """
-        Read protocol message with proper framing.
+        Read EXACTLY ONE protocol message with proper framing.
         
-        Reads until:
-        - '!\r\n' terminator found (complete message)
-        - 1024 bytes reached  
-        - Reader returns no data
+        CRITICAL FIX: Uses readuntil() to read exactly one message and avoid 
+        mixing multiple responses from rapid message sending.
         
         Returns:
-            bytes: Complete protocol message
+            bytes: Single complete protocol message
         """
-        buffer = b''
-        max_size = 1024
-        
-        while len(buffer) < max_size:
-            # Read larger chunks for better performance
-            chunk = await self.reader.read(256)
-            if not chunk:
-                break
-                
-            buffer += chunk
+        try:
+            # Read until we find the exact terminator sequence
+            message = await self.reader.readuntil(b'!\r\n')
+            return message
             
-            # Check for complete message terminator using same logic as server
-            if self._check_message_end(buffer):
-                break
-                
-        return buffer
+        except asyncio.IncompleteReadError as e:
+            # Handle partial reads
+            print(f"    IncompleteReadError: got {len(e.partial)} bytes: {e.partial}")
+            return e.partial
+            
+        except asyncio.LimitOverrunError:
+            # Message too long - read what we can
+            print(f"    LimitOverrunError: reading up to 1024 bytes manually")
+            buffer = await self.reader.read(1024)
+            print(f"    Manual read returned {len(buffer)} bytes")
+            return buffer
     
     def _check_message_end(self, buffer: bytes) -> bool:
         """

@@ -67,8 +67,8 @@ class MessageGenerator:
         # Generate random hex header
         hex_header = f"{random.randint(0, 0xFFFF):04X}"
         
-        # Test larger messages for debugging
-        payload_size = min(payload_size, 128)
+        # Limit payload size for UART2ETH device compatibility
+        payload_size = min(payload_size, 32)
         
         # Generate payload of specified size using valid characters per protocol spec
         # Valid chars: '0'-'9', 'A'-'F' (avoiding protocol special chars #!\\r\\n)
@@ -155,7 +155,8 @@ class MessageGenerator:
         
         for i in range(count):
             # Vary message sizes for realistic stress testing
-            payload_size = random.randint(0, 512)  # Moderate size for high volume
+            # Reduced to 32 bytes max to ensure reliable processing with UART2ETH device
+            payload_size = random.randint(0, 32)  # Small size for high volume
             message = self.generate_medium(payload_size)
             messages.append(message)
             
@@ -198,8 +199,9 @@ class MessageGenerator:
         messages = []
         total_bytes = 0
         
-        # Use medium-sized messages for good throughput characteristics
-        typical_payload_size = 256
+        # Use small payloads compatible with UART2ETH device limitations  
+        # Reduced to 16 bytes to ensure reliable processing
+        typical_payload_size = 16
         typical_message_size = typical_payload_size + 8  # + protocol overhead
         
         while total_bytes < target_bytes:

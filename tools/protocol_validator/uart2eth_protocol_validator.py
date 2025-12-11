@@ -68,6 +68,7 @@ async def run_performance_test(scenario: PerformanceTestScenario, args: argparse
     """Run performance measurement test."""
     print(f"Starting performance test on {args.target_ip}:{args.target_ports[0]}")
     print(f"Duration: {args.duration}s, Target: {args.throughput} kbps")
+    print("DEBUG: Performance test - now using proper TCP flow control")
     
     # Connect to device
     connected = await scenario.connect_to_device(args.target_ports[0])
@@ -100,6 +101,7 @@ async def run_stress_test(scenario: PerformanceTestScenario, args: argparse.Name
     """Run stress test scenario."""
     print(f"Starting stress test on {args.target_ip}:{args.target_ports[0]}")
     print(f"Duration: {args.duration}s, Connections: {args.concurrent_connections}")
+    print("DEBUG: Stress test - now using proper TCP flow control with minimum delays")
     
     # Connect to device
     connected = await scenario.connect_to_device(args.target_ports[0])

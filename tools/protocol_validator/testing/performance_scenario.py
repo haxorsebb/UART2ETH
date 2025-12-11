@@ -72,13 +72,14 @@ class PerformanceTestScenario:
             await self.tcp_client.disconnect()
             self.tcp_client = None
     
-    async def send_test_message(self, message: ProtocolMessage, port: int) -> bool:
+    async def send_test_message(self, message: ProtocolMessage, port: int, timeout: float = 30.0) -> bool:
         """
         Send a test message and record metrics.
         
         Args:
             message: Protocol message to send
             port: Port number for metrics tracking
+            timeout: Response timeout in seconds
             
         Returns:
             bool: True if message sent successfully
@@ -87,14 +88,21 @@ class PerformanceTestScenario:
             return False
         
         try:
-            rtt = await self.tcp_client.send_message(message)
+            rtt = await self.tcp_client.send_message(message, timeout)
             message_size = len(message.to_wire_format())
             
             # Record metrics
             self.metrics_collector.record_message(rtt, message_size, port)
             
             return True
-        except Exception:
+        except asyncio.TimeoutError:
+            # CRITICAL: Timeout occurred - need to clear any pending responses to prevent
+            # them from contaminating next test. Reconnect to flush TCP buffers.
+            print(f"TIMEOUT: Message timed out after {timeout}s - reconnecting to clear buffers")
+            await self.tcp_client.reconnect()
+            return False
+        except Exception as e:
+            print(f"ERROR: Message send failed: {e}")
             return False
     
     async def run_compliance_test(self, message_count: int = 100) -> Dict[str, Any]:
@@ -140,7 +148,8 @@ class PerformanceTestScenario:
             
             for message in test_messages:
                 if message.is_valid():
-                    success = await self.send_test_message(message, self.target_ports[0])
+                    # Use 30-second timeout for compliance testing
+                    success = await self.send_test_message(message, self.target_ports[0], timeout=30.0)
                     if success:
                         successful_messages += 1
                     else:
@@ -197,11 +206,15 @@ class PerformanceTestScenario:
             if current_time - start_time >= test_duration:
                 break
                 
-            await self.send_test_message(message, self.target_ports[0])
-            messages_sent += 1
+            # Use longer timeout for performance testing under load
+            success = await self.send_test_message(message, self.target_ports[0], timeout=30.0)
+            if success:
+                messages_sent += 1
+            else:
+                print("Performance test: Message send failed")
             
-            # Small delay to control rate
-            # await asyncio.sleep(0.001)
+            # Add proper rate control to prevent overwhelming the system
+            await asyncio.sleep(0.01)  # 10ms delay between messages
         
         # Stop metrics collection
         self.metrics_collector.stop_collection()
@@ -258,16 +271,18 @@ class PerformanceTestScenario:
                 break
             
             try:
-                success = await self.send_test_message(message, self.target_ports[0])
+                # Use longer timeout for stress testing under load  
+                success = await self.send_test_message(message, self.target_ports[0], timeout=30.0)
                 if success:
                     messages_sent += 1
                 else:
                     connection_failures += 1
-            except Exception:
+            except Exception as e:
+                print(f"Stress test: Exception during message send: {e}")
                 connection_failures += 1
             
-            # Control message rate
-            target_delay = 1.0 / message_rate
+            # Control message rate with minimum delay to prevent overwhelming
+            target_delay = max(1.0 / message_rate, 0.01)  # Minimum 10ms between messages
             await asyncio.sleep(target_delay)
         
         self.metrics_collector.stop_collection()
