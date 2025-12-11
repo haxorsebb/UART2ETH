@@ -481,7 +481,9 @@ bool core0_check_for_pending_work(void) {
     }
 
     //buffered data can be handled later
-    if (ringbuffer_get_count(RX_TCP_TO_UART) > 0) {
+    uint32_t tcp_to_uart_count = ringbuffer_get_count(RX_TCP_TO_UART);
+    if (tcp_to_uart_count > 0) {
+        printf("[CORE0-WORK] Found %u TCP->UART messages in ringbuffer\n", tcp_to_uart_count);
         state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_DATA_READY);
         return true;
     }

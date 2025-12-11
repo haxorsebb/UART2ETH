@@ -402,8 +402,8 @@ static bool read_flash_page(uint32_t page_index, flash_persistence_page_t* page_
     uint32_t flash_offset = g_flash_state.partition_start_offset + 
                            (page_index * FLASH_PERSISTENCE_PAGE_SIZE);
     
-    // Use XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE for raw flash access
-    const uint8_t *flash_target_contents = (const uint8_t *)(XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE + flash_offset);
+    // Use XIP_NOCACHE_NOALLOC_BASE for raw flash access
+    const uint8_t *flash_target_contents = (const uint8_t *)(XIP_NOCACHE_NOALLOC_BASE + flash_offset);
     
     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_READ, page_index);
     

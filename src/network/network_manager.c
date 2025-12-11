@@ -581,6 +581,7 @@ bool network_manager_process_dhcp(void) {
                 printf("Network Manager: Failed to start DHCP client (error %d)\n", err);
             });
             return false;
+
         }
         DEBUG_ONLY({
             printf("DHCP start called, err=%d\n", err);

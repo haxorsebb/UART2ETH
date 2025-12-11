@@ -514,7 +514,9 @@ static err_t tcp_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, struc
         close_connection(conn);
         return ERR_OK;
     }
-        
+    
+    printf("[TCP-RECV] Callback triggered: channel=%u, pbuf_len=%u\n", conn->channel, p->tot_len);
+    
     // Process received data
     struct pbuf *q = p;
     uint16_t total_len = p->tot_len;
@@ -529,6 +531,8 @@ static err_t tcp_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, struc
         q = q->next;
     }
 
+    printf("[TCP-RECV] Processed %d bytes on channel %u\n", processed, conn->channel);
+    
     tcp_recved(tpcb, total_len);
     pbuf_free(p);
     
@@ -622,30 +626,41 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
     processed = len;
 
     bool message_complete = check_message_end(conn->line_buffer, conn->line_pos);
+    printf("[TCP-RECV] Message state: pos=%zu, complete=%d, channel=%u\n", conn->line_pos, message_complete ? 1 : 0, conn->channel);
+    
     if (message_complete) {
         processed = len;
+        
+        printf("[TCP-RECV] Complete message detected: '%.*s' (len=%zu)\n", (int)conn->line_pos, conn->line_buffer, conn->line_pos);
         
         // Ring Buffer Integration: Enqueue TCP messages for Core0 processing
         ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, conn->channel);
         
-        // BUFFER PADDING FIX: Ensure payload is completely clear before copying new data
-        memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
-        entry->fill_index = conn->line_pos;
-        
-        // Copy message data to ring buffer
-        if (entry->fill_index > RINGBUFFER_PAYLOAD_MAX_SIZE) {
-            entry->fill_index = RINGBUFFER_PAYLOAD_MAX_SIZE;
-        }
-        memcpy(entry->payload, conn->line_buffer, entry->fill_index);
-        
-        // Enqueue for Core0 processing
-        bool enqueue_result = ringbuffer_enqueue_entry(entry);
-        if (enqueue_result) {
-            if (conn->server_instance) {
-                conn->server_instance->stats.lines_processed++;
-            }
+        if (!entry) {
+            printf("[TCP-RECV] ERROR: No free ring entries for channel %u!\n", conn->channel);
         } else {
-            printf("[TCP-RECV] FAILED to enqueue message for Core0 - Channel %u\n", conn->channel);
+            printf("[TCP-RECV] Got free ring entry for channel %u\n", conn->channel);
+            
+            // BUFFER PADDING FIX: Ensure payload is completely clear before copying new data
+            memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
+            entry->fill_index = conn->line_pos;
+            
+            // Copy message data to ring buffer
+            if (entry->fill_index > RINGBUFFER_PAYLOAD_MAX_SIZE) {
+                entry->fill_index = RINGBUFFER_PAYLOAD_MAX_SIZE;
+            }
+            memcpy(entry->payload, conn->line_buffer, entry->fill_index);
+            
+            // Enqueue for Core0 processing
+            bool enqueue_result = ringbuffer_enqueue_entry(entry);
+            if (enqueue_result) {
+                printf("[TCP-RECV] Successfully enqueued message for Core0 - Channel %u\n", conn->channel);
+                if (conn->server_instance) {
+                    conn->server_instance->stats.lines_processed++;
+                }
+            } else {
+                printf("[TCP-RECV] FAILED to enqueue message for Core0 - Channel %u\n", conn->channel);
+            }
         }
     }
     

@@ -911,15 +911,76 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
         enc28j60_write_buffer(&control_byte, 1);
         enc28j60_write_buffer(packet->data, packet->length);
 
-        // Clear any previous TX interrupt
-        enc28j60_clear_register_bits(ENC28J60_EIR, ENC28J60_EIR_TXIF);
-        //wait 1 us to get everything settled
-        sleep_us(1);
+        // CHECK LINK STATUS BEFORE TRANSMISSION
+        bool link_up = enc28j60_get_link_status();
+        printf("ENC28J60: Link status before TX: %s\n", link_up ? "UP" : "DOWN");
+        if (!link_up) {
+            printf("ENC28J60: WARNING - Attempting transmission with no physical link!\n");
+        }
+        
+        // COMPREHENSIVE TX STATE RESET - clear all TX-related flags and state
+        enc28j60_clear_register_bits(ENC28J60_EIR, ENC28J60_EIR_TXIF | ENC28J60_EIR_TXERIF);
+        
+        // Ensure we're in the right bank for ECON1
+        enc28j60_set_register_bank_internal(ERXTX_BANK);
+        
+        // Make sure TXRTS is clear and no reset is pending  
+        uint8_t econ1_before = enc28j60_read_register_internal(ENC28J60_ECON1);
+        if (econ1_before & (ENC28J60_ECON1_TXRTS | ENC28J60_ECON1_TXRST)) {
+            // Force clear TXRTS and TXRST if set
+            enc28j60_clear_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRTS | ENC28J60_ECON1_TXRST);
+            sleep_us(10); // Wait for clear to take effect
+        }
+        
+        //wait for everything to settle
+        sleep_us(5);
+        
         // Start transmission (Arduino reference)
         enc28j60_set_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRTS);
         
+        // Verify TXRTS was actually set
+        uint8_t econ1_after = enc28j60_read_register_internal(ENC28J60_ECON1);
+        printf("TXRTS VERIFICATION: before=0x%02X after=0x%02X TXRTS_bit=0x%02X\n", econ1_before, econ1_after, ENC28J60_ECON1_TXRTS);
+        if (!(econ1_after & ENC28J60_ECON1_TXRTS)) {
+            printf("ERROR: TXRTS failed to set! Hardware rejected transmission\n");
+        } else {
+            printf("SUCCESS: TXRTS bit is set\n");
+        }
+        
         // DEBUGGING: Dump registers immediately after TXRTS set
         DEBUG_ONLY({enc28j60_dump_tx_registers("AFTER TXRTS SET");});
+
+        // CHECK FOR IMMEDIATE COMPLETION (transmission often completes in microseconds!)
+        sleep_us(10); // Give hardware time to complete very fast transmissions
+        
+        uint8_t econ1_immediate = enc28j60_read_register_internal(ENC28J60_ECON1);
+        uint8_t eir_immediate = enc28j60_read_register_internal(ENC28J60_EIR);
+        
+        bool immediate_complete = (econ1_immediate & ENC28J60_ECON1_TXRTS) == 0;
+        bool immediate_txif = (eir_immediate & ENC28J60_EIR_TXIF) != 0;
+        bool immediate_txerif = (eir_immediate & ENC28J60_EIR_TXERIF) != 0;
+        
+        printf("IMMEDIATE CHECK: ECON1=0x%02X TXRTS=%d, EIR=0x%02X TXIF=%d TXERIF=%d\n",
+               econ1_immediate, immediate_complete ? 0 : 1, eir_immediate, 
+               immediate_txif ? 1 : 0, immediate_txerif ? 1 : 0);
+
+        if (immediate_complete && immediate_txif) {
+            printf("FAST COMPLETION: Transmission completed immediately!\n");
+            transfer_complete = true;
+            transfer_complete_interrupt_flag = true;
+            transfer_error_interrupt_flag = immediate_txerif;
+            
+            // Clear the interrupt flags manually since we caught them before interrupt handler
+            enc28j60_clear_register_bits(ENC28J60_EIR, ENC28J60_EIR_TXIF | ENC28J60_EIR_TXERIF);
+            
+            goto transfer_finished;
+        } else if (immediate_txerif) {
+            printf("FAST ERROR: Transmission error detected immediately!\n");
+            transfer_complete = immediate_complete;
+            transfer_complete_interrupt_flag = false;
+            transfer_error_interrupt_flag = true;
+            goto transfer_finished;
+        }
 
         core1_timer_set(CORE1_TIMER_NETWORK_TX_TIMEOUT,1);
         enc28j60_unblock_interrupt();
@@ -1039,6 +1100,28 @@ transfer_finished:
         printf("  transfer_complete: %d, transfer_complete_interrupt_flag: %d, transfer_error_interrupt_flag: %d\n",
             transfer_complete ? 1 : 0, transfer_complete_interrupt_flag ? 1 : 0, transfer_error_interrupt_flag ? 1 : 0);
         printf("  tx_success: %d\n", tx_success ? 1 : 0);
+        
+        // DETAILED FAILURE ANALYSIS
+        if (!tx_success) {
+            uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
+            printf("  ESTAT detailed: 0x%02X (TXABRT=%d, CLKRDY=%d)\n", 
+                estat, 
+                (estat & ENC28J60_ESTAT_TXABRT) ? 1 : 0,
+                (estat & ENC28J60_ESTAT_CLKRDY) ? 1 : 0);
+                
+            if (transfer_complete_interrupt_flag && !transfer_complete) {
+                printf("  DIAGNOSIS: TXIF set but TXRTS not cleared - unusual state\n");
+            } else if (!transfer_complete_interrupt_flag && !transfer_error_interrupt_flag) {
+                printf("  DIAGNOSIS: No interrupt flags - transmission never started properly\n");
+            } else if (transfer_error_interrupt_flag) {
+                printf("  DIAGNOSIS: TXERIF set - transmission error occurred\n");
+            } else if (transfer_complete_interrupt_flag && transfer_complete) {
+                printf("  DIAGNOSIS: Normal completion but success flag not set - check success criteria\n");
+            }
+            
+            bool final_link = enc28j60_get_link_status();
+            printf("  Final link status: %s\n", final_link ? "UP" : "DOWN");
+        }
         printf("========================\n");
     });
     
@@ -1060,16 +1143,55 @@ transfer_finished:
 }
 
 /**
- * @brief reset tx after timeout
+ * @brief reset tx after timeout with complete chip soft reset
  */
 static void enc28j60_reset_tx_logic(void) {
-    enc28j60_set_register_bank_internal(ERXTX_BANK);
-    enc28j60_set_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRST);
-    enc28j60_clear_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRST);
+    printf("ENC28J60: Performing FULL CHIP SOFT RESET due to TX failure\n");
     
-    // Re-initialize TX FIFO after reset
-    enc28j60_write_register_internal(ENC28J60_ETXSTL, TX_BUF_START & 0xFF);
-    enc28j60_write_register_internal(ENC28J60_ETXSTH, (TX_BUF_START >> 8) & 0xFF);
+    // Perform complete soft reset (Arduino reference)
+    enc28j60_arch_spi_select();
+    enc28j60_spi_transfer(ENC28J60_SOFT_RESET);
+    enc28j60_arch_spi_deselect();
+    
+    // Wait for reset to complete (Arduino reference - critical timing)
+    sleep_ms(2);  // Give chip time to reset completely
+    
+    // Verify reset completed by checking ESTAT.CLKRDY
+    uint32_t timeout = 1000;
+    while (timeout > 0) {
+        uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
+        if (estat != 0xFF && (estat & ENC28J60_ESTAT_CLKRDY)) {
+            break;
+        }
+        sleep_us(10);
+        timeout--;
+    }
+    
+    if (timeout == 0) {
+        printf("ENC28J60: ERROR - Reset failed, chip not ready\n");
+        return;
+    }
+    
+    printf("ENC28J60: Soft reset completed, re-initializing...\n");
+    
+    // Reinitialize the chip completely
+    // Reset driver state
+    g_current_bank = 0xFF; // Force bank reconfiguration
+    
+    // Reconfigure buffers
+    enc28j60_configure_buffers();
+    
+    // Reconfigure MAC
+    enc28j60_configure_mac();
+    
+    // Enable RX
+    enc28j60_set_register_bank_internal(ERXTX_BANK);
+    enc28j60_write_register_internal(ENC28J60_ECON1, ENC28J60_ECON1_RXEN);
+    
+    // Re-enable interrupts  
+    enc28j60_enable_interrupts();
+    
+    printf("ENC28J60: Full reset and re-initialization completed\n");
 }
 
 /**
@@ -1219,7 +1341,7 @@ void enc28j60_clear_interrupts(uint8_t flags) {
     if (!g_driver_initialized) {
         return;
     }
-    DEBUG_ONLY({ printf("Clearing interrupt flag in register %d", flags); });
+    //DEBUG_ONLY({ printf("Clearing interrupt flag in register %d", flags); });
     enc28j60_set_register_bank_internal(ERXTX_BANK);
     enc28j60_clear_register_bits(ENC28J60_EIR, flags);
 
@@ -1382,10 +1504,9 @@ static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
         timeout--;
     }
     
-    printf("ENC28J60: TIMEOUT AFTER READING PHY REGISTER: %X, timeout: %d", phy_reg,timeout); 
-
     if(timeout == 0)
     {
+        printf("ENC28J60: TIMEOUT AFTER READING PHY REGISTER: %X, timeout: %d", phy_reg,timeout); 
         // TBD: we should do something to mitigate the error
         //DEBUG_ONLY({ 
             

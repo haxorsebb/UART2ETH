@@ -317,7 +317,7 @@ static void core1_idle_wait(void) {
     //__wfi();
     sleep_us(500);
     DEBUG_ONLY({
-        printf("wfi elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - get_interrupt_ms());
+        //printf("wfi elapsed since interrupt: %d\n",to_ms_since_boot(get_absolute_time()) - get_interrupt_ms());
     });
 
 }
