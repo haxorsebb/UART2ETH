@@ -480,6 +480,12 @@ bool state_machine_process_core1_event(core1_event_t event) {
                         new_state = CORE1_CONFIG_NET_WAIT_FOR_DHCP;
                     }
                     break;
+                case CORE1_EVENT_CONFIG_NET_COMPLETE:
+                    {
+                        // BUGFIX: Handle static IP configuration complete
+                        new_state = CORE1_CONFIG_COMPLETE;
+                    }
+                    break;
                 case CORE1_EVENT_CONFIG_NET_FAILED:
                     {
                         new_state = CORE1_CONFIG_ERROR;

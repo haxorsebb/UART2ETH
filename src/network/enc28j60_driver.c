@@ -986,8 +986,9 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
         enc28j60_unblock_interrupt();
 
         //wait for interrupt, either ENC28J60_EIR_TXIF (good case) or CORE1_TIMER_NETWORK_TX_TIMEOUT (bad case)
-        while( !core1_timer_is_expired(CORE1_TIMER_NETWORK_TX_TIMEOUT)) {
-            __wfi();
+        uint32_t poll_timeout = 1000; // Simple timeout fallback
+        while( !core1_timer_is_expired(CORE1_TIMER_NETWORK_TX_TIMEOUT) && poll_timeout-- > 0) {
+            sleep_us(100); // Replace __wfi() with simple delay
             // block to read registers
             enc28j60_block_interrupt();
                 
@@ -1396,7 +1397,7 @@ bool enc28j60_process_interrupts(bool forced) {
         {
             // Clear the interrupt pending flag
             g_interrupt_pending = false;
-            printf("CIP\n");
+            // DEBUG: Interrupt pending flag cleared (removed spam)
         }
     }
     else {

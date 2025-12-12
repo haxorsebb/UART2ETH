@@ -487,12 +487,21 @@ static void core1_load_configuration(void) {
     if (result) {
         // Generate to move to next phase
         if(layout->config.network.use_dhcp) {
+            DEBUG_ONLY({
+                printf("DEBUG: Using DHCP - sending DHCP_REQUEST event\n");
+            });
             state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_DHCP_REQUEST);
         }
         else {
+            DEBUG_ONLY({
+                printf("DEBUG: Using STATIC IP - sending CONFIG_NET_COMPLETE event\n");
+            });
             state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
         }
     } else {
+        DEBUG_ONLY({
+            printf("DEBUG: Network reconfigure FAILED - sending CONFIG_NET_FAILED event\n");
+        });
         //signalize failure
         state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_FAILED);
     }

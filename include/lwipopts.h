@@ -127,8 +127,23 @@
  * @brief DHCP configuration
  */
 
-/* DHCP timeout options */
-#define DHCP_DOES_ARP_CHECK        1
+/* DHCP timeout options - SURGICAL DISABLE APPROACH */
+#define DHCP_DOES_ARP_CHECK        0      // Disable DHCP ARP checking
+
+/* ARP conflict detection - KEEP ENABLED but make it VERY fast */
+#define LWIP_IPV4_ACD              1      // Keep enabled for compilation
+#define ACD_TMR_INTERVAL           10     // Very fast timer (10ms instead of 100ms)
+#define ACD_PROBE_WAIT             100    // Very short initial delay (100ms instead of 1000ms) 
+#define ACD_PROBE_NUM              1      // Only 1 probe packet instead of 3
+#define ACD_PROBE_MIN              50     // Very short delay between probes (50ms)
+#define ACD_PROBE_MAX              100    // Very short max delay (100ms)
+#define ACD_ANNOUNCE_WAIT          100    // Very short announce wait (100ms)
+#define ACD_ANNOUNCE_NUM           1      // Only 1 announcement instead of 2
+#define ACD_ANNOUNCE_INTERVAL      100    // Very short interval (100ms)
+#define ACD_MAX_CONFLICTS          1      // Give up after 1 conflict
+
+/* AutoIP disabled to prevent conflicts */
+#define LWIP_AUTOIP                0      // Disable AutoIP completely
 
 /* DHCP fine timers (milliseconds) */
 #define DHCP_FINE_TIMER_MSECS      500
