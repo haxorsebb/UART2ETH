@@ -13,6 +13,7 @@
  * Documentation Reference:
  * - ADR-007: Event-Driven State Machine Architecture
  * - arc42 Chapter 5 - Building Block View
+ *
  */
 
 #include <stdio.h>
