@@ -19,6 +19,7 @@
 #include "network/lwip_netif_enc28j60.h"
 #include "log_manager.h"
 #include "pico/stdlib.h"
+#include "pico/unique_id.h"
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/dhcp.h"
@@ -324,14 +325,22 @@ void network_manager_get_default_config(network_config_t* config) {
     config->use_dhcp = true;
     config->dhcp_timeout_ms = 30000;  // 30 seconds
     
-    // Generate default MAC address based on flash unique ID
-    // For now, use a simple default MAC address
-    config->mac_address[0] = 0x02;  // Locally administered
-    config->mac_address[1] = 0x00;
-    config->mac_address[2] = 0x00;
-    config->mac_address[3] = 0x12;
-    config->mac_address[4] = 0x34;
-    config->mac_address[5] = 0x56;
+    // Generate unique MAC address based on RP2350 flash unique ID
+    pico_unique_board_id_t unique_id;
+    pico_get_unique_board_id(&unique_id);
+    
+    config->mac_address[0] = 0x02;  // Locally administered, unicast
+    config->mac_address[1] = unique_id.id[0];
+    config->mac_address[2] = unique_id.id[1]; 
+    config->mac_address[3] = unique_id.id[2];
+    config->mac_address[4] = unique_id.id[3];
+    config->mac_address[5] = unique_id.id[4];
+    
+    DEBUG_ONLY({
+        printf("Network Manager: Generated unique MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+               config->mac_address[0], config->mac_address[1], config->mac_address[2],
+               config->mac_address[3], config->mac_address[4], config->mac_address[5]);
+    });
 
     IP4_ADDR(&config->static_ip, 192, 168, 1, 100);
     IP4_ADDR(&config->static_gateway, 192, 168, 1, 100);

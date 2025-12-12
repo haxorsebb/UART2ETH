@@ -79,6 +79,7 @@ target_link_libraries(core_modules
     log_manager
     network_manager
     tcp_socket_server
+    http_server
     timer_subsystems
     ringbuffer
     uart_manager

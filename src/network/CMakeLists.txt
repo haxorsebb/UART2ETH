@@ -38,3 +38,20 @@ target_link_libraries(tcp_socket_server
 target_include_directories(tcp_socket_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
+
+# Create HTTP server library
+add_library(http_server
+    http_server.c
+)
+
+# Link required libraries including lwIP
+target_link_libraries(http_server
+    pico_stdlib
+    log_manager
+    pico_lwip_nosys     # lwIP NO_SYS implementation for raw API
+)
+
+# Include directories
+target_include_directories(http_server PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+)

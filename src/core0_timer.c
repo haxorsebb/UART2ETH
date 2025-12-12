@@ -58,8 +58,8 @@ bool core0_timer_init(void) {
     
     // Set up hardware timer alarm interrupt
     hw_set_bits(&timer_hw->inte, 1u << CORE0_TIMER_ALARM_NUM);
-    irq_set_exclusive_handler(TIMER0_IRQ_0, core0_timer_alarm_isr);
-    irq_set_enabled(TIMER0_IRQ_0, true);
+    irq_set_exclusive_handler(TIMER1_IRQ_0, core0_timer_alarm_isr);
+    irq_set_enabled(TIMER1_IRQ_0, true);
     
     g_core0_timers.initialized = true;
     
@@ -75,7 +75,7 @@ void core0_timer_cleanup(void) {
     }
     
     // Disable timer alarm interrupt
-    irq_set_enabled(TIMER0_IRQ_0, false);
+    irq_set_enabled(TIMER1_IRQ_0, false);
     hw_clear_bits(&timer_hw->inte, 1u << CORE0_TIMER_ALARM_NUM);
     
     // Clear all timers

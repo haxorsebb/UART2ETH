@@ -35,6 +35,7 @@
 #include "network/enc28j60_driver.h"
 #include "network/tcp_socket_server.h"
 #include "network/multi_tcp_server.h"
+#include "network/http_server.h"
 
 
 
@@ -604,9 +605,20 @@ static void core1_configuration_complete(void) {
             printf("Core1: Multi-instance initialization complete: %d successful, %d failed\n", successful_channels, failed_channels);
 //        });
 
+        // Initialize HTTP server for device information web interface
+        printf("Core1: Initializing HTTP server for web interface on port 80\n");
+        if (http_server_init()) {
+            printf("Core1: ✅ HTTP server initialized successfully on port 80\n");
+            printf("Core1: 📄 Device information available at http://%s\n", ip_str);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 80);
+        } else {
+            printf("Core1: ❌ HTTP server initialization FAILED on port 80\n");
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 80);
+        }
+
     } else {
         DEBUG_ONLY({
-            printf("Core1: No IP address available, skipping TCP server init\n");
+            printf("Core1: No IP address available, skipping TCP and HTTP server init\n");
         });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 999);
     }
@@ -681,6 +693,9 @@ static void core1_process_network(void) {
     
     // Process multi-port TCP socket servers (handle connections, data)
     multi_tcp_server_process();
+    
+    // Process HTTP server (handle web requests for device information)
+    http_server_process();
     
     network_manager_check_timeouts();
 

@@ -212,8 +212,8 @@ void enc28j60_reset(void) {
     // Reset bank tracking - after reset, we're in bank 0 (Arduino reference)
     g_current_bank = ERXTX_BANK;
     
-    // Arduino reference: "Workaround for erratum #2" + wait for reset
-    sleep_us(1000);  // 1ms delay (Arduino reference)
+    // Arduino reference: "Workaround for erratum #2" + wait for reset (increased for RP2350)
+    sleep_us(2000);  // 2ms delay (increased for RP2350 timing)
     
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_RESET, 0);
 }
@@ -384,9 +384,9 @@ bool enc28j60_init(void) {
     enc28j60_spi_init();
     enc28j60_gpio_init();
     
-    // Ensure CS is deasserted and interface stable
+    // Ensure CS is deasserted and interface stable (increased for RP2350)
     gpio_put(ENC28J60_CS_PIN, 1);
-    sleep_ms(10);
+    sleep_ms(25);
     
     // Arduino reference initialization sequence:
     
@@ -1153,8 +1153,8 @@ static void enc28j60_reset_tx_logic(void) {
     enc28j60_spi_transfer(ENC28J60_SOFT_RESET);
     enc28j60_arch_spi_deselect();
     
-    // Wait for reset to complete (Arduino reference - critical timing)
-    sleep_ms(2);  // Give chip time to reset completely
+    // Wait for reset to complete (Arduino reference - critical timing, increased for RP2350)
+    sleep_ms(5);  // Give chip time to reset completely (increased for RP2350)
     
     // Verify reset completed by checking ESTAT.CLKRDY
     uint32_t timeout = 1000;
