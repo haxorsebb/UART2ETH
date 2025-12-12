@@ -84,11 +84,11 @@
 /* TCP Maximum Segment Size */
 #define TCP_MSS                    1460
 
-/* TCP send buffer size */
-#define TCP_SND_BUF                2920
+/* TCP send buffer size - increased to handle HTTP responses */
+#define TCP_SND_BUF                4096
 
-/* TCP receive window size */
-#define TCP_WND                    2920
+/* TCP receive window size - increased to match send buffer */
+#define TCP_WND                    4096
 
 /* Enable TCP keepalive */
 #define LWIP_TCP_KEEPALIVE         1

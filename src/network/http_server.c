@@ -25,7 +25,7 @@
 // HTTP server configuration
 #define HTTP_SERVER_PORT 80
 #define HTTP_SERVER_MAX_CONNECTIONS 2
-#define HTTP_RESPONSE_BUFFER_SIZE 2048
+#define HTTP_RESPONSE_BUFFER_SIZE 4096  // Increased from 2048 to prevent truncation
 
 // HTTP server state
 static struct tcp_pcb* g_http_server_pcb = NULL;
@@ -360,8 +360,46 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
     // Get device configuration
     shared_memory_layout_t* layout = shared_memory_get_layout();
     
+    // Generate GPIO pin strings for each UART channel
+    char uart1_pins[16], uart2_pins[16], uart3_pins[16];
+    
+    if (layout->config.channels[CHANNEL_1].enabled) {
+        snprintf(uart1_pins, sizeof(uart1_pins), "GP%d/GP%d", 
+                layout->config.channels[CHANNEL_1].tx_gpio,
+                layout->config.channels[CHANNEL_1].rx_gpio);
+    } else {
+        strcpy(uart1_pins, "-");
+    }
+    
+    if (layout->config.channels[CHANNEL_2].enabled) {
+        snprintf(uart2_pins, sizeof(uart2_pins), "GP%d/GP%d", 
+                layout->config.channels[CHANNEL_2].tx_gpio,
+                layout->config.channels[CHANNEL_2].rx_gpio);
+    } else {
+        strcpy(uart2_pins, "-");
+    }
+    
+    if (layout->config.channels[CHANNEL_3].enabled) {
+        snprintf(uart3_pins, sizeof(uart3_pins), "GP%d/GP%d", 
+                layout->config.channels[CHANNEL_3].tx_gpio,
+                layout->config.channels[CHANNEL_3].rx_gpio);
+    } else {
+        strcpy(uart3_pins, "-");
+    }
+    
+    // DEBUG: Print channel configuration 
+    DEBUG_ONLY({
+        printf("HTTP: Channel config - CH0:%s CH1:%s CH2:%s CH3:%s\n",
+               layout->config.channels[CHANNEL_0].enabled ? "ON" : "OFF",
+               layout->config.channels[CHANNEL_1].enabled ? "ON" : "OFF", 
+               layout->config.channels[CHANNEL_2].enabled ? "ON" : "OFF",
+               layout->config.channels[CHANNEL_3].enabled ? "ON" : "OFF");
+        printf("HTTP: GPIO pins - CH1:%s CH2:%s CH3:%s\n", uart1_pins, uart2_pins, uart3_pins);
+        printf("HTTP: Generating HTML response (buffer size: %d)\n", (int)buffer_size);
+    });
+    
     // Generate HTML response
-    snprintf(buffer, buffer_size,
+    int html_len = snprintf(buffer, buffer_size,
         "HTTP/1.0 200 OK\r\n"
         "Content-Type: text/html\r\n"
         "Connection: close\r\n"
@@ -452,12 +490,22 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         layout->config.network.use_dhcp ? "Enabled" : "Static",
         layout->config.channels[CHANNEL_0].enabled ? "Active" : "Disabled",
         layout->config.channels[CHANNEL_1].enabled ? "Active" : "Disabled",
-        layout->config.channels[CHANNEL_1].enabled ? "GP4/GP5" : "-",
+        uart1_pins,
         layout->config.channels[CHANNEL_2].enabled ? "Active" : "Disabled",
-        layout->config.channels[CHANNEL_2].enabled ? "GP4/GP5" : "-",
+        uart2_pins,
         layout->config.channels[CHANNEL_3].enabled ? "Active" : "Disabled",
-        layout->config.channels[CHANNEL_3].enabled ? "GP4/GP5" : "-",
+        uart3_pins,
         (int)g_server_stats.uptime_seconds,
         ip_str
     );
+    
+    // DEBUG: Check if HTML generation was successful
+    DEBUG_ONLY({
+        printf("HTTP: Generated HTML length: %d bytes (max: %d)\n", html_len, (int)buffer_size);
+        if (html_len >= buffer_size) {
+            printf("HTTP: WARNING - HTML truncated! Increase buffer size\n");
+        }
+        printf("HTTP: HTML contains all UART rows: %s\n", 
+               strstr(buffer, "UART3") ? "YES" : "NO");
+    });
 }
