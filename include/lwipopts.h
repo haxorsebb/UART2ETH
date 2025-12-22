@@ -134,17 +134,12 @@
 /* DHCP timeout options - SURGICAL DISABLE APPROACH */
 #define DHCP_DOES_ARP_CHECK        0      // Disable DHCP ARP checking
 
-/* ARP conflict detection - KEEP ENABLED but make it VERY fast */
-#define LWIP_IPV4_ACD              1      // Keep enabled for compilation
-#define ACD_TMR_INTERVAL           10     // Very fast timer (10ms instead of 100ms)
-#define ACD_PROBE_WAIT             100    // Very short initial delay (100ms instead of 1000ms) 
-#define ACD_PROBE_NUM              1      // Only 1 probe packet instead of 3
-#define ACD_PROBE_MIN              50     // Very short delay between probes (50ms)
-#define ACD_PROBE_MAX              100    // Very short max delay (100ms)
-#define ACD_ANNOUNCE_WAIT          100    // Very short announce wait (100ms)
-#define ACD_ANNOUNCE_NUM           1      // Only 1 announcement instead of 2
-#define ACD_ANNOUNCE_INTERVAL      100    // Very short interval (100ms)
-#define ACD_MAX_CONFLICTS          1      // Give up after 1 conflict
+/* ARP/Address conflict detection - DISABLED to fix DHCP hanging in state 8 */
+#define LWIP_DHCP_DOES_ACD_CHECK   0      // CRITICAL: Disable ACD check during DHCP
+#define LWIP_ACD                   0      // Disable ACD module entirely
+#define LWIP_IPV4_ACD              0      // Disable IPv4 ACD as well
+// Note: With ACD disabled, there's no IP conflict detection. This is safe on
+// managed networks where the DHCP server ensures unique IP assignments.
 
 /* AutoIP disabled to prevent conflicts */
 #define LWIP_AUTOIP                0      // Disable AutoIP completely
@@ -194,10 +189,10 @@
 #define TCP_OUTPUT_DEBUG           LWIP_DBG_OFF
 #define TCP_RST_DEBUG              LWIP_DBG_OFF
 #define TCP_QLEN_DEBUG             LWIP_DBG_OFF
-#define UDP_DEBUG                  LWIP_DBG_OFF
+#define UDP_DEBUG                  LWIP_DBG_ON
 #define TCPIP_DEBUG                LWIP_DBG_OFF
 #define SLIP_DEBUG                 LWIP_DBG_OFF
-#define DHCP_DEBUG                 LWIP_DBG_OFF
+#define DHCP_DEBUG                 LWIP_DBG_ON
 #define AUTOIP_DEBUG               LWIP_DBG_OFF
 #define DNS_DEBUG                  LWIP_DBG_OFF
 #define IP6_DEBUG                  LWIP_DBG_OFF

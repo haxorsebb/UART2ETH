@@ -268,6 +268,13 @@ static bool core1_check_for_pending_work(void) {
     if(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT))
     {
         network_manager_check_timeouts();
+        
+        // During DHCP wait, trigger a DHCP status check after processing timeouts
+        // This allows ACD timers to advance and then check if DHCP is complete
+        core1_substate_t sub_state = state_machine_get_core1_substate();
+        if (sub_state == CORE1_CONFIG_NET_WAIT_FOR_DHCP || sub_state == CORE1_CONFIG_NET_CHECK_DHCP) {
+            state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
+        }
         return true;
     }
 

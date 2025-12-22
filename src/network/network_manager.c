@@ -509,6 +509,17 @@ bool network_manager_reconfigure(const network_config_t* config) {
         return false;
     }
 
+    // Check if DHCP is already in progress - don't restart it!
+    struct dhcp *dhcp = netif_dhcp_data(g_netif);
+    bool dhcp_in_progress = (dhcp != NULL && dhcp->state != DHCP_STATE_OFF && dhcp->state != DHCP_STATE_BOUND);
+    
+    if (dhcp_in_progress && config->use_dhcp) {
+        printf("Network Manager: DHCP already in progress (state=%d), not restarting\n", dhcp->state);
+        // Just update the config but don't restart DHCP
+        memcpy(&g_network_config, config, sizeof(network_config_t));
+        return true;
+    }
+
     printf("Network Manager: 🔧 Reconfiguring interface with new settings\n");
     printf("Network Manager: 📍 Target IP: %d.%d.%d.%d | DHCP: %s\n",
            (int)((config->static_ip.addr >> 0) & 0xFF),
@@ -590,32 +601,30 @@ bool network_manager_process_dhcp(void) {
     // Start DHCP if not already started
     struct dhcp *dhcp = netif_dhcp_data(g_netif);
     if (dhcp == NULL || dhcp->state == DHCP_STATE_OFF) {
-        DEBUG_ONLY({
-            printf("Network Manager: Starting DHCP client\n");
-        });
-        
-        DEBUG_ONLY({
-            printf("netif status before DHCP: up=%d, link_up=%d\n", 
+        printf("DHCP: Starting DHCP client...\n");
+        printf("DHCP: netif status: up=%d, link_up=%d\n", 
             netif_is_up(g_netif), netif_is_link_up(g_netif));
-        });
+        
+        // Print MAC address being used
+        printf("DHCP: MAC=%02X:%02X:%02X:%02X:%02X:%02X\n",
+            g_netif->hwaddr[0], g_netif->hwaddr[1], g_netif->hwaddr[2],
+            g_netif->hwaddr[3], g_netif->hwaddr[4], g_netif->hwaddr[5]);
 
         err_t err = dhcp_start(g_netif);
         if (err != ERR_OK) {
-            DEBUG_ONLY({
-                printf("Network Manager: Failed to start DHCP client (error %d)\n", err);
-            });
+            printf("DHCP: Failed to start DHCP client (error %d)\n", err);
             return false;
-
         }
-        DEBUG_ONLY({
-            printf("DHCP start called, err=%d\n", err);
-        });
+        printf("DHCP: dhcp_start() returned OK\n");
         
         core1_timer_set(CORE1_TIMER_DHCP_DISCOVER, g_network_config.dhcp_timeout_ms);
+        // CRITICAL: Also set network timeout timer so sys_check_timeouts() gets called
+        // This is needed for DHCP and ACD timers to advance properly
+        core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, 10);  // 10ms initial, will be updated
         g_network_stats.dhcp_requests++;
-        DEBUG_ONLY({
-            printf("Network Manager: DHCP request sent\n");
-        });
+        printf("DHCP: DHCP DISCOVER should be sent, timeout=%u ms\n", g_network_config.dhcp_timeout_ms);
+    } else {
+        printf("DHCP: Already running, state=%d\n", dhcp ? dhcp->state : -1);
     }
     return true;
 }
@@ -630,6 +639,10 @@ bool network_manager_check_dhcp_status(void) {
     
     // Process network interface (packet RX)
     lwip_netif_enc28j60_process();
+    
+    // CRITICAL: Process lwIP timers to advance DHCP and ACD state machines
+    // Without this, ACD (Address Conflict Detection in state 8) will hang!
+    sys_check_timeouts();
     
     // Track DHCP state 8 hang detection
     static uint32_t state_8_start_time = 0;
@@ -690,31 +703,30 @@ bool network_manager_check_dhcp_status(void) {
         }
     }
     
-    DEBUG_ONLY({
-        printf("=== DHCP Debug ===\n");
-        printf("netif UP: %d\n", netif_is_up(g_netif));
-        printf("netif link UP: %d\n", netif_is_link_up(g_netif));
-
+    // DHCP status debug (always print during DHCP debugging)
+    static uint32_t last_dhcp_debug = 0;
+    if (current_time - last_dhcp_debug > 2000) {  // Print every 2 seconds
+        last_dhcp_debug = current_time;
+        printf("=== DHCP Status @%ums ===\n", current_time);
+        printf("  netif: up=%d, link=%d\n", netif_is_up(g_netif), netif_is_link_up(g_netif));
         if (dhcp) {
-            printf("DHCP state: %d", dhcp->state);
+            printf("  DHCP state: %d", dhcp->state);
             if (dhcp->state == 8 && state_8_start_time > 0) {
-                printf(" (in state 8 for %u ms)", current_time - state_8_start_time);
+                printf(" (ACD for %u ms)", current_time - state_8_start_time);
             }
             printf("\n");
-            printf("DHCP server IP: %s\n", ip4addr_ntoa(&dhcp->server_ip_addr));
+            if (!ip4_addr_isany(&dhcp->server_ip_addr)) {
+                printf("  Server: %s\n", ip4addr_ntoa(&dhcp->server_ip_addr));
+            }
+            printf("  Offered IP: %s\n", ip4addr_ntoa(&dhcp->offered_ip_addr));
         } else {
-            printf("No DHCP data\n");
+            printf("  No DHCP data yet\n");
         }
-
         if (!ip4_addr_isany(netif_ip4_addr(g_netif))) {
-            printf("Current IP: %s\n", ip4addr_ntoa(netif_ip4_addr(g_netif)));
-        } else {
-            printf("No IP assigned\n");
+            printf("  Current IP: %s\n", ip4addr_ntoa(netif_ip4_addr(g_netif)));
         }
-
-        printf("dhcp_supplied_address: %d\n", dhcp_supplied_address(g_netif));
-        printf("=================\n");
-    });
+        printf("========================\n");
+    }
 
     // Check if we got an IP address (either from DHCP or static fallback)
     if (dhcp_supplied_address(g_netif) || !ip4_addr_isany(netif_ip4_addr(g_netif))) {

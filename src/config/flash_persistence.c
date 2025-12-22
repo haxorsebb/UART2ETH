@@ -134,6 +134,9 @@ bool flash_persistence_load_configuration(void) {
         g_flash_state.last_written_revision = layout->revision_counter;
         g_flash_state.last_valid_page = best_page;
         
+        // Clear runtime flags that should not be persisted
+        layout->config_change_pending = false;  // This is a runtime flag, not config
+        
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_LOADED, 
                   layout->revision_counter);
     }
