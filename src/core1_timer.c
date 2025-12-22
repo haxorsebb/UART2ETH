@@ -238,7 +238,7 @@ static void core1_timer_update_next_alarm(void) {
         g_core1_timers.next_alarm_time_us = core1_next_expiration;
         if(timer_hardware_alarm_set_target(timer_hw, CORE1_TIMER_ALARM_NUM, (absolute_time_t)core1_next_expiration))
         {
-            printf("CORE1: TIMER WAS MISSED!\n");
+            // printf("CORE1: TIMER WAS MISSED!\n");
         }
     }
 }

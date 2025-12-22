@@ -85,10 +85,14 @@
 #define TCP_MSS                    1460
 
 /* TCP send buffer size - increased to handle HTTP responses */
-#define TCP_SND_BUF                4096
+#define TCP_SND_BUF                8192
 
 /* TCP receive window size - increased to match send buffer */
-#define TCP_WND                    4096
+#define TCP_WND                    8192
+
+/* TCP memory pool settings for larger buffers */
+#define MEMP_NUM_TCP_SEG           40   // Increase TCP segments for larger send buffer
+#define TCP_SND_QUEUELEN           32   // Increase send queue length for 8KB buffer
 
 /* Enable TCP keepalive */
 #define LWIP_TCP_KEEPALIVE         1

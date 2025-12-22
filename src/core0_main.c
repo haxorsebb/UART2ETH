@@ -100,7 +100,7 @@ void core0_main(void) {
         debug_counter++;
         
         if (debug_counter <= 3 || debug_counter % 50000 == 0) {  // First 3 loops and then every 50k loops  
-            printf("DEBUG: Core0 loop #%u - main_state=%d, sub_state=%d\n", debug_counter, main_state, sub_state);
+            // printf("DEBUG: Core0 loop #%u - main_state=%d, sub_state=%d\n", debug_counter, main_state, sub_state);
         }
         
         // Big switch statement for main states

@@ -107,6 +107,8 @@ void lwip_netif_enc28j60_process(void) {
         return;
     }
 
+    // DISABLED: Too verbose. Uncomment for debugging.
+#if 0
     DEBUG_ONLY({ 
         static uint32_t last_debug_time = 0;
         uint32_t current_time = to_ms_since_boot(get_absolute_time());
@@ -125,6 +127,7 @@ void lwip_netif_enc28j60_process(void) {
             last_debug_time = current_time;
         }
     });
+#endif
     
     
     // Check for incoming packets and process them
@@ -147,26 +150,17 @@ void lwip_netif_enc28j60_process(void) {
                     
                     // Feed packet to lwIP
                     if (g_enc28j60_netif.input(p, &g_enc28j60_netif) != ERR_OK) {
-                        //DEBUG_ONLY({ 
-                            printf("lwIP netif: Failed to input packet to lwIP\n"); 
-                        //});
+                        DEBUG_ONLY({ printf("lwIP netif: Failed to input packet to lwIP\n"); });
                         pbuf_free(p);
                     }
-                    else { 
-                        DEBUG_ONLY( { 
-                            printf("lwIP: %d bytes Packet successfully fed to lwIP!\n", packet.length); 
-                        });
-                    }
                 } else {
-                    //DEBUG_ONLY({ 
-                        printf("lwIP netif: Failed to allocate pbuf for incoming packet (length=%u)\n", packet.length); 
-                    //});
+                    DEBUG_ONLY({ printf("lwIP netif: Failed to allocate pbuf (length=%u)\n", packet.length); });
                 }
                 packets_processed++;
             }
         }
     }
-    DEBUG_ONLY( {printf("ENC28J60: read %d packets\n",packets_processed );});
+    // DEBUG_ONLY( {printf("ENC28J60: read %d packets\n",packets_processed );});
 }
 
 /**
@@ -246,33 +240,6 @@ static err_t enc28j60_netif_output(struct netif *netif, struct pbuf *p) {
         return ERR_BUF;
     }
 
-    DEBUG_ONLY({
-        // DEBUG: Enable detailed packet inspection for ping corruption analysis
-        printf("TX: Packet length=%u bytes, first 64 bytes:\n", total_len);
-        for (int i = 0; i < 64 && i < total_len; i++) {
-            if (i % 16 == 0) printf("  %02X: ", i);
-            printf("%02X ", tx_buffer[i]);
-            if (i % 16 == 15) printf("\n");
-        }
-        if (total_len % 16 != 0) printf("\n");
-        
-        // Decode Ethernet header for debugging
-        if (total_len >= 14) {
-            printf("  ETH: dst=%02X:%02X:%02X:%02X:%02X:%02X src=%02X:%02X:%02X:%02X:%02X:%02X type=0x%04X\n",
-                tx_buffer[0], tx_buffer[1], tx_buffer[2], tx_buffer[3], tx_buffer[4], tx_buffer[5],
-                tx_buffer[6], tx_buffer[7], tx_buffer[8], tx_buffer[9], tx_buffer[10], tx_buffer[11],
-                (tx_buffer[12] << 8) | tx_buffer[13]);
-        }
-        
-        // Decode IP header if it's IP packet
-        if (total_len >= 34 && tx_buffer[12] == 0x08 && tx_buffer[13] == 0x00) {
-            printf("  IP: ver_ihl=0x%02X tos=0x%02X len=%u src=%u.%u.%u.%u dst=%u.%u.%u.%u\n",
-                tx_buffer[14], tx_buffer[15], 
-                (tx_buffer[16] << 8) | tx_buffer[17],
-                tx_buffer[26], tx_buffer[27], tx_buffer[28], tx_buffer[29],
-                tx_buffer[30], tx_buffer[31], tx_buffer[32], tx_buffer[33]);
-        }
-    });
 
     // Create packet structure for ENC28J60
     enc28j60_packet_t packet;

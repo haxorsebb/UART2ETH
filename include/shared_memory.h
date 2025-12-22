@@ -99,8 +99,9 @@ typedef struct {
 typedef struct {
     // Revision and integrity (at start for easy access)
     volatile uint32_t revision_counter;       // Incremented on each config change
+    volatile bool config_change_pending;      // Flag for Core1 to detect config changes
     // TODO: Add SHA256 checksum for integrity validation in future version
-    uint32_t reserved[8];                     // Reserved for future integrity features
+    uint32_t reserved[7];                     // Reserved for future integrity features (reduced by 1)
     
     // Configuration structures
     system_config_t config;

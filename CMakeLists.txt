@@ -47,7 +47,7 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 # Debug build option (can be set with -DDEBUG=ON)
-option(DEBUG "Enable debug mode" ON)
+option(DEBUG "Enable debug mode" OFF)
 
 # Configure compiler flags based on debug mode
 if(DEBUG)

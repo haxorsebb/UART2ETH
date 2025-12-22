@@ -321,9 +321,9 @@ void network_manager_get_default_config(network_config_t* config) {
     
     memset(config, 0, sizeof(network_config_t));
     
-    // TEMPORARY: Use static IP to bypass DHCP ACD issue
-    config->use_dhcp = false;  // DISABLE DHCP - use static IP instead
-    config->dhcp_timeout_ms = 30000;  // 30 seconds (not used with static)
+    // Re-enable DHCP with fast ACD timeouts to prevent hangs
+    config->use_dhcp = true;   // ENABLE DHCP - use dynamic IP assignment
+    config->dhcp_timeout_ms = 30000;  // 30 seconds DHCP timeout
     
     // Generate unique MAC address based on RP2350 flash unique ID
     pico_unique_board_id_t unique_id;
@@ -343,7 +343,7 @@ void network_manager_get_default_config(network_config_t* config) {
                config->mac_address[3], config->mac_address[4], config->mac_address[5]);
     });
 
-    // Configure static IP to match your network (DHCP server was 10.10.10.1)
+    // Static IP configuration (only used when use_dhcp = false)
     IP4_ADDR(&config->static_ip, 10, 10, 10, 41);       // Static IP: 10.10.10.41
     IP4_ADDR(&config->static_gateway, 10, 10, 10, 1);   // Gateway: 10.10.10.1 (DHCP server)
     IP4_ADDR(&config->static_netmask, 255, 255, 255, 0); // Netmask: 255.255.255.0
@@ -505,53 +505,66 @@ static bool network_manager_init_lwip(void) {
  */
 bool network_manager_reconfigure(const network_config_t* config) {
 
-    if(!g_netif) {
+    if(!g_netif || !config) {
         return false;
     }
 
+    printf("Network Manager: 🔧 Reconfiguring interface with new settings\n");
+    printf("Network Manager: 📍 Target IP: %d.%d.%d.%d | DHCP: %s\n",
+           (int)((config->static_ip.addr >> 0) & 0xFF),
+           (int)((config->static_ip.addr >> 8) & 0xFF),
+           (int)((config->static_ip.addr >> 16) & 0xFF),
+           (int)((config->static_ip.addr >> 24) & 0xFF),
+           config->use_dhcp ? "ENABLED" : "DISABLED");
+
+    // Update global configuration with new settings
+    memcpy(&g_network_config, config, sizeof(network_config_t));
+
     core1_timer_cancel(CORE1_TIMER_NETWORK_TIMEOUT);
     core1_timer_cancel(CORE1_TIMER_DHCP_DISCOVER);
-    
 
     //stop dhcp if running
     dhcp_stop(g_netif);
-    //put if down for reconfig
+    //put interface down for reconfig
     netif_set_down(g_netif);
 
     // Initialize lwIP network interface for ENC28J60
     ip4_addr_t ip_addr, netmask, gateway;
-    //prepare ip's
-    if (g_network_config.use_dhcp) {
+    
+    // CRITICAL FIX: Use NEW config parameter instead of old g_network_config
+    if (config->use_dhcp) {
         // Use zero addresses for DHCP
         IP4_ADDR(&ip_addr, 0, 0, 0, 0);
         IP4_ADDR(&netmask, 0, 0, 0, 0);
         IP4_ADDR(&gateway, 0, 0, 0, 0);
-        DEBUG_ONLY({
-            printf("Network Manager: (Re)Configured for DHCP\n");
-        });
+        printf("Network Manager: ✅ Configured for DHCP\n");
     } else {
-        // Use static IP configuration
-        ip_addr.addr = g_network_config.static_ip.addr;
-        netmask.addr = g_network_config.static_netmask.addr;
-        gateway.addr = g_network_config.static_gateway.addr;
-        DEBUG_ONLY({
-            printf("Network Manager: (Re)Configured for static IP\n");
-        });
+        // Use NEW static IP configuration from parameter
+        ip_addr.addr = config->static_ip.addr;        // FIXED: Use config parameter
+        netmask.addr = config->static_netmask.addr;   // FIXED: Use config parameter  
+        gateway.addr = config->static_gateway.addr;   // FIXED: Use config parameter
+        printf("Network Manager: ✅ Configured for static IP: %d.%d.%d.%d\n",
+               (int)((config->static_ip.addr >> 0) & 0xFF),
+               (int)((config->static_ip.addr >> 8) & 0xFF),
+               (int)((config->static_ip.addr >> 16) & 0xFF),
+               (int)((config->static_ip.addr >> 24) & 0xFF));
     }
 
     netif_set_ipaddr(g_netif, &ip_addr);
     netif_set_netmask(g_netif, &netmask); 
     netif_set_gw(g_netif, &gateway);
     
-    //put if up after reconfig
+    //put interface back up after reconfig
     netif_set_up(g_netif);
 
-
-    if(g_network_config.use_dhcp) {
+    // FIXED: Use NEW config parameter for DHCP decision
+    if(config->use_dhcp) {
+        printf("Network Manager: 🔄 Starting DHCP client\n");
         //start dhcp by sending a request
         return(network_manager_process_dhcp());
     }
     
+    printf("Network Manager: ✅ Static IP configuration applied successfully\n");
     core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, sys_timeouts_sleeptime());
         
     return true;
@@ -618,14 +631,76 @@ bool network_manager_check_dhcp_status(void) {
     // Process network interface (packet RX)
     lwip_netif_enc28j60_process();
     
+    // Track DHCP state 8 hang detection
+    static uint32_t state_8_start_time = 0;
+    static bool state_8_timeout_triggered = false;
+    const uint32_t STATE_8_TIMEOUT_MS = 5000;  // 5 seconds max in state 8
+    
+    struct dhcp *dhcp = netif_dhcp_data(g_netif);
+    uint32_t current_time = to_ms_since_boot(get_absolute_time());
+    
+    // Detect DHCP state 8 hang and implement fallback
+    if (dhcp && dhcp->state == 8) {  // DHCP_STATE_CHECKING (ACD)
+        if (state_8_start_time == 0) {
+            state_8_start_time = current_time;
+            DEBUG_ONLY({
+                printf("DHCP: Entered state 8 (ACD checking) at %u ms\n", current_time);
+            });
+        } else if (!state_8_timeout_triggered && (current_time - state_8_start_time) > STATE_8_TIMEOUT_MS) {
+            // State 8 timeout detected - fall back to static IP
+            state_8_timeout_triggered = true;
+            
+            DEBUG_ONLY({
+                printf("DHCP: State 8 hang detected after %u ms! Falling back to static IP\n", 
+                       current_time - state_8_start_time);
+            });
+            
+            // Stop DHCP
+            dhcp_stop(g_netif);
+            
+            // FIXED: Use configured static IP as fallback (not hardcoded IP)
+            ip4_addr_t static_ip, gateway, netmask;
+            static_ip.addr = g_network_config.static_ip.addr;      // Use CONFIGURED static IP
+            gateway.addr = g_network_config.static_gateway.addr;   // Use CONFIGURED gateway
+            netmask.addr = g_network_config.static_netmask.addr;   // Use CONFIGURED netmask
+            
+            // Apply configured static IP as fallback
+            netif_set_ipaddr(g_netif, &static_ip);
+            netif_set_netmask(g_netif, &netmask);
+            netif_set_gw(g_netif, &gateway);
+            
+            printf("DHCP: DHCP timeout - falling back to CONFIGURED static IP: %d.%d.%d.%d\n",
+                   (static_ip.addr >> 0) & 0xFF,
+                   (static_ip.addr >> 8) & 0xFF,
+                   (static_ip.addr >> 16) & 0xFF,
+                   (static_ip.addr >> 24) & 0xFF);
+            printf("DHCP: Network now operational with user-configured IP\n");
+            
+            // Cancel DHCP timer and start network timeout timer instead
+            core1_timer_cancel(CORE1_TIMER_DHCP_DISCOVER);
+            core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, sys_timeouts_sleeptime());
+            
+            return true;  // Network is now ready with static IP
+        }
+    } else {
+        // Reset state 8 tracking when not in state 8
+        if (state_8_start_time != 0) {
+            state_8_start_time = 0;
+            state_8_timeout_triggered = false;
+        }
+    }
+    
     DEBUG_ONLY({
         printf("=== DHCP Debug ===\n");
         printf("netif UP: %d\n", netif_is_up(g_netif));
         printf("netif link UP: %d\n", netif_is_link_up(g_netif));
 
-        struct dhcp *dhcp = netif_dhcp_data(g_netif);
         if (dhcp) {
-            printf("DHCP state: %d\n", dhcp->state);
+            printf("DHCP state: %d", dhcp->state);
+            if (dhcp->state == 8 && state_8_start_time > 0) {
+                printf(" (in state 8 for %u ms)", current_time - state_8_start_time);
+            }
+            printf("\n");
             printf("DHCP server IP: %s\n", ip4addr_ntoa(&dhcp->server_ip_addr));
         } else {
             printf("No DHCP data\n");
@@ -641,9 +716,8 @@ bool network_manager_check_dhcp_status(void) {
         printf("=================\n");
     });
 
-
-    // Check if we got an IP address
-    if (dhcp_supplied_address(g_netif)) {
+    // Check if we got an IP address (either from DHCP or static fallback)
+    if (dhcp_supplied_address(g_netif) || !ip4_addr_isany(netif_ip4_addr(g_netif))) {
         //stop the timer
         core1_timer_cancel(CORE1_TIMER_DHCP_DISCOVER);
         
@@ -656,8 +730,9 @@ bool network_manager_check_dhcp_status(void) {
                 (unsigned)ip4_addr3_16(netif_ip4_addr(g_netif)),
                 (unsigned)ip4_addr4_16(netif_ip4_addr(g_netif)));
         
+        const char* source = dhcp_supplied_address(g_netif) ? "DHCP" : "Static Fallback";
         DEBUG_ONLY({
-            printf("Network Manager: DHCP successful! IP: %s\n", ip_str);
+            printf("Network Manager: %s successful! IP: %s\n", source, ip_str);
             printf("Network Manager: Network ready for ping and TCP/IP operations\n");
         });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 1);
