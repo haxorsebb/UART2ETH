@@ -4,6 +4,7 @@
 add_library(config_manager
     config/shared_memory.c
     config/flash_persistence.c
+    config/uart_config_protocol.c
 )
 
 target_include_directories(config_manager PUBLIC ../include)
@@ -12,6 +13,7 @@ target_link_libraries(config_manager
     pico_sync 
     hardware_sync
     hardware_flash
+    hardware_watchdog
     pico_bootrom
 )
 
@@ -106,6 +108,7 @@ target_include_directories(uart_manager PUBLIC ../include)
 target_link_libraries(uart_manager 
     ringbuffer
     log_manager
+    config_manager
     pico_stdlib
     hardware_uart
     hardware_gpio

@@ -223,15 +223,11 @@ static size_t pio_uart_ch3_send_data(void* context, const uint8_t* data, size_t 
         return 0;
     }
     
-    printf("PIO UART Ch3: Sending %zu bytes\n", len);
-    
     // For large transfers, use DMA buffer approach (like Channel 2)
     if (len > 16 && !ctx->tx_in_progress) {
         // Copy to DMA buffer (limit to buffer size)
         size_t transfer_len = len > PIO_UART_CH3_DMA_BUFFER_SIZE ? PIO_UART_CH3_DMA_BUFFER_SIZE : len;
         memcpy(ctx->tx_dma_buffer, data, transfer_len);
-        
-        printf("PIO UART Ch3: Using DMA buffer for %zu bytes (requested %zu)\n", transfer_len, len);
         
         // Configure and start DMA transfer
         dma_channel_config tx_config = dma_channel_get_default_config(ctx->tx_dma_chan);
@@ -252,11 +248,9 @@ static size_t pio_uart_ch3_send_data(void* context, const uint8_t* data, size_t 
         ctx->tx_in_progress = true;
         ctx->state.bytes_sent += transfer_len;
         
-        printf("PIO UART Ch3: DMA transfer started for %zu bytes\n", transfer_len);
         return transfer_len;
     } else {
         // Use direct PIO FIFO for small transfers or if DMA busy
-        printf("PIO UART Ch3: Using FIFO for %zu bytes (DMA busy=%s)\n", len, ctx->tx_in_progress ? "yes" : "no");
         size_t sent = 0;
         for (size_t i = 0; i < len; i++) {
             if (!pio_sm_is_tx_fifo_full(ctx->pio_instance, ctx->tx_sm)) {
@@ -267,7 +261,6 @@ static size_t pio_uart_ch3_send_data(void* context, const uint8_t* data, size_t 
                 break;  // FIFO full, return partial send
             }
         }
-        printf("PIO UART Ch3: FIFO sent %zu/%zu bytes\n", sent, len);
         return sent;
     }
 }
@@ -279,10 +272,10 @@ static bool pio_uart_ch3_has_rx_data(void* context) {
         return false;
     }
     
-    // Check PIO RX FIFO and transfer to ring buffer
+    // Check PIO RX FIFO and transfer to ring buffer (no printf - called frequently)
     while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm)) {
         uint32_t data = pio_sm_get(ctx->pio_instance, ctx->rx_sm);
-        uint8_t byte = (uint8_t)(data & 0xFF);
+        uint8_t byte = (uint8_t)(data >> 24);  // Extract byte from left-justified PIO data
         
         if (uart_receive_buffer_put(&ctx->rx_ring, byte)) {
             ctx->state.bytes_received++;
@@ -301,17 +294,11 @@ static size_t pio_uart_ch3_read_data(void* context, uint8_t* buffer, size_t max_
         return 0;
     }
     
-    // First check for new data in PIO FIFO
+    // First check for new data in PIO FIFO (polls directly, bypasses interrupt)
     pio_uart_ch3_has_rx_data(context);
     
     // Read from ring buffer
-    size_t read = uart_receive_buffer_read(&ctx->rx_ring, buffer, max_len);
-    
-    if (read > 0) {
-        printf("PIO UART Ch3: Read %zu bytes from buffer\n", read);
-    }
-    
-    return read;
+    return uart_receive_buffer_read(&ctx->rx_ring, buffer, max_len);
 }
 
 // Other required interface functions - simplified implementations
@@ -415,29 +402,16 @@ static void pio_uart_ch3_pio_rx_irq_handler(void) {
     
     pio_uart_ch3_context_t* ctx = &pio_uart_ch3_context;
     
-    // Clear interrupt first to prevent runaway condition
-    pio_interrupt_clear(ctx->pio_instance, pis_sm0_rx_fifo_not_empty + ctx->rx_sm);
-    
-    // Process available data from FIFO
-    int max_bytes = 32;  // Prevent unbounded interrupt processing
-    
-    printf("PIO UART Ch3: RX interrupt - processing FIFO data\n");
-    
-    while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm) && max_bytes-- > 0) {
+    // Process all available data from FIFO - NO printf in interrupt!
+    while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm)) {
         uint32_t word = pio_sm_get(ctx->pio_instance, ctx->rx_sm);
         uint8_t byte = (uint8_t)(word >> 24);  // Extract byte from left-justified data
         
-        printf("PIO UART Ch3: Received byte 0x%02X ('%c')\n", byte, (byte >= 32 && byte < 127) ? byte : '?');
-        
         // Put byte into ring buffer (interrupt-safe)
-        bool success = uart_receive_buffer_put(&ctx->rx_ring, byte);
-        
-        if (!success) {
+        if (uart_receive_buffer_put(&ctx->rx_ring, byte)) {
+            ctx->state.bytes_received++;
+        } else {
             ctx->state.overrun_errors++;
-            printf("PIO UART Ch3: Ring buffer overrun!\n");
-            break;  // Buffer full, stop processing
         }
     }
-    
-    printf("PIO UART Ch3: RX interrupt processing complete\n");
 }

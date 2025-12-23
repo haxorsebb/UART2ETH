@@ -6,6 +6,7 @@
 #include "uart/uart_manager.h"
 #include "shared_memory.h"
 #include "uart/uart_interface.h"
+#include "uart_config_protocol.h"
 #include "ringbuffer.h"
 #include "log_manager.h"
 #include "pico/stdlib.h"
@@ -62,6 +63,9 @@ bool uart_manager_init(void) {
     memset(&g_manager, 0, sizeof(uart_manager_t));
     g_manager.stats.status = UART_MANAGER_STATUS_INITIALIZING;
     g_manager.start_time = to_ms_since_boot(get_absolute_time());
+    
+    // Initialize UART configuration protocol
+    uart_config_protocol_init();
     
     // Initialize UART channels
     bool success = true;
@@ -390,9 +394,29 @@ static bool process_channel_incoming_data(channel_id_t channel) {
             
     // Read data from UART
     size_t bytes_read = 0;
-    int rounds=0;
+    int rounds = 0;
+    int empty_rounds = 0;  // Count rounds with no data (for waiting on slow UARTs)
+    const int MAX_EMPTY_ROUNDS = 20;  // Max retries when waiting for more data (20ms total)
+    
     do {
         bytes_read = uart->ops->read_data(uart->driver_context, buffer, sizeof(buffer));
+        
+        if (bytes_read == 0) {
+            // No data available right now
+            if (entry && entry->fill_index > 0) {
+                // We have partial data - wait a bit for more to arrive (PIO UART timing)
+                empty_rounds++;
+                if (empty_rounds < MAX_EMPTY_ROUNDS) {
+                    sleep_us(1000);  // Wait 1ms for more data to arrive
+                    continue;
+                }
+                printf("UART_MGR: Ch%d timeout after %d rounds, fill=%u\n", 
+                       channel, empty_rounds, entry->fill_index);
+            }
+            break;  // No partial data or timeout - exit
+        }
+        
+        empty_rounds = 0;  // Reset empty counter when we get data
         
         for (size_t idx = 0; idx < bytes_read; idx++) {
             uint8_t byte = buffer[idx];
@@ -413,8 +437,39 @@ static bool process_channel_incoming_data(channel_id_t channel) {
             entry->payload[entry->fill_index++] = byte;
             
             if(check_message_end(entry->payload, entry->fill_index)) {
-                ringbuffer_enqueue_entry(entry);
-                entry = NULL; // CRITICAL FIX: Clear entry pointer to force new allocation
+                // Debug: Log message received on each channel
+                printf("UART_MGR: Ch%d msg complete, len=%u, starts='%.10s'\n", 
+                       channel, entry->fill_index, entry->payload);
+                
+                // Check if this is a configuration command (except channel 0)
+                bool is_cfg_cmd = uart_config_is_command(entry->payload, entry->fill_index);
+                printf("UART_MGR: Ch%d is_cfg_cmd=%d, channel!=0=%d\n", 
+                       channel, is_cfg_cmd, channel != CHANNEL_0);
+                
+                if (channel != CHANNEL_0 && is_cfg_cmd) {
+                    // Process config command and send response back via UART
+                    uint8_t response[CFG_MAX_RESPONSE];
+                    size_t response_len = 0;
+                    
+                    printf("UART_MGR: Ch%d processing config command\n", channel);
+                    
+                    if (uart_config_process_command(channel, entry->payload, entry->fill_index,
+                                                     response, &response_len)) {
+                        // Send response back on the same UART channel
+                        printf("UART_MGR: Ch%d sending response len=%zu\n", channel, response_len);
+                        if (response_len > 0 && uart->ops->send_data) {
+                            uart->ops->send_data(uart->driver_context, response, response_len);
+                        }
+                    }
+                    
+                    // Don't forward config commands to TCP - just reset entry for reuse
+                    memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
+                    entry->fill_index = 0;
+                } else {
+                    // Normal message - enqueue for TCP transmission
+                    ringbuffer_enqueue_entry(entry);
+                    entry = NULL; // CRITICAL FIX: Clear entry pointer to force new allocation
+                }
                 
                 // BUFFER PADDING FIX: Clear UART receive buffer after processing complete message
                 // This prevents old data from accumulating and causing buffer padding issues
@@ -423,7 +478,7 @@ static bool process_channel_incoming_data(channel_id_t channel) {
                 }
                 
                 // If there's more data to process, get a new entry immediately
-                if(idx < bytes_read - 1) {
+                if(idx < bytes_read - 1 && entry == NULL) {
                     entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
                     // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
                     if (entry) {
@@ -448,7 +503,7 @@ static bool process_channel_incoming_data(channel_id_t channel) {
         }
         
         rounds++;
-    } while(bytes_read == sizeof(buffer));
+    } while(bytes_read > 0 || (entry && entry->fill_index > 0 && empty_rounds < MAX_EMPTY_ROUNDS));
 
     return true;
 }
