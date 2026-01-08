@@ -442,17 +442,18 @@ static bool http_parse_post_data(const char* post_data, size_t data_len) {
     // (unchecked checkboxes don't appear in POST data)
     
     // Save previous states for change detection
-    bool channel_enabled_before[4] = {
+    bool channel_enabled_before[5] = {
         layout->config.channels[0].enabled,
         layout->config.channels[1].enabled, 
         layout->config.channels[2].enabled,
-        layout->config.channels[3].enabled
+        layout->config.channels[3].enabled,
+        layout->config.channels[4].enabled
     };
     bool dhcp_enabled_before = layout->config.network.use_dhcp;
     
     // Reset all checkboxes to false first, then enable only checked ones
     layout->config.network.use_dhcp = false;  // CRITICAL FIX: Reset DHCP checkbox
-    for (int ch = 1; ch <= 3; ch++) {
+    for (int ch = 1; ch <= 4; ch++) {
         layout->config.channels[ch].enabled = false;  // Reset UART channel checkboxes
     }
     
@@ -495,7 +496,7 @@ static bool http_parse_post_data(const char* post_data, size_t data_len) {
             }
             
             // Parse UART channel settings (ch1_port, ch1_enabled, etc.)
-            for (int ch = 1; ch <= 3; ch++) {
+            for (int ch = 1; ch <= 4; ch++) {
                 char field_name[16];
                 
                 snprintf(field_name, sizeof(field_name), "ch%d_port", ch);
@@ -530,7 +531,7 @@ static bool http_parse_post_data(const char* post_data, size_t data_len) {
     }
     
     // Check channel changes
-    for (int ch = 1; ch <= 3; ch++) {
+    for (int ch = 1; ch <= 4; ch++) {
         if (channel_enabled_before[ch] != layout->config.channels[ch].enabled) {
             config_changed = true;
             printf("HTTP: Channel %d changed: %s -> %s\n", ch,
@@ -611,8 +612,19 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         strcpy(uart3_pins, "-");
     }
 #endif
+
+#if DEVICE_CHANNEL_4_ENABLED
+    char uart4_pins[16];
+    if (layout->config.channels[CHANNEL_4].enabled) {
+        snprintf(uart4_pins, sizeof(uart4_pins), "GP%d/GP%d", 
+                layout->config.channels[CHANNEL_4].tx_gpio,
+                layout->config.channels[CHANNEL_4].rx_gpio);
+    } else {
+        strcpy(uart4_pins, "-");
+    }
+#endif
     
-    // DEBUG: Print channel configuration 
+    // DEBUG: Print channel configuration
     DEBUG_ONLY({
         printf("HTTP: Device mode: %s, Data channels: %d\n", DEVICE_MODE_NAME, DEVICE_NUM_DATA_CHANNELS);
         printf("HTTP: Channel config - CH0:%s CH1:%s\n",
@@ -704,6 +716,14 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         "                    <td>%s</td>\n"
         "                </tr>\n"
 #endif
+#if DEVICE_CHANNEL_4_ENABLED
+        "                <tr>\n"
+        "                    <td>UART4</td>\n"
+        "                    <td>%d</td>\n"
+        "                    <td>%s</td>\n"
+        "                    <td>%s</td>\n"
+        "                </tr>\n"
+#endif
         "            </table>\n"
         "        </div>\n"
         "        \n"
@@ -738,6 +758,11 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         layout->config.channels[CHANNEL_3].tcp_port,
         layout->config.channels[CHANNEL_3].enabled ? "Active" : "Disabled",
         uart3_pins,
+#endif
+#if DEVICE_CHANNEL_4_ENABLED
+        layout->config.channels[CHANNEL_4].tcp_port,
+        layout->config.channels[CHANNEL_4].enabled ? "Active" : "Disabled",
+        uart4_pins,
 #endif
         DEVICE_MODE_NAME,
         (int)g_server_stats.uptime_seconds,
@@ -907,6 +932,20 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
         "                    <div style=\"flex: 0.5; font-size: 14px; color: #7f8c8d;\">GP22/GP23</div>\n"
         "                </div>\n"
 #endif
+#if DEVICE_CHANNEL_4_ENABLED
+        "                \n"
+        "                <div class=\"uart-row\">\n"
+        "                    <div class=\"checkbox-group\">\n"
+        "                        <input type=\"checkbox\" id=\"ch4_enabled\" name=\"ch4_enabled\" value=\"1\" %s>\n"
+        "                        <label for=\"ch4_enabled\">UART4 Enabled</label>\n"
+        "                    </div>\n"
+        "                    <div class=\"form-group\" style=\"margin-bottom: 0;\">\n"
+        "                        <label for=\"ch4_port\">TCP Port:</label>\n"
+        "                        <input type=\"number\" id=\"ch4_port\" name=\"ch4_port\" value=\"%d\" min=\"1024\" max=\"65535\">\n"
+        "                    </div>\n"
+        "                    <div style=\"flex: 0.5; font-size: 14px; color: #7f8c8d;\">GP24/GP25</div>\n"
+        "                </div>\n"
+#endif
         "            </div>\n"
         "            \n"
         "            <div class=\"section\">\n"
@@ -934,6 +973,10 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
 #if DEVICE_CHANNEL_3_ENABLED
         ,layout->config.channels[CHANNEL_3].enabled ? "checked" : "",
         layout->config.channels[CHANNEL_3].tcp_port
+#endif
+#if DEVICE_CHANNEL_4_ENABLED
+        ,layout->config.channels[CHANNEL_4].enabled ? "checked" : "",
+        layout->config.channels[CHANNEL_4].tcp_port
 #endif
     );
     

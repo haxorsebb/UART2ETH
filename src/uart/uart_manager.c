@@ -24,10 +24,15 @@ extern const uart_interface_t pio_uart_interface;
 extern void* pio_create_context(uint8_t pio_num, uint8_t sm_num);
 extern void pio_destroy_context(void* context);
 
-// PIO UART Channel 3 interface
+// PIO UART Channel 3 interface (PIO1)
 extern const uart_interface_t pio_uart_ch3_interface;
 extern void* pio_ch3_create_context(uint8_t pio_num, uint8_t sm_num);
 extern void pio_ch3_destroy_context(void* context);
+
+// PIO UART Channel 4 interface (PIO2)
+extern const uart_interface_t pio_uart_ch4_interface;
+extern void* pio_ch4_create_context(uint8_t pio_num, uint8_t sm_num);
+extern void pio_ch4_destroy_context(void* context);
 
 // Line assembly for incoming data
 #define MINIMUM_MESSAGE_LENGTH 8  // '#0000!\r\n' minimum
@@ -75,6 +80,11 @@ bool uart_manager_init(void) {
             log_event(EVENT_SOURCE_UART1, LOG_LEVEL_ERROR, LOG_EVENT_UART1_ERROR, channel);
             success = false;
             break;
+        }
+        // Small delay between channel inits to let PIO state machines settle
+        // This helps prevent intermittent hangs when initializing multiple PIO blocks
+        if (channel >= CHANNEL_2) {
+            sleep_ms(10);
         }
     }
     
@@ -295,14 +305,18 @@ static bool init_channel(channel_id_t channel_id) {
         uart->ops = &pl011_uart_interface;
     } else if (channel.type == UART_TYPE_PIO) {
         // PIO UART implementation - different drivers for different channels
-        if (channel_id == 2) {
-            // Channel 2: Use general PIO UART driver (Issue #82)
-            uart->driver_context = pio_create_context(0, 0);  // PIO0, SM0/SM1
+        if (channel_id == CHANNEL_2) {
+            // Channel 2: PIO0 SM0/SM1
+            uart->driver_context = pio_create_context(0, 0);
             uart->ops = &pio_uart_interface;
-        } else if (channel_id == 3) {
-            // Channel 3: Use dedicated Channel 3 PIO UART driver
-            uart->driver_context = pio_ch3_create_context(0, 0);  // PIO0, SM2/SM3
+        } else if (channel_id == CHANNEL_3) {
+            // Channel 3: PIO1 SM0/SM1
+            uart->driver_context = pio_ch3_create_context(1, 0);
             uart->ops = &pio_uart_ch3_interface;
+        } else if (channel_id == CHANNEL_4) {
+            // Channel 4: PIO2 SM0/SM1
+            uart->driver_context = pio_ch4_create_context(2, 0);
+            uart->ops = &pio_uart_ch4_interface;
         } else {
             printf("ERROR: PIO UART not supported for channel %u\n", channel_id);
             return false;
@@ -356,12 +370,15 @@ static void deinit_channel(channel_id_t channel) {
     if (uart->type == UART_TYPE_PL011 && uart->driver_context) {
         pl011_destroy_context(uart->driver_context);
     } else if (uart->type == UART_TYPE_PIO && uart->driver_context) {
-        if (uart->channel_id == 2) {
-            // Channel 2: Use general PIO UART destroy
+        if (uart->channel_id == CHANNEL_2) {
+            // Channel 2: Use general PIO UART destroy (PIO0)
             pio_destroy_context(uart->driver_context);
-        } else if (uart->channel_id == 3) {
-            // Channel 3: Use dedicated Channel 3 PIO UART destroy
+        } else if (uart->channel_id == CHANNEL_3) {
+            // Channel 3: Use dedicated Channel 3 PIO UART destroy (PIO1)
             pio_ch3_destroy_context(uart->driver_context);
+        } else if (uart->channel_id == CHANNEL_4) {
+            // Channel 4: Use dedicated Channel 4 PIO UART destroy (PIO2)
+            pio_ch4_destroy_context(uart->driver_context);
         }
     }
     

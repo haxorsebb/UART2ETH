@@ -1,15 +1,10 @@
 /**
  * @file pio_uart_channel3_driver.h
- * @brief PIO UART driver header for Channel 3 (GPIO 16,17)
+ * @brief PIO UART driver header for Channel 3 implementation (PIO1)
  * 
- * Dedicated PIO UART implementation for Channel 3 testing.
- * Uses GPIO 16 (TX) and GPIO 17 (RX) with PIO0 state machines 2,3.
- * 
- * Based on the working Channel 2 implementation but configured for Channel 3.
- * 
- * Documentation Reference:
- * - Expansion for Channel 3 support
- * - arc42 Chapter 5 - PIO UART Channel 3 Implementation
+ * Provides software UART functionality using RP2350 PIO1 state machines
+ * with DMA acceleration and robust error handling.
+ * Copy of Channel 2 driver adapted for PIO1.
  */
 
 #ifndef PIO_UART_CHANNEL3_DRIVER_H
@@ -23,24 +18,26 @@
 #include "uart/uart_interface.h"
 #include "uart/uart_receive_buffer.h"
 
-// PIO Configuration for Channel 3 - Use PIO0 with state machines 2,3
-#define PIO_UART_CH3_PIO_INSTANCE    pio0
-#define PIO_UART_CH3_TX_SM          2      // State machine 2 for TX
-#define PIO_UART_CH3_RX_SM          3      // State machine 3 for RX
-#define PIO_UART_CH3_DEFAULT_BAUD   115200 // Default baud rate
+// PIO Configuration for Channel 3 - Uses PIO1
+#define PIO_UART_CH3_PIO_INSTANCE    pio1
+#define PIO_UART_CH3_TX_SM           0      // State machine 0 for TX
+#define PIO_UART_CH3_RX_SM           1      // State machine 1 for RX
+#define PIO_UART_CH3_DEFAULT_BAUD    230400 // Default baud rate
 
 // GPIO Pin Configuration for Channel 3
-#define PIO_UART_CH3_TX_GPIO        16     // Channel 3 TX
-#define PIO_UART_CH3_RX_GPIO        17     // Channel 3 RX
+#define PIO_UART_CH3_TX_GPIO         22     // Channel 3 TX
+#define PIO_UART_CH3_RX_GPIO         23     // Channel 3 RX
 
 // Buffer configuration
-#define PIO_UART_CH3_RX_BUFFER_SIZE 1536   // Receive ring buffer size
-#define PIO_UART_CH3_DMA_BUFFER_SIZE 1024  // DMA staging buffer size
+#define PIO_UART_CH3_RX_BUFFER_SIZE  1536   // Receive ring buffer size
+#define PIO_UART_CH3_DMA_BUFFER_SIZE 1024   // DMA staging buffer size
+
+// Constants for resource management
+#define PIO_UART_CH3_PROGRAM_OFFSET_INVALID 0
+#define PIO_UART_CH3_INVALID_DMA_CHANNEL ((uint)-1)
 
 /**
  * @brief PIO UART Channel 3 context structure
- * 
- * Contains all state and configuration for Channel 3 PIO UART instance
  */
 typedef struct {
     // PIO hardware references

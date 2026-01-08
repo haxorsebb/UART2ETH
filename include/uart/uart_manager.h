@@ -18,7 +18,7 @@ extern "C" {
 // Forward declaration
 struct uart_instance;
 
-#define UART_MANAGER_MAX_CHANNELS 4
+#define UART_MANAGER_MAX_CHANNELS 5  // Channels 0-4 (debug + 4 data channels)
 
 typedef enum {
     UART_MANAGER_STATUS_UNINITIALIZED,

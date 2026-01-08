@@ -31,7 +31,7 @@
 #define TCP_SERVER_MAX_CONNECTIONS 4  // Pool size per server
 #define TCP_SERVER_LINE_BUFFER_SIZE 1024
 #define MINIMUM_MESSAGE_LENGTH 8  // '#0000!\r\n' minimum
-#define MAX_TCP_SERVER_INSTANCES 4  // Maximum number of concurrent servers
+#define MAX_TCP_SERVER_INSTANCES 5  // Maximum number of concurrent servers (one per channel)
 
 // TCP server error codes for logging
 #define TCP_ERROR_PCB_CREATION_FAILED 1

@@ -177,8 +177,8 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
         return false;
     }
     
-    // SECURITY: Validate UART channel is within expected range
-    if (entry->channel > 3) {
+    // SECURITY: Validate UART channel is within expected range (0-4)
+    if (entry->channel > 4) {
         mutex_exit(&g_ringbuffer.access_mutex);
         return false;
     }

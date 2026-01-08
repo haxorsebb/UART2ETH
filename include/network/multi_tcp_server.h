@@ -21,7 +21,7 @@
 extern "C" {
 #endif
 
-#define MAX_TCP_SERVERS 4  // Support up to 4 UART channels
+#define MAX_TCP_SERVERS 5  // Support up to 5 UART channels (0-4)
 
 /**
  * Initialize multi-port TCP server for enabled channels

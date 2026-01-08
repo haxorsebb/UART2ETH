@@ -123,9 +123,9 @@
 #define DEVICE_UART3_TX_GPIO        22
 #define DEVICE_UART3_RX_GPIO        23
 
-// UART Channel 4 - PIO UART (PRIMARY/SECONDARY only, future)
-#define DEVICE_UART4_TX_GPIO        0   // TBD
-#define DEVICE_UART4_RX_GPIO        0   // TBD
+// UART Channel 4 - PIO UART (PRIMARY/SECONDARY only)
+#define DEVICE_UART4_TX_GPIO        24
+#define DEVICE_UART4_RX_GPIO        25
 
 // ============================================================================
 // SPI Configuration

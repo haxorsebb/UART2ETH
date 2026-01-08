@@ -900,7 +900,7 @@ static void core1_apply_configuration_changes(void) {
     
     printf("Core1: Starting TCP servers for enabled channels\n");
     
-    for (int ch = 1; ch <= 3; ch++) {
+    for (int ch = 1; ch < CHANNEL_MAX; ch++) {
         // Skip channels not available in current device mode
         if (!DEVICE_CHANNEL_AVAILABLE(ch)) {
             printf("Core1: Channel %d not available in %s mode, skipping\n", ch, DEVICE_MODE_NAME);

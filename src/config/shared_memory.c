@@ -116,12 +116,20 @@ bool shared_memory_init(void) {
     g_shared_memory->config.channels[CHANNEL_2].enabled = true;
 #endif
     
-    // Channel 3 - PIO UART (disabled in SHARK mode)
+    // Channel 3 - PIO UART on PIO1 (disabled in SHARK mode)
     g_shared_memory->config.channels[CHANNEL_3].tx_gpio = DEVICE_UART3_TX_GPIO;
     g_shared_memory->config.channels[CHANNEL_3].rx_gpio = DEVICE_UART3_RX_GPIO;
     g_shared_memory->config.channels[CHANNEL_3].type = UART_TYPE_PIO;
 #if DEVICE_CHANNEL_3_ENABLED
     g_shared_memory->config.channels[CHANNEL_3].enabled = true;
+#endif
+    
+    // Channel 4 - PIO UART on PIO2 (disabled in SHARK mode)
+    g_shared_memory->config.channels[CHANNEL_4].tx_gpio = DEVICE_UART4_TX_GPIO;
+    g_shared_memory->config.channels[CHANNEL_4].rx_gpio = DEVICE_UART4_RX_GPIO;
+    g_shared_memory->config.channels[CHANNEL_4].type = UART_TYPE_PIO;
+#if DEVICE_CHANNEL_4_ENABLED
+    g_shared_memory->config.channels[CHANNEL_4].enabled = true;
 #endif
     
     printf("Device mode: %s (channels: %d data, ethernet: %s)\n", 

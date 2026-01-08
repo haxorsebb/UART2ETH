@@ -36,10 +36,11 @@
  * @brief channel enumeration for typing
  */
 typedef enum {
-    CHANNEL_0 = 0,  
+    CHANNEL_0 = 0,
     CHANNEL_1,
     CHANNEL_2,
     CHANNEL_3,
+    CHANNEL_4,
     CHANNEL_MAX,
     CHANNEL_ANY = -1
 } channel_id_t;

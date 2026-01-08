@@ -487,7 +487,7 @@ static cfg_error_t get_current_param(const char* param, char* value) {
 }
 
 static cfg_error_t get_ch_param(int channel, const char* param, char* value) {
-    if (channel < 1 || channel > 3) {
+    if (channel < 1 || channel > 4) {
         return CFG_ERR_UNKNOWN_PARAM;
     }
     
@@ -515,7 +515,7 @@ static cfg_error_t get_ch_param(int channel, const char* param, char* value) {
 }
 
 static cfg_error_t set_ch_param(int channel, const char* param, const char* value) {
-    if (channel < 1 || channel > 3) {
+    if (channel < 1 || channel > 4) {
         return CFG_ERR_UNKNOWN_PARAM;
     }
     

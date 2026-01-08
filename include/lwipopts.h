@@ -37,11 +37,11 @@
 /* Enable custom memory pools */
 #define MEMP_MEM_MALLOC            0
 
-/* Number of concurrent TCP connections - increased for 4 UART channels */
-#define MEMP_NUM_TCP_PCB           8
+/* Number of concurrent TCP connections - increased for 5 UART channels */
+#define MEMP_NUM_TCP_PCB           12
 
-/* Number of listening TCP connections - must support 4 UART channels */
-#define MEMP_NUM_TCP_PCB_LISTEN    4
+/* Number of listening TCP connections - must support 5 UART channels + HTTP */
+#define MEMP_NUM_TCP_PCB_LISTEN    6
 
 /* Number of UDP connections */
 #define MEMP_NUM_UDP_PCB           4

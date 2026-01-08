@@ -14,6 +14,7 @@
 #include "device_mode.h"
 #include "log_manager.h"
 #include "pico/stdlib.h"
+#include <stdio.h>
 #include "pico/bootrom.h"
 #include "hardware/flash.h"
 #include "hardware/sync.h"
@@ -149,6 +150,31 @@ bool flash_persistence_load_configuration(void) {
 #if !DEVICE_CHANNEL_3_ENABLED
         layout->config.channels[CHANNEL_3].enabled = false;
 #endif
+#if !DEVICE_CHANNEL_4_ENABLED
+        layout->config.channels[CHANNEL_4].enabled = false;
+#endif
+        
+        // Validate and fix channel TCP ports (may be garbage from old flash data)
+        for (int ch = CHANNEL_0; ch < CHANNEL_MAX; ch++) {
+            if (layout->config.channels[ch].tcp_port < 1024 || 
+                layout->config.channels[ch].tcp_port > 65535) {
+                layout->config.channels[ch].tcp_port = 4001 + ch;
+                printf("Flash: Fixed invalid port for channel %d -> %d\n", 
+                       ch, layout->config.channels[ch].tcp_port);
+            }
+        }
+        
+        // ALWAYS enforce GPIO pins from device_mode.h (hardware-specific, not configurable)
+        layout->config.channels[CHANNEL_0].tx_gpio = DEVICE_UART0_TX_GPIO;
+        layout->config.channels[CHANNEL_0].rx_gpio = DEVICE_UART0_RX_GPIO;
+        layout->config.channels[CHANNEL_1].tx_gpio = DEVICE_UART1_TX_GPIO;
+        layout->config.channels[CHANNEL_1].rx_gpio = DEVICE_UART1_RX_GPIO;
+        layout->config.channels[CHANNEL_2].tx_gpio = DEVICE_UART2_TX_GPIO;
+        layout->config.channels[CHANNEL_2].rx_gpio = DEVICE_UART2_RX_GPIO;
+        layout->config.channels[CHANNEL_3].tx_gpio = DEVICE_UART3_TX_GPIO;
+        layout->config.channels[CHANNEL_3].rx_gpio = DEVICE_UART3_RX_GPIO;
+        layout->config.channels[CHANNEL_4].tx_gpio = DEVICE_UART4_TX_GPIO;
+        layout->config.channels[CHANNEL_4].rx_gpio = DEVICE_UART4_RX_GPIO;
         
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_LOADED, 
                   layout->revision_counter);
