@@ -13,6 +13,7 @@
 #include "network/http_server.h"
 #include "network/network_manager.h"
 #include "shared_memory.h"
+#include "device_mode.h"
 #include "log_manager.h"
 #include "debug.h"
 #include "pico/stdlib.h"
@@ -579,7 +580,7 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
     shared_memory_layout_t* layout = shared_memory_get_layout();
     
     // Generate GPIO pin strings for each UART channel
-    char uart1_pins[16], uart2_pins[16], uart3_pins[16];
+    char uart1_pins[16];
     
     if (layout->config.channels[CHANNEL_1].enabled) {
         snprintf(uart1_pins, sizeof(uart1_pins), "GP%d/GP%d", 
@@ -589,6 +590,8 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         strcpy(uart1_pins, "-");
     }
     
+#if DEVICE_CHANNEL_2_ENABLED
+    char uart2_pins[16];
     if (layout->config.channels[CHANNEL_2].enabled) {
         snprintf(uart2_pins, sizeof(uart2_pins), "GP%d/GP%d", 
                 layout->config.channels[CHANNEL_2].tx_gpio,
@@ -596,7 +599,10 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
     } else {
         strcpy(uart2_pins, "-");
     }
+#endif
     
+#if DEVICE_CHANNEL_3_ENABLED
+    char uart3_pins[16];
     if (layout->config.channels[CHANNEL_3].enabled) {
         snprintf(uart3_pins, sizeof(uart3_pins), "GP%d/GP%d", 
                 layout->config.channels[CHANNEL_3].tx_gpio,
@@ -604,19 +610,18 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
     } else {
         strcpy(uart3_pins, "-");
     }
+#endif
     
     // DEBUG: Print channel configuration 
     DEBUG_ONLY({
-        printf("HTTP: Channel config - CH0:%s CH1:%s CH2:%s CH3:%s\n",
+        printf("HTTP: Device mode: %s, Data channels: %d\n", DEVICE_MODE_NAME, DEVICE_NUM_DATA_CHANNELS);
+        printf("HTTP: Channel config - CH0:%s CH1:%s\n",
                layout->config.channels[CHANNEL_0].enabled ? "ON" : "OFF",
-               layout->config.channels[CHANNEL_1].enabled ? "ON" : "OFF", 
-               layout->config.channels[CHANNEL_2].enabled ? "ON" : "OFF",
-               layout->config.channels[CHANNEL_3].enabled ? "ON" : "OFF");
-        printf("HTTP: GPIO pins - CH1:%s CH2:%s CH3:%s\n", uart1_pins, uart2_pins, uart3_pins);
+               layout->config.channels[CHANNEL_1].enabled ? "ON" : "OFF");
         printf("HTTP: Generating HTML response (buffer size: %d)\n", (int)buffer_size);
     });
     
-    // Generate HTML response
+    // Build HTML response with device-mode-aware channel list
     int html_len = snprintf(buffer, buffer_size,
         "HTTP/1.0 200 OK\r\n"
         "Content-Type: text/html\r\n"
@@ -640,12 +645,13 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         "        .nav-links { margin: 20px 0; text-align: center; }\n"
         "        .nav-links a { display: inline-block; margin: 0 10px; padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 4px; }\n"
         "        .nav-links a:hover { background-color: #2980b9; }\n"
+        "        .mode-badge { display: inline-block; padding: 4px 12px; background-color: #9b59b6; color: white; border-radius: 12px; font-size: 12px; margin-left: 10px; }\n"
         "    </style>\n"
         "</head>\n"
         "<body>\n"
         "    <div class=\"container\">\n"
         "        <div class=\"header\">\n"
-        "            <h1>UART2ETH Device Information</h1>\n"
+        "            <h1>UART2ETH Device Information <span class=\"mode-badge\">%s</span></h1>\n"
         "            <p>Serial to Network Bridge - Device Status</p>\n"
         "        </div>\n"
         "        \n"
@@ -674,7 +680,7 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         "                    <td>UART0 (Debug)</td>\n"
         "                    <td>4001</td>\n"
         "                    <td>%s</td>\n"
-        "                    <td>GP16/GP17</td>\n"
+        "                    <td>GP0/GP1</td>\n"
         "                </tr>\n"
         "                <tr>\n"
         "                    <td>UART1</td>\n"
@@ -682,24 +688,28 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         "                    <td>%s</td>\n"
         "                    <td>%s</td>\n"
         "                </tr>\n"
+#if DEVICE_CHANNEL_2_ENABLED
         "                <tr>\n"
         "                    <td>UART2</td>\n"
         "                    <td>%d</td>\n"
         "                    <td>%s</td>\n"
         "                    <td>%s</td>\n"
         "                </tr>\n"
+#endif
+#if DEVICE_CHANNEL_3_ENABLED
         "                <tr>\n"
         "                    <td>UART3</td>\n"
         "                    <td>%d</td>\n"
         "                    <td>%s</td>\n"
         "                    <td>%s</td>\n"
         "                </tr>\n"
+#endif
         "            </table>\n"
         "        </div>\n"
         "        \n"
         "        <div class=\"section\">\n"
         "            <h2>Device Information</h2>\n"
-        "            <p><span class=\"label\">Firmware:</span> <span class=\"value\">UART2ETH v1.0</span></p>\n"
+        "            <p><span class=\"label\">Firmware:</span> <span class=\"value\">UART2ETH v1.0 (%s)</span></p>\n"
         "            <p><span class=\"label\">Hardware:</span> <span class=\"value\">RP2350 + ENC28J60</span></p>\n"
         "            <p><span class=\"label\">Uptime:</span> <span class=\"value\">%d seconds</span></p>\n"
         "        </div>\n"
@@ -711,22 +721,28 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         "    </div>\n"
         "</body>\n"
         "</html>\r\n",
+        DEVICE_MODE_NAME,
         ip_str,
         mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5],
         layout->config.network.use_dhcp ? "Enabled" : "Static",
         layout->config.channels[CHANNEL_0].enabled ? "Active" : "Disabled",
-        layout->config.channels[CHANNEL_1].tcp_port,  // Dynamic port for UART1
+        layout->config.channels[CHANNEL_1].tcp_port,
         layout->config.channels[CHANNEL_1].enabled ? "Active" : "Disabled",
         uart1_pins,
-        layout->config.channels[CHANNEL_2].tcp_port,  // Dynamic port for UART2
+#if DEVICE_CHANNEL_2_ENABLED
+        layout->config.channels[CHANNEL_2].tcp_port,
         layout->config.channels[CHANNEL_2].enabled ? "Active" : "Disabled",
         uart2_pins,
-        layout->config.channels[CHANNEL_3].tcp_port,  // Dynamic port for UART3
+#endif
+#if DEVICE_CHANNEL_3_ENABLED
+        layout->config.channels[CHANNEL_3].tcp_port,
         layout->config.channels[CHANNEL_3].enabled ? "Active" : "Disabled",
         uart3_pins,
+#endif
+        DEVICE_MODE_NAME,
         (int)g_server_stats.uptime_seconds,
         ip_str,
-        layout->config.channels[CHANNEL_1].tcp_port  // Port for example
+        layout->config.channels[CHANNEL_1].tcp_port
     );
     
     // DEBUG: Check if HTML generation was successful
@@ -863,6 +879,7 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
         "                    </div>\n"
         "                    <div style=\"flex: 0.5; font-size: 14px; color: #7f8c8d;\">GP4/GP5</div>\n"
         "                </div>\n"
+#if DEVICE_CHANNEL_2_ENABLED
         "                \n"
         "                <div class=\"uart-row\">\n"
         "                    <div class=\"checkbox-group\">\n"
@@ -875,6 +892,8 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
         "                    </div>\n"
         "                    <div style=\"flex: 0.5; font-size: 14px; color: #7f8c8d;\">GP14/GP15</div>\n"
         "                </div>\n"
+#endif
+#if DEVICE_CHANNEL_3_ENABLED
         "                \n"
         "                <div class=\"uart-row\">\n"
         "                    <div class=\"checkbox-group\">\n"
@@ -887,6 +906,7 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
         "                    </div>\n"
         "                    <div style=\"flex: 0.5; font-size: 14px; color: #7f8c8d;\">GP22/GP23</div>\n"
         "                </div>\n"
+#endif
         "            </div>\n"
         "            \n"
         "            <div class=\"section\">\n"
@@ -906,11 +926,15 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
         static_ip_str,
         mac_str,
         layout->config.channels[CHANNEL_1].enabled ? "checked" : "",
-        layout->config.channels[CHANNEL_1].tcp_port,
-        layout->config.channels[CHANNEL_2].enabled ? "checked" : "",
-        layout->config.channels[CHANNEL_2].tcp_port,
-        layout->config.channels[CHANNEL_3].enabled ? "checked" : "",
+        layout->config.channels[CHANNEL_1].tcp_port
+#if DEVICE_CHANNEL_2_ENABLED
+        ,layout->config.channels[CHANNEL_2].enabled ? "checked" : "",
+        layout->config.channels[CHANNEL_2].tcp_port
+#endif
+#if DEVICE_CHANNEL_3_ENABLED
+        ,layout->config.channels[CHANNEL_3].enabled ? "checked" : "",
         layout->config.channels[CHANNEL_3].tcp_port
+#endif
     );
     
     // DEBUG: Check if HTML generation was successful

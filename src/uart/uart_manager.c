@@ -5,6 +5,7 @@
 
 #include "uart/uart_manager.h"
 #include "shared_memory.h"
+#include "device_mode.h"
 #include "uart/uart_interface.h"
 #include "uart_config_protocol.h"
 #include "ringbuffer.h"
@@ -123,6 +124,7 @@ bool uart_manager_has_incoming_work(void) {
     
     // Check if any channel has incoming data
     for (channel_id_t channel_idx = CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++) {
+        if (!DEVICE_CHANNEL_AVAILABLE(channel_idx)) continue;
         if (!shared_memory_get_layout()->config.channels[channel_idx].enabled) continue;
         
         uart_instance_t* uart = &g_manager.uarts[channel_idx];
@@ -139,6 +141,7 @@ bool uart_manager_process_incoming_data(void) {
     bool data_processed = false;
     
     for (channel_id_t channel_idx = CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++) {
+        if (!DEVICE_CHANNEL_AVAILABLE(channel_idx)) continue;
         if (!shared_memory_get_layout()->config.channels[channel_idx].enabled) continue;
         
         if (process_channel_incoming_data(channel_idx)) {
@@ -164,6 +167,7 @@ bool uart_manager_process_outgoing_data(void) {
     bool data_processed = false;
  
     for (channel_id_t channel_idx = CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++) {
+        if (!DEVICE_CHANNEL_AVAILABLE(channel_idx)) continue;
         if (!shared_memory_get_layout()->config.channels[channel_idx].enabled) continue;
         
         if (process_channel_outgoing_data(channel_idx)) {

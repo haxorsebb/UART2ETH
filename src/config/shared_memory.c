@@ -12,6 +12,7 @@
  */
 
 #include "shared_memory.h"
+#include "device_mode.h"
 #include "hardware/sync.h"
 #include <string.h>
 #include <stddef.h>  // For offsetof
@@ -93,25 +94,39 @@ bool shared_memory_init(void) {
         g_shared_memory->config.channels[channel_idx].enabled = false;
         g_shared_memory->config.channels[channel_idx].tcp_port = 4001+channel_idx;
     }
-    //channel specific config
-    g_shared_memory->config.channels[CHANNEL_0].tx_gpio = 0;
-    g_shared_memory->config.channels[CHANNEL_0].rx_gpio = 1;
+    
+    // Channel 0 (Debug) - always PL011
+    g_shared_memory->config.channels[CHANNEL_0].tx_gpio = DEVICE_UART0_TX_GPIO;
+    g_shared_memory->config.channels[CHANNEL_0].rx_gpio = DEVICE_UART0_RX_GPIO;
     g_shared_memory->config.channels[CHANNEL_0].type = UART_TYPE_PL011;
     
-    g_shared_memory->config.channels[CHANNEL_1].tx_gpio = 4;
-    g_shared_memory->config.channels[CHANNEL_1].rx_gpio = 5;
+    // Channel 1 - PL011
+    g_shared_memory->config.channels[CHANNEL_1].tx_gpio = DEVICE_UART1_TX_GPIO;
+    g_shared_memory->config.channels[CHANNEL_1].rx_gpio = DEVICE_UART1_RX_GPIO;
     g_shared_memory->config.channels[CHANNEL_1].type = UART_TYPE_PL011;
+#if DEVICE_CHANNEL_1_ENABLED
     g_shared_memory->config.channels[CHANNEL_1].enabled = true;
+#endif
     
-    g_shared_memory->config.channels[CHANNEL_2].tx_gpio = 14;
-    g_shared_memory->config.channels[CHANNEL_2].rx_gpio = 15;
+    // Channel 2 - PIO UART (disabled in SHARK mode)
+    g_shared_memory->config.channels[CHANNEL_2].tx_gpio = DEVICE_UART2_TX_GPIO;
+    g_shared_memory->config.channels[CHANNEL_2].rx_gpio = DEVICE_UART2_RX_GPIO;
     g_shared_memory->config.channels[CHANNEL_2].type = UART_TYPE_PIO;
+#if DEVICE_CHANNEL_2_ENABLED
     g_shared_memory->config.channels[CHANNEL_2].enabled = true;
+#endif
     
-    g_shared_memory->config.channels[CHANNEL_3].tx_gpio = 22;
-    g_shared_memory->config.channels[CHANNEL_3].rx_gpio = 23;
+    // Channel 3 - PIO UART (disabled in SHARK mode)
+    g_shared_memory->config.channels[CHANNEL_3].tx_gpio = DEVICE_UART3_TX_GPIO;
+    g_shared_memory->config.channels[CHANNEL_3].rx_gpio = DEVICE_UART3_RX_GPIO;
     g_shared_memory->config.channels[CHANNEL_3].type = UART_TYPE_PIO;
+#if DEVICE_CHANNEL_3_ENABLED
     g_shared_memory->config.channels[CHANNEL_3].enabled = true;
+#endif
+    
+    printf("Device mode: %s (channels: %d data, ethernet: %s)\n", 
+           DEVICE_MODE_NAME, DEVICE_NUM_DATA_CHANNELS, 
+           DEVICE_HAS_ETHERNET ? "yes" : "no");
     
     network_manager_get_default_config(&g_shared_memory->config.network);
     // Initialize system settings

@@ -11,6 +11,7 @@
  */
 
 #include "shared_memory.h"
+#include "device_mode.h"
 #include "log_manager.h"
 #include "pico/stdlib.h"
 #include "pico/bootrom.h"
@@ -136,6 +137,18 @@ bool flash_persistence_load_configuration(void) {
         
         // Clear runtime flags that should not be persisted
         layout->config_change_pending = false;  // This is a runtime flag, not config
+        
+        // Enforce device mode channel restrictions
+        // Disable channels that are not available in current device mode
+#if !DEVICE_CHANNEL_1_ENABLED
+        layout->config.channels[CHANNEL_1].enabled = false;
+#endif
+#if !DEVICE_CHANNEL_2_ENABLED
+        layout->config.channels[CHANNEL_2].enabled = false;
+#endif
+#if !DEVICE_CHANNEL_3_ENABLED
+        layout->config.channels[CHANNEL_3].enabled = false;
+#endif
         
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_LOADED, 
                   layout->revision_counter);

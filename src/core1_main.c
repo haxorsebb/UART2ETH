@@ -37,6 +37,7 @@
 #include "network/tcp_socket_server.h"
 #include "network/multi_tcp_server.h"
 #include "network/http_server.h"
+#include "device_mode.h"
 
 
 
@@ -612,7 +613,12 @@ static void core1_configuration_complete(void) {
         
         for(int channel_idx=CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++)
         {
-            // Channel 1: Standard UART1 on port 4002
+            // Skip channels not available in current device mode
+            if (!DEVICE_CHANNEL_AVAILABLE(channel_idx)) {
+                printf("Core1: Channel %d not available in %s mode, skipping\n", channel_idx, DEVICE_MODE_NAME);
+                continue;
+            }
+            
             channel_config_t channel_config = shared_memory_get_layout()->config.channels[channel_idx];
             if(channel_config.enabled)
             {
@@ -895,6 +901,12 @@ static void core1_apply_configuration_changes(void) {
     printf("Core1: Starting TCP servers for enabled channels\n");
     
     for (int ch = 1; ch <= 3; ch++) {
+        // Skip channels not available in current device mode
+        if (!DEVICE_CHANNEL_AVAILABLE(ch)) {
+            printf("Core1: Channel %d not available in %s mode, skipping\n", ch, DEVICE_MODE_NAME);
+            continue;
+        }
+        
         if (layout->config.channels[ch].enabled) {
             uint16_t tcp_port = layout->config.channels[ch].tcp_port;
             

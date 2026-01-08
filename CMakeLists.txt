@@ -24,6 +24,8 @@ set(PICO_BOARD uart2eth_board)
 #set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards)
 #set(PICO_BOARD pico2)
 
+# Set platform explicitly for RP2350 (required for uart2eth_board which inherits from pico2)
+set(PICO_PLATFORM rp2350)
 
 # Pull in SDK (must be before project)
 include(src/pico_sdk_import.cmake)
@@ -48,6 +50,30 @@ pico_sdk_init()
 
 # Debug build option (can be set with -DDEBUG=ON)
 option(DEBUG "Enable debug mode" OFF)
+
+# ====================================================================================
+# Device Mode Selection
+# ====================================================================================
+# To change the device mode, modify the line below:
+#   "SHARK"     - 2 UARTs (Channel 0 debug + Channel 1), ENC28J60 Ethernet
+#   "PRIMARY"   - 5 UARTs, ENC28J60 Ethernet + SPI link to SECONDARY (future)
+#   "SECONDARY" - 5 UARTs, SPI link to PRIMARY, no Ethernet (future)
+# ====================================================================================
+set(DEVICE_MODE "SHARK" CACHE STRING "Device mode: SHARK, PRIMARY, or SECONDARY")
+
+# Configure device mode
+if(DEVICE_MODE STREQUAL "SHARK")
+    message(STATUS "UART2ETH: Device mode = SHARK (2 UARTs, ENC28J60)")
+    add_compile_definitions(DEVICE_MODE_SHARK)
+elseif(DEVICE_MODE STREQUAL "PRIMARY")
+    message(STATUS "UART2ETH: Device mode = PRIMARY (5 UARTs, ENC28J60, SPI link)")
+    add_compile_definitions(DEVICE_MODE_PRIMARY)
+elseif(DEVICE_MODE STREQUAL "SECONDARY")
+    message(STATUS "UART2ETH: Device mode = SECONDARY (5 UARTs, SPI link)")
+    add_compile_definitions(DEVICE_MODE_SECONDARY)
+else()
+    message(FATAL_ERROR "Invalid DEVICE_MODE: ${DEVICE_MODE}. Must be SHARK, PRIMARY, or SECONDARY")
+endif()
 
 # Configure compiler flags based on debug mode
 if(DEBUG)
