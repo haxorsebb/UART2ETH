@@ -48,6 +48,7 @@ Apply on save: SYS.SAVE saves to flash AND immediately applies network/TCP serve
 
 #include "uart_config_protocol.h"
 #include "shared_memory.h"
+#include "network/enc28j60_driver.h"
 #include "network/network_manager.h"
 #include "hardware/watchdog.h"
 #include <string.h>
@@ -175,8 +176,8 @@ bool uart_config_process_command(channel_id_t channel, const uint8_t* data, size
         int count = 0;
         
         if (strcmp(prefix, "NET.") == 0) {
-            static const char* net_params[] = {"NET.DHCP", "NET.IP", "NET.MASK", "NET.GW", "NET.MAC"};
-            for (int i = 0; i < 5 && count < 20; i++) {
+            static const char* net_params[] = {"NET.DHCP", "NET.IP", "NET.MASK", "NET.GW", "NET.MAC", "NET.ETH"};
+            for (int i = 0; i < 6 && count < 20; i++) {
                 if (get_net_param(net_params[i] + 4, value_storage[count]) == CFG_ERR_OK) {
                     params[count] = net_params[i];
                     values[count] = value_storage[count];
@@ -390,6 +391,10 @@ static cfg_error_t get_net_param(const char* param, char* value) {
     }
     if (strcmp(param, "MAC") == 0) {
         format_mac_address(layout->config.network.mac_address, value);
+        return CFG_ERR_OK;
+    }
+    if (strcmp(param, "ETH") == 0) {
+        sprintf(value, "%d", enc28j60_is_ready() ? 1 : 0);
         return CFG_ERR_OK;
     }
     
