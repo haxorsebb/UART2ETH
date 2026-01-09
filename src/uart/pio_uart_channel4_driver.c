@@ -276,21 +276,25 @@ static size_t pio_uart_ch4_send_data(void* context, const uint8_t* data, size_t 
         return 0;
     }
     
-    printf("PIO CH4 TX: Sending %zu bytes to PIO%d SM%d\n", len,
-           ctx->pio_instance == pio0 ? 0 : (ctx->pio_instance == pio1 ? 1 : 2), ctx->tx_sm);
-    
-    // Use FIFO-based transfers
+    // Send all bytes, waiting for FIFO space as needed (like send_byte does)
     size_t sent = 0;
     for (size_t i = 0; i < len; i++) {
-        if (!pio_sm_is_tx_fifo_full(ctx->pio_instance, ctx->tx_sm)) {
+        // Wait for FIFO space with timeout
+        int timeout = 10000;  // ~10ms at tight loop speed
+        while (pio_sm_is_tx_fifo_full(ctx->pio_instance, ctx->tx_sm) && timeout-- > 0) {
+            tight_loop_contents();
+        }
+        
+        if (timeout > 0) {
             pio_sm_put(ctx->pio_instance, ctx->tx_sm, (uint32_t)data[i]);
             sent++;
             ctx->state.bytes_sent++;
         } else {
-            break;  // FIFO full, return partial send
+            // Timeout - FIFO stuck, abort
+            printf("PIO CH4 TX: FIFO timeout at byte %zu/%zu\n", i, len);
+            break;
         }
     }
-    printf("PIO CH4 TX: Sent %zu bytes\n", sent);
     return sent;
 }
 

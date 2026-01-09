@@ -472,30 +472,39 @@ static bool process_channel_incoming_data(channel_id_t channel) {
                     uint8_t response[CFG_MAX_RESPONSE];
                     size_t response_len = 0;
                     
-                    printf("UART_MGR: Ch%d processing config command\n", channel);
+                    printf("UART_MGR: Ch%d processing config command, entry=%p, status=%d\n", 
+                           channel, entry, entry->status);
                     
                     if (uart_config_process_command(channel, entry->payload, entry->fill_index,
                                                      response, &response_len)) {
                         // Send response back on the same UART channel
-                        printf("UART_MGR: Ch%d sending response len=%zu\n", channel, response_len);
+                        printf("UART_MGR: Ch%d config response='%.*s' len=%zu\n", 
+                               channel, (int)response_len, response, response_len);
                         if (response_len > 0 && uart->ops->send_data) {
-                            uart->ops->send_data(uart->driver_context, response, response_len);
+                            size_t sent = uart->ops->send_data(uart->driver_context, response, response_len);
+                            printf("UART_MGR: Ch%d response sent=%zu/%zu\n", channel, sent, response_len);
                         }
+                    } else {
+                        printf("UART_MGR: Ch%d config command processing FAILED\n", channel);
                     }
                     
                     // Don't forward config commands to TCP - just reset entry for reuse
+                    printf("UART_MGR: Ch%d resetting entry for reuse\n", channel);
                     memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
                     entry->fill_index = 0;
                 } else {
                     // Normal message - enqueue for TCP transmission
                     ringbuffer_enqueue_entry(entry);
                     entry = NULL; // CRITICAL FIX: Clear entry pointer to force new allocation
-                }
-                
-                // BUFFER PADDING FIX: Clear UART receive buffer after processing complete message
-                // This prevents old data from accumulating and causing buffer padding issues
-                if (uart->ops->clear_rx_buffer) {
-                    uart->ops->clear_rx_buffer(uart->driver_context);
+                    
+                    // BUFFER PADDING FIX: Clear UART receive buffer after processing complete message
+                    // This prevents old data from accumulating and causing buffer padding issues
+                    // NOTE: Only clear for normal messages, NOT after config commands!
+                    // Config commands send a response that will be echoed back via loopback
+                    // - we need to receive that echoed response to forward it to TCP
+                    if (uart->ops->clear_rx_buffer) {
+                        uart->ops->clear_rx_buffer(uart->driver_context);
+                    }
                 }
                 
                 // If there's more data to process, get a new entry immediately
