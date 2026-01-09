@@ -422,6 +422,15 @@ static bool process_channel_incoming_data(channel_id_t channel) {
     do {
         bytes_read = uart->ops->read_data(uart->driver_context, buffer, sizeof(buffer));
         
+        // DEBUG: Print incoming data as hex for UART1 (Channel 1)
+        if (bytes_read > 0 && channel == CHANNEL_1) {
+            printf("UART1 RX [%zu]: ", bytes_read);
+            for (size_t i = 0; i < bytes_read; i++) {
+                printf("%02X ", buffer[i]);
+            }
+            printf("\n");
+        }
+        
         if (bytes_read == 0) {
             // No data available right now
             if (entry && entry->fill_index > 0) {

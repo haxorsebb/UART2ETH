@@ -1544,6 +1544,9 @@ static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
  * @brief Get link status by reading PHY register (Arduino reference implementation)
  */
 bool enc28j60_get_link_status(void) {
+    static uint32_t last_print_time = 0;
+    static bool last_link_state = false;
+    
     if (!g_driver_initialized) {
         return false;
     }
@@ -1551,13 +1554,16 @@ bool enc28j60_get_link_status(void) {
     // Arduino reference: phyread(MACSTAT2) & 0x400
     uint16_t phstat2 = enc28j60_read_phy_register(ENC28J60_PHSTAT2);
     
-    
     // Check bit 10 (0x0400) - Link Status bit
     bool link_up = (phstat2 & ENC28J60_PHSTAT2_LSTAT) != 0;
     
-    //DEBUG_ONLY({ 
-        printf("ENC28J60: checking link state: %d\n", link_up); 
-    //});
+    // Only print on state change or every 5 seconds to reduce spam
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+    if (link_up != last_link_state || (now - last_print_time) > 5000) {
+        printf("ENC28J60: link state: %d (PHSTAT2=0x%04X)\n", link_up, phstat2);
+        last_print_time = now;
+        last_link_state = link_up;
+    }
     
     return link_up;
 }

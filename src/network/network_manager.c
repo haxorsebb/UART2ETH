@@ -637,6 +637,40 @@ bool network_manager_check_dhcp_status(void) {
         return false;
     }
     
+    // CRITICAL: Poll actual hardware link status and update netif
+    // This is needed when Ethernet is connected AFTER boot
+    static bool last_link_status = false;
+    bool current_link_status = enc28j60_get_link_status();
+    
+    if (current_link_status != last_link_status) {
+        printf("DHCP: Link status changed: %d -> %d\n", last_link_status, current_link_status);
+        last_link_status = current_link_status;
+        
+        if (current_link_status) {
+            // Link just came up - update netif and restart DHCP
+            netif_set_link_up(g_netif);
+            printf("DHCP: Link UP - restarting DHCP discovery\n");
+            
+            // Stop any existing DHCP and restart fresh
+            struct dhcp *dhcp = netif_dhcp_data(g_netif);
+            if (dhcp) {
+                dhcp_stop(g_netif);
+            }
+            dhcp_start(g_netif);
+            core1_timer_set(CORE1_TIMER_DHCP_DISCOVER, g_network_config.dhcp_timeout_ms);
+            g_network_stats.dhcp_requests++;
+        } else {
+            // Link went down
+            netif_set_link_down(g_netif);
+            printf("DHCP: Link DOWN\n");
+        }
+    }
+    
+    // If link is down, don't bother checking DHCP status
+    if (!current_link_status) {
+        return false;
+    }
+    
     // Process network interface (packet RX)
     lwip_netif_enc28j60_process();
     

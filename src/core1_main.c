@@ -459,23 +459,40 @@ static void core1_init_hardware(void) {
 }
 
 /**
- * @brief wait for the link to become available
+ * @brief wait for the link to become available (with timeout)
+ * 
+ * Waits for Ethernet link to come up, but proceeds after a timeout to allow
+ * UART processing to work even without network connectivity.
+ * Network will be configured later when link becomes available.
  */
 static void core1_wait_for_link_up(void) {
-
-    DEBUG_ONLY({
-        printf("WAINTING FOR LINK UP!");
-    });
+    static int link_wait_attempts = 0;
+    const int MAX_LINK_WAIT_ATTEMPTS = 15;  // 15 * 200ms = 3 seconds max wait
+    
     bool result = network_manager_is_link_up();
     
     if (result) {
+        printf("CORE1: Ethernet link UP - proceeding with network init\n");
+        link_wait_attempts = 0;  // Reset for future use
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_UP, 1);
-        // Generate network up event to move to next phase
         state_machine_process_core1_event(CORE1_EVENT_INIT_NET_LINK_UP);
     } else {
-        sleep_ms(200); //wait for link up
-        log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DOWN, 1);
-        state_machine_process_core1_event(CORE1_EVENT_INIT_NET_LINK_DOWN);                                        
+        link_wait_attempts++;
+        
+        if (link_wait_attempts >= MAX_LINK_WAIT_ATTEMPTS) {
+            // Timeout - proceed without link to allow UART to work
+            printf("CORE1: Ethernet link DOWN after %d attempts - proceeding anyway (UART will work)\n", 
+                   link_wait_attempts);
+            link_wait_attempts = 0;  // Reset for future use
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 1);
+            // Proceed to next phase even without link - network will be set up later
+            state_machine_process_core1_event(CORE1_EVENT_INIT_NET_LINK_UP);
+        } else {
+            printf("CORE1: Waiting for Ethernet link (%d/%d)...\n", link_wait_attempts, MAX_LINK_WAIT_ATTEMPTS);
+            sleep_ms(200);
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DOWN, 1);
+            state_machine_process_core1_event(CORE1_EVENT_INIT_NET_LINK_DOWN);
+        }
     }
 }
 
@@ -534,10 +551,17 @@ static void core1_load_configuration(void) {
  * @brief Wait for DHCP to complete and get IP address
  */
 static void core1_check_dhcp_status(void) {
+    static int dhcp_retry_count = 0;
+    const int MAX_DHCP_RETRIES = 3;  // After 3 DHCP timeouts, proceed without network
     
     DEBUG_ONLY({
         printf("CHECK IF DHCP IS COMPLETE!\n");
     });
+    
+    // Poll link status - this updates netif link state if cable was connected after boot
+    // This is critical when device boots without Ethernet and cable is connected later
+    network_manager_is_link_up();
+    
     network_manager_check_timeouts();
 
     // Check if DHCP has successfully bound an IP address
@@ -545,15 +569,41 @@ static void core1_check_dhcp_status(void) {
         DEBUG_ONLY({
             printf("DHCP successfully bound IP address\n");
         });
+        dhcp_retry_count = 0;  // Reset for future use
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 1);
         state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_GOT_DHCP);
         return;
     }
 
+    // Check if link is actually up before waiting for DHCP
+    bool link_up = network_manager_is_link_up();
+    if (!link_up) {
+        // No point waiting for DHCP if link is down
+        static uint32_t last_no_link_msg = 0;
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+        if (now - last_no_link_msg > 5000) {  // Print every 5 seconds
+            printf("CORE1: DHCP waiting but link is DOWN - connect Ethernet cable\n");
+            last_no_link_msg = now;
+        }
+        // Don't count this against DHCP retries - just wait for link
+        return;
+    }
+    
     if(core1_timer_is_expired(CORE1_TIMER_DHCP_DISCOVER)) {
-        DEBUG_ONLY({
-            printf("DHCP TIMEOUT, retry\n");
-        });
+        dhcp_retry_count++;
+        printf("CORE1: DHCP timer expired, retry %d/%d\n", dhcp_retry_count, MAX_DHCP_RETRIES);
+        
+        if (dhcp_retry_count >= MAX_DHCP_RETRIES) {
+            // Too many retries - proceed without network to allow UART to work
+            printf("CORE1: DHCP failed after %d retries - proceeding without network (UART will work)\n",
+                   dhcp_retry_count);
+            dhcp_retry_count = 0;  // Reset for future use
+            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 1);
+            // Proceed to OPERATIONAL state even without DHCP
+            state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
+            return;
+        }
+        
         state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT);
         return;
     }
