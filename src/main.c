@@ -45,59 +45,12 @@ void core1_entry() {
     // ABSOLUTE MINIMAL - no printf, no shared memory, no complex operations
     
     // Simple infinite loop with basic operations to test Core1 viability
-    volatile uint32_t core1_alive_counter = 0;
-    volatile bool core1_basic_test_passed = false;
-    
-    // Test 1: Basic arithmetic and memory access
-    for (volatile int i = 0; i < 1000; i++) {
-        core1_alive_counter++;
-    }
-    
-    // Test 2: Simple GPIO toggle for oscilloscope (GPIO 21)
-    // Note: This might conflict with Core0, but it's a simple test
-    gpio_init(21);
-    gpio_set_dir(21, GPIO_OUT);
-    
-    // Test 3: Basic timer access  
-    absolute_time_t start_time = get_absolute_time();
-    (void)start_time;  // Suppress unused variable warning
-    
-    // If we reach here, basic Core1 functionality works
-    core1_basic_test_passed = true;
-    
-    // Simple toggle pattern for oscilloscope to indicate Core1 is alive
-    while (true) {
-        gpio_put(21, 1);
-        busy_wait_us(100000);  // 100ms - using busy wait instead of sleep_ms
-        gpio_put(21, 0);
-        busy_wait_us(100000);  // 100ms
-        
-        core1_alive_counter++;
-        
-        // After basic tests pass, try to enable printf
-        if (core1_basic_test_passed && (core1_alive_counter % 10 == 0)) {
-            // Try printf only after basic operations prove stable
-            printf("DEBUG: Core1 alive counter: %u\n", core1_alive_counter);
-            
-            // If printf works, try more complex operations
-            if (core1_alive_counter > 50) {
-                printf("DEBUG: Core1 basic tests passed, attempting core1_main()\n");
-                break;  // Exit to try core1_main()
-            }
-        }
-    }
-    
-    // Only call core1_main() if basic tests pass
-    if (core1_basic_test_passed) {
-        core1_main();
-    }
+    // Launch Core1 main function directly
+    core1_main();
     
     // Should never reach here
     while (true) {
-        gpio_put(21, 1);
-        busy_wait_us(1000000);  // 1 second
-        gpio_put(21, 0);
-        busy_wait_us(1000000);  // 1 second - error pattern: slow toggle
+        busy_wait_us(1000000);  // 1 second - error state
     }
 }
 
@@ -116,6 +69,10 @@ int main() {
 
 
     stdio_uart_init_full(uart0, 115200, 16, 17);
+    
+    // Configure GPIO21 to output 25 MHz clock for ENC28J60
+    float clk_div = (float)clock_get_hz(clk_sys) / 25000000.0f;
+    clock_gpio_init(21, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, clk_div);
     
     // Wait for USB-serial connection for debugging
     sleep_ms(2000);
