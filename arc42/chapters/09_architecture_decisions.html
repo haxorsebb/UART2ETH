@@ -213,11 +213,11 @@
     <li class="nav-item mr-4 mb-2 mb-lg-0"><!--img src="../../images/status.png" alt="status" width="16" height="16" onerror="this.style.display='none'"--></li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link " href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
+                <a class="nav-link active" href="../../arc42/chapters/00_architecture_communication_canvas.html"><span>arc42</span></a>
             </li>
 
             <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link active" href="../../arc42/chapters/00_architecture_communication_canvas.html"><span>arc42</span></a>
+                <a class="nav-link " href="../../arc42/adrs/ADR-001-microcontroller-selection.html"><span>adrs</span></a>
             </li>
 
         </ul>
@@ -441,6 +441,9 @@
 </li>
 <li>
 <p><a href="../adrs/ADR-012-core0-ringbuffer-separation.html">ADR-012: Core0 Ringbuffer Processing Separation</a> - Documents the decision to separate ring buffer processing responsibilities between cores, with Core0 handling TCP-to-UART direction and Core1 managing UART-to-TCP message flow.</p>
+</li>
+<li>
+<p><a href="../adrs/ADR-013-pio-uart-implementation.html">ADR-013: PIO UART Implementation for Channel 2</a> - Documents the decision to implement Channel 2 UART functionality using RP2350 PIO hardware with DMA integration, following the full-featured approach with robust error handling and seamless UART Manager integration.</p>
 </li>
 </ul>
 </div>

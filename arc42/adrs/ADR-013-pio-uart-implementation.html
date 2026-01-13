@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-007-state-machine-architecture.html -->
+    <!-- sourceuri: arc42/adrs/ADR-013-pio-uart-implementation.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-007: State Machine Architecture for UART2ETH</title>
+    <title>ADR-013: PIO UART Implementation for Channel 2</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -292,7 +292,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/adrs/ADR-007-state-machine-architecture.html" title="ADR-007: State Machine Architecture for UART2ETH">ADR-007: State Machine Architecture for UART2ETH</a>
                                 
                             </li>
@@ -322,7 +322,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../../arc42/adrs/ADR-013-pio-uart-implementation.html" title="ADR-013: PIO UART Implementation for Channel 2">ADR-013: PIO UART Implementation for Channel 2</a>
                                 
                             </li>
@@ -338,11 +338,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-007-state-machine-architecture.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-013-pio-uart-implementation.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-007-state-machine-architecture.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-013%3A+PIO+UART+Implementation+for+Channel+2%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-013-pio-uart-implementation.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -351,37 +351,18 @@
 
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
-<ul class="sectlevel0">
-<li><a href="#_adr_007_event_driven_state_machine_architecture">ADR-007: Event-Driven State Machine Architecture</a>
 <ul class="sectlevel1">
-<li><a href="#_status">Status</a></li>
-<li><a href="#_date">Date</a></li>
-<li><a href="#_context">Context</a></li>
-<li><a href="#_decision">Decision</a>
+<li><a href="#_adr_013_pio_uart_implementation_for_channel_2">ADR-013: PIO UART Implementation for Channel 2</a>
 <ul class="sectlevel2">
-<li><a href="#_event_driven_state_machine_architecture">Event-Driven State Machine Architecture</a></li>
-<li><a href="#_state_definitions">State Definitions</a></li>
-<li><a href="#_event_driven_interface_design">Event-Driven Interface Design</a></li>
-<li><a href="#_concurrency_and_safety_model">Concurrency and Safety Model</a></li>
-<li><a href="#_core_main_loop_architecture">Core Main Loop Architecture</a></li>
-<li><a href="#_complex_state_transition_examples">Complex State Transition Examples</a></li>
-<li><a href="#_condition_checking_functions">Condition Checking Functions</a></li>
-</ul>
-</li>
-<li><a href="#_rationale">Rationale</a>
-<ul class="sectlevel2">
-<li><a href="#_advantages">Advantages</a></li>
-<li><a href="#_implementation_strategy">Implementation Strategy</a></li>
-</ul>
-</li>
-<li><a href="#_consequences">Consequences</a>
-<ul class="sectlevel2">
-<li><a href="#_positive">Positive</a></li>
-<li><a href="#_negative">Negative</a></li>
-<li><a href="#_implementation_requirements">Implementation Requirements</a></li>
-</ul>
-</li>
-<li><a href="#_updated_state_machine_diagrams">Updated State Machine Diagrams</a></li>
+<li><a href="#_decision">Decision</a></li>
+<li><a href="#_implementation_architecture">Implementation Architecture</a></li>
+<li><a href="#_technical_specifications">Technical Specifications</a></li>
+<li><a href="#_testing_strategy">Testing Strategy</a></li>
+<li><a href="#_rationale">Rationale</a></li>
+<li><a href="#_consequences">Consequences</a></li>
+<li><a href="#_implementation_dependencies">Implementation Dependencies</a></li>
+<li><a href="#_future_extensions">Future Extensions</a></li>
+<li><a href="#_references">References</a></li>
 </ul>
 </li>
 </ul>
@@ -406,533 +387,404 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_007_event_driven_state_machine_architecture" class="sect0">ADR-007: Event-Driven State Machine Architecture</h1>
 <div class="sect1">
-<h2 id="_status">Status</h2>
+<h2 id="_adr_013_pio_uart_implementation_for_channel_2">ADR-013: PIO UART Implementation for Channel 2</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Decided and Implemented</p>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_date">Date</h2>
-<div class="sectionbody">
-<div class="paragraph">
-<p>2024-01-16 (Updated: 2025-08-16)</p>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_context">Context</h2>
-<div class="sectionbody">
-<div class="paragraph">
-<p>The UART2ETH system requires coordinated dual-core operation with predictable behavior across system initialization, configuration loading, normal operation, error conditions, and recovery procedures. The system needs sophisticated state coordination between Core0 (UART processing) and Core1 (network, persistence, and maintenance) while maintaining deterministic behavior and avoiding race conditions.</p>
+<p><strong>Status:</strong> Accepted</p>
 </div>
 <div class="paragraph">
-<p>Key requirements:
-* <strong>Dual-core state coordination</strong> with atomic main state synchronization using doorbells
-* <strong>Complex initialization sequences</strong> with persistence, logging, and network hardware setup
-* <strong>Configuration phase</strong> with UART setup and DHCP network configuration
-* <strong>Runtime state management</strong> for UART processing and network operations
-* <strong>Event-driven state transitions</strong> with condition validation (no direct state manipulation)
-* <strong>ISR-safe operations</strong> for core-specific sub-states with atomic variables
-* <strong>Cross-core wakeup</strong> using RP2350 multicore doorbells
-* <strong>Comprehensive error handling</strong> with recovery and fallback mechanisms</p>
+<p><strong>Date:</strong> 2025-08-28</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_decision">Decision</h2>
-<div class="sectionbody">
 <div class="paragraph">
-<p>We implement <strong>three independent event-driven state machines</strong> with <strong>atomic main state</strong> and <strong>ISR-safe sub-states</strong> using the following architecture:</p>
+<p><strong>Context:</strong> The UART2ETH system requires implementation of Channel 2 UART functionality using RP2350 PIO (Programmable I/O) hardware to extend beyond the two hardware UART peripherals. Channel 2 must provide equivalent functionality to hardware UARTs while integrating seamlessly with the existing UART Manager architecture.</p>
 </div>
 <div class="sect2">
-<h3 id="_event_driven_state_machine_architecture">Event-Driven State Machine Architecture</h3>
+<h3 id="_decision">Decision</h3>
 <div class="paragraph">
-<p><strong>Three Independent State Machines:</strong>
-* <strong>Main State Machine</strong>: Global system coordination (atomic, cross-core)
-* <strong>Core0 Sub-State Machine</strong>: UART-specific operations (ISR-safe, Core0-only)
-* <strong>Core1 Sub-State Machine</strong>: Network and maintenance operations (ISR-safe, Core1-only)</p>
+<p>We will implement a full-featured PIO UART driver for Channel 2 using the following approach:</p>
 </div>
-<div class="paragraph">
-<p><strong>Event-Driven Pattern Only:</strong>
-* <strong>No Direct State Setting</strong>: State machines only accept events, never direct state manipulation
-* <strong>Transition Function</strong>: <code>current_state + event + check_condition() → new_state</code>
-* <strong>Validation Required</strong>: All transitions must pass condition checks
-* <strong>Event Processing</strong>: Single interface for each state machine</p>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>PIO Resource Allocation</strong>: Use PIO0 with two state machines (SM0 for TX, SM1 for RX)</p>
+</li>
+<li>
+<p><strong>Pin Assignment</strong>: GP14 (TX) and GP15 (RX) as documented in ADR-008</p>
+</li>
+<li>
+<p><strong>Implementation Pattern</strong>: Follow the existing <code>uart_interface_t</code> pattern from PL011 driver</p>
+</li>
+<li>
+<p><strong>DMA Integration</strong>: Implement DMA transfers following the uart_dma reference example</p>
+</li>
+<li>
+<p><strong>Interrupt Handling</strong>: Use the same interrupt handling pattern as PL011 driver, adapted for PIO</p>
+</li>
+<li>
+<p><strong>Error Handling</strong>: Implement robust error detection and recovery using PIO error reporting features</p>
+</li>
+</ol>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_state_definitions">State Definitions</h3>
-<div class="paragraph">
-<p><strong>Main States (shared between cores, atomic access):</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    MAIN_STATE_INIT = 0,           // System initialization and hardware setup
-    MAIN_STATE_CONFIGURATION = 1,  // Configuration loading and validation
-    MAIN_STATE_OPERATIONAL = 2,    // Normal operation mode
-    MAIN_STATE_ERROR = 3           // Error state requiring recovery
-} main_state_t;</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p><strong>Core0 Sub-States (UART processing, ISR-safe):</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    // Initialization sequence
-    CORE0_INIT_UART,        // Initializing UART hardware
-    CORE0_INIT_COMPLETE,    // UART init complete, signaling main state
-    CORE0_INIT_IDLE,        // Waiting for other core during init
-    CORE0_INIT_ERROR,       // UART initialization failed
-
-    // Configuration sequence
-    CORE0_CONFIG_UART,      // Configure UARTS
-    CORE0_CONFIG_COMPLETE,  // Reconfiguration successful
-    CORE0_CONFIG_IDLE,      // Reconfiguration successful, waiting
-    CORE0_CONFIG_ERROR,     // Reconfiguration NOT successful
-
-    // Operational states
-    CORE0_UART_IDLE,        // No active UART operations
-    CORE0_UART_ACTIVE,      // Processing UART data
-    CORE0_UART_ERROR        // UART hardware error state
-} core0_substate_t;</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p><strong>Core1 Sub-States (Network and maintenance, ISR-safe):</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    // Initialization sequence
-    CORE1_INIT_PERISTENCE,      // Init persistence
-    CORE1_INIT_LOGGING,         // Init logging
-    CORE1_INIT_NET,             // Init net
-    CORE1_INIT_WAIT_FOR_LINK,   // Init is not complete without link
-    CORE1_INIT_COMPLETE,        // Init complete
-    CORE1_INIT_IDLE,            // Init complete, sleep until other core finishes init
-
-    // Configuration sequence with DHCP
-    CORE1_CONFIG_NET,           // (re)-configure net
-    CORE1_CONFIG_COMPLETE,      // (re)-configuration of net successfull
-    CORE1_CONFIG_NET_WAIT_FOR_DHCP, // (re)-configuration of net successfull, get dhcp
-    CORE1_CONFIG_NET_CHECK_DHCP, // (re)-configuration of net successfull, check if we got dhcp
-    CORE1_CONFIG_IDLE,          // (re)-configuration of net successfull
-    CORE1_CONFIG_LOG_ACTIVE,    // There are logs queued during config
-    CORE1_CONFIG_ERROR,         // (re)-configuration of net NOT successfull
-
-    // Operational states
-    CORE1_NET_LINK_CHANGE,      // Network interface changing
-    CORE1_NET_CONNECTED,        // Network interface up
-    CORE1_NET_DISCONNECTED,     // Network interface down
-    CORE1_NET_IDLE,             // Network interface up, no connections
-    CORE1_NET_ACTIVE_RECEIVE,   // Active network connections receiving
-    CORE1_NET_ACTIVE_SEND,      // Active network connections sending
-    CORE1_PERSISTENCE_ACTIVE,   // Flash persistence operation active
-    CORE1_LOG_ACTIVE,           // Log processing active
-    CORE1_IDLE,                 // Idle, may sleep here or schedule new work
-
-    // Error states
-    CORE1_INIT_ERROR,           // Unrecoverable init error
-    CORE1_SHUTDOWN              // Stop main loop
-} core1_substate_t;</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_event_driven_interface_design">Event-Driven Interface Design</h3>
-<div class="paragraph">
-<p><strong>Core State Machine Interface:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Event processing functions (the ONLY way to change states)
-bool state_machine_process_main_event(main_state_event_t event);
-bool state_machine_process_core0_event(core0_event_t event);
-bool state_machine_process_core1_event(core1_event_t event);
-
-// State queries (read-only, non-blocking)
-main_state_t state_machine_get_main_state(void);
-core0_substate_t state_machine_get_core0_substate(void);
-core1_substate_t state_machine_get_core1_substate(void);</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p><strong>Main State Events:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    MAIN_EVENT_INIT_COMPLETE_CORE0,     // UART initialized
-    MAIN_EVENT_INIT_COMPLETE_CORE1,     // Network interface initialized
-    MAIN_EVENT_CONFIG_COMPLETE_CORE0,   // Configuration loaded and validated
-    MAIN_EVENT_CONFIG_COMPLETE_CORE1,   // Configuration loaded and validated
-    MAIN_EVENT_SYSTEM_ERROR,       // System error detected
-    MAIN_EVENT_ERROR_RECOVERED     // Recovery from error state complete
-} main_state_event_t;</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p><strong>Core0 Events:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    CORE0_EVENT_INIT_UART_COMPLETE,     // UART initialized
-    CORE0_EVENT_INIT_UART_FAILED,       // UART could not be initialized
-    CORE0_EVENT_CONFIG_UART_COMPLETE,   // UART reconfigured successfully
-    CORE0_EVENT_CONFIG_UART_FAILED,     // UART reconfiguration failed
-    CORE0_EVENT_UART_DATA_READY,        // UART data available for processing
-    CORE0_EVENT_UART_IDLE,              // UART processing completed
-    CORE0_EVENT_UART_ERROR,             // UART hardware error detected
-    CORE0_EVENT_ERROR_RECOVERED,        // UART error recovery complete
-    CORE0_EVENT_AUTO_TRANSITION         // Dummy event for auto-state transition
-} core0_event_t;</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p><strong>Core1 Events (extensive network and maintenance events):</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    // Initialization events
-    CORE1_EVENT_INIT_PERSISTENCE_COMPLETE,
-    CORE1_EVENT_INIT_PERSISTENCE_FAILED,
-    CORE1_EVENT_INIT_LOGGING_COMPLETE,
-    CORE1_EVENT_INIT_LOGGING_FAILED,
-    CORE1_EVENT_INIT_NET_WAIT_FOR_LINK_UP,
-    CORE1_EVENT_INIT_NET_LINK_UP,
-    CORE1_EVENT_INIT_NET_LINK_DOWN,
-    CORE1_EVENT_INIT_NET_COMPLETE,
-    CORE1_EVENT_INIT_NET_FAILED,
-
-    // Configuration events with DHCP handling
-    CORE1_EVENT_CONFIG_NET_DHCP_REQUEST,
-    CORE1_EVENT_CONFIG_NET_GOT_DHCP,
-    CORE1_EVENT_CONFIG_NET_WAIT_DHCP,
-    CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT,
-    CORE1_EVENT_CONFIG_NET_COMPLETE,
-    CORE1_EVENT_CONFIG_NET_FAILED,
-
-    // Network operational events
-    CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE,
-    CORE1_EVENT_NETWORK_LINK_UP,
-    CORE1_EVENT_NETWORK_LINK_DOWN,
-    CORE1_EVENT_NETWORK_RECEIVE_ACTIVE,
-    CORE1_EVENT_NETWORK_RECEIVE_FINISHED,
-    CORE1_EVENT_NETWORK_SENDING_ACTIVE,
-    CORE1_EVENT_NETWORK_SENDING_FINISHED,
-    CORE1_EVENT_NETWORK_UP,
-    CORE1_EVENT_NETWORK_DOWN,
-    CORE1_EVENT_CONNECTION_ACTIVE,
-    CORE1_EVENT_CONNECTION_IDLE,
-
-    // Maintenance events
-    CORE1_EVENT_PERSISTENCE_START,
-    CORE1_EVENT_PERSISTENCE_END,
-    CORE1_EVENT_LOG_START,
-    CORE1_EVENT_LOG_END,
-    CORE1_EVENT_AUTO_TRANSITION
-} core1_event_t;</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_concurrency_and_safety_model">Concurrency and Safety Model</h3>
-<div class="paragraph">
-<p><strong>Main State Machine:</strong>
-* <strong>Atomic Operations</strong>: Uses <code>_Atomic</code> variables for state transitions
-* <strong>Cross-Core Access</strong>: Both cores can send events, both can read state
-* <strong>Doorbell Synchronization</strong>: RP2350 multicore doorbells wake other core on main state changes
-* <strong>Memory Barriers</strong>: Proper barriers ensure cache coherency</p>
-</div>
-<div class="paragraph">
-<p><strong>Sub-State Machines:</strong>
-* <strong>ISR-Safe</strong>: Compatible with interrupt service routines using <code>_Atomic</code> variables
-* <strong>Single-Core Ownership</strong>: Core0 owns Core0 sub-state, Core1 owns Core1 sub-state
-* <strong>No Cross-Core Locking</strong>: No mutexes required for sub-states
-* <strong>Atomic Variables</strong>: Use <code>_Atomic</code> variables for ISR safety</p>
-</div>
-<div class="paragraph">
-<p><strong>Doorbell Implementation:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">extern int doorbell_core0_wakes_core1;
-extern int doorbell_core1_wakes_core0;
-
-static void wake_other_core_after_main_state_change(main_state_t new_state) {
-    // Wake the other core
-    multicore_doorbell_set_other_core(doorbell_core0_wakes_core1);
-    multicore_doorbell_set_other_core(doorbell_core1_wakes_core0);
-}</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_core_main_loop_architecture">Core Main Loop Architecture</h3>
-<div class="paragraph">
-<p><strong>Dual-Core Launch</strong>: <code>main.c</code> launches both cores with dedicated entry points
-<strong>Core-Specific Modules</strong>: <code>core0_main.c</code> and <code>core1_main.c</code> with dedicated main functions
-<strong>State-Driven Logic</strong>: Core main loops query states and send events to control behavior
-<strong>Non-Blocking Queries</strong>: State access never blocks core operations</p>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_complex_state_transition_examples">Complex State Transition Examples</h3>
-<div class="paragraph">
-<p><strong>Initialization Sequence:</strong>
-1. Main state starts in <code>MAIN_STATE_INIT</code>
-2. Core0: <code>CORE0_INIT_UART</code> → <code>CORE0_INIT_COMPLETE</code> → <code>CORE0_INIT_IDLE</code>
-3. Core1: <code>CORE1_INIT_PERISTENCE</code> → <code>CORE1_INIT_LOGGING</code> → <code>CORE1_INIT_NET</code> → <code>CORE1_INIT_WAIT_FOR_LINK</code> → <code>CORE1_INIT_COMPLETE</code> → <code>CORE1_INIT_IDLE</code>
-4. When both cores reach IDLE, main state transitions to <code>MAIN_STATE_CONFIGURATION</code></p>
-</div>
-<div class="paragraph">
-<p><strong>Configuration Sequence:</strong>
-1. Main state: <code>MAIN_STATE_CONFIGURATION</code>
-2. Core0: <code>CORE0_CONFIG_UART</code> → <code>CORE0_CONFIG_COMPLETE</code> → <code>CORE0_CONFIG_IDLE</code>
-3. Core1: <code>CORE1_CONFIG_NET</code> → <code>CORE1_CONFIG_NET_WAIT_FOR_DHCP</code> → <code>CORE1_CONFIG_NET_CHECK_DHCP</code> → <code>CORE1_CONFIG_COMPLETE</code> → <code>CORE1_CONFIG_IDLE</code>
-4. When both cores reach IDLE, main state transitions to <code>MAIN_STATE_OPERATIONAL</code></p>
-</div>
-<div class="paragraph">
-<p><strong>DHCP Configuration Handling:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Complex DHCP state handling in Core1
-case CORE1_CONFIG_NET_WAIT_FOR_DHCP:
-    switch (event) {
-        case CORE1_EVENT_NETWORK_RECEIVE_ACTIVE:
-            new_state = CORE1_CONFIG_NET_CHECK_DHCP;
-            break;
-        case CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT:
-            new_state = CORE1_CONFIG_NET; // Retry
-            break;
-        case CORE1_EVENT_LOG_START:
-            new_state = CORE1_CONFIG_LOG_ACTIVE; // Handle logs during DHCP
-            break;
-    }
-    break;</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_condition_checking_functions">Condition Checking Functions</h3>
-<div class="paragraph">
-<p><strong>Cross-Core Coordination Conditions:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Checks if Core0 can trigger main state transition from INIT to CONFIGURATION
-static bool check_core0_initialization_complete(void) {
-    return atomic_load(&amp;g_initialized) &amp;&amp;
-           atomic_load(&amp;g_main_state) == MAIN_STATE_INIT &amp;&amp;
-           (atomic_load(&amp;g_core1_substate) == CORE1_INIT_IDLE) &amp;&amp;
-           (atomic_load(&amp;g_core0_substate) == CORE0_INIT_COMPLETE ||
-            atomic_load(&amp;g_core0_substate) == CORE0_INIT_IDLE);
-}
-
-// Checks if Core1 can trigger main state transition from CONFIGURATION to OPERATIONAL
-static bool check_core1_configuration_complete(void) {
-    return atomic_load(&amp;g_initialized) &amp;&amp;
-           atomic_load(&amp;g_main_state) == MAIN_STATE_CONFIGURATION &amp;&amp;
-           (atomic_load(&amp;g_core1_substate) == CORE1_CONFIG_COMPLETE ||
-            atomic_load(&amp;g_core1_substate) == CORE1_CONFIG_IDLE) &amp;&amp;
-           (atomic_load(&amp;g_core0_substate) == CORE0_CONFIG_IDLE);
-}</code></pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_rationale">Rationale</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_advantages">Advantages</h3>
+<h3 id="_implementation_architecture">Implementation Architecture</h3>
+<div class="sect3">
+<h4 id="_pio_program_selection">PIO Program Selection</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Deterministic Behavior</strong>: Complex state sequences ensure predictable system behavior</p>
+<p><strong>TX Program</strong>: Use <code>uart_tx</code> program from pico-examples for reliable transmission</p>
 </li>
 <li>
-<p><strong>Robust Initialization</strong>: Multi-stage initialization prevents race conditions</p>
+<p><strong>RX Program</strong>: Use <code>uart_rx</code> program with built-in framing error detection and break condition handling</p>
 </li>
 <li>
-<p><strong>DHCP Integration</strong>: Sophisticated network configuration with timeout handling</p>
-</li>
-<li>
-<p><strong>Cross-Core Coordination</strong>: Atomic main state with doorbell wakeup ensures synchronization</p>
-</li>
-<li>
-<p><strong>ISR Compatibility</strong>: Sub-state machines safe for interrupt context</p>
-</li>
-<li>
-<p><strong>Error Recovery</strong>: Comprehensive error handling at each stage</p>
-</li>
-<li>
-<p><strong>Testability</strong>: Event processing and condition functions can be unit tested independently</p>
-</li>
-<li>
-<p><strong>Maintainability</strong>: Clear event definitions make system behavior easier to understand</p>
-</li>
-<li>
-<p><strong>Performance</strong>: Non-blocking state queries and lock-free sub-states</p>
+<p><strong>Baud Rate</strong>: Support 230400 baud as required for testing, with configurable rates</p>
 </li>
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_implementation_strategy">Implementation Strategy</h3>
-<div class="paragraph">
-<p><strong>Memory Layout:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// State variables with proper synchronization
-static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;
-static _Atomic core0_substate_t g_core0_substate = CORE0_INIT_UART;
-static _Atomic core1_substate_t g_core1_substate = CORE1_INIT_PERISTENCE;
-
-// Initialization flag
-_Atomic bool g_initialized = false;</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p><strong>Event Processing Pattern:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">bool state_machine_process_main_event(main_state_event_t event) {
-    main_state_t current_state = atomic_load(&amp;g_main_state);
-    main_state_t new_state = current_state;  // Default: no change
-
-    // State + Event + Condition → New State
-    switch (current_state) {
-        case MAIN_STATE_INIT:
-            switch (event) {
-                case MAIN_EVENT_INIT_COMPLETE_CORE0:
-                    if (check_core0_initialization_complete()) {
-                        new_state = MAIN_STATE_CONFIGURATION;
-                        // Also update substates for next phase
-                        atomic_store(&amp;g_core0_substate, CORE0_CONFIG_UART);
-                        atomic_store(&amp;g_core1_substate, CORE1_CONFIG_NET);
-                    }
-                    break;
-            }
-            break;
-    }
-
-    // Apply state change if needed
-    if (new_state != current_state) {
-        atomic_store(&amp;g_main_state, new_state);
-        wake_other_core_after_main_state_change(new_state);
-    }
-
-    return true;
-}</code></pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_consequences">Consequences</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_positive">Positive</h3>
+<div class="sect3">
+<h4 id="_memory_and_buffering_strategy">Memory and Buffering Strategy</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Impossible Invalid States</strong>: Event-driven pattern prevents invalid state transitions</p>
+<p><strong>Receive Buffer</strong>: Implement ring buffer similar to PL011 driver for consistency</p>
 </li>
 <li>
-<p><strong>Complex Coordination</strong>: Handles sophisticated dual-core initialization and configuration</p>
+<p><strong>DMA Buffers</strong>: Allocate separate TX/RX DMA buffers for efficient data transfer</p>
 </li>
 <li>
-<p><strong>DHCP Integration</strong>: Robust network configuration with proper timeout handling</p>
-</li>
-<li>
-<p><strong>Cross-Core Synchronization</strong>: Doorbell-based wakeup ensures efficient coordination</p>
-</li>
-<li>
-<p><strong>ISR-Safe Operations</strong>: Sub-state machines work correctly in interrupt context</p>
-</li>
-<li>
-<p><strong>Comprehensive Error Handling</strong>: Error states and recovery at each stage</p>
-</li>
-<li>
-<p><strong>Maintainability</strong>: Clear state diagrams show system behavior</p>
-</li>
-<li>
-<p><strong>Testability</strong>: Each state transition can be unit tested independently</p>
+<p><strong>Buffer Sizes</strong>: Match PL011 buffer sizes for consistent behavior</p>
 </li>
 </ul>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_negative">Negative</h3>
+<div class="sect3">
+<h4 id="_integration_points">Integration Points</h4>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Implementation Complexity</strong>: Large number of states and transitions</p>
+<p><strong>UART Manager</strong>: Register via <code>pio_uart_interface</code> and channel configuration</p>
 </li>
 <li>
-<p><strong>Memory Overhead</strong>: Event processing and condition functions for all transitions</p>
+<p><strong>Ring Buffer System</strong>: Full integration with existing TCP↔UART message bridge</p>
 </li>
 <li>
-<p><strong>Development Time</strong>: Must design proper events and conditions for each transition</p>
+<p><strong>State Machine</strong>: Integrate with Core0 UART subsystem states</p>
 </li>
 <li>
-<p><strong>Learning Curve</strong>: Developers must understand complex state machine interactions</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_implementation_requirements">Implementation Requirements</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Event-driven state machine module with atomic operations and ISR-safe sub-states</p>
-</li>
-<li>
-<p>Core0 main function with UART processing and complex initialization sequence</p>
-</li>
-<li>
-<p>Core1 main function with network, persistence, DHCP handling, and log processing</p>
-</li>
-<li>
-<p>Doorbell-based cross-core synchronization for main state changes</p>
-</li>
-<li>
-<p>Comprehensive condition checking functions for state transition validation</p>
-</li>
-<li>
-<p>Integration with existing shared memory, logging, and persistence systems</p>
+<p><strong>TCP Port</strong>: Expose as port 4003 for network connectivity</p>
 </li>
 </ul>
 </div>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="_updated_state_machine_diagrams">Updated State Machine Diagrams</h2>
-<div class="sectionbody">
-<div class="imageblock">
+<div class="sect2">
+<h3 id="_technical_specifications">Technical Specifications</h3>
+<div class="sect3">
+<h4 id="_pio_configuration">PIO Configuration</h4>
+<div class="listingblock">
 <div class="content">
-<img src="../../images/state-machine-overview.svg" alt="state machine overview" width="3073" height="1723">
+<pre class="prettyprint highlight"><code data-lang="c">// PIO0 State Machine allocation
+#define PIO_UART_PIO_INSTANCE    pio0
+#define PIO_UART_TX_SM          0      // State machine 0 for TX
+#define PIO_UART_RX_SM          1      // State machine 1 for RX
+#define PIO_UART_DEFAULT_BAUD   230400 // Default test baud rate
+
+// GPIO Pin Configuration
+#define PIO_UART_TX_GPIO        14     // As per ADR-008
+#define PIO_UART_RX_GPIO        15     // As per ADR-008</code></pre>
 </div>
 </div>
+</div>
+<div class="sect3">
+<h4 id="_dma_channel_allocation">DMA Channel Allocation</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>TX DMA Channel</strong>: Dynamically allocated channel for transmit operations</p>
+</li>
+<li>
+<p><strong>RX DMA Channel</strong>: Dynamically allocated channel for receive operations</p>
+</li>
+<li>
+<p><strong>Interrupt Priority</strong>: Follow existing DMA interrupt priority scheme</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_interface_implementation">Interface Implementation</h4>
 <div class="paragraph">
-<p>This updated ADR-007 now accurately reflects the actual implemented state machine architecture with its complex initialization sequences, DHCP handling, and sophisticated cross-core coordination.</p>
+<p>The PIO UART driver implements the complete <code>uart_interface_t</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct pio_uart_context {
+    // PIO hardware references
+    PIO pio_instance;
+    uint tx_sm;
+    uint rx_sm;
+    uint tx_offset;
+    uint rx_offset;
+
+    // DMA channels
+    uint tx_dma_chan;
+    uint rx_dma_chan;
+
+    // Buffers
+    uart_receive_buffer_t rx_ring;
+    uint8_t rx_buffer[RX_BUFFER_SIZE];
+
+    // State tracking
+    uart_state_t state;
+    uart_config_t current_config;
+} pio_uart_context_t;</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_testing_strategy">Testing Strategy</h3>
+<div class="sect3">
+<h4 id="_unit_tests">Unit Tests</h4>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>Hardware Configuration</strong>: Verify PIO state machine setup and GPIO configuration</p>
+</li>
+<li>
+<p><strong>Loopback Testing</strong>: Hardware loopback with GP14↔GP15 connection</p>
+</li>
+<li>
+<p><strong>Message Processing</strong>: Single line and multi-line message transmission</p>
+</li>
+<li>
+<p><strong>DMA Operations</strong>: Verify DMA transfer completion and error handling</p>
+</li>
+<li>
+<p><strong>Integration Testing</strong>: Ring buffer integration and TCP echo functionality</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_integration_tests">Integration Tests</h4>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><strong>TCP Connectivity</strong>: Port 4002 accepts connections and processes messages</p>
+</li>
+<li>
+<p><strong>Echo Functionality</strong>: Messages sent to port 4002 echo back correctly</p>
+</li>
+<li>
+<p><strong>Performance Testing</strong>: Verify 230400 baud operation under load</p>
+</li>
+<li>
+<p><strong>Error Recovery</strong>: Test error conditions and recovery mechanisms</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_rationale">Rationale</h3>
+<div class="sect3">
+<h4 id="_why_pio0">Why PIO0?</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Available state machines for both TX/RX operations</p>
+</li>
+<li>
+<p>No conflicts with existing peripheral allocations</p>
+</li>
+<li>
+<p>Optimal for real-time UART operations on Core0</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_why_full_featured_implementation">Why Full-Featured Implementation?</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Provides robust error handling equivalent to hardware UARTs</p>
+</li>
+<li>
+<p>Enables comprehensive diagnostics and monitoring</p>
+</li>
+<li>
+<p>Supports future expansion to additional PIO UART channels</p>
+</li>
+<li>
+<p>Maintains consistency with PL011 driver capabilities</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_why_dma_integration">Why DMA Integration?</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Reduces CPU overhead for data transfers</p>
+</li>
+<li>
+<p>Enables higher throughput and lower latency</p>
+</li>
+<li>
+<p>Consistent with modern embedded system practices</p>
+</li>
+<li>
+<p>Follows proven pattern from pico-examples uart_dma</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_consequences">Consequences</h3>
+<div class="sect3">
+<h4 id="_positive">Positive</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Channel 2 provides equivalent functionality to hardware UART channels</p>
+</li>
+<li>
+<p>Scalable architecture supports future PIO UART channel additions (Channel 3)</p>
+</li>
+<li>
+<p>High-performance operation through DMA and interrupt-driven design</p>
+</li>
+<li>
+<p>Seamless integration with existing UART Manager and ring buffer system</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_negative">Negative</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Consumes 2 of 4 available PIO state machines on PIO0</p>
+</li>
+<li>
+<p>Additional complexity compared to simple polling-based PIO implementation</p>
+</li>
+<li>
+<p>Requires careful timing validation for reliable 230400 baud operation</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_neutral">Neutral</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Code size increases moderately due to PIO program compilation</p>
+</li>
+<li>
+<p>Development effort equivalent to implementing additional hardware UART driver</p>
+</li>
+<li>
+<p>Testing complexity similar to existing PL011 driver validation</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_dependencies">Implementation Dependencies</h3>
+<div class="sect3">
+<h4 id="_required_components">Required Components</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>PIO program compilation support in CMake build system</p>
+</li>
+<li>
+<p>DMA channel allocation and management functions</p>
+</li>
+<li>
+<p>Integration with existing interrupt handling infrastructure</p>
+</li>
+<li>
+<p>Update to UART Manager channel configuration table</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_documentation_updates">Documentation Updates</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Update Chapter 5 Building Block View to reflect PIO UART implementation</p>
+</li>
+<li>
+<p>Update hardware pin configuration documentation if needed</p>
+</li>
+<li>
+<p>Add PIO UART driver to API documentation</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_future_extensions">Future Extensions</h3>
+<div class="sect3">
+<h4 id="_channel_3_implementation">Channel 3 Implementation</h4>
+<div class="paragraph">
+<p>This ADR establishes the pattern for implementing Channel 3 using PIO0 SM2/SM3 or PIO1 resources.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_advanced_features">Advanced Features</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>Flow control support (RTS/CTS) using additional GPIO pins</p>
+</li>
+<li>
+<p>Protocol-specific optimizations (RS485 half-duplex mode)</p>
+</li>
+<li>
+<p>Adaptive baud rate detection for auto-configuration</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_references">References</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Issue #82: PIO UART Driver Implementation</p>
+</li>
+<li>
+<p>ADR-008: Hardware Pin Configuration</p>
+</li>
+<li>
+<p>pico-examples: pio/uart_dma reference implementation</p>
+</li>
+<li>
+<p>RP2350 Datasheet: PIO (Programmable I/O) documentation</p>
+</li>
+<li>
+<p>arc42 Chapter 5: Core 0 UART Subsystem Implementation</p>
+</li>
+</ul>
+</div>
 </div>
 </div>
 </div>
@@ -963,11 +815,11 @@ _Atomic bool g_initialized = false;</code></pre>
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-013%3A+PIO+UART+Implementation+for+Channel+2%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-013-pio-uart-implementation.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-013%3A+PIO+UART+Implementation+for+Channel+2%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-013-pio-uart-implementation.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
