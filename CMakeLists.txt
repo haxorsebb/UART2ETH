@@ -14,6 +14,22 @@ endif()
 # ====================================================================================
 cmake_minimum_required(VERSION 3.13)
 
+# Configure compiler flags based on debug mode
+# set early to make it work
+if(DEBUG)
+    message(STATUS "UART2ETH: Debug mode enabled")
+    add_compile_definitions(DEBUG=1)
+    add_compile_definitions(LOG_MINIMUM_LEVEL=LOG_LEVEL_DEBUG)
+    add_compile_options(-g -O0)  # Debug symbols, no optimization
+    set(CMAKE_BUILD_TYPE Debug)
+else()
+    message(STATUS "UART2ETH: Release mode")
+    # add_compile_definitions(DEBUG=0)
+    add_compile_definitions(LOG_MINIMUM_LEVEL=LOG_LEVEL_DEBUG)
+    add_compile_options(-O2)     # Optimization for release
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
 set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards)
 
 # Set board before initializing SDK
@@ -30,7 +46,17 @@ set(PICO_PLATFORM rp2350)
 # Pull in SDK (must be before project)
 include(src/pico_sdk_import.cmake)
 
-
+# build time in UTC ISO 8601
+FILE (WRITE ${CMAKE_BINARY_DIR}/timestamp.cmake "STRING(TIMESTAMP TIMEZ UTC)\n")
+FILE (APPEND ${CMAKE_BINARY_DIR}/timestamp.cmake "FILE(WRITE timestamp.h \"#ifndef TIMESTAMP_H\\n\")\n")
+FILE (APPEND ${CMAKE_BINARY_DIR}/timestamp.cmake "FILE(APPEND timestamp.h \"#define TIMESTAMP_H\\n\\n\")\n")
+FILE (APPEND ${CMAKE_BINARY_DIR}/timestamp.cmake "FILE(APPEND timestamp.h \"#define _TIMEZ_ \\\"\${TIMEZ}\\\"\\n\\n\")\n")
+FILE (APPEND ${CMAKE_BINARY_DIR}/timestamp.cmake "FILE(APPEND timestamp.h \"#endif // TIMESTAMP_H\\n\")\n")
+ADD_CUSTOM_TARGET (
+    timestamp
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/timestamp.cmake
+    ADD_DEPENDENCIES ${CMAKE_BINARY_DIR}/timestamp.cmake)
+    
 # Set project name
 project(uart2eth C CXX ASM)
 
@@ -47,9 +73,6 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Initialize the SDK
 pico_sdk_init()
-
-# Debug build option (can be set with -DDEBUG=ON)
-option(DEBUG "Enable debug mode" OFF)
 
 # ====================================================================================
 # Device Mode Selection
@@ -75,20 +98,7 @@ else()
     message(FATAL_ERROR "Invalid DEVICE_MODE: ${DEVICE_MODE}. Must be SHARK, PRIMARY, or SECONDARY")
 endif()
 
-# Configure compiler flags based on debug mode
-if(DEBUG)
-    message(STATUS "UART2ETH: Debug mode enabled")
-    add_compile_definitions(DEBUG=1)
-    add_compile_definitions(LOG_MINIMUM_LEVEL=LOG_LEVEL_DEBUG)
-    add_compile_options(-g -O0)  # Debug symbols, no optimization
-    set(CMAKE_BUILD_TYPE Debug)
-else()
-    message(STATUS "UART2ETH: Release mode")
-    add_compile_definitions(DEBUG=0)
-    add_compile_definitions(LOG_MINIMUM_LEVEL=LOG_LEVEL_INFO)
-    add_compile_options(-O2)     # Optimization for release
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+
 
 add_compile_options(-Wall
         -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
@@ -121,6 +131,12 @@ add_executable(uart2eth
 #     "LINKER:--wrap=xosc_dormant"
 #     "LINKER:--wrap=xosc_hz"
 # )
+
+# Source - https://stackoverflow.com/a
+# Posted by dbanet, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-01-17, License - CC BY-SA 3.0
+ADD_DEPENDENCIES (uart2eth timestamp)
+INCLUDE_DIRECTORIES (${CMAKE_BINARY_DIR})
 
 # Link libraries  
 target_link_libraries(uart2eth 

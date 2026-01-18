@@ -1,0 +1,263 @@
+:jbake-title: ADR-006: Flash Persistence Strategy for UART2ETH
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 6
+:filename: /adrs/ADR-006-flash-persistence-strategy.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+= ADR-006: Flash Persistence Strategy
+
+== Status
+Accepted
+
+== Date
+2024-01-15
+
+== Context
+
+The UART2ETH system requires persistent storage of configuration data to survive power cycles and system resets. The configuration includes UART channel settings, network parameters, user accounts, and system preferences stored in the `g_shared_memory` structure.
+
+Key requirements:
+* Embedded system constraints (limited flash, no external storage)
+* Power-loss safety (industrial environment)
+* Flash wear leveling (device longevity)
+* Fast startup times (minimize boot delays)
+* Simple implementation (avoid complex file systems)
+* Integrity verification (detect corruption)
+
+== Decision
+
+We will implement flash persistence using a **4-page ring buffer strategy** with **RP2350 partition table isolation** for industrial reliability:
+
+### Flash Partitioning Strategy
+* **RP2350 Partition Table**: Use native partition system for true isolation
+* **Configuration Data Partition**: Dedicated 512KB data partition (ID=2)
+* **A/B Firmware Isolation**: Firmware updates never touch configuration partition
+* **Industrial Safety**: `"ignored_during_arm_boot": true` prevents accidental erasure
+
+### Storage Format
+* **Raw binary storage**: Direct copy of `g_shared_memory` structure to flash
+* **No JSON or schema validation**: Eliminates parsing overhead and complexity
+* **Complete structure per snapshot**: Atomic writes of entire configuration
+
+### Ring Buffer Management
+* **4 Configuration Snapshots** organized as circular ring buffer within data partition
+* **Wear leveling**: Sequential writes advance through ring
+* **Snapshot metadata**: Revision counter + SHA256 checksum per snapshot
+* **Magic number**: Snapshot validity marker (`0xC0FFEEAA`)
+* **Partition isolation**: 512KB data partition provides 128x current needs
+
+### Write Strategy
+* **Deferred write-back**: Integrated into Core1 main loop
+* **Frequency limiting**: Maximum once per 30 seconds
+* **Change detection**: Write only when `revision_counter` increments
+* **Atomic operations**: Complete snapshot written or nothing
+
+### Recovery Process
+* **Startup validation**: Read all 4 snapshots, verify checksums
+* **Snapshot selection**: Use snapshot with highest revision + valid checksum
+* **Corruption handling**: Skip invalid snapshots, fallback to factory defaults
+* **Error logging**: Track corruption events for diagnostics
+
+## Rationale
+
+### Advantages
+* **Power-loss safety**: Atomic page writes prevent partial corruption
+* **Wear leveling**: Ring buffer distributes writes across 4 pages
+* **Fast recovery**: Simple page validation, no complex parsing
+* **Integrity verification**: SHA256 detects any data corruption
+* **Embedded-friendly**: No file system overhead or external dependencies
+* **Deterministic behavior**: Known write patterns, predictable performance
+
+### Rejected Alternatives
+
+**File System Approach**
+* Rejected due to complexity and flash overhead
+* Would require FAT or custom file system implementation
+* Higher RAM usage for file system structures
+
+**JSON Configuration Files**
+* Rejected due to parsing overhead and complexity
+* Would require JSON parser library (code size increase)
+* Schema validation adds unnecessary complexity for embedded use
+
+**A/B Partition Strategy**
+* Rejected as insufficient for wear leveling
+* Only 2 locations would wear out faster
+* No automatic progression through multiple backup copies
+
+**EEPROM External Storage**
+* Rejected to avoid additional hardware components
+* Increases BOM cost and PCB complexity
+* RP2350 internal flash sufficient for configuration data
+
+### Trade-offs
+* **Flash usage**: 512KB data partition (32x current needs) for configuration ring buffer
+* **Write frequency**: Limited to 30-second intervals (acceptable for config changes)  
+* **Recovery time**: Startup requires reading/validating 4 snapshots (minimal impact)
+* **Partition complexity**: Requires RP2350 partition table support in build system
+
+== Consequences
+
+### Positive
+* **Partition Isolation**: Configuration data completely isolated from firmware updates
+* **A/B Update Safety**: Software updates never risk configuration data corruption
+* **Industrial Reliability**: RP2350 partition table provides true isolation guarantees
+* **Future Growth**: 512KB partition allows 32x expansion for new features
+* **Automatic wear leveling**: Ring buffer distributes writes across larger space
+* **Simple implementation**: Raw binary storage reduces bugs and maintenance
+* **Fast startup**: Minimal validation overhead with integrity verification
+* **Power-loss safety**: Atomic snapshot writes prevent partial corruption
+
+### Negative
+* **Flash usage**: 512KB data partition reservation (generous allocation)
+* **Write frequency**: Limited to 30-second intervals (acceptable for config changes)
+* **Build complexity**: Requires partition table embedding in build system
+* **No incremental updates**: Entire structure written each time
+
+### Implementation Requirements
+* Flash operations abstraction layer for RP2350 with partition awareness
+* SHA256 hash implementation for integrity verification
+* Integration with Core1 main loop for deferred writes
+* Factory reset capability for complete corruption recovery
+* Configuration Snapshot format definition and serialization functions
+
+== Implementation Notes
+
+The persistence system will be integrated into the existing shared memory module rather than implemented as a separate component. This maintains architectural simplicity while providing the required functionality.
+
+The `revision_counter` in `g_shared_memory` serves dual purposes:
+1. Coordination between cores for configuration changes
+2. Flash persistence trigger and page selection during recovery
+
+== Detailed Implementation Strategy
+
+### Partition Table Integration
+* **RP2350 Bootrom APIs**: Use `rom_get_partition_table_info()` and `rom_flash_op()` for partition access
+* **No Raw Flash Offsets**: Leverage bootrom partition table parsing instead of manual calculations
+* **Permission Checking**: Bootrom automatically validates partition permissions during flash operations
+* **Partition Discovery**: Use partition ID=2 to locate configuration data partition at runtime
+
+### Hardware Crypto Implementation
+* **SHA256 Engine**: Use pico-sdk hardware crypto APIs for integrity verification
+* **Fresh Implementation**: Start with clean integration of `pico/crypto/hash.h` interfaces
+* **Performance Optimization**: Hardware acceleration eliminates software SHA256 overhead
+* **Atomic Checksum**: Generate SHA256 for complete shared memory structure per snapshot
+
+### Core1 Integration Strategy
+* **New Core1 Main Function**: Create `core1_main()` as entry point for Core1 processing
+* **Lowest Priority Task**: Flash persistence checking runs after all other Core1 tasks
+* **Deferred Write Logic**: Check for changes every 100ms, write only if 30+ seconds elapsed
+* **Non-blocking Operation**: Persistence never blocks critical network or ring buffer operations
+
+### Change Detection and Write Control
+* **Static State Tracking**: Local static variable tracks last written `revision_counter` value
+* **Change Detection**: Compare current vs. last written revision to detect config changes
+* **Write Frequency Limiting**: Track last write timestamp, enforce 30-second minimum interval
+* **Atomic Decision**: Only proceed with write if both change detected AND time interval met
+
+### Error Handling and Recovery
+* **Factory Reset Strategy**: If all 4 ring buffer pages corrupt, load `shared_memory_init()` defaults
+* **Recovery Event Logging**: Use existing `log_event()` API to record factory reset as first entry
+* **Graceful Degradation**: System continues operation with defaults if persistence fails
+* **Corruption Detection**: SHA256 mismatch triggers recovery sequence with detailed error logging
+
+### Ring Buffer State Management
+* **4-Page Circular Buffer**: Pages 0-3 in sequential write order with wrap-around at page 3→0
+* **Page Selection Logic**: Write to next page in sequence, select highest revision during recovery
+* **Write State Persistence**: Track current write page position across power cycles
+* **Overflow Handling**: After page 3, wrap to page 0 for continuous wear leveling
+
+### Memory Layout and Data Structures
+
+```c
+// Flash persistence page structure (4096 bytes flash sector aligned)
+typedef struct {
+    uint32_t magic_number;                    // 0xC0FFEEAA page validity
+    uint32_t revision_counter;                // Write sequence tracking
+    uint8_t  sha256_checksum[32];             // Hardware crypto checksum
+    uint32_t reserved[4];                     // Future expansion
+    
+    shared_memory_layout_t shared_memory_data; // Complete config snapshot
+    
+    uint8_t padding[...];                     // Flash sector alignment
+} __attribute__((packed, aligned(4096))) flash_persistence_page_t;
+
+// Ring buffer management state (persistent across reboots)
+typedef struct {
+    uint8_t  current_write_page;              // 0-3, next page to write  
+    uint8_t  last_valid_page;                 // 0-3, last successfully read
+    uint32_t total_writes_lifetime;           // Total write operations
+    uint32_t corruption_events;               // Detected corruption count
+    uint32_t last_written_revision;           // Change detection state
+    uint32_t last_write_timestamp_ms;         // Write frequency control
+} flash_persistence_state_t;
+```
+
+### Implementation Phases
+
+**Phase 1: Core Infrastructure**
+1. Create `flash_persistence.c` implementation file
+2. Add partition table discovery using bootrom APIs
+3. Implement hardware SHA256 integration
+4. Add basic ring buffer state management
+
+**Phase 2: Core1 Integration**  
+1. Create `core1_main()` function with task scheduling
+2. Integrate persistence checking as lowest priority task
+3. Add change detection and write frequency limiting
+4. Implement atomic write operations with error handling
+
+**Phase 3: Recovery and Error Handling**
+1. Add startup recovery logic with page validation
+2. Implement factory reset fallback for total corruption
+3. Add comprehensive error logging and diagnostics  
+4. Test power-loss safety with real hardware
+
+### Function Interface Design
+
+```c
+// Core persistence management functions
+bool flash_persistence_init(void);
+bool flash_persistence_load_configuration(void);
+bool flash_persistence_save_configuration_if_needed(void);
+bool flash_persistence_force_save_configuration(void);
+void flash_persistence_factory_reset(void);
+
+// Diagnostic and monitoring functions  
+uint32_t flash_persistence_get_write_count(void);
+uint32_t flash_persistence_get_corruption_count(void);
+bool flash_persistence_verify_ring_buffer_integrity(void);
+
+// Internal implementation functions (static)
+static bool find_partition_info(uint32_t partition_id, uint32_t* start_addr, uint32_t* size);
+static bool read_flash_page(uint32_t page_index, flash_persistence_page_t* page_data);
+static bool write_flash_page(uint32_t page_index, const flash_persistence_page_t* page_data);
+static bool validate_page_integrity(const flash_persistence_page_t* page_data);
+static uint32_t calculate_sha256_checksum(const shared_memory_layout_t* data);
+static int find_best_valid_page(void);
+static void advance_ring_buffer_position(void);
+```
+
+### Test Strategy
+
+**Unit Tests (TDD Approach)**
+* Test partition discovery and validation
+* Test hardware SHA256 checksum generation
+* Test ring buffer page selection logic
+* Test change detection algorithms
+* Test write frequency limiting
+* Test corruption detection and recovery
+
+**Integration Tests**
+* Test Core1 main loop integration
+* Test persistence across simulated power cycles
+* Test factory reset under various corruption scenarios
+* Test performance impact on real-time operations
+
+**Hardware Tests**
+* Real flash write/erase/read cycles
+* Power-loss safety validation  
+* Flash wear testing with extended write cycles
+* Performance benchmarking under load

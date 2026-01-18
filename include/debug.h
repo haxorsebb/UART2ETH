@@ -18,10 +18,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/*
 // Debug mode detection (set by CMake)
 #ifndef DEBUG
 #define DEBUG 0
 #endif
+*/
 
 // Default minimum log level if not set by CMake
 #ifndef LOG_MINIMUM_LEVEL

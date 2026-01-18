@@ -8,6 +8,8 @@ add_library(config_manager
 )
 
 target_include_directories(config_manager PUBLIC ../include)
+target_include_directories(config_manager PUBLIC ../include/config)
+target_include_directories(config_manager PUBLIC ../include/log)
 target_link_libraries(config_manager 
     pico_stdlib
     pico_sync 
@@ -15,6 +17,8 @@ target_link_libraries(config_manager
     hardware_flash
     hardware_watchdog
     pico_bootrom
+    utils
+    boot_uf2_headers
 )
 
 # Log manager
@@ -36,6 +40,11 @@ add_library(ringbuffer
 )
 
 target_include_directories(ringbuffer PUBLIC ../include)
+target_include_directories(ringbuffer PUBLIC ../include/ringbuffer)
+target_include_directories(ringbuffer PUBLIC ../include/config)
+target_include_directories(ringbuffer PUBLIC ../include/log)
+target_include_directories(ringbuffer PUBLIC ../include/state_machine)
+
 target_link_libraries(ringbuffer 
     pico_stdlib
     pico_sync
@@ -49,6 +58,10 @@ add_library(state_machine
 )
 
 target_include_directories(state_machine PUBLIC ../include)
+target_include_directories(state_machine PUBLIC ../include/state_machine)
+target_include_directories(state_machine PUBLIC ../include/config)
+target_include_directories(state_machine PUBLIC ../include/log)
+
 target_link_libraries(state_machine 
     pico_stdlib
     pico_sync 
@@ -62,6 +75,9 @@ add_library(timer_subsystems
 )
 
 target_include_directories(timer_subsystems PUBLIC ../include)
+target_include_directories(timer_subsystems PUBLIC ../include/state_machine)
+target_include_directories(timer_subsystems PUBLIC ../include/log)
+
 target_link_libraries(timer_subsystems 
     pico_stdlib
     hardware_timer
@@ -73,7 +89,6 @@ add_library(core_modules
     core0_main.c
     core1_main.c
 )
-
 target_include_directories(core_modules PUBLIC ../include)
 target_link_libraries(core_modules 
     state_machine
@@ -101,6 +116,7 @@ add_library(uart_manager
     uart/uart_receive_buffer.c
 )
 
+
 # Generate PIO headers for PIO UART implementation
 pico_generate_pio_header(uart_manager ${CMAKE_CURRENT_LIST_DIR}/uart/pio_uart_tx.pio)
 pico_generate_pio_header(uart_manager ${CMAKE_CURRENT_LIST_DIR}/uart/pio_uart_rx.pio)
@@ -117,6 +133,19 @@ target_link_libraries(uart_manager
     hardware_pio
     hardware_dma
     pico_sync
+)
+
+
+# utils - bits and pieces from the pico sdk and examples
+add_library(utils
+    utils/uf2_family_ids.c
+)
+target_include_directories(utils PUBLIC ../include)
+target_link_libraries(utils 
+    pico_bootrom
+    pico_stdlib
+    hardware_flash
+    boot_uf2_headers
 )
 
 # Add network subdirectory

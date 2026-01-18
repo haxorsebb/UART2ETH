@@ -64,7 +64,7 @@ typedef struct {
 
 // System configuration structures
 typedef struct {
-    channel_config_t channels[4];
+    channel_config_t channels[5];
     network_config_t network;
     uint8_t log_level;             // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
     uint32_t watchdog_timeout_ms;  // Default 200ms
@@ -102,7 +102,7 @@ typedef struct {
     volatile uint32_t revision_counter;       // Incremented on each config change
     volatile bool config_change_pending;      // Flag for Core1 to detect config changes
     // TODO: Add SHA256 checksum for integrity validation in future version
-    uint32_t reserved[7];                     // Reserved for future integrity features (reduced by 1)
+    uint32_t reserved[8];                     // Reserved for future integrity features (reduced by 1)
     
     // Configuration structures
     system_config_t config;
@@ -118,12 +118,15 @@ typedef struct {
 } __attribute__((aligned(4))) shared_memory_layout_t;
 
 // Flash persistence constants - RP2350 Partition Table Approach
-#define FLASH_PERSISTENCE_RING_SIZE 4                    // 4 pages in ring buffer
+#define FLASH_PERSISTENCE_RING_SIZE 8                    // 4 pages in ring buffer
 #define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
+#define FLASH_PERSISTENCE_BLOCK_SIZE 16*4096             // SRAM4 BANK SIZE
 #define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
 #define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
-#define FLASH_PERSISTENCE_CONFIG_PARTITION_ID 2          // Configuration Data partition ID
-#define FLASH_PERSISTENCE_PARTITION_SIZE (512 * 1024)   // 512KB partition size (rest of 4MB flash)
+#define FLASH_PARTITION_FIRMWARE_A 0
+#define FLASH_PARTITION_FIRMWARE_B 1
+#define FLASH_PARTITION_FACTORY_DEFAULTS 2
+#define FLASH_PARTITION_CONFIGURATION_DATA 3
 
 // Flash page structure for ring buffer persistence
 typedef struct {
@@ -135,15 +138,16 @@ typedef struct {
     // Complete shared memory structure (raw binary copy)
     shared_memory_layout_t shared_memory_data;
     
-    // Padding to ensure flash sector alignment
-    uint8_t padding[FLASH_PERSISTENCE_PAGE_SIZE - sizeof(uint32_t) * 8 - 32 - sizeof(shared_memory_layout_t)];
-} __attribute__((packed, aligned(4096))) flash_persistence_page_t;
+    // Padding to ensure flash sector alignment and leave room for dynamic log entries
+    uint8_t padding[FLASH_PERSISTENCE_BLOCK_SIZE - sizeof(uint32_t) * 8 - 32 - sizeof(shared_memory_layout_t)];
+} __attribute__((packed, aligned(FLASH_PERSISTENCE_PAGE_SIZE))) flash_persistence_block_t;
 
 // Function declarations - Core shared memory
 bool shared_memory_init(void);
 bool shared_memory_force_reinit(void);  // For factory reset - forces re-initialization 
 uint32_t shared_memory_get_log_buffer_capacity(void);  // Returns number of entries, not bytes
 shared_memory_layout_t* shared_memory_get_layout(void);
+void update_shared_memory_revision();
 
 // Function declarations - Flash persistence
 bool flash_persistence_init(void);
@@ -155,5 +159,9 @@ void flash_persistence_factory_reset(void);
 uint32_t flash_persistence_get_write_count(void);
 uint32_t flash_persistence_get_corruption_count(void);
 bool flash_persistence_verify_ring_buffer_integrity(void);
+
+//factory reset
+void do_factory_reset();
+bool factory_reset_needed();
 
 #endif // SHARED_MEMORY_H

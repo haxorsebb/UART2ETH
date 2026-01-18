@@ -19,6 +19,7 @@ target_link_libraries(network_manager
 # Include directories
 target_include_directories(network_manager PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
 )
 
 # Create TCP socket server library
@@ -37,6 +38,9 @@ target_link_libraries(tcp_socket_server
 # Include directories
 target_include_directories(tcp_socket_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/ringbuffer
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/state_machine
 )
 
 # Create HTTP server library
@@ -54,4 +58,5 @@ target_link_libraries(http_server
 # Include directories
 target_include_directories(http_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
 )
