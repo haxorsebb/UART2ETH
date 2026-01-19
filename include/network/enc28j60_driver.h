@@ -79,6 +79,8 @@ extern "C" {
 #define ENC28J60_MAMXFLH        0x0B
 #define ENC28J60_MICMD          0x12
 #define ENC28J60_MIREGADR       0x14
+#define ENC28J60_MIWRL          0x16
+#define ENC28J60_MIWRH          0x17
 #define ENC28J60_MIRDL          0x18
 #define ENC28J60_MIRDH          0x19
 
@@ -457,7 +459,6 @@ void enc28j60_get_mac_address(uint8_t mac_addr[6]);
  * @note Output goes to printf() - redirect stdout as needed for logging.
  */
 void enc28j60_dump_signal_quality_registers(void);
-
 
 #ifdef __cplusplus
 }

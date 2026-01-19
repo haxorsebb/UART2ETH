@@ -129,7 +129,6 @@ void lwip_netif_enc28j60_process(void) {
     });
 #endif
     
-    
     // Check for incoming packets and process them
     int packets_processed = 0;
     while (enc28j60_has_rx_packet() && packets_processed < 2) {  // Limit to prevent infinite loop

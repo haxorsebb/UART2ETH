@@ -99,6 +99,7 @@ bool enc28j60_is_ready(void)
 {
     return g_is_ready;
 }
+
 /**
  * @brief Check if register is MAC or MII type (Arduino reference exact logic)
  */
@@ -1286,9 +1287,9 @@ bool enc28j60_receive_packet(enc28j60_packet_t* packet, uint16_t max_length) {
     }
     else {
         g_enc28j60_state.rx_errors++;
-        //DEBUG_ONLY({ 
-            printf("ENC28J60: invalid packet received, wrong size: %d", packet_length); 
-        //});
+        printf("ENC28J60: invalid packet - hdr=[%02X %02X %02X %02X %02X %02X] next=0x%04X len=%d status=0x%04X\n",
+               packet_header[0], packet_header[1], packet_header[2], packet_header[3], 
+               packet_header[4], packet_header[5], next_packet, packet_length, rx_status);
     }
     
 
@@ -1487,6 +1488,42 @@ bool enc28j60_clear_tx_interrupt_flags(void)
 /**
  * @brief Read PHY register via MII interface (Arduino reference implementation)
  */
+static void enc28j60_write_phy_register(uint8_t phy_reg, uint16_t value) {
+    if (!g_driver_initialized) {
+        return;
+    }
+    enc28j60_block_interrupt();
+
+    // Set bank 2 for MII access
+    enc28j60_set_register_bank_internal(MACONX_BANK);
+    
+    // Set the PHY register address
+    enc28j60_write_register_internal(ENC28J60_MIREGADR, phy_reg);
+    
+    // Write the data (low byte first, then high byte starts the write)
+    enc28j60_write_register_internal(ENC28J60_MIWRL, value & 0xFF);
+    enc28j60_write_register_internal(ENC28J60_MIWRH, (value >> 8) & 0xFF);
+    
+    // Wait for the PHY write to complete
+    enc28j60_set_register_bank_internal(MAADRX_BANK);  // Bank 3 for MISTAT
+    
+    uint32_t timeout = 1000;  // 1ms timeout
+    while (timeout > 0) {
+        uint8_t mistat = enc28j60_read_register_internal(ENC28J60_MISTAT);
+        if ((mistat & ENC28J60_MISTAT_BUSY) == 0) {
+            break;
+        }
+        sleep_us(1);
+        timeout--;
+    }
+    
+    if (timeout == 0) {
+        printf("ENC28J60: TIMEOUT writing PHY register 0x%02X\n", phy_reg);
+    }
+    
+    enc28j60_unblock_interrupt();
+}
+
 static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
     if (!g_driver_initialized) {
         return 0xFFFF;

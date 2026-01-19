@@ -24,6 +24,7 @@ NET.IP                          IP          Static IP address
 NET.MASK                        IP          Subnet mask
 NET.GW                          IP          Gateway
 NET.MAC                         MAC         MAC address
+NET.ETH                         read only   ENC28J60 detected (0=no, 1=yes)
 CH1.EN / CH2.EN / CH3.EN        0/1         Channel enabled
 CH1.PORT / CH2.PORT / CH3.PORT  1-65535     TCP port
 CH1.BAUD / CH2.BAUD / CH3.BAUD  300-921600  Baud rate
