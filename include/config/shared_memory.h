@@ -101,8 +101,7 @@ typedef struct {
     // Revision and integrity (at start for easy access)
     volatile uint32_t revision_counter;       // Incremented on each config change
     volatile bool config_change_pending;      // Flag for Core1 to detect config changes
-    // TODO: Add SHA256 checksum for integrity validation in future version
-    uint32_t reserved[8];                     // Reserved for future integrity features (reduced by 1)
+    uint32_t reserved[8];                     // Reserved for future integrity features 
     
     // Configuration structures
     system_config_t config;
@@ -129,17 +128,27 @@ typedef struct {
 #define FLASH_PARTITION_CONFIGURATION_DATA 3
 
 // Flash page structure for ring buffer persistence
+// Note: sha256_checksum is placed first to simplify exclusion during hash calculation.
+// The hash covers all fields after sha256_checksum (magic_number through padding).
 typedef struct {
+    uint8_t  sha256_checksum[32];                        // Page integrity verification (first for easy hash exclusion)
     uint32_t magic_number;                               // Page validity marker
     uint32_t revision_counter;                           // Write sequence number
-    uint8_t  sha256_checksum[32];                        // Page integrity verification
     uint32_t reserved[4];                                // Future use, alignment
     
     // Complete shared memory structure (raw binary copy)
     shared_memory_layout_t shared_memory_data;
     
     // Padding to ensure flash sector alignment and leave room for dynamic log entries
-    uint8_t padding[FLASH_PERSISTENCE_BLOCK_SIZE - sizeof(uint32_t) * 8 - 32 - sizeof(shared_memory_layout_t)];
+    uint8_t padding[FLASH_PERSISTENCE_BLOCK_SIZE 
+        - 32*sizeof(uint8_t)  /*sha256_checksum*/
+        - sizeof(uint32_t)  /*magic_number*/
+        - sizeof(uint32_t)  /*revision_counter*/
+        - sizeof(uint32_t)  /*reserved[0]*/
+        - sizeof(uint32_t)  /*reserved[1]*/
+        - sizeof(uint32_t)  /*reserved[2]*/
+        - sizeof(uint32_t)  /*reserved[3]*/
+        - sizeof(shared_memory_layout_t)];
 } __attribute__((packed, aligned(FLASH_PERSISTENCE_PAGE_SIZE))) flash_persistence_block_t;
 
 // Function declarations - Core shared memory

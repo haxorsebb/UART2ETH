@@ -13,6 +13,7 @@ target_include_directories(config_manager PUBLIC ../include/log)
 target_link_libraries(config_manager 
     pico_stdlib
     pico_sync 
+    pico_sha256
     hardware_sync
     hardware_flash
     hardware_watchdog

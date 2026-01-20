@@ -14,6 +14,7 @@
 #include "device_mode.h"
 #include "log_manager.h"
 #include "pico/stdlib.h"
+#include "pico/sha256.h"
 #include <pico/flash.h>
 #include <stdio.h>
 #include "pico/bootrom.h"
@@ -72,7 +73,7 @@ static bool find_partition_info(uint32_t partition_id, uint32_t* start_addr, uin
 static bool read_flash_block(uint32_t block_index, flash_persistence_block_t* block_data);
 static bool write_flash_block(uint32_t block_index, const flash_persistence_block_t* block_data);
 static bool validate_block_integrity(const flash_persistence_block_t* block_data);
-static uint32_t calculate_sha256_checksum(const shared_memory_layout_t* data, uint8_t* checksum_out);
+static uint32_t calculate_sha256_checksum(const void* data, size_t size, uint8_t* checksum_out);
 static int find_best_valid_block(void);
 static void advance_ring_buffer_position(void);
 static void call_flash_range_erase(void *param);
@@ -318,8 +319,11 @@ bool flash_persistence_force_save_configuration(void) {
     //keep doing stuff while we finish this write
     restore_interrupts(ints);
         
-    // Calculate SHA256 checksum
-    calculate_sha256_checksum(layout, shadow_block_copy.sha256_checksum);
+    // Calculate SHA256 checksum of the complete block (excluding the checksum field itself)
+    // Since sha256_checksum is at the start of the struct, hash from magic_number onwards
+    calculate_sha256_checksum(&shadow_block_copy.magic_number,
+                              sizeof(flash_persistence_block_t) - sizeof(shadow_block_copy.sha256_checksum),
+                              shadow_block_copy.sha256_checksum);
     
     // Write to next block in ring buffer
     if (!write_flash_block(g_flash_state.current_write_block, &shadow_block_copy)) {
@@ -648,9 +652,12 @@ static bool validate_block_integrity(const flash_persistence_block_t* block_data
         return false;
     }
     
-    // Calculate and verify SHA256 checksum
+    // Calculate and verify SHA256 checksum over the complete block (excluding checksum field)
+    // Since sha256_checksum is at the start of the struct, hash from magic_number onwards
     uint8_t calculated_checksum[32];
-    if (calculate_sha256_checksum(&block_data->shared_memory_data, calculated_checksum) != 0) {
+    if (calculate_sha256_checksum(&block_data->magic_number,
+                                  sizeof(flash_persistence_block_t) - sizeof(block_data->sha256_checksum),
+                                  calculated_checksum) != 0) {
         return false;
     }
     
@@ -658,25 +665,33 @@ static bool validate_block_integrity(const flash_persistence_block_t* block_data
 }
 
 /**
- * Calculate SHA256 checksum of shared memory data
+ * Calculate SHA256 checksum of arbitrary data
  * 
- * @param data Shared memory data to checksum
+ * Uses RP2350 hardware-accelerated SHA-256 to hash the provided data buffer.
+ * 
+ * @param data Pointer to data to checksum
+ * @param size Size of data in bytes
  * @param checksum_out Output buffer for 32-byte checksum
  * @return 0 on success, -1 on error
  */
-static uint32_t calculate_sha256_checksum(const shared_memory_layout_t* data, uint8_t* checksum_out) {
-    if (!data || !checksum_out) {
+static uint32_t calculate_sha256_checksum(const void* data, size_t size, uint8_t* checksum_out) {
+    if (!data || !checksum_out || size == 0) {
         return -1;
     }
     
-    // Simple deterministic checksum for testing - based on revision counter
-    memset(checksum_out, 0, 32);
-    
-    // Generate a simple but deterministic checksum based on data
-    uint32_t simple_checksum = data->revision_counter;
-    for (int i = 0; i < 8; i++) {
-        checksum_out[i * 4] = (simple_checksum >> (i * 4)) & 0xFF;
+    // Use RP2350 hardware SHA-256 accelerator
+    pico_sha256_state_t state;
+    int rc = pico_sha256_start_blocking(&state, SHA256_BIG_ENDIAN, true);
+    if (rc != PICO_OK) {
+        return -1;
     }
+    
+    pico_sha256_update_blocking(&state, (const uint8_t*)data, size);
+    
+    sha256_result_t result;
+    pico_sha256_finish(&state, &result);
+    
+    memcpy(checksum_out, result.bytes, SHA256_RESULT_BYTES);
     
     return 0;
 }
