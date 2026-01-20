@@ -2,8 +2,8 @@
  * @file shared_memory.h
  * @brief Shared memory layout for config manager and log manager
  * 
- * SRAM Bank 4 Memory Layout:
- * [Config Structures][Performance Counters][Log Management][Ring Buffer Data]
+ * Shared Memory Layout (statically allocated, 64KB aligned):
+ * [Config Structures][Performance Counters][Log Management][Log Entry Buffer]
  * 
  * Access Patterns:
  * - Core0: Read-only config access, read-write log access
@@ -21,16 +21,13 @@
 #include <hardware/sync/spin_lock.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "hardware/regs/addressmap.h"
 #include "log_manager.h"  // For log_entry_t definition
-#include "network/network_manager.h"  // For log_entry_t definition
+#include "network/network_manager.h"  // For network_config_t definition
 
-// SRAM Bank 4 base address and size (RP2350)
-// Note: RP2350 has non-contiguous SRAM banks: SRAM0, SRAM4, SRAM8, SRAM9
-// No SRAM1-3 or SRAM5-7 exist. SRAM4 spans 0x20040000-0x20080000 (256KB total)
-// but we only use 64KB for shared memory to avoid conflicts with other allocations
-#define SRAM_BANK4_BASE     SRAM4_BASE        // Use official SDK constant (0x20040000)
-#define SRAM_BANK4_SIZE     (64 * 1024)      // 64KB (design choice for shared memory)
+// Shared memory size configuration
+// Aligned to 64KB bank boundary for optimal memory access patterns
+#define SHARED_MEMORY_BANK_SIZE     (64 * 1024)      // 64KB for shared memory region
+#define SHARED_MEMORY_ALIGNMENT     (64 * 1024)      // 64KB alignment requirement
 
 /**
  * @brief channel enumeration for typing

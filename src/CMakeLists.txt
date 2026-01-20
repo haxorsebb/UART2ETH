@@ -1,5 +1,9 @@
 # Source files for UART2ETH firmware
 
+if (NOT TARGET hardware_sha256)
+    return()
+endif()
+
 # Configuration manager
 add_library(config_manager
     config/shared_memory.c
@@ -12,8 +16,8 @@ target_include_directories(config_manager PUBLIC ../include/config)
 target_include_directories(config_manager PUBLIC ../include/log)
 target_link_libraries(config_manager 
     pico_stdlib
-    pico_sync 
     pico_sha256
+    pico_sync 
     hardware_sync
     hardware_flash
     hardware_watchdog

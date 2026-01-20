@@ -2,8 +2,8 @@
  * @file shared_memory.c
  * @brief Implementation of shared memory layout for config and log managers
  * 
- * Implements SRAM Bank 4 memory layout with compile-time size calculations
- * as documented in arc42 architecture documentation.
+ * Implements statically allocated shared memory with 64KB alignment and
+ * compile-time size calculations as documented in arc42 architecture.
  * 
  * Documentation Reference:
  * - arc42 Chapter 5 - Configuration Manager Implementation
@@ -22,7 +22,11 @@
 
 // Static variables for shared memory management
 static shared_memory_layout_t* g_shared_memory = NULL;
-static flash_persistence_block_t aligned_block_including_logs = {0};
+
+// Statically allocated shared memory block, aligned to 64KB bank boundary
+// This ensures optimal memory access patterns and cache behavior
+static flash_persistence_block_t aligned_block_including_logs 
+    __attribute__((aligned(SHARED_MEMORY_ALIGNMENT))) = {0};
 
 static _Atomic bool g_initialized = false;
 static spin_lock_t* g_reservation_lock = NULL;
@@ -30,14 +34,14 @@ static spin_lock_t* g_reservation_lock = NULL;
 static bool factory_reset_requested = false;
 
 /**
- * Calculate maximum number of log entries based on SRAM bank layout
+ * Calculate maximum number of log entries based on shared memory layout
  * 
  * @return Number of log entries that fit in available space
  */
 static uint32_t calculate_log_buffer_capacity(void) {
     // Calculate: Total Bank Size - (Fixed Structure Size excluding flexible array)
     size_t fixed_size = offsetof(shared_memory_layout_t, log_entries);
-    uint32_t available_bytes = SRAM_BANK4_SIZE - fixed_size;
+    uint32_t available_bytes = SHARED_MEMORY_BANK_SIZE - fixed_size;
     
     // Calculate number of entries that fit
     uint32_t max_entries = available_bytes / sizeof(log_entry_t);
@@ -51,7 +55,7 @@ static uint32_t calculate_log_buffer_capacity(void) {
 }
 
 /**
- * Initialize shared memory layout in SRAM Bank 4
+ * Initialize shared memory layout
  * 
  * @return true if initialization successful, false otherwise
  */
@@ -61,8 +65,8 @@ bool shared_memory_init(void) {
         return true;  // Already initialized
     }
     
-    // Point to an aligned block big enough to contain logs.
-    g_shared_memory = &(aligned_block_including_logs.shared_memory_data); //(shared_memory_layout_t*)SRAM_BANK4_BASE;
+    // Point to the statically allocated, 64KB-aligned block
+    g_shared_memory = &(aligned_block_including_logs.shared_memory_data);
     
     atomic_store(&g_initialized,true);
     
@@ -80,7 +84,7 @@ bool shared_memory_init(void) {
     printf("DEBUG: Spinlock initialized successfully (lock_num=%u)\n", lock_num);
     
     // Initialize shared memory structure
-    memset(g_shared_memory, 0, SRAM_BANK4_SIZE);
+    memset(g_shared_memory, 0, SHARED_MEMORY_BANK_SIZE);
     
     // Set up basic configuration defaults
     g_shared_memory->revision_counter = 1;
