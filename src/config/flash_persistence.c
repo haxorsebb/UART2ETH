@@ -70,11 +70,9 @@ static flash_persistence_state_t g_flash_state = {0};
 static flash_persistence_block_t shadow_block_copy = {0};   //allocate only once, not on stack (stack is only 2k)
 
 // Function prototypes for internal implementation
-static bool find_partition_info(uint32_t partition_id, uint32_t* start_addr, uint32_t* size);
 static bool read_flash_block(uint32_t block_index, flash_persistence_block_t* block_data);
 static bool write_flash_block(uint32_t block_index, const flash_persistence_block_t* block_data);
 static bool validate_block_integrity(const flash_persistence_block_t* block_data);
-static uint32_t calculate_sha256_checksum(const void* data, size_t size, uint8_t* checksum_out);
 static int find_best_valid_block(void);
 static void advance_ring_buffer_position(void);
 static void call_flash_range_erase(void *param);
@@ -96,9 +94,9 @@ bool flash_persistence_init(void) {
     g_flash_state.active_config_partition_id = FLASH_PARTITION_CONFIGURATION_DATA;
     
     // Find the active configuration partition
-    if (!find_partition_info(g_flash_state.active_config_partition_id, 
-                            &g_flash_state.partition_start_offset, 
-                            &g_flash_state.partition_size)) {
+    if (!flash_find_partition_info(g_flash_state.active_config_partition_id, 
+                                    &g_flash_state.partition_start_offset, 
+                                    &g_flash_state.partition_size)) {
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_PARTITION_ID, 
                   g_flash_state.active_config_partition_id);
         return false;
@@ -322,9 +320,9 @@ bool flash_persistence_force_save_configuration(void) {
         
     // Calculate SHA256 checksum of the complete block (excluding the checksum field itself)
     // Since sha256_checksum is at the start of the struct, hash from magic_number onwards
-    calculate_sha256_checksum(&shadow_block_copy.magic_number,
-                              sizeof(flash_persistence_block_t) - sizeof(shadow_block_copy.sha256_checksum),
-                              shadow_block_copy.sha256_checksum);
+    flash_calculate_sha256(&shadow_block_copy.magic_number,
+                           sizeof(flash_persistence_block_t) - sizeof(shadow_block_copy.sha256_checksum),
+                           shadow_block_copy.sha256_checksum);
     
     // Write to next block in ring buffer
     if (!write_flash_block(g_flash_state.current_write_block, &shadow_block_copy)) {
@@ -480,14 +478,14 @@ bool flash_persistence_verify_ring_buffer_integrity(void) {
 // Internal implementation functions
 
 /**
- * Find partition information using bootrom APIs
+ * Find partition information using bootrom APIs (exposed for factory_defaults)
  * 
  * @param partition_id Partition ID to search for
  * @param start_addr Output: partition start address
  * @param size Output: partition size in bytes
  * @return true if partition found, false otherwise
  */
-static bool find_partition_info(uint32_t partition_id, uint32_t* start_addr, uint32_t* size) {
+bool flash_find_partition_info(uint32_t partition_id, uint32_t* start_addr, uint32_t* size) {
     // Query partition table from bootrom
     pico_partition_table_t pt;
     int rc;
@@ -660,9 +658,9 @@ static bool validate_block_integrity(const flash_persistence_block_t* block_data
     // Calculate and verify SHA256 checksum over the complete block (excluding checksum field)
     // Since sha256_checksum is at the start of the struct, hash from magic_number onwards
     uint8_t calculated_checksum[32];
-    if (calculate_sha256_checksum(&block_data->magic_number,
-                                  sizeof(flash_persistence_block_t) - sizeof(block_data->sha256_checksum),
-                                  calculated_checksum) != 0) {
+    if (flash_calculate_sha256(&block_data->magic_number,
+                               sizeof(flash_persistence_block_t) - sizeof(block_data->sha256_checksum),
+                               calculated_checksum) != 0) {
         return false;
     }
     
@@ -670,7 +668,7 @@ static bool validate_block_integrity(const flash_persistence_block_t* block_data
 }
 
 /**
- * Calculate SHA256 checksum of arbitrary data
+ * Calculate SHA256 checksum of arbitrary data (exposed for factory_defaults)
  * 
  * Uses RP2350 hardware-accelerated SHA-256 to hash the provided data buffer.
  * 
@@ -679,7 +677,7 @@ static bool validate_block_integrity(const flash_persistence_block_t* block_data
  * @param checksum_out Output buffer for 32-byte checksum
  * @return 0 on success, -1 on error
  */
-static uint32_t calculate_sha256_checksum(const void* data, size_t size, uint8_t* checksum_out) {
+int flash_calculate_sha256(const void* data, size_t size, uint8_t* checksum_out) {
     if (!data || !checksum_out || size == 0) {
         return -1;
     }

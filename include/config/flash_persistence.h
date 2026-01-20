@@ -40,5 +40,30 @@ typedef struct {
 
 flash_persistence_state_t* get_persistence_state(void);
 
+// Utility functions for partition table access (shared with factory_defaults)
+
+/**
+ * @brief Find partition information by partition ID
+ * 
+ * Uses bootrom APIs to locate partition in flash partition table.
+ * 
+ * @param partition_id Partition ID to search for
+ * @param start_addr Output: partition start address (flash offset)
+ * @param size Output: partition size in bytes
+ * @return true if partition found, false otherwise
+ */
+bool flash_find_partition_info(uint32_t partition_id, uint32_t* start_addr, uint32_t* size);
+
+/**
+ * @brief Calculate SHA256 checksum for arbitrary data
+ * 
+ * Uses RP2350 hardware SHA-256 accelerator for fast hashing.
+ * 
+ * @param data Pointer to data to hash
+ * @param size Size of data in bytes
+ * @param checksum_out Output buffer for 32-byte SHA256 hash
+ * @return 0 on success, -1 on error
+ */
+int flash_calculate_sha256(const void* data, size_t size, uint8_t* checksum_out);
 
 #endif // FLASH_PERSISTENCE_H
