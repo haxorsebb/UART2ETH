@@ -173,3 +173,59 @@ pico_embed_pt_in_binary(uart2eth "${CMAKE_CURRENT_SOURCE_DIR}/partition_table.js
 # Create UF2 output
 pico_add_extra_outputs(uart2eth)
 
+# ====================================================================================
+# Factory Internal Build Target
+# ====================================================================================
+# This target is used for manufacturing to program factory defaults to devices.
+# It enables write/erase functions in factory_defaults.c via FACTORY_INTERNAL_VERSION.
+# ====================================================================================
+
+# Create factory internal executable target (same as uart2eth but with FACTORY_INTERNAL_VERSION)
+add_executable(uart2eth_factory_internal
+    src/main.c
+)
+
+# Add factory internal version compile definition
+target_compile_definitions(uart2eth_factory_internal PRIVATE
+    FACTORY_INTERNAL_VERSION=1
+)
+
+# Source - https://stackoverflow.com/a
+# Posted by dbanet, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-01-17, License - CC BY-SA 3.0
+ADD_DEPENDENCIES(uart2eth_factory_internal timestamp)
+
+# Link libraries (same as uart2eth)
+target_link_libraries(uart2eth_factory_internal 
+    pico_stdlib        # Basic functionality
+    hardware_gpio      # For LED control
+    hardware_clocks    # For clock testing
+    pico_multicore     # Dual core support
+    pico_sync          # Synchronization primitives
+    hardware_uart
+    hardware_spi
+    hardware_watchdog  # Watchdog for stability
+    pico_lwip_nosys    # lwIP NO_SYS implementation for raw API
+    config_manager     # Our config manager library
+    log_manager        # Our log manager library
+    state_machine      # Our event-driven state machine library
+    network_manager    # Our network manager library (now with lwIP)
+    tcp_socket_server  # all sockets are handled here
+    http_server        # HTTP server for device information web interface
+    ringbuffer         # Ring buffer for UART-TCP message bridging
+    uart_manager       # New 4-channel UART manager
+    core_modules       # Core0 and Core1 main functions
+)
+
+# Enable stdio: UART0 for debugging (same as uart2eth)
+pico_enable_stdio_uart(uart2eth_factory_internal 1)
+
+# Set UF2 family for RP2350 (same as uart2eth)
+pico_set_uf2_family(uart2eth_factory_internal "rp2350-arm-s")
+
+# Embed partition table for flash isolation (same as uart2eth)
+pico_embed_pt_in_binary(uart2eth_factory_internal "${CMAKE_CURRENT_SOURCE_DIR}/partition_table.json")
+
+# Create UF2 output
+pico_add_extra_outputs(uart2eth_factory_internal)
+
