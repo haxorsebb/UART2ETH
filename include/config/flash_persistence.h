@@ -19,6 +19,7 @@
 #define FLASH_PERSISTENCE_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 
 // Flash persistence state management
