@@ -22,10 +22,13 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "hardware/flash.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define FACTORY_DEFAULTS_SIZE     (8 * 1024)      // 8KB for factory defaults
 
 /**
  * @brief Board type enumeration for hardware variant identification
@@ -60,14 +63,25 @@ typedef struct {
     // Default network configuration (9 bytes)
     uint32_t default_ip;               // Default IP address (network byte order)
     uint32_t default_netmask;          // Default netmask (network byte order)
-    bool default_dhcp_enable;          // Default DHCP enable flag
+    uint8_t default_dhcp_enable;          // Default DHCP enable flag
     
     // Security (32 bytes)
     char default_password[32];         // Factory default password (including null-terminator)
     
     // Reserved for future expansion (pad to clean alignment)
-    uint8_t reserved[56];              // Pad to 136 bytes total
-} __attribute__((packed)) factory_defaults_t;
+    uint8_t padding[ FACTORY_DEFAULTS_SIZE 
+        - 32*sizeof(uint8_t)    /*sha256_checksum*/
+        - sizeof(uint8_t)       /*production_week*/
+        - sizeof(uint8_t)       /*production_year*/
+        - 6*sizeof(uint8_t)     /*serial_number*/
+        - 6*sizeof(uint8_t)     /*mac_address*/
+        - sizeof(uint8_t)       /*board_type*/
+        - sizeof(uint32_t)      /*default_ip*/
+        - sizeof(uint32_t)      /*default_netmask*/
+        - sizeof(uint8_t)       /*default_dhcp_enable*/
+        - 32*sizeof(char)       /*default_password*/
+        ];
+    } __attribute__((packed, aligned(FLASH_SECTOR_SIZE))) factory_defaults_t;
 
 /**
  * @brief Initialize factory defaults system and load from flash

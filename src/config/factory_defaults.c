@@ -32,7 +32,6 @@ static bool validate_factory_defaults_integrity(const factory_defaults_t* defaul
  * Initialize factory defaults system and load from flash
  */
 bool factory_defaults_init(void) {
-    printf("Factory defaults init...\n");
     
     if (!load_factory_defaults()) {
         printf("WARNING: Factory defaults invalid or corrupted\n");
@@ -41,7 +40,6 @@ bool factory_defaults_init(void) {
     }
     
     g_factory_defaults_valid = true;
-    printf("Factory defaults loaded successfully\n");
     return true;
 }
 
@@ -135,16 +133,17 @@ static bool load_factory_defaults(void) {
         return false;
     }
     
-    // Read factory defaults from flash using XIP raw flash access
-    const uint8_t *flash_contents = (const uint8_t *)(XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE + partition_start);
-    memcpy(&g_factory_defaults, flash_contents, sizeof(factory_defaults_t));
-    
     // Validate integrity
-    if (!validate_factory_defaults_integrity(&g_factory_defaults)) {
+    if (!validate_factory_defaults_integrity((const factory_defaults_t *)(XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE + partition_start))) {
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FACTORY_DEFAULTS_CHECKSUM_FAILED, 0);
         return false;
     }
     
+    // Read factory defaults from flash using XIP raw flash access
+    const uint8_t *flash_contents = (const uint8_t *)(XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE + partition_start);
+    memcpy(&g_factory_defaults, flash_contents, sizeof(factory_defaults_t));
+    
+
     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_FACTORY_DEFAULTS_LOADED, 
               g_factory_defaults.board_type);
     
