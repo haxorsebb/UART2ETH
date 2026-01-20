@@ -1,0 +1,226 @@
+:jbake-title: ADR-014: Factory Defaults Implementation
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 14
+:filename: /adrs/ADR-014-factory-defaults-implementation.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+= ADR-014: Factory Defaults Implementation
+
+== Status
+Accepted
+
+== Date
+2026-01-20
+
+== Context
+
+The UART2ETH system requires device-specific factory configuration data that must survive firmware updates and power cycles. This data includes:
+
+* Manufacturing information (serial number, production date)
+* Network identity (MAC address, default IP configuration)
+* Board type identification (for variant support)
+* Security (factory default password)
+
+Key requirements:
+* Separate from user configuration (not affected by factory reset)
+* Written once during manufacturing (read-only from firmware perspective)
+* Early availability (needed before main system initialization)
+* Integrity protection (corruption detection)
+* Simple structure (direct memory mapping)
+
+== Decision
+
+We will implement factory defaults using a dedicated flash partition with raw binary storage protected by SHA256 integrity verification:
+
+### Flash Partitioning Strategy
+* **Dedicated Partition**: FLASH_PARTITION_FACTORY_DEFAULTS (ID=2, 8KB)
+* **Isolated from Configuration**: Separate from FLASH_PARTITION_CONFIGURATION_DATA
+* **A/B Firmware Safe**: Factory defaults never touched during firmware updates
+* **Single Instance**: No ring buffer, only current factory data
+
+### Storage Format
+* **Raw Binary Storage**: Direct copy of `factory_defaults_t` structure to flash
+* **No Wear Leveling**: Written once during manufacturing, read-only from firmware
+* **SHA256 Integrity**: Hash protection same as configuration persistence
+* **Hash Placement**: SHA256 checksum first in struct for easy exclusion during hash calculation
+
+### Data Structure
+```c
+typedef struct {
+    uint8_t sha256_checksum[32];       // First, for easy exclusion during hash
+    
+    // Serial number (8 bytes total)
+    uint8_t production_week;           // Week number 1-52
+    uint8_t production_year;           // Years since 2000
+    uint8_t serial_number[6];          // 6-byte running number
+    
+    // Network identity
+    uint8_t mac_address[6];            // Raw MAC address
+    
+    // Board type
+    uint8_t board_type;                // Hardware variant identifier
+    
+    // Default network configuration
+    uint32_t default_ip;               // Network byte order
+    uint32_t default_netmask;          // Network byte order
+    bool default_dhcp_enable;
+    
+    // Security
+    char default_password[32];         // Including null-terminator
+} __attribute__((packed)) factory_defaults_t;
+```
+
+### Integration Points
+* **Early Initialization**: Load immediately after stdio init, before factory reset check
+* **Serial Number Logging**: Display in boot messages for field identification
+* **Factory Reset Application**: Copy defaults to shared memory on factory reset
+* **Compile-Time Guarding**: Write functions protected by FACTORY_INTERNAL_VERSION
+
+### Write Strategy (Manufacturing Only)
+* **Protected Functions**: `#ifdef FACTORY_INTERNAL_VERSION` compile guard
+* **Single Write Operation**: No update mechanism from normal firmware
+* **External Programming**: Manufacturing tools write partition directly
+* **Verification**: SHA256 checksum validated on every boot
+
+## Rationale
+
+### Advantages
+* **Separation of Concerns**: Factory data isolated from user configuration
+* **Update Safety**: Firmware updates never touch factory defaults
+* **Early Availability**: Loaded before main system initialization
+* **Field Identification**: Serial number visible in boot logs
+* **Integrity Protection**: SHA256 detects corruption
+* **Simple Implementation**: No complex wear leveling or ring buffer
+
+### Rejected Alternatives
+
+**Embedding in Firmware**
+* Rejected due to loss of per-device uniqueness during firmware updates
+* Would require separate firmware builds per device (manufacturing complexity)
+* Updates would overwrite device-specific data
+
+**Combined with User Configuration**
+* Rejected to avoid factory reset affecting manufacturing data
+* Separation provides clearer architecture
+* Different lifecycle (write-once vs. write-many)
+
+**External EEPROM**
+* Rejected to avoid additional hardware components
+* Increases BOM cost and PCB complexity
+* Internal flash sufficient for factory data
+
+### Trade-offs
+* **Flash Usage**: 8KB partition for factory defaults (acceptable overhead)
+* **Write Protection**: No firmware-based write protection (acceptable for read-only use case)
+* **Single Copy**: No redundancy for factory defaults (acceptable with SHA256 integrity)
+
+== Consequences
+
+### Positive
+* **Partition Isolation**: Factory data completely isolated from user configuration
+* **Update Safety**: Firmware updates never risk factory data corruption
+* **Field Support**: Serial number visible in logs simplifies field support
+* **Manufacturing Flexibility**: Supports different board types with single firmware
+* **Simple Implementation**: Direct flash read without complex logic
+
+### Negative
+* **Manufacturing Tools**: Requires external tools to program factory partition
+* **No Firmware Write**: Cannot update factory defaults from running firmware
+* **Single Instance**: No redundancy if flash sector fails (acceptable with integrity check)
+
+### Implementation Requirements
+* Factory defaults structure definition in header file
+* Init function to load from flash partition early in boot
+* Serial number formatting and logging functions
+* Factory reset integration to copy defaults to config
+* Compile-time guards for write functions
+* Manufacturing tool documentation
+
+== Implementation Notes
+
+The factory defaults system will be implemented as a separate module in the configuration subsystem. It follows the same integrity verification pattern as configuration persistence but without the ring buffer complexity.
+
+Integration points:
+1. **main.c**: Load factory defaults immediately after stdio_uart_init
+2. **main.c**: Log serial number after software version
+3. **flash_persistence.c**: Apply factory defaults during factory reset
+4. **shared_memory.c**: Reference factory defaults for default values
+
+## Detailed Implementation Strategy
+
+### Partition Table Integration
+* **RP2350 Bootrom APIs**: Use `rom_get_partition_table_info()` for partition discovery
+* **Partition Discovery**: Use partition ID=2 (FLASH_PARTITION_FACTORY_DEFAULTS)
+* **Safe Flash Operations**: Use raw flash read (XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE)
+
+### Integrity Verification
+* **SHA256 Engine**: Use pico-sdk `pico/sha256.h` hardware crypto APIs
+* **Hash Coverage**: SHA256 covers all fields after checksum (production_week through default_password)
+* **Checksum Placement**: SHA256 checksum placed first for easy exclusion
+
+### Early Boot Integration
+* **Load Sequence**: stdio_uart_init → factory_defaults_init() → log_serial_number() → factory_reset_check()
+* **Error Handling**: Invalid factory defaults logged but not fatal (system continues)
+* **Logging**: Serial number displayed immediately after software version
+
+### Factory Reset Application
+```c
+void flash_persistence_factory_reset(void) {
+    // ... existing code ...
+    
+    // Apply factory defaults to shared memory
+    factory_defaults_apply_to_config();
+    
+    // Save configuration with factory defaults
+    flash_persistence_force_save_configuration();
+}
+```
+
+### Function Interface Design
+
+```c
+// Core factory defaults functions (factory_defaults.h)
+bool factory_defaults_init(void);
+void factory_defaults_print_serial_number(void);
+void factory_defaults_apply_to_config(void);
+const factory_defaults_t* factory_defaults_get(void);
+
+// Manufacturing functions (guarded by FACTORY_INTERNAL_VERSION)
+#ifdef FACTORY_INTERNAL_VERSION
+bool factory_defaults_write(const factory_defaults_t* defaults);
+bool factory_defaults_erase(void);
+#endif
+
+// Internal implementation (static in factory_defaults.c)
+static bool load_factory_defaults(void);
+static bool validate_factory_defaults_integrity(const factory_defaults_t* defaults);
+static uint32_t calculate_factory_defaults_checksum(const factory_defaults_t* defaults, uint8_t* checksum_out);
+static bool find_factory_partition_info(uint32_t* start_addr, uint32_t* size);
+```
+
+### Serial Number Format
+Serial number formatted as: `YYWW-NNNNNN` where:
+* YY = Year (2000 + production_year)
+* WW = Week (01-52)
+* NNNNNN = Running number (6 bytes, hexadecimal)
+
+Example: `2601-0A1B2C` = Week 1 of 2026, serial 0x0A1B2C
+
+### Implementation Constants
+
+```c
+// Factory defaults constants (shared_memory.h)
+#define FLASH_PARTITION_FACTORY_DEFAULTS 2              // Partition ID
+#define FACTORY_DEFAULTS_SIZE 8192                      // 8KB partition
+#define FACTORY_DEFAULTS_SERIAL_NUMBER_SIZE 6           // 6-byte running number
+
+// Board type enumeration
+typedef enum {
+    BOARD_TYPE_STANDARD_4CH = 0,    // Standard 4-channel version
+    BOARD_TYPE_COMPACT_2CH = 1,     // Compact 2-channel version
+    BOARD_TYPE_INDUSTRIAL_4CH = 2   // Industrial 4-channel version
+} board_type_t;
+```
+
