@@ -8,6 +8,7 @@ endif()
 add_library(config_manager
     config/shared_memory.c
     config/flash_persistence.c
+    config/factory_defaults.c
     config/uart_config_protocol.c
 )
 

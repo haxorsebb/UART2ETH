@@ -22,6 +22,7 @@
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
 #include "shared_memory.h"
+#include "factory_defaults.h"
 #include "state_machine.h"
 #include "log_manager.h"
 #include "ringbuffer.h"
@@ -83,6 +84,9 @@ int main() {
     printf(_TIMEZ_);
     printf("\n--------SOFTWARE START--------\n");
     
+    // Initialize and display factory defaults (early boot)
+    factory_defaults_init();
+    factory_defaults_print_serial_number();
     
     //read factory reset pin after wait
     if(!gpio_get(FACTORY_RESET_GPIO)) {

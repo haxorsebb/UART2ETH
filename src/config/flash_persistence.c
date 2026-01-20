@@ -11,6 +11,7 @@
  */
 #include "flash_persistence.h"
 #include "shared_memory.h"
+#include "factory_defaults.h"
 #include "device_mode.h"
 #include "log_manager.h"
 #include "pico/stdlib.h"
@@ -404,6 +405,9 @@ void flash_persistence_factory_reset(void) {
         return;
     }
     
+    // Apply factory defaults to configuration (if available)
+    factory_defaults_apply_to_config();
+    
     // Verify the factory defaults were applied
     shared_memory_layout_t* layout = shared_memory_get_layout();
     if (layout) {
@@ -411,12 +415,13 @@ void flash_persistence_factory_reset(void) {
                   layout->config.channels[0].baud_rate);
     }
     
+    // Save configuration with factory defaults applied
+    flash_persistence_force_save_configuration();
+    
     // Update flash state
     g_flash_state.last_written_revision = 0;  // No valid data in flash
     g_flash_state.corruption_events++;       // Count factory reset as corruption event
     g_flash_state.current_write_block = 0;     // Reset to first block
-    
-    printf("-5\n");
     
     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_FACTORY_RESET, 1);
 }
@@ -502,7 +507,7 @@ static bool find_partition_info(uint32_t partition_id, uint32_t* start_addr, uin
 
     pico_partition_t p;
     while (read_next_partition(&pt, &p)) {
-        if(pt.current_partition - 1 == partition_id) {
+        if(p.partition_id == partition_id) {
             *start_addr = p.first_sector * FLASH_SECTOR_SIZE;
             *size = ((p.last_sector + 1) - p.first_sector) * FLASH_SECTOR_SIZE; 
             DEBUG_ONLY({

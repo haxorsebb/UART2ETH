@@ -126,6 +126,13 @@ static const char* const event_format_strings[] = {
     [LOG_EVENT_PERSISTENCE_END] = "Persistence operation completed",
     [LOG_EVENT_PERSISTENCE_NEEDED] = "Persistence needed - configuration changed",
     [LOG_EVENT_SHARED_MEMORY_REINIT] = "Shared memory re-initialized with factory defaults",
+    [LOG_EVENT_FACTORY_PARTITION_NOT_FOUND] = "Factory defaults partition not found",
+    [LOG_EVENT_FACTORY_PARTITION_TOO_SMALL] = "Factory defaults partition too small - size %u bytes",
+    [LOG_EVENT_FACTORY_DEFAULTS_CHECKSUM_FAILED] = "Factory defaults checksum validation failed",
+    [LOG_EVENT_FACTORY_DEFAULTS_LOADED] = "Factory defaults loaded - board type %u",
+    [LOG_EVENT_FACTORY_DEFAULTS_INVALID] = "Factory defaults invalid - using built-in defaults",
+    [LOG_EVENT_FACTORY_DEFAULTS_APPLIED] = "Factory defaults applied to configuration - board type %u",
+    [LOG_EVENT_FACTORY_DEFAULTS_APPLY_FAILED] = "Failed to apply factory defaults - shared memory unavailable",
     
     // OTA events (400-499)
     [LOG_EVENT_OTA_START] = "OTA update started - size %u bytes",

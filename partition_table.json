@@ -35,7 +35,7 @@
     },
     {
       "name": "Factory Defaults",
-      "id": 3,
+      "id": 2,
       "size": "8K",
       "families": ["data"],
       "permissions": {
@@ -48,7 +48,7 @@
     },
     {
       "name": "Configuration Data",
-      "id": 4,
+      "id": 3,
       "size": "512K",
       "families": ["data"],
       "permissions": {
