@@ -31,9 +31,9 @@ extern "C" {
  * @brief Board type enumeration for hardware variant identification
  */
 typedef enum {
-    BOARD_TYPE_STANDARD_4CH = 0,    // Standard 4-channel version
-    BOARD_TYPE_COMPACT_2CH = 1,     // Compact 2-channel version  
-    BOARD_TYPE_INDUSTRIAL_4CH = 2   // Industrial 4-channel version
+    BOARD_TYPE_SHARK = 0,      // Default SHARK board (2 UARTs, ENC28J60)
+    BOARD_TYPE_PRIMARY = 1,    // Primary controller board
+    BOARD_TYPE_SECONDARY = 2   // Secondary controller board
 } board_type_t;
 
 /**
@@ -86,7 +86,7 @@ bool factory_defaults_init(void);
  * @brief Print serial number to console for field identification
  * 
  * Formats serial number as: YYWW-NNNNNN
- * Example: 2601-0A1B2C = Week 1 of 2026, serial 0x0A1B2C
+ * Example: 2601-123456 = Week 1 of 2026, serial 123456
  * 
  * Should be called after factory_defaults_init() and after software version display.
  */

@@ -201,12 +201,12 @@ static bool find_factory_partition_info(uint32_t* start_addr, uint32_t* size);
 ```
 
 ### Serial Number Format
-Serial number formatted as: `YYWW-NNNNNN` where:
+Serial number formatted as: `YYWW-NNNNNNNNNNNN` where:
 * YY = Year (2000 + production_year)
 * WW = Week (01-52)
-* NNNNNN = Running number (6 bytes, hexadecimal)
+* NNNNNNNNNNNN = Running number (6 bytes, decimal, 12 digits with leading zeros)
 
-Example: `2601-0A1B2C` = Week 1 of 2026, serial 0x0A1B2C
+Example: `2601-000000000123` = Week 1 of 2026, serial number 123
 
 ### Implementation Constants
 
@@ -218,9 +218,9 @@ Example: `2601-0A1B2C` = Week 1 of 2026, serial 0x0A1B2C
 
 // Board type enumeration
 typedef enum {
-    BOARD_TYPE_STANDARD_4CH = 0,    // Standard 4-channel version
-    BOARD_TYPE_COMPACT_2CH = 1,     // Compact 2-channel version
-    BOARD_TYPE_INDUSTRIAL_4CH = 2   // Industrial 4-channel version
+    BOARD_TYPE_SHARK = 0,      // Default SHARK board (2 UARTs, ENC28J60)
+    BOARD_TYPE_PRIMARY = 1,    // Primary controller board
+    BOARD_TYPE_SECONDARY = 2   // Secondary controller board
 } board_type_t;
 ```
 

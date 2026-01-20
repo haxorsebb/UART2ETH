@@ -96,16 +96,17 @@ void factory_defaults_print_serial_number(void) {
         return;
     }
     
-    // Format: YYWW-NNNNNN
-    printf("Serial Number: %02u%02u-%02X%02X%02X%02X%02X%02X\n",
+    // Convert 6-byte serial number to decimal value
+    uint64_t serial_decimal = 0;
+    for (int i = 0; i < 6; i++) {
+        serial_decimal = (serial_decimal << 8) | g_factory_defaults.serial_number[i];
+    }
+    
+    // Format: YYWW-NNNNNNNNNNNN (decimal, 12 digits with leading zeros)
+    printf("Serial Number: %02u%02u-%012llu\n",
            g_factory_defaults.production_year,
            g_factory_defaults.production_week,
-           g_factory_defaults.serial_number[0],
-           g_factory_defaults.serial_number[1],
-           g_factory_defaults.serial_number[2],
-           g_factory_defaults.serial_number[3],
-           g_factory_defaults.serial_number[4],
-           g_factory_defaults.serial_number[5]);
+           serial_decimal);
 }
 
 /**
