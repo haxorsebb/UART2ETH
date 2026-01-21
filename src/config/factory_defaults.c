@@ -16,6 +16,7 @@
 #include "flash_persistence.h"
 #include "log_manager.h"
 #include "pico/stdlib.h"
+#include "pico/flash.h"
 #include "hardware/flash.h"
 #include <stdio.h>
 #include <string.h>
@@ -27,6 +28,12 @@ static bool g_factory_defaults_valid = false;
 // Function prototypes
 static bool load_factory_defaults(void);
 static bool validate_factory_defaults_integrity(const factory_defaults_t* defaults);
+
+#ifdef FACTORY_INTERNAL_VERSION
+// Flash callback functions for safe multi-core flash access
+static void call_flash_range_erase(void *param);
+static void call_flash_range_program(void *param);
+#endif
 
 /**
  * Initialize factory defaults system and load from flash
@@ -175,7 +182,9 @@ static bool validate_factory_defaults_integrity(const factory_defaults_t* defaul
 #ifdef FACTORY_INTERNAL_VERSION
 
 /**
- * Write factory defaults to flash partition
+ * Write factory defaults to flash partition (manufacturing use only)
+ * 
+ * Uses flash_safe_execute() for safe multi-core flash access.
  */
 bool factory_defaults_write(const factory_defaults_t* defaults) {
     if (!defaults) {
@@ -210,17 +219,26 @@ bool factory_defaults_write(const factory_defaults_t* defaults) {
         return false;
     }
     
-    // Write data to flash
-    uint32_t ints = save_and_disable_interrupts();
-    flash_range_program(partition_start, (const uint8_t*)&write_data, FLASH_SECTOR_SIZE);
-    restore_interrupts(ints);
+    // Write data to flash using flash_safe_execute for multi-core safety
+    // Flash is "execute in place" and will be in use when code runs on either core.
+    // flash_safe_execute disables interrupts and cooperates with the other core
+    // to ensure flash is not in use during the write operation.
+    uintptr_t params[] = { (uintptr_t)partition_start, (uintptr_t)&write_data };
+    int rc = flash_safe_execute(call_flash_range_program, params, UINT32_MAX);
+    
+    if (rc != PICO_OK) {
+        printf("ERROR: Flash program failed with error code %d\n", rc);
+        return false;
+    }
     
     printf("Factory defaults written successfully\n");
     return true;
 }
 
 /**
- * Erase factory defaults partition
+ * Erase factory defaults partition (manufacturing use only)
+ * 
+ * Uses flash_safe_execute() for safe multi-core flash access.
  */
 bool factory_defaults_erase(void) {
     uint32_t partition_start = 0;
@@ -232,15 +250,43 @@ bool factory_defaults_erase(void) {
         return false;
     }
     
-    // Erase partition (erase full 8KB = 2 sectors)
-    uint32_t ints = save_and_disable_interrupts();
+    // Erase partition (erase full 8KB = 2 sectors) using flash_safe_execute
+    // Flash is "execute in place" and will be in use when code runs on either core.
+    // flash_safe_execute disables interrupts and cooperates with the other core
+    // to ensure flash is not in use during the erase operation.
     for (uint32_t offset = 0; offset < partition_size; offset += FLASH_SECTOR_SIZE) {
-        flash_range_erase(partition_start + offset, FLASH_SECTOR_SIZE);
+        int rc = flash_safe_execute(call_flash_range_erase, (void*)(partition_start + offset), UINT32_MAX);
+        
+        if (rc != PICO_OK) {
+            printf("ERROR: Flash erase failed at offset 0x%X with error code %d\n", 
+                   partition_start + offset, rc);
+            return false;
+        }
     }
-    restore_interrupts(ints);
     
     printf("Factory defaults partition erased\n");
     return true;
+}
+
+// Flash callback functions (called by flash_safe_execute)
+
+/**
+ * Callback function for flash_range_erase called from flash_safe_execute
+ * This will be called when it's safe to erase flash (interrupts disabled, other core coordinated)
+ */
+static void call_flash_range_erase(void *param) {
+    uint32_t offset = (uint32_t)param;
+    flash_range_erase(offset, FLASH_SECTOR_SIZE);
+}
+
+/**
+ * Callback function for flash_range_program called from flash_safe_execute
+ * This will be called when it's safe to program flash (interrupts disabled, other core coordinated)
+ */
+static void call_flash_range_program(void *param) {
+    uint32_t offset = ((uintptr_t*)param)[0];
+    const uint8_t *data = (const uint8_t *)((uintptr_t*)param)[1];
+    flash_range_program(offset, data, FLASH_SECTOR_SIZE);
 }
 
 #endif // FACTORY_INTERNAL_VERSION
