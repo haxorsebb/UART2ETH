@@ -24,6 +24,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef FACTORY_INTERNAL_VERSION
+#include "factory_defaults.h"
+#endif
+
 // HTTP server configuration
 #define HTTP_SERVER_PORT 80
 #define HTTP_SERVER_MAX_CONNECTIONS 2
@@ -63,6 +67,11 @@ static void http_generate_config_page(char* buffer, size_t buffer_size);
 static http_request_type_t http_parse_request_type(const char* request_data);
 static bool http_parse_post_data(const char* post_data, size_t data_len);
 static void http_send_redirect(http_connection_t* conn, const char* location);
+
+#ifdef FACTORY_INTERNAL_VERSION
+static void http_generate_factory_page(char* buffer, size_t buffer_size);
+static bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* error_msg, size_t error_msg_size);
+#endif
 
 /**
  * @brief Initialize HTTP server on port 80
@@ -275,27 +284,63 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     
     if (request_type == HTTP_POST) {
-        // Handle configuration update
-        printf("HTTP Server: Processing configuration update\n");
-        
-        // Parse POST data and update configuration
-        if (http_parse_post_data(request_buffer, copy_len)) {
-            // Configuration updated successfully - redirect to main page
-            http_send_redirect(conn, "/");
-        } else {
-            // Error updating configuration - show error page
-            snprintf(response_buffer, sizeof(response_buffer),
-                "HTTP/1.0 400 Bad Request\r\n"
-                "Content-Type: text/html\r\n"
-                "Connection: close\r\n"
-                "\r\n"
-                "<html><body><h1>Configuration Error</h1>"
-                "<p>Failed to update configuration. Please check your input values.</p>"
-                "<p><a href=\"/\">Return to main page</a></p>"
-                "</body></html>\r\n");
-            http_send_response(conn, response_buffer, strlen(response_buffer));
+        // Determine which form was submitted based on the action URL
+        #ifdef FACTORY_INTERNAL_VERSION
+        if (strstr(request_buffer, "POST /factory") != NULL) {
+            // Handle factory defaults write
+            printf("HTTP Server: Processing factory defaults write\n");
+            
+            char error_msg[256] = {0};
+            if (http_parse_factory_post_data(request_buffer, copy_len, error_msg, sizeof(error_msg))) {
+                // Factory defaults written successfully - redirect to factory page to show result
+                http_send_redirect(conn, "/factory");
+            } else {
+                // Error writing factory defaults - show error page
+                snprintf(response_buffer, sizeof(response_buffer),
+                    "HTTP/1.0 400 Bad Request\r\n"
+                    "Content-Type: text/html\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                    "<html><body><h1>Factory Defaults Error</h1>"
+                    "<p>Failed to write factory defaults: %s</p>"
+                    "<p><a href=\"/factory\">Return to factory page</a></p>"
+                    "</body></html>\r\n",
+                    error_msg[0] ? error_msg : "Unknown error");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+            }
+        } else
+        #endif
+        {
+            // Handle configuration update
+            printf("HTTP Server: Processing configuration update\n");
+            
+            // Parse POST data and update configuration
+            if (http_parse_post_data(request_buffer, copy_len)) {
+                // Configuration updated successfully - redirect to main page
+                http_send_redirect(conn, "/");
+            } else {
+                // Error updating configuration - show error page
+                snprintf(response_buffer, sizeof(response_buffer),
+                    "HTTP/1.0 400 Bad Request\r\n"
+                    "Content-Type: text/html\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                    "<html><body><h1>Configuration Error</h1>"
+                    "<p>Failed to update configuration. Please check your input values.</p>"
+                    "<p><a href=\"/\">Return to main page</a></p>"
+                    "</body></html>\r\n");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+            }
         }
-    } else if (strstr(request_buffer, "GET /config") != NULL) {
+    }
+    #ifdef FACTORY_INTERNAL_VERSION
+    else if (strstr(request_buffer, "GET /factory") != NULL) {
+        // Show factory defaults configuration page
+        http_generate_factory_page(response_buffer, sizeof(response_buffer));
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+    }
+    #endif
+    else if (strstr(request_buffer, "GET /config") != NULL) {
         // Show configuration page
         http_generate_config_page(response_buffer, sizeof(response_buffer));
         http_send_response(conn, response_buffer, strlen(response_buffer));
@@ -989,3 +1034,529 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
                (int)buffer_size - html_len);
     }
 }
+
+#ifdef FACTORY_INTERNAL_VERSION
+/**
+ * @brief Generate factory defaults configuration HTML page (manufacturing only)
+ * 
+ * Documentation Reference:
+ * - ADR-015: Factory Defaults Web Interface
+ */
+static void http_generate_factory_page(char* buffer, size_t buffer_size) {
+    if (!buffer || buffer_size == 0) {
+        return;
+    }
+    
+    // Get current factory defaults (if any)
+    const factory_defaults_t* current_factory = factory_defaults_get();
+    bool factory_valid = factory_defaults_is_valid();
+    
+    // Prepare current values for display
+    char current_serial[32] = "Not Programmed";
+    char current_mac[18] = "00:00:00:00:00:00";
+    char current_ip[16] = "0.0.0.0";
+    char current_netmask[16] = "0.0.0.0";
+    const char* current_dhcp = "No";
+    const char* current_board_type = "Unknown";
+    
+    if (factory_valid && current_factory) {
+        // Format serial number as YYWW-NNNNNNNNNNNN
+        uint64_t serial_decimal = 0;
+        for (int i = 0; i < 6; i++) {
+            serial_decimal = (serial_decimal << 8) | current_factory->serial_number[i];
+        }
+        snprintf(current_serial, sizeof(current_serial), "%02u%02u-%012llu",
+                 current_factory->production_year,
+                 current_factory->production_week,
+                 serial_decimal);
+        
+        // Format MAC address
+        snprintf(current_mac, sizeof(current_mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 current_factory->mac_address[0], current_factory->mac_address[1],
+                 current_factory->mac_address[2], current_factory->mac_address[3],
+                 current_factory->mac_address[4], current_factory->mac_address[5]);
+        
+        // Format IP addresses
+        uint32_t ip = current_factory->default_ip;
+        snprintf(current_ip, sizeof(current_ip), "%d.%d.%d.%d",
+                 (int)((ip >> 0) & 0xFF), (int)((ip >> 8) & 0xFF),
+                 (int)((ip >> 16) & 0xFF), (int)((ip >> 24) & 0xFF));
+        
+        uint32_t netmask = current_factory->default_netmask;
+        snprintf(current_netmask, sizeof(current_netmask), "%d.%d.%d.%d",
+                 (int)((netmask >> 0) & 0xFF), (int)((netmask >> 8) & 0xFF),
+                 (int)((netmask >> 16) & 0xFF), (int)((netmask >> 24) & 0xFF));
+        
+        current_dhcp = current_factory->default_dhcp_enable ? "Yes" : "No";
+        
+        // Get board type name
+        switch (current_factory->board_type) {
+            case BOARD_TYPE_SHARK: current_board_type = "SHARK"; break;
+            case BOARD_TYPE_PRIMARY: current_board_type = "PRIMARY"; break;
+            case BOARD_TYPE_SECONDARY: current_board_type = "SECONDARY"; break;
+            default: current_board_type = "Unknown"; break;
+        }
+    }
+    
+    // Generate HTML response with factory defaults form
+    int html_len = snprintf(buffer, buffer_size,
+        "HTTP/1.0 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head>\n"
+        "    <title>Factory Defaults Configuration</title>\n"
+        "    <style>\n"
+        "        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }\n"
+        "        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 900px; }\n"
+        "        .header { color: #2c3e50; border-bottom: 3px solid #e67e22; padding-bottom: 10px; margin-bottom: 30px; }\n"
+        "        .warning-badge { display: inline-block; padding: 6px 15px; background-color: #e67e22; color: white; border-radius: 4px; font-size: 14px; font-weight: bold; margin-left: 10px; }\n"
+        "        .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 4px; }\n"
+        "        .section h3 { margin-top: 0; color: #2c3e50; }\n"
+        "        .form-group { margin-bottom: 15px; }\n"
+        "        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #34495e; }\n"
+        "        .form-group input, .form-group select { width: 100%%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }\n"
+        "        .form-group small { display: block; margin-top: 3px; color: #7f8c8d; font-size: 12px; }\n"
+        "        .form-row { display: flex; gap: 15px; }\n"
+        "        .form-row .form-group { flex: 1; }\n"
+        "        .checkbox-group { display: flex; align-items: center; }\n"
+        "        .checkbox-group input[type=checkbox] { width: auto; margin-right: 10px; }\n"
+        "        .button { background-color: #27ae60; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }\n"
+        "        .button:hover { background-color: #229954; }\n"
+        "        .button-danger { background-color: #e74c3c; }\n"
+        "        .button-danger:hover { background-color: #c0392b; }\n"
+        "        .button-secondary { background-color: #95a5a6; }\n"
+        "        .button-secondary:hover { background-color: #7f8c8d; }\n"
+        "        .nav-links { margin: 20px 0; text-align: center; }\n"
+        "        .nav-links a { display: inline-block; margin: 0 10px; padding: 10px 20px; background-color: #95a5a6; color: white; text-decoration: none; border-radius: 4px; }\n"
+        "        .nav-links a:hover { background-color: #7f8c8d; }\n"
+        "        .current-factory { background-color: %s; padding: 15px; border-radius: 4px; margin-bottom: 20px; border-left: 4px solid %s; }\n"
+        "        .current-factory h4 { margin-top: 0; color: #2c3e50; }\n"
+        "        .current-factory .value { font-family: monospace; color: #2980b9; font-weight: bold; }\n"
+        "        .preview-box { background-color: #ecf0f1; padding: 10px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 14px; font-weight: bold; }\n"
+        "        .error { color: #e74c3c; border-color: #e74c3c !important; }\n"
+        "        .success { color: #27ae60; }\n"
+        "    </style>\n"
+        "    <script>\n"
+        "        function updateSerialPreview() {\n"
+        "            var year = document.getElementById('prod_year').value;\n"
+        "            var week = document.getElementById('prod_week').value;\n"
+        "            var serial = document.getElementById('serial_number').value;\n"
+        "            var preview = document.getElementById('serial_preview');\n"
+        "            \n"
+        "            if (year && week && serial) {\n"
+        "                var paddedYear = year.padStart(2, '0');\n"
+        "                var paddedWeek = week.padStart(2, '0');\n"
+        "                var paddedSerial = serial.padStart(12, '0');\n"
+        "                preview.textContent = 'Serial: ' + paddedYear + paddedWeek + '-' + paddedSerial;\n"
+        "            } else {\n"
+        "                preview.textContent = 'Serial: ----;--';\n"
+        "            }\n"
+        "        }\n"
+        "        \n"
+        "        function validateForm() {\n"
+        "            var valid = true;\n"
+        "            \n"
+        "            // Validate production year (0-99)\n"
+        "            var year = parseInt(document.getElementById('prod_year').value);\n"
+        "            if (isNaN(year) || year < 0 || year > 99) {\n"
+        "                document.getElementById('prod_year').classList.add('error');\n"
+        "                valid = false;\n"
+        "            } else {\n"
+        "                document.getElementById('prod_year').classList.remove('error');\n"
+        "            }\n"
+        "            \n"
+        "            // Validate production week (1-52)\n"
+        "            var week = parseInt(document.getElementById('prod_week').value);\n"
+        "            if (isNaN(week) || week < 1 || week > 52) {\n"
+        "                document.getElementById('prod_week').classList.add('error');\n"
+        "                valid = false;\n"
+        "            } else {\n"
+        "                document.getElementById('prod_week').classList.remove('error');\n"
+        "            }\n"
+        "            \n"
+        "            // Validate serial number (decimal, 0-281474976710655)\n"
+        "            var serial = document.getElementById('serial_number').value;\n"
+        "            var serialNum = parseInt(serial);\n"
+        "            if (isNaN(serialNum) || serialNum < 0 || serialNum > 281474976710655) {\n"
+        "                document.getElementById('serial_number').classList.add('error');\n"
+        "                valid = false;\n"
+        "            } else {\n"
+        "                document.getElementById('serial_number').classList.remove('error');\n"
+        "            }\n"
+        "            \n"
+        "            // Validate password (max 31 chars)\n"
+        "            var password = document.getElementById('default_password').value;\n"
+        "            if (password.length > 31) {\n"
+        "                document.getElementById('default_password').classList.add('error');\n"
+        "                valid = false;\n"
+        "            } else {\n"
+        "                document.getElementById('default_password').classList.remove('error');\n"
+        "            }\n"
+        "            \n"
+        "            return valid;\n"
+        "        }\n"
+        "        \n"
+        "        function confirmWrite() {\n"
+        "            if (!validateForm()) {\n"
+        "                alert('Please fix validation errors before submitting.');\n"
+        "                return false;\n"
+        "            }\n"
+        "            \n"
+        "            var year = document.getElementById('prod_year').value.padStart(2, '0');\n"
+        "            var week = document.getElementById('prod_week').value.padStart(2, '0');\n"
+        "            var serial = document.getElementById('serial_number').value.padStart(12, '0');\n"
+        "            var mac = document.getElementById('mac_address').value;\n"
+        "            var board = document.getElementById('board_type').selectedOptions[0].text;\n"
+        "            var ip = document.getElementById('default_ip').value;\n"
+        "            var netmask = document.getElementById('default_netmask').value;\n"
+        "            var dhcp = document.getElementById('default_dhcp').checked ? 'Yes' : 'No';\n"
+        "            \n"
+        "            var msg = 'Write factory defaults to flash?\\n\\n' +\n"
+        "                     'Serial Number: ' + year + week + '-' + serial + '\\n' +\n"
+        "                     'MAC Address: ' + mac + '\\n' +\n"
+        "                     'Board Type: ' + board + '\\n' +\n"
+        "                     'Default IP: ' + ip + '\\n' +\n"
+        "                     'Default Netmask: ' + netmask + '\\n' +\n"
+        "                     'Default DHCP: ' + dhcp + '\\n\\n' +\n"
+        "                     'This will permanently program the device!';\n"
+        "            \n"
+        "            return confirm(msg);\n"
+        "        }\n"
+        "    </script>\n"
+        "</head>\n"
+        "<body>\n"
+        "    <div class=\"container\">\n"
+        "        <div class=\"header\">\n"
+        "            <h1>Factory Defaults Configuration<span class=\"warning-badge\">⚠️ FACTORY INTERNAL USE ONLY</span></h1>\n"
+        "            <p>Manufacturing Tool - Program Device-Specific Factory Configuration</p>\n"
+        "        </div>\n"
+        "        \n"
+        "        <div class=\"nav-links\">\n"
+        "            <a href=\"/\">Status</a>\n"
+        "            <a href=\"/config\">Configuration</a>\n"
+        "        </div>\n"
+        "        \n"
+        "        <div class=\"current-factory\">\n"
+        "            <h4>Currently Programmed Factory Defaults</h4>\n"
+        "            <p><strong>Serial Number:</strong> <span class=\"value\">%s</span></p>\n"
+        "            <p><strong>MAC Address:</strong> <span class=\"value\">%s</span></p>\n"
+        "            <p><strong>Board Type:</strong> <span class=\"value\">%s</span></p>\n"
+        "            <p><strong>Default IP:</strong> <span class=\"value\">%s</span> | <strong>Netmask:</strong> <span class=\"value\">%s</span> | <strong>DHCP:</strong> <span class=\"value\">%s</span></p>\n"
+        "        </div>\n"
+        "        \n"
+        "        <form method=\"POST\" action=\"/factory\" onsubmit=\"return confirmWrite();\">\n"
+        "            \n"
+        "            <div class=\"section\">\n"
+        "                <h3>Serial Number</h3>\n"
+        "                \n"
+        "                <div class=\"form-row\">\n"
+        "                    <div class=\"form-group\">\n"
+        "                        <label for=\"prod_year\">Production Year (YY):</label>\n"
+        "                        <input type=\"number\" id=\"prod_year\" name=\"prod_year\" min=\"0\" max=\"99\" value=\"26\" oninput=\"updateSerialPreview()\" required>\n"
+        "                        <small>Enter YY for 20YY (e.g., 26 for 2026)</small>\n"
+        "                    </div>\n"
+        "                    \n"
+        "                    <div class=\"form-group\">\n"
+        "                        <label for=\"prod_week\">Production Week:</label>\n"
+        "                        <input type=\"number\" id=\"prod_week\" name=\"prod_week\" min=\"1\" max=\"52\" value=\"1\" oninput=\"updateSerialPreview()\" required>\n"
+        "                        <small>Week of production (1-52)</small>\n"
+        "                    </div>\n"
+        "                </div>\n"
+        "                \n"
+        "                <div class=\"form-group\">\n"
+        "                    <label for=\"serial_number\">Serial Number (Decimal):</label>\n"
+        "                    <input type=\"text\" id=\"serial_number\" name=\"serial_number\" value=\"1\" oninput=\"updateSerialPreview()\" required>\n"
+        "                    <small>6-byte unique device serial (decimal: 0 to 281474976710655)</small>\n"
+        "                    <div id=\"serial_preview\" class=\"preview-box\">Serial: 2601-000000000001</div>\n"
+        "                </div>\n"
+        "            </div>\n"
+        "            \n"
+        "            <div class=\"section\">\n"
+        "                <h3>Network Identity</h3>\n"
+        "                \n"
+        "                <div class=\"form-group\">\n"
+        "                    <label for=\"mac_address\">MAC Address:</label>\n"
+        "                    <input type=\"text\" id=\"mac_address\" name=\"mac_address\" value=\"02:00:00:00:00:01\" placeholder=\"02:00:00:00:00:01\" required>\n"
+        "                    <small>Unique MAC address (format: XX:XX:XX:XX:XX:XX)</small>\n"
+        "                </div>\n"
+        "            </div>\n"
+        "            \n"
+        "            <div class=\"section\">\n"
+        "                <h3>Board Type</h3>\n"
+        "                \n"
+        "                <div class=\"form-group\">\n"
+        "                    <label for=\"board_type\">Hardware Variant:</label>\n"
+        "                    <select id=\"board_type\" name=\"board_type\" required>\n"
+        "                        <option value=\"0\" selected>SHARK - Default SHARK board (2 UARTs, ENC28J60)</option>\n"
+        "                        <option value=\"1\">PRIMARY - Primary controller board</option>\n"
+        "                        <option value=\"2\">SECONDARY - Secondary controller board</option>\n"
+        "                    </select>\n"
+        "                </div>\n"
+        "            </div>\n"
+        "            \n"
+        "            <div class=\"section\">\n"
+        "                <h3>Default Network Configuration</h3>\n"
+        "                \n"
+        "                <div class=\"form-row\">\n"
+        "                    <div class=\"form-group\">\n"
+        "                        <label for=\"default_ip\">Default IP Address:</label>\n"
+        "                        <input type=\"text\" id=\"default_ip\" name=\"default_ip\" value=\"192.168.1.100\" placeholder=\"192.168.1.100\" required>\n"
+        "                        <small>Factory default static IP</small>\n"
+        "                    </div>\n"
+        "                    \n"
+        "                    <div class=\"form-group\">\n"
+        "                        <label for=\"default_netmask\">Default Netmask:</label>\n"
+        "                        <input type=\"text\" id=\"default_netmask\" name=\"default_netmask\" value=\"255.255.255.0\" placeholder=\"255.255.255.0\" required>\n"
+        "                        <small>Factory default netmask</small>\n"
+        "                    </div>\n"
+        "                </div>\n"
+        "                \n"
+        "                <div class=\"form-group\">\n"
+        "                    <div class=\"checkbox-group\">\n"
+        "                        <input type=\"checkbox\" id=\"default_dhcp\" name=\"default_dhcp\" value=\"1\">\n"
+        "                        <label for=\"default_dhcp\">Enable DHCP by default</label>\n"
+        "                    </div>\n"
+        "                    <small>Unchecked = use static IP by default</small>\n"
+        "                </div>\n"
+        "            </div>\n"
+        "            \n"
+        "            <div class=\"section\">\n"
+        "                <h3>Security</h3>\n"
+        "                \n"
+        "                <div class=\"form-group\">\n"
+        "                    <label for=\"default_password\">Factory Default Password:</label>\n"
+        "                    <input type=\"text\" id=\"default_password\" name=\"default_password\" value=\"admin\" maxlength=\"31\" required>\n"
+        "                    <small>Factory default admin password (max 31 characters)</small>\n"
+        "                </div>\n"
+        "            </div>\n"
+        "            \n"
+        "            <div class=\"section\">\n"
+        "                <h3>Actions</h3>\n"
+        "                <p><strong>Warning:</strong> Writing factory defaults will permanently program device-specific data to flash memory.</p>\n"
+        "                \n"
+        "                <button type=\"submit\" class=\"button\">✓ Write Factory Defaults</button>\n"
+        "                <a href=\"/\" class=\"button button-secondary\" style=\"text-decoration: none; display: inline-block; margin-left: 10px;\">Cancel</a>\n"
+        "            </div>\n"
+        "            \n"
+        "        </form>\n"
+        "    </div>\n"
+        "</body>\n"
+        "</html>\r\n",
+        factory_valid ? "#d5f4e6" : "#fadbd8",  // Background color
+        factory_valid ? "#27ae60" : "#e74c3c",  // Border color
+        current_serial, current_mac, current_board_type, 
+        current_ip, current_netmask, current_dhcp
+    );
+    
+    printf("HTTP: Generated factory page HTML length: %d bytes (max: %d)\n", html_len, (int)buffer_size);
+    if (html_len >= buffer_size) {
+        printf("HTTP: ERROR - Factory HTML truncated! Need at least %d bytes\n", html_len);
+    }
+}
+
+/**
+ * @brief Parse factory defaults POST data and write to flash (manufacturing only)
+ * 
+ * Documentation Reference:
+ * - ADR-015: Factory Defaults Web Interface
+ */
+static bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* error_msg, size_t error_msg_size) {
+    // Find start of form data (after double CRLF)
+    const char* form_start = strstr(post_data, "\r\n\r\n");
+    if (!form_start) {
+        snprintf(error_msg, error_msg_size, "Invalid POST data format");
+        return false;
+    }
+    form_start += 4; // Skip past \r\n\r\n
+    
+    printf("HTTP: Parsing factory defaults form data: %s\n", form_start);
+    
+    // Prepare factory defaults structure
+    factory_defaults_t factory_data = {0};
+    
+    // Parse form fields
+    char* form_copy = malloc(strlen(form_start) + 1);
+    if (!form_copy) {
+        snprintf(error_msg, error_msg_size, "Memory allocation failed");
+        return false;
+    }
+    strcpy(form_copy, form_start);
+    
+    // Initialize defaults
+    uint8_t prod_year = 0;
+    uint8_t prod_week = 0;
+    uint64_t serial_number = 0;
+    bool has_year = false, has_week = false, has_serial = false;
+    bool has_mac = false, has_board_type = false;
+    bool has_ip = false, has_netmask = false;
+    bool has_password = false;
+    
+    char* token = strtok(form_copy, "&");
+    while (token) {
+        char* equals = strchr(token, '=');
+        if (equals) {
+            *equals = '\0';
+            char* key = token;
+            char* value = equals + 1;
+            
+            // Parse serial number fields
+            if (strcmp(key, "prod_year") == 0) {
+                int year = atoi(value);
+                if (year >= 0 && year <= 99) {
+                    prod_year = (uint8_t)year;
+                    has_year = true;
+                }
+            } else if (strcmp(key, "prod_week") == 0) {
+                int week = atoi(value);
+                if (week >= 1 && week <= 52) {
+                    prod_week = (uint8_t)week;
+                    has_week = true;
+                }
+            } else if (strcmp(key, "serial_number") == 0) {
+                // Parse decimal serial number
+                unsigned long long sn = strtoull(value, NULL, 10);
+                if (sn <= 281474976710655ULL) {  // Max value for 6 bytes
+                    serial_number = sn;
+                    has_serial = true;
+                }
+            } 
+            // Parse MAC address
+            else if (strcmp(key, "mac_address") == 0) {
+                int m[6];
+                if (sscanf(value, "%02x:%02x:%02x:%02x:%02x:%02x", 
+                          &m[0], &m[1], &m[2], &m[3], &m[4], &m[5]) == 6 ||
+                    sscanf(value, "%02x-%02x-%02x-%02x-%02x-%02x", 
+                          &m[0], &m[1], &m[2], &m[3], &m[4], &m[5]) == 6) {
+                    for (int i = 0; i < 6; i++) {
+                        factory_data.mac_address[i] = (uint8_t)m[i];
+                    }
+                    has_mac = true;
+                }
+            }
+            // Parse board type
+            else if (strcmp(key, "board_type") == 0) {
+                int board_type = atoi(value);
+                if (board_type >= 0 && board_type <= 2) {
+                    factory_data.board_type = (uint8_t)board_type;
+                    has_board_type = true;
+                }
+            }
+            // Parse default IP
+            else if (strcmp(key, "default_ip") == 0) {
+                int a, b, c, d;
+                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4) {
+                    factory_data.default_ip = (uint32_t)a | ((uint32_t)b << 8) | 
+                                             ((uint32_t)c << 16) | ((uint32_t)d << 24);
+                    has_ip = true;
+                }
+            }
+            // Parse default netmask
+            else if (strcmp(key, "default_netmask") == 0) {
+                int a, b, c, d;
+                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4) {
+                    factory_data.default_netmask = (uint32_t)a | ((uint32_t)b << 8) | 
+                                                  ((uint32_t)c << 16) | ((uint32_t)d << 24);
+                    has_netmask = true;
+                }
+            }
+            // Parse default DHCP
+            else if (strcmp(key, "default_dhcp") == 0 && strcmp(value, "1") == 0) {
+                factory_data.default_dhcp_enable = 1;
+            }
+            // Parse default password
+            else if (strcmp(key, "default_password") == 0) {
+                // URL decode password (replace + with space, decode %)
+                char decoded_password[32] = {0};
+                size_t decoded_len = 0;
+                for (size_t i = 0; value[i] && decoded_len < 31; i++) {
+                    if (value[i] == '+') {
+                        decoded_password[decoded_len++] = ' ';
+                    } else if (value[i] == '%' && value[i+1] && value[i+2]) {
+                        int hex_val;
+                        sscanf(&value[i+1], "%02x", &hex_val);
+                        decoded_password[decoded_len++] = (char)hex_val;
+                        i += 2;
+                    } else {
+                        decoded_password[decoded_len++] = value[i];
+                    }
+                }
+                strncpy(factory_data.default_password, decoded_password, 31);
+                factory_data.default_password[31] = '\0';
+                has_password = true;
+            }
+        }
+        token = strtok(NULL, "&");
+    }
+    
+    free(form_copy);
+    
+    // Validate all required fields present
+    if (!has_year || !has_week || !has_serial) {
+        snprintf(error_msg, error_msg_size, "Missing serial number fields");
+        return false;
+    }
+    if (!has_mac) {
+        snprintf(error_msg, error_msg_size, "Missing MAC address");
+        return false;
+    }
+    if (!has_board_type) {
+        snprintf(error_msg, error_msg_size, "Missing board type");
+        return false;
+    }
+    if (!has_ip || !has_netmask) {
+        snprintf(error_msg, error_msg_size, "Missing IP configuration");
+        return false;
+    }
+    if (!has_password) {
+        snprintf(error_msg, error_msg_size, "Missing default password");
+        return false;
+    }
+    
+    // Convert decimal serial number to 6-byte array (big-endian)
+    factory_data.production_year = prod_year;
+    factory_data.production_week = prod_week;
+    for (int i = 5; i >= 0; i--) {
+        factory_data.serial_number[i] = (uint8_t)(serial_number & 0xFF);
+        serial_number >>= 8;
+    }
+    
+    // Log what we're about to write
+    printf("HTTP: Factory defaults to write:\n");
+    printf("  Serial: %02u%02u-%02X%02X%02X%02X%02X%02X\n",
+           factory_data.production_year, factory_data.production_week,
+           factory_data.serial_number[0], factory_data.serial_number[1],
+           factory_data.serial_number[2], factory_data.serial_number[3],
+           factory_data.serial_number[4], factory_data.serial_number[5]);
+    printf("  MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+           factory_data.mac_address[0], factory_data.mac_address[1],
+           factory_data.mac_address[2], factory_data.mac_address[3],
+           factory_data.mac_address[4], factory_data.mac_address[5]);
+    printf("  Board Type: %u\n", factory_data.board_type);
+    printf("  Default IP: %u.%u.%u.%u\n",
+           (unsigned int)(factory_data.default_ip & 0xFF),
+           (unsigned int)((factory_data.default_ip >> 8) & 0xFF),
+           (unsigned int)((factory_data.default_ip >> 16) & 0xFF),
+           (unsigned int)((factory_data.default_ip >> 24) & 0xFF));
+    printf("  Default DHCP: %s\n", factory_data.default_dhcp_enable ? "Yes" : "No");
+    
+    // Write factory defaults to flash
+    if (!factory_defaults_write(&factory_data)) {
+        snprintf(error_msg, error_msg_size, "Flash write operation failed");
+        return false;
+    }
+    
+    printf("HTTP: Factory defaults written successfully!\n");
+    
+    // Verify by reloading
+    if (!factory_defaults_init()) {
+        snprintf(error_msg, error_msg_size, "Write succeeded but verification failed");
+        return false;
+    }
+    
+    printf("HTTP: Factory defaults verified successfully!\n");
+    return true;
+}
+#endif // FACTORY_INTERNAL_VERSION
