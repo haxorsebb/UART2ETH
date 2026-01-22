@@ -326,6 +326,16 @@
                                    href="../../arc42/adrs/ADR-013-pio-uart-implementation.html" title="ADR-013: PIO UART Implementation for Channel 2">ADR-013: PIO UART Implementation for Channel 2</a>
                                 
                             </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/adrs/ADR-014-factory-defaults-implementation.html" title="ADR-014: Factory Defaults Implementation">ADR-014: Factory Defaults Implementation</a>
+                                
+                            </li>
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/adrs/ADR-015-factory-defaults-web-interface.html" title="ADR-015: Factory Defaults Web Interface">ADR-015: Factory Defaults Web Interface</a>
+                                
+                            </li>
                         </ul>
                       </li>
                   </ul>
@@ -390,9 +400,10 @@
 <li><a href="#_error_handling_and_recovery">Error Handling and Recovery</a></li>
 <li><a href="#_ring_buffer_state_management">Ring Buffer State Management</a></li>
 <li><a href="#_memory_layout_and_data_structures">Memory Layout and Data Structures</a></li>
-<li><a href="#_implementation_phases">Implementation Phases</a></li>
+<li><a href="#_implementation_phases_completed">Implementation Phases (Completed)</a></li>
 <li><a href="#_function_interface_design">Function Interface Design</a></li>
 <li><a href="#_test_strategy">Test Strategy</a></li>
+<li><a href="#_implementation_constants">Implementation Constants</a></li>
 </ul>
 </li>
 </ul>
@@ -457,7 +468,7 @@
 <h2 id="_decision">Decision</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>We will implement flash persistence using a <strong>4-page ring buffer strategy</strong> with <strong>RP2350 partition table isolation</strong> for industrial reliability:</p>
+<p>We will implement flash persistence using an <strong>8-block ring buffer strategy</strong> with <strong>RP2350 partition table isolation</strong> for industrial reliability:</p>
 </div>
 <div class="sect2">
 <h3 id="_flash_partitioning_strategy">Flash Partitioning Strategy</h3>
@@ -467,7 +478,7 @@
 <p><strong>RP2350 Partition Table</strong>: Use native partition system for true isolation</p>
 </li>
 <li>
-<p><strong>Configuration Data Partition</strong>: Dedicated 512KB data partition (ID=2)</p>
+<p><strong>Configuration Data Partition</strong>: Dedicated data partition (ID=3) discovered via bootrom APIs</p>
 </li>
 <li>
 <p><strong>A/B Firmware Isolation</strong>: Firmware updates never touch configuration partition</p>
@@ -483,13 +494,16 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Raw binary storage</strong>: Direct copy of <code>g_shared_memory</code> structure to flash</p>
+<p><strong>Raw binary storage</strong>: Direct copy of <code>shared_memory_layout_t</code> structure to flash</p>
 </li>
 <li>
 <p><strong>No JSON or schema validation</strong>: Eliminates parsing overhead and complexity</p>
 </li>
 <li>
-<p><strong>Complete structure per snapshot</strong>: Atomic writes of entire configuration</p>
+<p><strong>Complete structure per block</strong>: Atomic writes of entire configuration</p>
+</li>
+<li>
+<p><strong>Embedded shared memory</strong>: Shared memory is statically allocated within a flash persistence block structure</p>
 </li>
 </ul>
 </div>
@@ -499,19 +513,22 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>4 Configuration Snapshots</strong> organized as circular ring buffer within data partition</p>
+<p><strong>8 Configuration Blocks</strong> organized as circular ring buffer within data partition</p>
 </li>
 <li>
-<p><strong>Wear leveling</strong>: Sequential writes advance through ring</p>
+<p><strong>Block size</strong>: 64KB per block (16 × 4096-byte flash sectors)</p>
 </li>
 <li>
-<p><strong>Snapshot metadata</strong>: Revision counter + SHA256 checksum per snapshot</p>
+<p><strong>Wear leveling</strong>: Sequential writes advance through ring, sector-by-sector updates</p>
 </li>
 <li>
-<p><strong>Magic number</strong>: Snapshot validity marker (<code>0xC0FFEEAA</code>)</p>
+<p><strong>Block metadata</strong>: SHA256 checksum (first field) + magic number + revision counter per block</p>
 </li>
 <li>
-<p><strong>Partition isolation</strong>: 512KB data partition provides 128x current needs</p>
+<p><strong>Magic number</strong>: Block validity marker (<code>0xC0FFEEAA</code>)</p>
+</li>
+<li>
+<p><strong>Partition discovery</strong>: Runtime partition table lookup via bootrom APIs</p>
 </li>
 </ul>
 </div>
@@ -530,7 +547,13 @@
 <p><strong>Change detection</strong>: Write only when <code>revision_counter</code> increments</p>
 </li>
 <li>
-<p><strong>Atomic operations</strong>: Complete snapshot written or nothing</p>
+<p><strong>Sector-level updates</strong>: Only changed sectors within a block are erased and reprogrammed</p>
+</li>
+<li>
+<p><strong>Safe flash operations</strong>: Uses <code>flash_safe_execute()</code> for interrupt-safe flash access</p>
+</li>
+<li>
+<p><strong>Write-in-progress tracking</strong>: Prevents concurrent write operations</p>
 </li>
 </ul>
 </div>
@@ -540,13 +563,13 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Startup validation</strong>: Read all 4 snapshots, verify checksums</p>
+<p><strong>Startup validation</strong>: Read all 8 blocks, verify checksums</p>
 </li>
 <li>
-<p><strong>Snapshot selection</strong>: Use snapshot with highest revision + valid checksum</p>
+<p><strong>Block selection</strong>: Use block with highest revision + valid checksum</p>
 </li>
 <li>
-<p><strong>Corruption handling</strong>: Skip invalid snapshots, fallback to factory defaults</p>
+<p><strong>Corruption handling</strong>: Skip invalid blocks, fallback to factory defaults</p>
 </li>
 <li>
 <p><strong>Error logging</strong>: Track corruption events for diagnostics</p>
@@ -564,10 +587,10 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Power-loss safety</strong>: Atomic page writes prevent partial corruption</p>
+<p><strong>Power-loss safety</strong>: Sector-by-sector writes with checksums prevent partial corruption</p>
 </li>
 <li>
-<p><strong>Wear leveling</strong>: Ring buffer distributes writes across 4 pages</p>
+<p><strong>Wear leveling</strong>: Ring buffer distributes writes across 8 blocks</p>
 </li>
 <li>
 <p><strong>Fast recovery</strong>: Simple page validation, no complex parsing</p>
@@ -616,13 +639,13 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Flash usage</strong>: 512KB data partition (32x current needs) for configuration ring buffer</p>
+<p><strong>Flash usage</strong>: 8 × 64KB blocks for configuration ring buffer</p>
 </li>
 <li>
 <p><strong>Write frequency</strong>: Limited to 30-second intervals (acceptable for config changes)</p>
 </li>
 <li>
-<p><strong>Recovery time</strong>: Startup requires reading/validating 4 snapshots (minimal impact)</p>
+<p><strong>Recovery time</strong>: Startup requires reading/validating 8 blocks (minimal impact)</p>
 </li>
 <li>
 <p><strong>Partition complexity</strong>: Requires RP2350 partition table support in build system</p>
@@ -649,10 +672,10 @@
 <p><strong>Industrial Reliability</strong>: RP2350 partition table provides true isolation guarantees</p>
 </li>
 <li>
-<p><strong>Future Growth</strong>: 512KB partition allows 32x expansion for new features</p>
+<p><strong>Future Growth</strong>: Partition size determined by partition table, allows expansion</p>
 </li>
 <li>
-<p><strong>Automatic wear leveling</strong>: Ring buffer distributes writes across larger space</p>
+<p><strong>Automatic wear leveling</strong>: Ring buffer distributes writes across 8 blocks</p>
 </li>
 <li>
 <p><strong>Simple implementation</strong>: Raw binary storage reduces bugs and maintenance</p>
@@ -671,7 +694,7 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Flash usage</strong>: 512KB data partition reservation (generous allocation)</p>
+<p><strong>Flash usage</strong>: 8 × 64KB blocks reserved for ring buffer</p>
 </li>
 <li>
 <p><strong>Write frequency</strong>: Limited to 30-second intervals (acceptable for config changes)</p>
@@ -680,7 +703,7 @@
 <p><strong>Build complexity</strong>: Requires partition table embedding in build system</p>
 </li>
 <li>
-<p><strong>No incremental updates</strong>: Entire structure written each time</p>
+<p><strong>Sector-level granularity</strong>: Updates are sector-by-sector within blocks, but still writes complete block metadata</p>
 </li>
 </ul>
 </div>
@@ -730,16 +753,16 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>RP2350 Bootrom APIs</strong>: Use <code>rom_get_partition_table_info()</code> and <code>rom_flash_op()</code> for partition access</p>
+<p><strong>RP2350 Bootrom APIs</strong>: Use <code>rom_get_partition_table_info()</code> for partition discovery</p>
 </li>
 <li>
 <p><strong>No Raw Flash Offsets</strong>: Leverage bootrom partition table parsing instead of manual calculations</p>
 </li>
 <li>
-<p><strong>Permission Checking</strong>: Bootrom automatically validates partition permissions during flash operations</p>
+<p><strong>Safe Flash Operations</strong>: Use <code>flash_safe_execute()</code> for interrupt-safe flash erase/program</p>
 </li>
 <li>
-<p><strong>Partition Discovery</strong>: Use partition ID=2 to locate configuration data partition at runtime</p>
+<p><strong>Partition Discovery</strong>: Use partition ID=3 (FLASH_PARTITION_CONFIGURATION_DATA) to locate configuration data partition at runtime</p>
 </li>
 </ul>
 </div>
@@ -749,16 +772,19 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>SHA256 Engine</strong>: Use pico-sdk hardware crypto APIs for integrity verification</p>
+<p><strong>SHA256 Engine</strong>: Use pico-sdk <code>pico/sha256.h</code> hardware crypto APIs for integrity verification</p>
 </li>
 <li>
-<p><strong>Fresh Implementation</strong>: Start with clean integration of <code>pico/crypto/hash.h</code> interfaces</p>
+<p><strong>RP2350 Hardware Acceleration</strong>: Uses <code>pico_sha256_start_blocking()</code>, <code>pico_sha256_update_blocking()</code>, <code>pico_sha256_finish()</code></p>
 </li>
 <li>
 <p><strong>Performance Optimization</strong>: Hardware acceleration eliminates software SHA256 overhead</p>
 </li>
 <li>
-<p><strong>Atomic Checksum</strong>: Generate SHA256 for complete shared memory structure per snapshot</p>
+<p><strong>Checksum Placement</strong>: SHA256 checksum placed first in block structure to simplify exclusion during hash calculation</p>
+</li>
+<li>
+<p><strong>Hash Coverage</strong>: SHA256 covers all fields after the checksum (magic_number through padding)</p>
 </li>
 </ul>
 </div>
@@ -806,7 +832,7 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Factory Reset Strategy</strong>: If all 4 ring buffer pages corrupt, load <code>shared_memory_init()</code> defaults</p>
+<p><strong>Factory Reset Strategy</strong>: If all 8 ring buffer blocks corrupt, load factory defaults via <code>shared_memory_force_reinit()</code></p>
 </li>
 <li>
 <p><strong>Recovery Event Logging</strong>: Use existing <code>log_event()</code> API to record factory reset as first entry</p>
@@ -825,16 +851,16 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>4-Page Circular Buffer</strong>: Pages 0-3 in sequential write order with wrap-around at page 3→0</p>
+<p><strong>8-Block Circular Buffer</strong>: Blocks 0-7 in sequential write order with wrap-around at block 7→0</p>
 </li>
 <li>
-<p><strong>Page Selection Logic</strong>: Write to next page in sequence, select highest revision during recovery</p>
+<p><strong>Block Selection Logic</strong>: Write to next block in sequence, select highest revision during recovery</p>
 </li>
 <li>
-<p><strong>Write State Persistence</strong>: Track current write page position across power cycles</p>
+<p><strong>Write State Tracking</strong>: Track current write block position in static state structure</p>
 </li>
 <li>
-<p><strong>Overflow Handling</strong>: After page 3, wrap to page 0 for continuous wear leveling</p>
+<p><strong>Overflow Handling</strong>: After block 7, wrap to block 0 for continuous wear leveling</p>
 </li>
 </ul>
 </div>
@@ -843,63 +869,77 @@
 <h3 id="_memory_layout_and_data_structures">Memory Layout and Data Structures</h3>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Flash persistence page structure (4096 bytes flash sector aligned)
+<pre class="prettyprint highlight"><code data-lang="c">// Flash persistence block structure (64KB aligned, 16 × 4096-byte sectors)
+// Note: sha256_checksum is placed first to simplify exclusion during hash calculation.
+// The hash covers all fields after sha256_checksum (magic_number through padding).
 typedef struct {
-    uint32_t magic_number;                    // 0xC0FFEEAA page validity
+    uint8_t  sha256_checksum[32];             // Block integrity verification (FIRST for easy hash exclusion)
+    uint32_t magic_number;                    // 0xC0FFEEAA block validity
     uint32_t revision_counter;                // Write sequence tracking
-    uint8_t  sha256_checksum[32];             // Hardware crypto checksum
     uint32_t reserved[4];                     // Future expansion
 
     shared_memory_layout_t shared_memory_data; // Complete config snapshot
 
-    uint8_t padding[...];                     // Flash sector alignment
-} __attribute__((packed, aligned(4096))) flash_persistence_page_t;
+    uint8_t padding[...];                     // Padding to 64KB block size
+} __attribute__((packed, aligned(4096))) flash_persistence_block_t;
 
-// Ring buffer management state (persistent across reboots)
+// Ring buffer management state (runtime tracking, not persisted)
 typedef struct {
-    uint8_t  current_write_page;              // 0-3, next page to write
-    uint8_t  last_valid_page;                 // 0-3, last successfully read
+    uint8_t  current_write_block;             // 0-7, next block to write
+    uint8_t  last_valid_block;                // 0-7, last successfully read
     uint32_t total_writes_lifetime;           // Total write operations
     uint32_t corruption_events;               // Detected corruption count
     uint32_t last_written_revision;           // Change detection state
     uint32_t last_write_timestamp_ms;         // Write frequency control
-} flash_persistence_state_t;</code></pre>
+    uint8_t  active_config_partition_id;      // Current config partition (3)
+    uint32_t partition_start_offset;          // Partition start address
+    uint32_t partition_size;                  // Partition size in bytes
+    bool     initialized;                     // Initialization status
+    bool     write_in_progress;               // Prevents concurrent writes
+} flash_persistence_state_t;
+
+// Shared memory is statically allocated within a flash_persistence_block_t:
+static flash_persistence_block_t aligned_block_including_logs
+    __attribute__((aligned(64 * 1024))) = {0};
+static shared_memory_layout_t* g_shared_memory =
+    &amp;(aligned_block_including_logs.shared_memory_data);</code></pre>
 </div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_implementation_phases">Implementation Phases</h3>
+<h3 id="_implementation_phases_completed">Implementation Phases (Completed)</h3>
 <div class="paragraph">
-<p><strong>Phase 1: Core Infrastructure</strong>
-1. Create <code>flash_persistence.c</code> implementation file
-2. Add partition table discovery using bootrom APIs
-3. Implement hardware SHA256 integration
-4. Add basic ring buffer state management</p>
+<p><strong>Phase 1: Core Infrastructure</strong> ✓
+1. Created <code>flash_persistence.c</code> and <code>flash_persistence.h</code> implementation files
+2. Implemented partition table discovery using bootrom APIs (<code>rom_get_partition_table_info()</code>)
+3. Integrated hardware SHA256 via <code>pico/sha256.h</code>
+4. Implemented 8-block ring buffer state management</p>
 </div>
 <div class="paragraph">
-<p><strong>Phase 2: Core1 Integration</strong>
-1. Create <code>core1_main()</code> function with task scheduling
-2. Integrate persistence checking as lowest priority task
-3. Add change detection and write frequency limiting
-4. Implement atomic write operations with error handling</p>
+<p><strong>Phase 2: Core1 Integration</strong> ✓
+1. Persistence checking integrated as lowest priority Core1 task
+2. Implemented change detection via revision counter comparison
+3. Added 30-second write frequency limiting
+4. Implemented sector-by-sector flash updates with <code>flash_safe_execute()</code></p>
 </div>
 <div class="paragraph">
-<p><strong>Phase 3: Recovery and Error Handling</strong>
-1. Add startup recovery logic with page validation
-2. Implement factory reset fallback for total corruption
-3. Add comprehensive error logging and diagnostics
-4. Test power-loss safety with real hardware</p>
+<p><strong>Phase 3: Recovery and Error Handling</strong> ✓
+1. Startup recovery validates all 8 blocks, selects highest valid revision
+2. Factory reset erases all blocks and calls <code>shared_memory_force_reinit()</code>
+3. Comprehensive error logging via <code>log_event()</code> API
+4. Device mode enforcement after flash load (GPIO pins, channel enables)</p>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_function_interface_design">Function Interface Design</h3>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Core persistence management functions
+<pre class="prettyprint highlight"><code data-lang="c">// Core persistence management functions (shared_memory.h)
 bool flash_persistence_init(void);
 bool flash_persistence_load_configuration(void);
 bool flash_persistence_save_configuration_if_needed(void);
 bool flash_persistence_force_save_configuration(void);
+bool flash_persistence_save_needed(void);
 void flash_persistence_factory_reset(void);
 
 // Diagnostic and monitoring functions
@@ -907,14 +947,19 @@ uint32_t flash_persistence_get_write_count(void);
 uint32_t flash_persistence_get_corruption_count(void);
 bool flash_persistence_verify_ring_buffer_integrity(void);
 
-// Internal implementation functions (static)
+// State access (flash_persistence.h)
+flash_persistence_state_t* get_persistence_state(void);
+
+// Internal implementation functions (static in flash_persistence.c)
 static bool find_partition_info(uint32_t partition_id, uint32_t* start_addr, uint32_t* size);
-static bool read_flash_page(uint32_t page_index, flash_persistence_page_t* page_data);
-static bool write_flash_page(uint32_t page_index, const flash_persistence_page_t* page_data);
-static bool validate_page_integrity(const flash_persistence_page_t* page_data);
-static uint32_t calculate_sha256_checksum(const shared_memory_layout_t* data);
-static int find_best_valid_page(void);
-static void advance_ring_buffer_position(void);</code></pre>
+static bool read_flash_block(uint32_t block_index, flash_persistence_block_t* block_data);
+static bool write_flash_block(uint32_t block_index, const flash_persistence_block_t* block_data);
+static bool validate_block_integrity(const flash_persistence_block_t* block_data);
+static uint32_t calculate_sha256_checksum(const void* data, size_t size, uint8_t* checksum_out);
+static int find_best_valid_block(void);
+static void advance_ring_buffer_position(void);
+static void call_flash_range_erase(void *param);
+static void call_flash_range_program(void *param);</code></pre>
 </div>
 </div>
 </div>
@@ -924,7 +969,7 @@ static void advance_ring_buffer_position(void);</code></pre>
 <p><strong>Unit Tests (TDD Approach)</strong>
 * Test partition discovery and validation
 * Test hardware SHA256 checksum generation
-* Test ring buffer page selection logic
+* Test ring buffer block selection logic
 * Test change detection algorithms
 * Test write frequency limiting
 * Test corruption detection and recovery</p>
@@ -938,10 +983,30 @@ static void advance_ring_buffer_position(void);</code></pre>
 </div>
 <div class="paragraph">
 <p><strong>Hardware Tests</strong>
-* Real flash write/erase/read cycles
+* Real flash write/erase/read cycles on RP2350 target
 * Power-loss safety validation
 * Flash wear testing with extended write cycles
-* Performance benchmarking under load</p>
+* Performance benchmarking under load
+* Sector-by-sector update verification</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_constants">Implementation Constants</h3>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Flash persistence constants (shared_memory.h)
+#define FLASH_PERSISTENCE_RING_SIZE 8                    // 8 blocks in ring buffer
+#define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
+#define FLASH_PERSISTENCE_BLOCK_SIZE (16*4096)           // 64KB per block
+#define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Block validity marker
+#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
+
+// Partition IDs
+#define FLASH_PARTITION_FIRMWARE_A 0
+#define FLASH_PARTITION_FIRMWARE_B 1
+#define FLASH_PARTITION_FACTORY_DEFAULTS 2
+#define FLASH_PARTITION_CONFIGURATION_DATA 3</code></pre>
+</div>
 </div>
 </div>
 </div>

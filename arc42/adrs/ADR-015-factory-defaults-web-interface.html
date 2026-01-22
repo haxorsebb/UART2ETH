@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-007-state-machine-architecture.html -->
+    <!-- sourceuri: arc42/adrs/ADR-015-factory-defaults-web-interface.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-007: State Machine Architecture for UART2ETH</title>
+    <title>ADR-015: Factory Defaults Web Interface</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -292,7 +292,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/adrs/ADR-007-state-machine-architecture.html" title="ADR-007: State Machine Architecture for UART2ETH">ADR-007: State Machine Architecture for UART2ETH</a>
                                 
                             </li>
@@ -332,7 +332,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../../arc42/adrs/ADR-015-factory-defaults-web-interface.html" title="ADR-015: Factory Defaults Web Interface">ADR-015: Factory Defaults Web Interface</a>
                                 
                             </li>
@@ -348,11 +348,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-007-state-machine-architecture.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-015-factory-defaults-web-interface.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-007-state-machine-architecture.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-015%3A+Factory+Defaults+Web+Interface%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-015-factory-defaults-web-interface.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -362,26 +362,22 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel0">
-<li><a href="#_adr_007_event_driven_state_machine_architecture">ADR-007: Event-Driven State Machine Architecture</a>
+<li><a href="#_adr_015_factory_defaults_web_interface">ADR-015: Factory Defaults Web Interface</a>
 <ul class="sectlevel1">
 <li><a href="#_status">Status</a></li>
 <li><a href="#_date">Date</a></li>
 <li><a href="#_context">Context</a></li>
 <li><a href="#_decision">Decision</a>
 <ul class="sectlevel2">
-<li><a href="#_event_driven_state_machine_architecture">Event-Driven State Machine Architecture</a></li>
-<li><a href="#_state_definitions">State Definitions</a></li>
-<li><a href="#_event_driven_interface_design">Event-Driven Interface Design</a></li>
-<li><a href="#_concurrency_and_safety_model">Concurrency and Safety Model</a></li>
-<li><a href="#_core_main_loop_architecture">Core Main Loop Architecture</a></li>
-<li><a href="#_complex_state_transition_examples">Complex State Transition Examples</a></li>
-<li><a href="#_condition_checking_functions">Condition Checking Functions</a></li>
+<li><a href="#_interface_design">Interface Design</a></li>
+<li><a href="#_implementation_integration">Implementation Integration</a></li>
 </ul>
 </li>
 <li><a href="#_rationale">Rationale</a>
 <ul class="sectlevel2">
 <li><a href="#_advantages">Advantages</a></li>
-<li><a href="#_implementation_strategy">Implementation Strategy</a></li>
+<li><a href="#_rejected_alternatives">Rejected Alternatives</a></li>
+<li><a href="#_trade_offs">Trade-offs</a></li>
 </ul>
 </li>
 <li><a href="#_consequences">Consequences</a>
@@ -391,7 +387,15 @@
 <li><a href="#_implementation_requirements">Implementation Requirements</a></li>
 </ul>
 </li>
-<li><a href="#_updated_state_machine_diagrams">Updated State Machine Diagrams</a></li>
+<li><a href="#_implementation_notes">Implementation Notes</a>
+<ul class="sectlevel2">
+<li><a href="#_html_generation_strategy">HTML Generation Strategy</a></li>
+<li><a href="#_validation_implementation">Validation Implementation</a></li>
+<li><a href="#_error_handling">Error Handling</a></li>
+<li><a href="#_user_experience_flow">User Experience Flow</a></li>
+</ul>
+</li>
+<li><a href="#_references">References</a></li>
 </ul>
 </li>
 </ul>
@@ -416,12 +420,12 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_007_event_driven_state_machine_architecture" class="sect0">ADR-007: Event-Driven State Machine Architecture</h1>
+<h1 id="_adr_015_factory_defaults_web_interface" class="sect0">ADR-015: Factory Defaults Web Interface</h1>
 <div class="sect1">
 <h2 id="_status">Status</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Decided and Implemented</p>
+<p>Accepted</p>
 </div>
 </div>
 </div>
@@ -429,7 +433,7 @@
 <h2 id="_date">Date</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>2024-01-16 (Updated: 2025-08-16)</p>
+<p>2026-01-21</p>
 </div>
 </div>
 </div>
@@ -437,18 +441,24 @@
 <h2 id="_context">Context</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>The UART2ETH system requires coordinated dual-core operation with predictable behavior across system initialization, configuration loading, normal operation, error conditions, and recovery procedures. The system needs sophisticated state coordination between Core0 (UART processing) and Core1 (network, persistence, and maintenance) while maintaining deterministic behavior and avoiding race conditions.</p>
+<p>The factory defaults system (ADR-014) requires a manufacturing interface to program device-specific configuration data during production. Manufacturing operators need a simple, reliable method to write factory defaults without command-line tools or external programmers.</p>
 </div>
 <div class="paragraph">
 <p>Key requirements:
-* <strong>Dual-core state coordination</strong> with atomic main state synchronization using doorbells
-* <strong>Complex initialization sequences</strong> with persistence, logging, and network hardware setup
-* <strong>Configuration phase</strong> with UART setup and DHCP network configuration
-* <strong>Runtime state management</strong> for UART processing and network operations
-* <strong>Event-driven state transitions</strong> with condition validation (no direct state manipulation)
-* <strong>ISR-safe operations</strong> for core-specific sub-states with atomic variables
-* <strong>Cross-core wakeup</strong> using RP2350 multicore doorbells
-* <strong>Comprehensive error handling</strong> with recovery and fallback mechanisms</p>
+* Simple web-based interface accessible from production floor
+* Input validation to prevent manufacturing errors
+* Read-back verification after programming
+* Only available in factory firmware builds
+* Minimal external dependencies</p>
+</div>
+<div class="paragraph">
+<p>Manufacturing workflow requires:
+* Serial number input (decimal format with leading zeros)
+* MAC address configuration
+* Board type selection
+* Default network configuration
+* Factory password setting
+* Immediate verification of programmed data</p>
 </div>
 </div>
 </div>
@@ -456,308 +466,175 @@
 <h2 id="_decision">Decision</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>We implement <strong>three independent event-driven state machines</strong> with <strong>atomic main state</strong> and <strong>ISR-safe sub-states</strong> using the following architecture:</p>
+<p>We will implement a web-based factory defaults programming interface accessible at <code>/factory</code> that is only compiled when <code>FACTORY_INTERNAL_VERSION</code> is defined.</p>
 </div>
 <div class="sect2">
-<h3 id="_event_driven_state_machine_architecture">Event-Driven State Machine Architecture</h3>
+<h3 id="_interface_design">Interface Design</h3>
 <div class="paragraph">
-<p><strong>Three Independent State Machines:</strong>
-* <strong>Main State Machine</strong>: Global system coordination (atomic, cross-core)
-* <strong>Core0 Sub-State Machine</strong>: UART-specific operations (ISR-safe, Core0-only)
-* <strong>Core1 Sub-State Machine</strong>: Network and maintenance operations (ISR-safe, Core1-only)</p>
-</div>
-<div class="paragraph">
-<p><strong>Event-Driven Pattern Only:</strong>
-* <strong>No Direct State Setting</strong>: State machines only accept events, never direct state manipulation
-* <strong>Transition Function</strong>: <code>current_state + event + check_condition() → new_state</code>
-* <strong>Validation Required</strong>: All transitions must pass condition checks
-* <strong>Event Processing</strong>: Single interface for each state machine</p>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_state_definitions">State Definitions</h3>
-<div class="paragraph">
-<p><strong>Main States (shared between cores, atomic access):</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    MAIN_STATE_INIT = 0,           // System initialization and hardware setup
-    MAIN_STATE_CONFIGURATION = 1,  // Configuration loading and validation
-    MAIN_STATE_OPERATIONAL = 2,    // Normal operation mode
-    MAIN_STATE_ERROR = 3           // Error state requiring recovery
-} main_state_t;</code></pre>
-</div>
+<p><strong>Route Structure</strong>
+* <code>GET /factory</code> - Display factory defaults configuration form
+* <code>POST /factory</code> - Process and write factory defaults to flash</p>
 </div>
 <div class="paragraph">
-<p><strong>Core0 Sub-States (UART processing, ISR-safe):</strong></p>
+<p><strong>Form Sections</strong>
+1. Serial Number Section
+   - Production year (0-99, representing 2000-2099)
+   - Production week (1-52)
+   - Serial number (decimal, 0-281474976710655, displayed with leading zeros)
+   - Real-time preview: "YYWW-NNNNNNNNNNNN"</p>
 </div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    // Initialization sequence
-    CORE0_INIT_UART,        // Initializing UART hardware
-    CORE0_INIT_COMPLETE,    // UART init complete, signaling main state
-    CORE0_INIT_IDLE,        // Waiting for other core during init
-    CORE0_INIT_ERROR,       // UART initialization failed
-
-    // Configuration sequence
-    CORE0_CONFIG_UART,      // Configure UARTS
-    CORE0_CONFIG_COMPLETE,  // Reconfiguration successful
-    CORE0_CONFIG_IDLE,      // Reconfiguration successful, waiting
-    CORE0_CONFIG_ERROR,     // Reconfiguration NOT successful
-
-    // Operational states
-    CORE0_UART_IDLE,        // No active UART operations
-    CORE0_UART_ACTIVE,      // Processing UART data
-    CORE0_UART_ERROR        // UART hardware error state
-} core0_substate_t;</code></pre>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Network Identity Section</p>
+<div class="ulist">
+<ul>
+<li>
+<p>MAC address (format: XX:XX:XX:XX:XX:XX)</p>
+</li>
+</ul>
 </div>
+</li>
+<li>
+<p>Board Type Section</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Radio buttons: SHARK (0), PRIMARY (1), SECONDARY (2)</p>
+</li>
+</ul>
 </div>
-<div class="paragraph">
-<p><strong>Core1 Sub-States (Network and maintenance, ISR-safe):</strong></p>
+</li>
+<li>
+<p>Default Network Configuration Section</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Default IP address (IPv4 format)</p>
+</li>
+<li>
+<p>Default netmask (IPv4 format)</p>
+</li>
+<li>
+<p>Default DHCP enable (checkbox)</p>
+</li>
+</ul>
 </div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    // Initialization sequence
-    CORE1_INIT_PERISTENCE,      // Init persistence
-    CORE1_INIT_LOGGING,         // Init logging
-    CORE1_INIT_NET,             // Init net
-    CORE1_INIT_WAIT_FOR_LINK,   // Init is not complete without link
-    CORE1_INIT_COMPLETE,        // Init complete
-    CORE1_INIT_IDLE,            // Init complete, sleep until other core finishes init
-
-    // Configuration sequence with DHCP
-    CORE1_CONFIG_NET,           // (re)-configure net
-    CORE1_CONFIG_COMPLETE,      // (re)-configuration of net successfull
-    CORE1_CONFIG_NET_WAIT_FOR_DHCP, // (re)-configuration of net successfull, get dhcp
-    CORE1_CONFIG_NET_CHECK_DHCP, // (re)-configuration of net successfull, check if we got dhcp
-    CORE1_CONFIG_IDLE,          // (re)-configuration of net successfull
-    CORE1_CONFIG_LOG_ACTIVE,    // There are logs queued during config
-    CORE1_CONFIG_ERROR,         // (re)-configuration of net NOT successfull
-
-    // Operational states
-    CORE1_NET_LINK_CHANGE,      // Network interface changing
-    CORE1_NET_CONNECTED,        // Network interface up
-    CORE1_NET_DISCONNECTED,     // Network interface down
-    CORE1_NET_IDLE,             // Network interface up, no connections
-    CORE1_NET_ACTIVE_RECEIVE,   // Active network connections receiving
-    CORE1_NET_ACTIVE_SEND,      // Active network connections sending
-    CORE1_PERSISTENCE_ACTIVE,   // Flash persistence operation active
-    CORE1_LOG_ACTIVE,           // Log processing active
-    CORE1_IDLE,                 // Idle, may sleep here or schedule new work
-
-    // Error states
-    CORE1_INIT_ERROR,           // Unrecoverable init error
-    CORE1_SHUTDOWN              // Stop main loop
-} core1_substate_t;</code></pre>
+</li>
+<li>
+<p>Security Section</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Factory default password (max 31 characters)</p>
+</li>
+</ul>
 </div>
+</li>
+<li>
+<p>Actions Section</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Write Factory Defaults (primary action)</p>
+</li>
+<li>
+<p>Cancel (return to status page)</p>
+</li>
+</ul>
 </div>
-</div>
-<div class="sect2">
-<h3 id="_event_driven_interface_design">Event-Driven Interface Design</h3>
-<div class="paragraph">
-<p><strong>Core State Machine Interface:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Event processing functions (the ONLY way to change states)
-bool state_machine_process_main_event(main_state_event_t event);
-bool state_machine_process_core0_event(core0_event_t event);
-bool state_machine_process_core1_event(core1_event_t event);
-
-// State queries (read-only, non-blocking)
-main_state_t state_machine_get_main_state(void);
-core0_substate_t state_machine_get_core0_substate(void);
-core1_substate_t state_machine_get_core1_substate(void);</code></pre>
-</div>
+</li>
+</ol>
 </div>
 <div class="paragraph">
-<p><strong>Main State Events:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    MAIN_EVENT_INIT_COMPLETE_CORE0,     // UART initialized
-    MAIN_EVENT_INIT_COMPLETE_CORE1,     // Network interface initialized
-    MAIN_EVENT_CONFIG_COMPLETE_CORE0,   // Configuration loaded and validated
-    MAIN_EVENT_CONFIG_COMPLETE_CORE1,   // Configuration loaded and validated
-    MAIN_EVENT_SYSTEM_ERROR,       // System error detected
-    MAIN_EVENT_ERROR_RECOVERED     // Recovery from error state complete
-} main_state_event_t;</code></pre>
-</div>
+<p><strong>Validation Strategy</strong></p>
 </div>
 <div class="paragraph">
-<p><strong>Core0 Events:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    CORE0_EVENT_INIT_UART_COMPLETE,     // UART initialized
-    CORE0_EVENT_INIT_UART_FAILED,       // UART could not be initialized
-    CORE0_EVENT_CONFIG_UART_COMPLETE,   // UART reconfigured successfully
-    CORE0_EVENT_CONFIG_UART_FAILED,     // UART reconfiguration failed
-    CORE0_EVENT_UART_DATA_READY,        // UART data available for processing
-    CORE0_EVENT_UART_IDLE,              // UART processing completed
-    CORE0_EVENT_UART_ERROR,             // UART hardware error detected
-    CORE0_EVENT_ERROR_RECOVERED,        // UART error recovery complete
-    CORE0_EVENT_AUTO_TRANSITION         // Dummy event for auto-state transition
-} core0_event_t;</code></pre>
-</div>
+<p>Server-side validation only (C code):
+* All validation performed server-side to minimize firmware size
+* Comprehensive input validation before flash operations
+* Specific error messages displayed inline on failure
+* Range checking: year (0-99), week (1-52), serial (0-281474976710655)
+* Format validation: IP addresses, MAC addresses
+* String length validation: password (max 31 chars)
+* Invalid inputs rejected with user-friendly error messages
+* Successful writes confirmed with inline success message</p>
 </div>
 <div class="paragraph">
-<p><strong>Core1 Events (extensive network and maintenance events):</strong></p>
+<p>Client-side validation:
+* Browser HTML5 validation only (required fields, number ranges)
+* No JavaScript required - keeps page lightweight</p>
 </div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
-    // Initialization events
-    CORE1_EVENT_INIT_PERSISTENCE_COMPLETE,
-    CORE1_EVENT_INIT_PERSISTENCE_FAILED,
-    CORE1_EVENT_INIT_LOGGING_COMPLETE,
-    CORE1_EVENT_INIT_LOGGING_FAILED,
-    CORE1_EVENT_INIT_NET_WAIT_FOR_LINK_UP,
-    CORE1_EVENT_INIT_NET_LINK_UP,
-    CORE1_EVENT_INIT_NET_LINK_DOWN,
-    CORE1_EVENT_INIT_NET_COMPLETE,
-    CORE1_EVENT_INIT_NET_FAILED,
-
-    // Configuration events with DHCP handling
-    CORE1_EVENT_CONFIG_NET_DHCP_REQUEST,
-    CORE1_EVENT_CONFIG_NET_GOT_DHCP,
-    CORE1_EVENT_CONFIG_NET_WAIT_DHCP,
-    CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT,
-    CORE1_EVENT_CONFIG_NET_COMPLETE,
-    CORE1_EVENT_CONFIG_NET_FAILED,
-
-    // Network operational events
-    CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE,
-    CORE1_EVENT_NETWORK_LINK_UP,
-    CORE1_EVENT_NETWORK_LINK_DOWN,
-    CORE1_EVENT_NETWORK_RECEIVE_ACTIVE,
-    CORE1_EVENT_NETWORK_RECEIVE_FINISHED,
-    CORE1_EVENT_NETWORK_SENDING_ACTIVE,
-    CORE1_EVENT_NETWORK_SENDING_FINISHED,
-    CORE1_EVENT_NETWORK_UP,
-    CORE1_EVENT_NETWORK_DOWN,
-    CORE1_EVENT_CONNECTION_ACTIVE,
-    CORE1_EVENT_CONNECTION_IDLE,
-
-    // Maintenance events
-    CORE1_EVENT_PERSISTENCE_START,
-    CORE1_EVENT_PERSISTENCE_END,
-    CORE1_EVENT_LOG_START,
-    CORE1_EVENT_LOG_END,
-    CORE1_EVENT_AUTO_TRANSITION
-} core1_event_t;</code></pre>
-</div>
+<div class="paragraph">
+<p><strong>Post-Write Verification</strong>
+After successful write operation:
+1. Reload factory defaults from flash
+2. Validate integrity (SHA256 check)
+3. Redirect to factory page showing updated values
+4. Display inline success message
+5. Show formatted serial number for verification</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_concurrency_and_safety_model">Concurrency and Safety Model</h3>
+<h3 id="_implementation_integration">Implementation Integration</h3>
 <div class="paragraph">
-<p><strong>Main State Machine:</strong>
-* <strong>Atomic Operations</strong>: Uses <code>_Atomic</code> variables for state transitions
-* <strong>Cross-Core Access</strong>: Both cores can send events, both can read state
-* <strong>Doorbell Synchronization</strong>: RP2350 multicore doorbells wake other core on main state changes
-* <strong>Memory Barriers</strong>: Proper barriers ensure cache coherency</p>
-</div>
-<div class="paragraph">
-<p><strong>Sub-State Machines:</strong>
-* <strong>ISR-Safe</strong>: Compatible with interrupt service routines using <code>_Atomic</code> variables
-* <strong>Single-Core Ownership</strong>: Core0 owns Core0 sub-state, Core1 owns Core1 sub-state
-* <strong>No Cross-Core Locking</strong>: No mutexes required for sub-states
-* <strong>Atomic Variables</strong>: Use <code>_Atomic</code> variables for ISR safety</p>
-</div>
-<div class="paragraph">
-<p><strong>Doorbell Implementation:</strong></p>
+<p><strong>HTTP Server Routes</strong>
+Factory routes are only compiled when <code>FACTORY_INTERNAL_VERSION</code> is defined:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">extern int doorbell_core0_wakes_core1;
-extern int doorbell_core1_wakes_core0;
-
-static void wake_other_core_after_main_state_change(main_state_t new_state) {
-    // Wake the other core
-    multicore_doorbell_set_other_core(doorbell_core0_wakes_core1);
-    multicore_doorbell_set_other_core(doorbell_core1_wakes_core0);
-}</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_core_main_loop_architecture">Core Main Loop Architecture</h3>
-<div class="paragraph">
-<p><strong>Dual-Core Launch</strong>: <code>main.c</code> launches both cores with dedicated entry points
-<strong>Core-Specific Modules</strong>: <code>core0_main.c</code> and <code>core1_main.c</code> with dedicated main functions
-<strong>State-Driven Logic</strong>: Core main loops query states and send events to control behavior
-<strong>Non-Blocking Queries</strong>: State access never blocks core operations</p>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_complex_state_transition_examples">Complex State Transition Examples</h3>
-<div class="paragraph">
-<p><strong>Initialization Sequence:</strong>
-1. Main state starts in <code>MAIN_STATE_INIT</code>
-2. Core0: <code>CORE0_INIT_UART</code> → <code>CORE0_INIT_COMPLETE</code> → <code>CORE0_INIT_IDLE</code>
-3. Core1: <code>CORE1_INIT_PERISTENCE</code> → <code>CORE1_INIT_LOGGING</code> → <code>CORE1_INIT_NET</code> → <code>CORE1_INIT_WAIT_FOR_LINK</code> → <code>CORE1_INIT_COMPLETE</code> → <code>CORE1_INIT_IDLE</code>
-4. When both cores reach IDLE, main state transitions to <code>MAIN_STATE_CONFIGURATION</code></p>
-</div>
-<div class="paragraph">
-<p><strong>Configuration Sequence:</strong>
-1. Main state: <code>MAIN_STATE_CONFIGURATION</code>
-2. Core0: <code>CORE0_CONFIG_UART</code> → <code>CORE0_CONFIG_COMPLETE</code> → <code>CORE0_CONFIG_IDLE</code>
-3. Core1: <code>CORE1_CONFIG_NET</code> → <code>CORE1_CONFIG_NET_WAIT_FOR_DHCP</code> → <code>CORE1_CONFIG_NET_CHECK_DHCP</code> → <code>CORE1_CONFIG_COMPLETE</code> → <code>CORE1_CONFIG_IDLE</code>
-4. When both cores reach IDLE, main state transitions to <code>MAIN_STATE_OPERATIONAL</code></p>
-</div>
-<div class="paragraph">
-<p><strong>DHCP Configuration Handling:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Complex DHCP state handling in Core1
-case CORE1_CONFIG_NET_WAIT_FOR_DHCP:
-    switch (event) {
-        case CORE1_EVENT_NETWORK_RECEIVE_ACTIVE:
-            new_state = CORE1_CONFIG_NET_CHECK_DHCP;
-            break;
-        case CORE1_EVENT_CONFIG_NET_DHCP_TIMEOUT:
-            new_state = CORE1_CONFIG_NET; // Retry
-            break;
-        case CORE1_EVENT_LOG_START:
-            new_state = CORE1_CONFIG_LOG_ACTIVE; // Handle logs during DHCP
-            break;
-    }
-    break;</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_condition_checking_functions">Condition Checking Functions</h3>
-<div class="paragraph">
-<p><strong>Cross-Core Coordination Conditions:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Checks if Core0 can trigger main state transition from INIT to CONFIGURATION
-static bool check_core0_initialization_complete(void) {
-    return atomic_load(&amp;g_initialized) &amp;&amp;
-           atomic_load(&amp;g_main_state) == MAIN_STATE_INIT &amp;&amp;
-           (atomic_load(&amp;g_core1_substate) == CORE1_INIT_IDLE) &amp;&amp;
-           (atomic_load(&amp;g_core0_substate) == CORE0_INIT_COMPLETE ||
-            atomic_load(&amp;g_core0_substate) == CORE0_INIT_IDLE);
+<pre class="prettyprint highlight"><code data-lang="c">#ifdef FACTORY_INTERNAL_VERSION
+if (strstr(request_buffer, "GET /factory") != NULL) {
+    http_generate_factory_page(response_buffer, sizeof(response_buffer),
+                                NULL, 0, NULL, 0);
+    http_send_response(conn, response_buffer, strlen(response_buffer));
 }
+else if (strstr(request_buffer, "POST /factory") != NULL) {
+    char error_msg[256] = {0};
+    if (http_parse_factory_post_data(request_buffer, copy_len,
+                                      error_msg, sizeof(error_msg))) {
+        http_send_redirect(conn, "/factory");  // Success - reload page
+    } else {
+        http_generate_factory_page(response_buffer, sizeof(response_buffer),
+                                    error_msg, strlen(error_msg), NULL, 0);
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+    }
+}
+#endif</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Factory Defaults Writing</strong>
+Parse POST data, validate inputs, and write to flash:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">static bool http_parse_factory_post_data(const char* post_data, size_t data_len,
+                                         char* error_msg, size_t error_msg_size) {
+    factory_defaults_t factory_data = {0};
 
-// Checks if Core1 can trigger main state transition from CONFIGURATION to OPERATIONAL
-static bool check_core1_configuration_complete(void) {
-    return atomic_load(&amp;g_initialized) &amp;&amp;
-           atomic_load(&amp;g_main_state) == MAIN_STATE_CONFIGURATION &amp;&amp;
-           (atomic_load(&amp;g_core1_substate) == CORE1_CONFIG_COMPLETE ||
-            atomic_load(&amp;g_core1_substate) == CORE1_CONFIG_IDLE) &amp;&amp;
-           (atomic_load(&amp;g_core0_substate) == CORE0_CONFIG_IDLE);
+    // Parse form fields with inline validation
+    // Year: must be 0-99
+    // Week: must be 1-52
+    // Serial: must be valid decimal 0-281474976710655
+    // MAC: must be valid format (XX:XX:XX:XX:XX:XX)
+    // Password: max 31 characters after URL decoding
+
+    // Return false with specific error_msg on validation failure
+    // Call factory_defaults_write(&amp;factory_data)
+    // Verify by reloading: factory_defaults_init()
+
+    return success;  // true on success, false with error_msg on failure
 }</code></pre>
 </div>
+</div>
+<div class="paragraph">
+<p><strong>Security Considerations</strong>
+* Page only available when <code>FACTORY_INTERNAL_VERSION</code> defined
+* No authentication required (factory-only firmware)
+* Warning banner indicating factory use only
+* No client-side confirmation (server-side validation prevents errors)
+* Factory builds never deployed to production devices</p>
 </div>
 </div>
 </div>
@@ -770,85 +647,71 @@ static bool check_core1_configuration_complete(void) {
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Deterministic Behavior</strong>: Complex state sequences ensure predictable system behavior</p>
+<p><strong>Ease of Use</strong>: Web interface requires no special tools or software installation</p>
 </li>
 <li>
-<p><strong>Robust Initialization</strong>: Multi-stage initialization prevents race conditions</p>
+<p><strong>Error Prevention</strong>: Comprehensive server-side validation prevents programming errors</p>
 </li>
 <li>
-<p><strong>DHCP Integration</strong>: Sophisticated network configuration with timeout handling</p>
+<p><strong>Minimal Size</strong>: No JavaScript keeps factory firmware size minimal</p>
 </li>
 <li>
-<p><strong>Cross-Core Coordination</strong>: Atomic main state with doorbell wakeup ensures synchronization</p>
+<p><strong>Verification</strong>: Automatic read-back confirms successful programming</p>
 </li>
 <li>
-<p><strong>ISR Compatibility</strong>: Sub-state machines safe for interrupt context</p>
+<p><strong>Production Efficiency</strong>: Fast, simple interface for manufacturing floor</p>
 </li>
 <li>
-<p><strong>Error Recovery</strong>: Comprehensive error handling at each stage</p>
+<p><strong>Compile-Time Safety</strong>: Factory functions only available in factory builds</p>
 </li>
 <li>
-<p><strong>Testability</strong>: Event processing and condition functions can be unit tested independently</p>
+<p><strong>Consistent UX</strong>: Uses shared CSS stylesheet with configuration pages</p>
 </li>
 <li>
-<p><strong>Maintainability</strong>: Clear event definitions make system behavior easier to understand</p>
-</li>
-<li>
-<p><strong>Performance</strong>: Non-blocking state queries and lock-free sub-states</p>
+<p><strong>Inline Feedback</strong>: Error and success messages displayed on same page</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_implementation_strategy">Implementation Strategy</h3>
+<h3 id="_rejected_alternatives">Rejected Alternatives</h3>
 <div class="paragraph">
-<p><strong>Memory Layout:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// State variables with proper synchronization
-static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;
-static _Atomic core0_substate_t g_core0_substate = CORE0_INIT_UART;
-static _Atomic core1_substate_t g_core1_substate = CORE1_INIT_PERISTENCE;
-
-// Initialization flag
-_Atomic bool g_initialized = false;</code></pre>
-</div>
+<p><strong>Command-Line Tool</strong>
+* Rejected due to complexity for manufacturing operators
+* Requires USB connection and terminal software
+* Higher error rate for manual hex/decimal input
+* Slower workflow</p>
 </div>
 <div class="paragraph">
-<p><strong>Event Processing Pattern:</strong></p>
+<p><strong>External Programmer</strong>
+* Rejected to avoid additional hardware requirement
+* Network-based programming simpler for production line
+* Web interface provides immediate visual feedback</p>
 </div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">bool state_machine_process_main_event(main_state_event_t event) {
-    main_state_t current_state = atomic_load(&amp;g_main_state);
-    main_state_t new_state = current_state;  // Default: no change
-
-    // State + Event + Condition → New State
-    switch (current_state) {
-        case MAIN_STATE_INIT:
-            switch (event) {
-                case MAIN_EVENT_INIT_COMPLETE_CORE0:
-                    if (check_core0_initialization_complete()) {
-                        new_state = MAIN_STATE_CONFIGURATION;
-                        // Also update substates for next phase
-                        atomic_store(&amp;g_core0_substate, CORE0_CONFIG_UART);
-                        atomic_store(&amp;g_core1_substate, CORE1_CONFIG_NET);
-                    }
-                    break;
-            }
-            break;
-    }
-
-    // Apply state change if needed
-    if (new_state != current_state) {
-        atomic_store(&amp;g_main_state, new_state);
-        wake_other_core_after_main_state_change(new_state);
-    }
-
-    return true;
-}</code></pre>
+<div class="paragraph">
+<p><strong>Separate Manufacturing Application</strong>
+* Rejected to minimize tooling complexity
+* Built-in web interface eliminates installation requirements
+* Consistent with existing web-based configuration</p>
 </div>
+</div>
+<div class="sect2">
+<h3 id="_trade_offs">Trade-offs</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Firmware Size</strong>: Optimized with minified HTML and external CSS (~3KB page size)</p>
+</li>
+<li>
+<p><strong>Server-Side Only</strong>: All validation on server reduces client complexity</p>
+</li>
+<li>
+<p><strong>Network Requirement</strong>: Requires working network for programming</p>
+</li>
+<li>
+<p><strong>No JavaScript</strong>: Browser-only validation (HTML5) less sophisticated but sufficient</p>
+</li>
+</ul>
 </div>
 </div>
 </div>
@@ -861,28 +724,22 @@ _Atomic bool g_initialized = false;</code></pre>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Impossible Invalid States</strong>: Event-driven pattern prevents invalid state transitions</p>
+<p><strong>Simplified Manufacturing</strong>: Web interface reduces operator training requirements</p>
 </li>
 <li>
-<p><strong>Complex Coordination</strong>: Handles sophisticated dual-core initialization and configuration</p>
+<p><strong>Error Reduction</strong>: Server-side validation prevents common manufacturing errors</p>
 </li>
 <li>
-<p><strong>DHCP Integration</strong>: Robust network configuration with proper timeout handling</p>
+<p><strong>Fast Verification</strong>: Immediate read-back confirms programming success</p>
 </li>
 <li>
-<p><strong>Cross-Core Synchronization</strong>: Doorbell-based wakeup ensures efficient coordination</p>
+<p><strong>No External Tools</strong>: Eliminates need for separate programming software</p>
 </li>
 <li>
-<p><strong>ISR-Safe Operations</strong>: Sub-state machines work correctly in interrupt context</p>
+<p><strong>Audit Trail</strong>: Programmed serial numbers visible in boot logs</p>
 </li>
 <li>
-<p><strong>Comprehensive Error Handling</strong>: Error states and recovery at each stage</p>
-</li>
-<li>
-<p><strong>Maintainability</strong>: Clear state diagrams show system behavior</p>
-</li>
-<li>
-<p><strong>Testability</strong>: Each state transition can be unit tested independently</p>
+<p><strong>Minimal Footprint</strong>: Minified HTML and shared CSS minimize factory firmware size</p>
 </li>
 </ul>
 </div>
@@ -892,16 +749,16 @@ _Atomic bool g_initialized = false;</code></pre>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Implementation Complexity</strong>: Large number of states and transitions</p>
+<p><strong>Factory Build Required</strong>: Must build separate firmware for manufacturing</p>
 </li>
 <li>
-<p><strong>Memory Overhead</strong>: Event processing and condition functions for all transitions</p>
+<p><strong>Code Size</strong>: Factory page adds ~3KB to firmware (mitigated by minification)</p>
 </li>
 <li>
-<p><strong>Development Time</strong>: Must design proper events and conditions for each transition</p>
+<p><strong>Network Dependency</strong>: Requires working network connection for programming</p>
 </li>
 <li>
-<p><strong>Learning Curve</strong>: Developers must understand complex state machine interactions</p>
+<p><strong>No Offline Validation</strong>: Validation only occurs on form submission</p>
 </li>
 </ul>
 </div>
@@ -911,22 +768,28 @@ _Atomic bool g_initialized = false;</code></pre>
 <div class="ulist">
 <ul>
 <li>
-<p>Event-driven state machine module with atomic operations and ISR-safe sub-states</p>
+<p>Add <code>/factory</code> GET and POST routes to HTTP server</p>
 </li>
 <li>
-<p>Core0 main function with UART processing and complex initialization sequence</p>
+<p>Implement <code>http_generate_factory_page()</code> with error/success message support</p>
 </li>
 <li>
-<p>Core1 main function with network, persistence, DHCP handling, and log processing</p>
+<p>Implement <code>http_parse_factory_post_data()</code> with comprehensive validation</p>
 </li>
 <li>
-<p>Doorbell-based cross-core synchronization for main state changes</p>
+<p>Use shared <code>/styles.css</code> stylesheet for consistent styling</p>
 </li>
 <li>
-<p>Comprehensive condition checking functions for state transition validation</p>
+<p>Guard all factory code with <code>#ifdef FACTORY_INTERNAL_VERSION</code></p>
 </li>
 <li>
-<p>Integration with existing shared memory, logging, and persistence systems</p>
+<p>Add read-back verification after write with <code>factory_defaults_init()</code></p>
+</li>
+<li>
+<p>Generate minified HTML to minimize firmware size</p>
+</li>
+<li>
+<p>Display inline error/success messages on same page</p>
 </li>
 </ul>
 </div>
@@ -934,15 +797,144 @@ _Atomic bool g_initialized = false;</code></pre>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_updated_state_machine_diagrams">Updated State Machine Diagrams</h2>
+<h2 id="_implementation_notes">Implementation Notes</h2>
 <div class="sectionbody">
-<div class="imageblock">
-<div class="content">
-<img src="../../images/state-machine-overview.svg" alt="state machine overview" width="3073" height="1723">
-</div>
+<div class="paragraph">
+<p>The factory defaults web interface will be implemented as an extension to the existing HTTP server module. Form generation and processing follow the same pattern as the <code>/config</code> page.</p>
 </div>
 <div class="paragraph">
-<p>This updated ADR-007 now accurately reflects the actual implemented state machine architecture with its complex initialization sequences, DHCP handling, and sophisticated cross-core coordination.</p>
+<p>Integration points:
+1. <strong>http_server.c</strong>: Add <code>/factory</code> route handling
+2. <strong>http_server.c</strong>: Implement factory page generation
+3. <strong>http_server.c</strong>: Implement factory POST data parsing
+4. <strong>factory_defaults.c</strong>: Utilize existing write/erase functions</p>
+</div>
+<div class="sect2">
+<h3 id="_html_generation_strategy">HTML Generation Strategy</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>External CSS via <code>/styles.css</code> (shared with other pages)</p>
+</li>
+<li>
+<p>Minified HTML output (no formatting whitespace)</p>
+</li>
+<li>
+<p>No JavaScript - server-side validation only</p>
+</li>
+<li>
+<p>Form fields organized into logical sections</p>
+</li>
+<li>
+<p>HTML5 validation attributes (required, min, max, maxlength)</p>
+</li>
+<li>
+<p>Inline error/success message display</p>
+</li>
+<li>
+<p>Total page size: ~3KB (vs ~7KB with inline CSS and JavaScript)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_validation_implementation">Validation Implementation</h3>
+<div class="paragraph">
+<p><strong>Server-Side Validation (Enforced):</strong>
+* Production year: Range 0-99 (enforced, error: "Production year must be 0-99")
+* Production week: Range 1-52 (enforced, error: "Production week must be 1-52")
+* Serial number: Decimal 0-281474976710655 using <code>strtoull()</code> with error checking
+* MAC address: Parse format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX
+* IP addresses: Parse format using <code>sscanf()</code> for <code>d.d.d.d</code>
+* Password: Max 31 characters after URL decoding (error: "Password must be max 31 characters")</p>
+</div>
+<div class="paragraph">
+<p><strong>Client-Side Hints (HTML5 attributes):</strong>
+* Year: <code>type="number" min="0" max="99" required</code>
+* Week: <code>type="number" min="1" max="52" required</code>
+* Serial: <code>type="text" required</code>
+* Password: <code>maxlength="31" required</code></p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_error_handling">Error Handling</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Validation errors: Display inline error message on factory page with red border</p>
+</li>
+<li>
+<p>Flash write errors: Return error message "Flash write operation failed"</p>
+</li>
+<li>
+<p>Read-back mismatch: Return error message "Write succeeded but verification failed"</p>
+</li>
+<li>
+<p>Partition errors: Handled by flash_persistence module</p>
+</li>
+<li>
+<p>All errors displayed inline without changing page URL</p>
+</li>
+<li>
+<p>Success redirects to <code>/factory</code> to show updated programmed values</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_user_experience_flow">User Experience Flow</h3>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Operator navigates to <code><a href="http://&lt;device-ip&gt;/factory" class="bare">http://&lt;device-ip&gt;/factory</a></code></p>
+</li>
+<li>
+<p>Form displays with default values (year=26, week=1, serial=1, etc.)</p>
+</li>
+<li>
+<p>Current programmed values shown at top (or "Not Programmed")</p>
+</li>
+<li>
+<p>Operator fills manufacturing data</p>
+</li>
+<li>
+<p>Browser HTML5 validation provides basic field checking</p>
+</li>
+<li>
+<p>Operator clicks "Write Factory Defaults"</p>
+</li>
+<li>
+<p>Server validates all inputs comprehensively</p>
+</li>
+<li>
+<p>On validation error: Page reloads with red error message banner</p>
+</li>
+<li>
+<p>On success: Page redirects to <code>/factory</code> showing updated values</p>
+</li>
+<li>
+<p>Operator verifies formatted serial number matches production database</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_references">References</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>ADR-014: Factory Defaults Implementation (storage format and structure)</p>
+</li>
+<li>
+<p>arc42 Chapter 5: Building Block View - HTTP Server Module</p>
+</li>
+<li>
+<p>RP2350 Datasheet: Flash memory programming</p>
+</li>
+</ul>
 </div>
 </div>
 </div>
@@ -973,11 +965,11 @@ _Atomic bool g_initialized = false;</code></pre>
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-015%3A+Factory+Defaults+Web+Interface%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-015-factory-defaults-web-interface.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-007%3A+State+Machine+Architecture+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-007-state-machine-architecture.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-015%3A+Factory+Defaults+Web+Interface%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-015-factory-defaults-web-interface.adoc">tell
     us how we can improve</a>.
     </p>
 </div>

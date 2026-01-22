@@ -589,32 +589,36 @@ Output packets:
 </div>
 <div class="paragraph">
 <p><strong>Storage Format</strong>
-* Raw binary copy of <code>g_shared_memory</code> structure written directly to flash
-* SHA256 checksum per flash page for integrity verification
+* Raw binary copy of <code>shared_memory_layout_t</code> structure written directly to flash
+* SHA256 checksum per flash block for integrity verification (checksum stored first in block for hash exclusion)
 * Revision counter incremented on each write operation
-* No JSON parsing or schema validation overhead</p>
+* No JSON parsing or schema validation overhead
+* Shared memory statically allocated within a <code>flash_persistence_block_t</code> structure</p>
 </div>
 <div class="paragraph">
 <p><strong>Flash Ring Buffer Management</strong>
-* 4 flash pages organized as circular ring buffer
-* Each page stores complete <code>g_shared_memory</code> snapshot + metadata
-* Write operations advance to next page in ring (wear leveling)
-* Power-loss safety through atomic page writes with checksums</p>
+* 8 flash blocks (64KB each) organized as circular ring buffer
+* Each block stores complete <code>shared_memory_layout_t</code> snapshot + metadata
+* Write operations advance to next block in ring (wear leveling)
+* Sector-by-sector updates: only changed sectors reprogrammed for efficiency
+* Power-loss safety through <code>flash_safe_execute()</code> for interrupt-safe operations</p>
 </div>
 <div class="paragraph">
 <p><strong>Startup Recovery Process</strong>
-* Read all 4 ring buffer pages from flash
-* Verify SHA256 checksum for each page
-* Select page with highest revision counter AND valid checksum
-* Load selected page data into <code>g_shared_memory</code>
-* Invalid pages ignored, fallback to factory defaults if no valid pages</p>
+* Read all 8 ring buffer blocks from flash (partition ID=3)
+* Verify SHA256 checksum for each block
+* Select block with highest revision counter AND valid checksum
+* Load selected block data into <code>shared_memory_layout_t</code>
+* Invalid blocks ignored, fallback to factory defaults if no valid blocks
+* Device mode enforcement: GPIO pins and channel enables applied from device_mode.h</p>
 </div>
 <div class="paragraph">
 <p><strong>Write-Back Strategy</strong>
 * Deferred writes executed by Core1 main loop
 * Write frequency limited to maximum once per 30 seconds
-* Write triggered only when <code>g_shared_memory</code> revision counter changes
-* Complete shared memory structure written atomically per page</p>
+* Write triggered only when <code>shared_memory_layout.revision_counter</code> changes
+* Complete shared memory structure written per block with sector-level optimization
+* Write-in-progress tracking prevents concurrent write operations</p>
 </div>
 </div>
 <div class="sect3">
@@ -631,15 +635,15 @@ Output packets:
 <h4 id="_factory_reset_and_recovery">Factory Reset and Recovery</h4>
 <div class="paragraph">
 <p><strong>Factory Reset Process</strong>
-* Erase all ring buffer pages
-* Initialize <code>g_shared_memory</code> with factory defaults
-* Force immediate write to establish initial page</p>
+* Erase all 8 ring buffer blocks
+* Call <code>shared_memory_force_reinit()</code> to restore factory defaults
+* Log factory reset event as first entry in clean log system</p>
 </div>
 <div class="paragraph">
 <p><strong>Error Recovery</strong>
-* Corrupted pages detected via SHA256 mismatch
-* Fallback to previous valid page if available
-* Complete factory reset if no valid pages found</p>
+* Corrupted blocks detected via SHA256 mismatch
+* Fallback to previous valid block if available
+* Complete factory reset if no valid blocks found</p>
 </div>
 </div>
 </div>
