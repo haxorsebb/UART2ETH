@@ -2,8 +2,8 @@
  * @file shared_memory.h
  * @brief Shared memory layout for config manager and log manager
  * 
- * SRAM Bank 4 Memory Layout:
- * [Config Structures][Performance Counters][Log Management][Ring Buffer Data]
+ * Shared Memory Layout (statically allocated, 64KB aligned):
+ * [Config Structures][Performance Counters][Log Management][Log Entry Buffer]
  * 
  * Access Patterns:
  * - Core0: Read-only config access, read-write log access
@@ -18,19 +18,18 @@
 #ifndef SHARED_MEMORY_H
 #define SHARED_MEMORY_H
 
+//#include <cstddef>
+
 #include <hardware/sync/spin_lock.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "hardware/regs/addressmap.h"
 #include "log_manager.h"  // For log_entry_t definition
-#include "network/network_manager.h"  // For log_entry_t definition
+#include "network/network_manager.h"  // For network_config_t definition
 
-// SRAM Bank 4 base address and size (RP2350)
-// Note: RP2350 has non-contiguous SRAM banks: SRAM0, SRAM4, SRAM8, SRAM9
-// No SRAM1-3 or SRAM5-7 exist. SRAM4 spans 0x20040000-0x20080000 (256KB total)
-// but we only use 64KB for shared memory to avoid conflicts with other allocations
-#define SRAM_BANK4_BASE     SRAM4_BASE        // Use official SDK constant (0x20040000)
-#define SRAM_BANK4_SIZE     (64 * 1024)      // 64KB (design choice for shared memory)
+// Shared memory size configuration
+// Aligned to 64KB bank boundary for optimal memory access patterns
+#define SHARED_MEMORY_BANK_SIZE     (64 * 1024)      // 64KB for shared memory region
+#define SHARED_MEMORY_ALIGNMENT     (64 * 1024)      // 64KB alignment requirement
 
 /**
  * @brief channel enumeration for typing
@@ -64,7 +63,7 @@ typedef struct {
 
 // System configuration structures
 typedef struct {
-    channel_config_t channels[4];
+    channel_config_t channels[5];
     network_config_t network;
     uint8_t log_level;             // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
     uint32_t watchdog_timeout_ms;  // Default 200ms
@@ -101,8 +100,7 @@ typedef struct {
     // Revision and integrity (at start for easy access)
     volatile uint32_t revision_counter;       // Incremented on each config change
     volatile bool config_change_pending;      // Flag for Core1 to detect config changes
-    // TODO: Add SHA256 checksum for integrity validation in future version
-    uint32_t reserved[7];                     // Reserved for future integrity features (reduced by 1)
+    uint32_t reserved[8];                     // Reserved for future integrity features 
     
     // Configuration structures
     system_config_t config;
@@ -118,32 +116,50 @@ typedef struct {
 } __attribute__((aligned(4))) shared_memory_layout_t;
 
 // Flash persistence constants - RP2350 Partition Table Approach
-#define FLASH_PERSISTENCE_RING_SIZE 4                    // 4 pages in ring buffer
+#define FLASH_PERSISTENCE_RING_SIZE 8                    // 4 pages in ring buffer
 #define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
+#define FLASH_PERSISTENCE_BLOCK_SIZE 16*4096             // SRAM4 BANK SIZE
 #define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
 #define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
-#define FLASH_PERSISTENCE_CONFIG_PARTITION_ID 2          // Configuration Data partition ID
-#define FLASH_PERSISTENCE_PARTITION_SIZE (512 * 1024)   // 512KB partition size (rest of 4MB flash)
+#define FLASH_PARTITION_FIRMWARE_A 0
+#define FLASH_PARTITION_FIRMWARE_B 1
+#define FLASH_PARTITION_FACTORY_DEFAULTS 2
+#define FLASH_PARTITION_CONFIGURATION_DATA 3
 
 // Flash page structure for ring buffer persistence
-typedef struct {
-    uint32_t magic_number;                               // Page validity marker
-    uint32_t revision_counter;                           // Write sequence number
-    uint8_t  sha256_checksum[32];                        // Page integrity verification
-    uint32_t reserved[4];                                // Future use, alignment
-    
-    // Complete shared memory structure (raw binary copy)
-    shared_memory_layout_t shared_memory_data;
-    
-    // Padding to ensure flash sector alignment
-    uint8_t padding[FLASH_PERSISTENCE_PAGE_SIZE - sizeof(uint32_t) * 8 - 32 - sizeof(shared_memory_layout_t)];
-} __attribute__((packed, aligned(4096))) flash_persistence_page_t;
+// Note: sha256_checksum is placed first to simplify exclusion during hash calculation.
+// The hash covers all fields after sha256_checksum (magic_number through padding).
+
+#define STRUCT_SIZE 65536
+
+#define PADDING_TO(size) \
+    uint8_t _padding[size - offsetof(struct my_data, _padding)]
+
+
+typedef union {
+    struct {
+        uint8_t  sha256_checksum[32];                        // Page integrity verification (first for easy hash exclusion)
+        uint32_t magic_number;                               // Page validity marker
+        uint32_t revision_counter;                           // Write sequence number
+        uint32_t reserved[4];                                // Future use, alignment
+        
+        // Complete shared memory structure (raw binary copy)
+        shared_memory_layout_t shared_memory_data;
+    };
+    // Padding to ensure flash sector alignment and leave room for dynamic log entries
+    uint8_t _size[FLASH_PERSISTENCE_BLOCK_SIZE];        
+}__attribute__((aligned(FLASH_PERSISTENCE_PAGE_SIZE))) flash_persistence_block_t;
+
+#define TOTAL_SHARED_MEM_USABLE_SIZE (FLASH_PERSISTENCE_BLOCK_SIZE - offsetof(flash_persistence_block_t,shared_memory_data))
+
+
 
 // Function declarations - Core shared memory
 bool shared_memory_init(void);
 bool shared_memory_force_reinit(void);  // For factory reset - forces re-initialization 
 uint32_t shared_memory_get_log_buffer_capacity(void);  // Returns number of entries, not bytes
 shared_memory_layout_t* shared_memory_get_layout(void);
+void update_shared_memory_revision();
 
 // Function declarations - Flash persistence
 bool flash_persistence_init(void);
@@ -155,5 +171,9 @@ void flash_persistence_factory_reset(void);
 uint32_t flash_persistence_get_write_count(void);
 uint32_t flash_persistence_get_corruption_count(void);
 bool flash_persistence_verify_ring_buffer_integrity(void);
+
+//factory reset
+void do_factory_reset();
+bool factory_reset_needed();
 
 #endif // SHARED_MEMORY_H

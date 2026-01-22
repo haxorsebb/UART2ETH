@@ -27,6 +27,7 @@
 #include "ringbuffer.h"
 #include "uart/uart_manager.h"
 #include <pico/time.h>
+#include <pico/flash.h>
 #include <stdio.h>
 #include "debug.h"
 
@@ -76,19 +77,12 @@ static uint32_t g_system_recovery_attempts = 0;
  * STATE CHANGES SHOULD ONLY OCCUR BY state_machine_process_main_event() or state_machine_process_core0_event()
  */
 void core0_main(void) {
-    // One-time initialization
-
-    printf("DEBUG: ENTERING CORE0 MAIN\n");
-
+    // One-time initialization    
     core0_initialize();
-    
-    printf("DEBUG: core0_initialize completed\n");
     
     // Get current states
     main_state_t main_state = state_machine_get_main_state();
     core0_substate_t sub_state = state_machine_get_core0_substate();
-
-    printf("DEBUG: Initial states - main_state=%d, sub_state=%d\n", main_state, sub_state);
 
     while (true) {
         // Get current states
@@ -100,7 +94,7 @@ void core0_main(void) {
         debug_counter++;
         
         if (debug_counter <= 3 || debug_counter % 50000 == 0) {  // First 3 loops and then every 50k loops  
-            // printf("DEBUG: Core0 loop #%u - main_state=%d, sub_state=%d\n", debug_counter, main_state, sub_state);
+            //printf("DEBUG: Core0 loop #%u - main_state=%d, sub_state=%d\n", debug_counter, main_state, sub_state);
         }
         
         // Big switch statement for main states
@@ -115,22 +109,22 @@ void core0_main(void) {
                 // Initialization phase - set up UART hardware
                 switch (sub_state) {
                     case CORE0_INIT_UART:
-                        if (debug_counter <= 3) printf("DEBUG: Calling core0_init_uart_hardware()\n");
+                        DEBUG_ONLY({printf("DEBUG: Calling core0_init_uart_hardware()\n");});
                         core0_init_uart_hardware();
-                        if (debug_counter <= 3) printf("DEBUG: core0_init_uart_hardware() completed\n");
+                        DEBUG_ONLY({printf("DEBUG: core0_init_uart_hardware() completed\n");});
                         break;
                     case CORE0_INIT_COMPLETE:
-                        if (debug_counter <= 3) printf("DEBUG: Calling core0_init_complete()\n");
+                        DEBUG_ONLY({printf("DEBUG: Calling core0_init_complete()\n");});
                         core0_init_complete();
-                        if (debug_counter <= 3) printf("DEBUG: core0_init_complete() completed\n");
+                        DEBUG_ONLY({printf("DEBUG: core0_init_complete() completed\n");});
                         break;
                     case CORE0_INIT_IDLE:
-                        if (debug_counter <= 3) printf("DEBUG: Calling core0_idle_wait() from INIT\n");
+                        DEBUG_ONLY({printf("DEBUG: Calling core0_idle_wait() from INIT\n");});
                         core0_idle_wait();  // Universal wait function
-                        if (debug_counter <= 3) printf("DEBUG: core0_idle_wait() returned from INIT\n");
+                        DEBUG_ONLY({printf("DEBUG: core0_idle_wait() returned from INIT\n");});
                         break;
                     case CORE0_INIT_ERROR:
-                        printf("DEBUG: Processing MAIN_EVENT_SYSTEM_ERROR\n");
+                        DEBUG_ONLY({printf("DEBUG: Processing MAIN_EVENT_SYSTEM_ERROR\n");});
                         state_machine_process_main_event(MAIN_EVENT_SYSTEM_ERROR);
                         break;
                     default:
@@ -194,6 +188,10 @@ void core0_main(void) {
  * @brief One-time Core0 initialization
  */
 static void core0_initialize(void) {
+
+    bool flash_safe = flash_safe_execute_core_init();
+    printf("DEBUG: Core0 initialize() starting. flash_safe: %d\n",flash_safe);
+    
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE0_STARTING, 0);
     
     // Reset state tracking

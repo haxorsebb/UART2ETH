@@ -1,0 +1,269 @@
+:jbake-title: ADR-015: Factory Defaults Web Interface
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 15
+:filename: /adrs/ADR-015-factory-defaults-web-interface.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+= ADR-015: Factory Defaults Web Interface
+
+== Status
+Accepted
+
+== Date
+2026-01-21
+
+== Context
+
+The factory defaults system (ADR-014) requires a manufacturing interface to program device-specific configuration data during production. Manufacturing operators need a simple, reliable method to write factory defaults without command-line tools or external programmers.
+
+Key requirements:
+* Simple web-based interface accessible from production floor
+* Input validation to prevent manufacturing errors
+* Read-back verification after programming
+* Only available in factory firmware builds
+* Minimal external dependencies
+
+Manufacturing workflow requires:
+* Serial number input (decimal format with leading zeros)
+* MAC address configuration
+* Board type selection
+* Default network configuration
+* Factory password setting
+* Immediate verification of programmed data
+
+== Decision
+
+We will implement a web-based factory defaults programming interface accessible at `/factory` that is only compiled when `FACTORY_INTERNAL_VERSION` is defined.
+
+### Interface Design
+
+**Route Structure**
+* `GET /factory` - Display factory defaults configuration form
+* `POST /factory` - Process and write factory defaults to flash
+
+**Form Sections**
+1. Serial Number Section
+   - Production year (0-99, representing 2000-2099)
+   - Production week (1-52)
+   - Serial number (decimal, 0-281474976710655, displayed with leading zeros)
+   - Real-time preview: "YYWW-NNNNNNNNNNNN"
+
+2. Network Identity Section
+   - MAC address (format: XX:XX:XX:XX:XX:XX)
+
+3. Board Type Section
+   - Radio buttons: SHARK (0), PRIMARY (1), SECONDARY (2)
+
+4. Default Network Configuration Section
+   - Default IP address (IPv4 format)
+   - Default netmask (IPv4 format)
+   - Default DHCP enable (checkbox)
+
+5. Security Section
+   - Factory default password (max 31 characters)
+
+6. Actions Section
+   - Write Factory Defaults (primary action)
+   - Cancel (return to status page)
+
+**Validation Strategy**
+
+Server-side validation only (C code):
+* All validation performed server-side to minimize firmware size
+* Comprehensive input validation before flash operations
+* Specific error messages displayed inline on failure
+* Range checking: year (0-99), week (1-52), serial (0-281474976710655)
+* Format validation: IP addresses, MAC addresses
+* String length validation: password (max 31 chars)
+* Invalid inputs rejected with user-friendly error messages
+* Successful writes confirmed with inline success message
+
+Client-side validation:
+* Browser HTML5 validation only (required fields, number ranges)
+* No JavaScript required - keeps page lightweight
+
+**Post-Write Verification**
+After successful write operation:
+1. Reload factory defaults from flash
+2. Validate integrity (SHA256 check)
+3. Redirect to factory page showing updated values
+4. Display inline success message
+5. Show formatted serial number for verification
+
+### Implementation Integration
+
+**HTTP Server Routes**
+Factory routes are only compiled when `FACTORY_INTERNAL_VERSION` is defined:
+```c
+#ifdef FACTORY_INTERNAL_VERSION
+if (strstr(request_buffer, "GET /factory") != NULL) {
+    http_generate_factory_page(response_buffer, sizeof(response_buffer), 
+                                NULL, 0, NULL, 0);
+    http_send_response(conn, response_buffer, strlen(response_buffer));
+}
+else if (strstr(request_buffer, "POST /factory") != NULL) {
+    char error_msg[256] = {0};
+    if (http_parse_factory_post_data(request_buffer, copy_len, 
+                                      error_msg, sizeof(error_msg))) {
+        http_send_redirect(conn, "/factory");  // Success - reload page
+    } else {
+        http_generate_factory_page(response_buffer, sizeof(response_buffer),
+                                    error_msg, strlen(error_msg), NULL, 0);
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+    }
+}
+#endif
+```
+
+**Factory Defaults Writing**
+Parse POST data, validate inputs, and write to flash:
+```c
+static bool http_parse_factory_post_data(const char* post_data, size_t data_len,
+                                         char* error_msg, size_t error_msg_size) {
+    factory_defaults_t factory_data = {0};
+    
+    // Parse form fields with inline validation
+    // Year: must be 0-99
+    // Week: must be 1-52
+    // Serial: must be valid decimal 0-281474976710655
+    // MAC: must be valid format (XX:XX:XX:XX:XX:XX)
+    // Password: max 31 characters after URL decoding
+    
+    // Return false with specific error_msg on validation failure
+    // Call factory_defaults_write(&factory_data)
+    // Verify by reloading: factory_defaults_init()
+    
+    return success;  // true on success, false with error_msg on failure
+}
+```
+
+**Security Considerations**
+* Page only available when `FACTORY_INTERNAL_VERSION` defined
+* No authentication required (factory-only firmware)
+* Warning banner indicating factory use only
+* No client-side confirmation (server-side validation prevents errors)
+* Factory builds never deployed to production devices
+
+## Rationale
+
+### Advantages
+* **Ease of Use**: Web interface requires no special tools or software installation
+* **Error Prevention**: Comprehensive server-side validation prevents programming errors
+* **Minimal Size**: No JavaScript keeps factory firmware size minimal
+* **Verification**: Automatic read-back confirms successful programming
+* **Production Efficiency**: Fast, simple interface for manufacturing floor
+* **Compile-Time Safety**: Factory functions only available in factory builds
+* **Consistent UX**: Uses shared CSS stylesheet with configuration pages
+* **Inline Feedback**: Error and success messages displayed on same page
+
+### Rejected Alternatives
+
+**Command-Line Tool**
+* Rejected due to complexity for manufacturing operators
+* Requires USB connection and terminal software
+* Higher error rate for manual hex/decimal input
+* Slower workflow
+
+**External Programmer**
+* Rejected to avoid additional hardware requirement
+* Network-based programming simpler for production line
+* Web interface provides immediate visual feedback
+
+**Separate Manufacturing Application**
+* Rejected to minimize tooling complexity
+* Built-in web interface eliminates installation requirements
+* Consistent with existing web-based configuration
+
+### Trade-offs
+* **Firmware Size**: Optimized with minified HTML and external CSS (~3KB page size)
+* **Server-Side Only**: All validation on server reduces client complexity
+* **Network Requirement**: Requires working network for programming
+* **No JavaScript**: Browser-only validation (HTML5) less sophisticated but sufficient
+
+== Consequences
+
+### Positive
+* **Simplified Manufacturing**: Web interface reduces operator training requirements
+* **Error Reduction**: Server-side validation prevents common manufacturing errors
+* **Fast Verification**: Immediate read-back confirms programming success
+* **No External Tools**: Eliminates need for separate programming software
+* **Audit Trail**: Programmed serial numbers visible in boot logs
+* **Minimal Footprint**: Minified HTML and shared CSS minimize factory firmware size
+
+### Negative
+* **Factory Build Required**: Must build separate firmware for manufacturing
+* **Code Size**: Factory page adds ~3KB to firmware (mitigated by minification)
+* **Network Dependency**: Requires working network connection for programming
+* **No Offline Validation**: Validation only occurs on form submission
+
+### Implementation Requirements
+* Add `/factory` GET and POST routes to HTTP server
+* Implement `http_generate_factory_page()` with error/success message support
+* Implement `http_parse_factory_post_data()` with comprehensive validation
+* Use shared `/styles.css` stylesheet for consistent styling
+* Guard all factory code with `#ifdef FACTORY_INTERNAL_VERSION`
+* Add read-back verification after write with `factory_defaults_init()`
+* Generate minified HTML to minimize firmware size
+* Display inline error/success messages on same page
+
+== Implementation Notes
+
+The factory defaults web interface will be implemented as an extension to the existing HTTP server module. Form generation and processing follow the same pattern as the `/config` page.
+
+Integration points:
+1. **http_server.c**: Add `/factory` route handling
+2. **http_server.c**: Implement factory page generation
+3. **http_server.c**: Implement factory POST data parsing
+4. **factory_defaults.c**: Utilize existing write/erase functions
+
+### HTML Generation Strategy
+* External CSS via `/styles.css` (shared with other pages)
+* Minified HTML output (no formatting whitespace)
+* No JavaScript - server-side validation only
+* Form fields organized into logical sections
+* HTML5 validation attributes (required, min, max, maxlength)
+* Inline error/success message display
+* Total page size: ~3KB (vs ~7KB with inline CSS and JavaScript)
+
+### Validation Implementation
+
+**Server-Side Validation (Enforced):**
+* Production year: Range 0-99 (enforced, error: "Production year must be 0-99")
+* Production week: Range 1-52 (enforced, error: "Production week must be 1-52")
+* Serial number: Decimal 0-281474976710655 using `strtoull()` with error checking
+* MAC address: Parse format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX
+* IP addresses: Parse format using `sscanf()` for `d.d.d.d`
+* Password: Max 31 characters after URL decoding (error: "Password must be max 31 characters")
+
+**Client-Side Hints (HTML5 attributes):**
+* Year: `type="number" min="0" max="99" required`
+* Week: `type="number" min="1" max="52" required`
+* Serial: `type="text" required`
+* Password: `maxlength="31" required`
+
+### Error Handling
+* Validation errors: Display inline error message on factory page with red border
+* Flash write errors: Return error message "Flash write operation failed"
+* Read-back mismatch: Return error message "Write succeeded but verification failed"
+* Partition errors: Handled by flash_persistence module
+* All errors displayed inline without changing page URL
+* Success redirects to `/factory` to show updated programmed values
+
+### User Experience Flow
+1. Operator navigates to `http://<device-ip>/factory`
+2. Form displays with default values (year=26, week=1, serial=1, etc.)
+3. Current programmed values shown at top (or "Not Programmed")
+4. Operator fills manufacturing data
+5. Browser HTML5 validation provides basic field checking
+6. Operator clicks "Write Factory Defaults"
+7. Server validates all inputs comprehensively
+8. On validation error: Page reloads with red error message banner
+9. On success: Page redirects to `/factory` showing updated values
+10. Operator verifies formatted serial number matches production database
+
+## References
+* ADR-014: Factory Defaults Implementation (storage format and structure)
+* arc42 Chapter 5: Building Block View - HTTP Server Module
+* RP2350 Datasheet: Flash memory programming

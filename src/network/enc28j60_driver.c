@@ -44,9 +44,9 @@ static const uint8_t* g_local_mac = NULL; // MAC address storage (Arduino patter
 #define SPI_BAUDRATE 20000000  // 20MHz SPI clock (max for ENC28J60)
 
 // Buffer addresses (shamelessly lifted from linux kernel)
-#define TX_BUF_START		0x1A00
+#define TX_BUF_START	0x1A00
 #define TX_BUF_END		0x1FFF
-#define RX_BUF_START		0x0000
+#define RX_BUF_START	0x0000
 #define RX_BUF_END		0x19FF
 
 // Maximum frame length (Arduino reference)
@@ -109,7 +109,7 @@ static bool enc28j60_is_mac_mii_register(uint8_t reg) {
         case MACONX_BANK:  // Bank 2
             return reg < ENC28J60_EIE;
         case MAADRX_BANK:  // Bank 3
-            return reg <= 0x05 || reg == ENC28J60_MISTAT; // MAADR2 is 0x05
+            return reg <= ENC28J60_MAADR2 || reg == ENC28J60_MISTAT; // MAADR2 is 0x05
         case ERXTX_BANK:   // Bank 0
         case EPKTCNT_BANK: // Bank 1
         default:
@@ -178,7 +178,6 @@ static void enc28j60_write_register_internal(uint8_t reg, uint8_t value) {
  */
 static void enc28j60_arch_spi_select(void) {
     gpio_put(ENC28J60_CS_PIN, 0);
-    sleep_us(1);  // Setup time (Arduino reference)
 }
 
 /**
@@ -187,6 +186,7 @@ static void enc28j60_arch_spi_select(void) {
 static void enc28j60_arch_spi_deselect(void) {
     sleep_us(1);  // Hold time (Arduino reference)
     gpio_put(ENC28J60_CS_PIN, 1);
+    sleep_us(1);  // Hold time (Arduino reference)
 }
 
 /**
@@ -244,9 +244,9 @@ static bool enc28j60_wait_for_osc_ready(void) {
         timeout -= 100;
     }
     
-    //DEBUG_ONLY({ 
+    DEBUG_ONLY({ 
         printf("ENC28J60: Oscillator timeout: %d\n", timeout); 
-    //});
+    });
     return false;
 }
 
@@ -308,18 +308,18 @@ static void enc28j60_configure_mac(void) {
     // CRITICAL FIX: Use direct register write instead of bit field operations for MAC registers
     uint8_t macon1_value = ENC28J60_MACON1_MARXEN | ENC28J60_MACON1_TXPAUS | ENC28J60_MACON1_RXPAUS;
     enc28j60_write_register_internal(ENC28J60_MACON1, macon1_value);
-    //DEBUG_ONLY({ 
+    DEBUG_ONLY({ 
         printf("ENC28J60: MACON1 = 0x%02X (should be 0x0D)\n", macon1_value); 
-    //});
+    });
     
     // Arduino step 2: Set padding, crc, full duplex
     // CRITICAL FIX: Use direct register write instead of bit field operations for MAC registers
     uint8_t macon3_value = ENC28J60_MACON3_PADCFG_FULL | ENC28J60_MACON3_TXCRCEN | 
                            ENC28J60_MACON3_FULDPX | ENC28J60_MACON3_FRMLNEN;
     enc28j60_write_register_internal(ENC28J60_MACON3, macon3_value);
-    //DEBUG_ONLY({ 
+    DEBUG_ONLY({ 
         printf("ENC28J60: MACON3 = 0x%02X (should be 0xF3)\n", macon3_value); 
-    //});
+    });
     
     // Arduino step 3: Set maximum frame length
     enc28j60_write_register_internal(ENC28J60_MAMXFLL, MAX_MAC_LENGTH & 0xFF);
@@ -396,9 +396,9 @@ bool enc28j60_init(void) {
     
     // 2. Wait for oscillator ready
     if (!enc28j60_wait_for_osc_ready()) {
-        //DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("ENC28J60: Oscillator not ready - init failed\n"); 
-        //});
+        });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 1);
         return false;
     }
@@ -446,9 +446,9 @@ bool enc28j60_init(void) {
     // Verify initialization by checking ECON1
     uint8_t econ1_check = enc28j60_read_register_internal(ENC28J60_ECON1);
     if ((econ1_check & ENC28J60_ECON1_RXEN) == 0) {
-        //DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("ENC28J60: RXEN verification failed\n");
-        //});
+        });
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 2);
         return false;
     }
@@ -1131,54 +1131,16 @@ transfer_finished:
 
 /**
  * @brief reset tx after timeout with complete chip soft reset
+ * !SEE ERRATA!
  */
 static void enc28j60_reset_tx_logic(void) {
-    DEBUG_ONLY({ printf("ENC28J60: Performing FULL CHIP SOFT RESET due to TX failure\n"); });
-    
-    // Perform complete soft reset (Arduino reference)
-    enc28j60_arch_spi_select();
-    enc28j60_spi_transfer(ENC28J60_SOFT_RESET);
-    enc28j60_arch_spi_deselect();
-    
-    // Wait for reset to complete (Arduino reference - critical timing, increased for RP2350)
-    sleep_ms(5);  // Give chip time to reset completely (increased for RP2350)
-    
-    // Verify reset completed by checking ESTAT.CLKRDY
-    uint32_t timeout = 1000;
-    while (timeout > 0) {
-        uint8_t estat = enc28j60_read_register_internal(ENC28J60_ESTAT);
-        if (estat != 0xFF && (estat & ENC28J60_ESTAT_CLKRDY)) {
-            break;
-        }
-        sleep_us(10);
-        timeout--;
-    }
-    
-    if (timeout == 0) {
-        printf("ENC28J60: ERROR - Reset failed, chip not ready\n");
-        return;
-    }
-    
-    printf("ENC28J60: Soft reset completed, re-initializing...\n");
-    
-    // Reinitialize the chip completely
-    // Reset driver state
-    g_current_bank = 0xFF; // Force bank reconfiguration
-    
-    // Reconfigure buffers
-    enc28j60_configure_buffers();
-    
-    // Reconfigure MAC
-    enc28j60_configure_mac();
-    
-    // Enable RX
     enc28j60_set_register_bank_internal(ERXTX_BANK);
-    enc28j60_write_register_internal(ENC28J60_ECON1, ENC28J60_ECON1_RXEN);
+    enc28j60_set_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRST);
+    enc28j60_clear_register_bits(ENC28J60_ECON1, ENC28J60_ECON1_TXRST);
     
-    // Re-enable interrupts  
-    enc28j60_enable_interrupts();
-    
-    printf("ENC28J60: Full reset and re-initialization completed\n");
+    // Re-initialize TX FIFO after reset
+    enc28j60_write_register_internal(ENC28J60_ETXSTL, TX_BUF_START & 0xFF);
+    enc28j60_write_register_internal(ENC28J60_ETXSTH, (TX_BUF_START >> 8) & 0xFF);
 }
 
 /**
@@ -1286,9 +1248,9 @@ bool enc28j60_receive_packet(enc28j60_packet_t* packet, uint16_t max_length) {
     }
     else {
         g_enc28j60_state.rx_errors++;
-        //DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("ENC28J60: invalid packet received, wrong size: %d", packet_length); 
-        //});
+        });
     }
     
 
@@ -1344,13 +1306,14 @@ uint8_t enc28j60_get_interrupt_status(void) {
  * @brief Clear interrupt flags
  */
 void enc28j60_clear_interrupts(uint8_t flags) {
+
     if (!g_driver_initialized) {
         return;
     }
     //DEBUG_ONLY({ printf("Clearing interrupt flag in register %d", flags); });
+
     enc28j60_set_register_bank_internal(ERXTX_BANK);
     enc28j60_clear_register_bits(ENC28J60_EIR, flags);
-
 }
 
 /**
@@ -1518,11 +1481,10 @@ static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
     
     if(timeout == 0)
     {
-        printf("ENC28J60: TIMEOUT AFTER READING PHY REGISTER: %X, timeout: %d", phy_reg,timeout); 
         // TBD: we should do something to mitigate the error
-        //DEBUG_ONLY({ 
-            
-        //});
+        DEBUG_ONLY({ 
+            printf("ENC28J60: TIMEOUT AFTER READING PHY REGISTER: %X, timeout: %d", phy_reg,timeout); 
+        });
     }
     // Return to Bank 2 for reading result
     enc28j60_set_register_bank_internal(MACONX_BANK);

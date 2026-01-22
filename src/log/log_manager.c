@@ -31,6 +31,7 @@ static shared_memory_layout_t* g_shared_layout = NULL;
 static const char* const event_format_strings[] = {
     // System events (0-99)
     [LOG_EVENT_SYSTEM_BOOT] = "System boot sequence initiated",
+    [LOG_EVENT_SYSTEM_CLOCK] = "System clock: %u Hz",
     [LOG_EVENT_SYSTEM_READY] = "System ready for operation",
     [LOG_EVENT_WATCHDOG_RESET] = "Watchdog reset occurred - timeout %u ms",
     [LOG_EVENT_MEMORY_INIT] = "Memory subsystem initialized - %u KB available",
@@ -106,23 +107,32 @@ static const char* const event_format_strings[] = {
     [LOG_EVENT_CONFIG_CHANGED] = "Configuration parameter %u changed",
     [LOG_EVENT_CONFIG_SAVED] = "Configuration saved to flash - revision %u",
     [LOG_EVENT_CONFIG_LOADED] = "Configuration loaded from flash - revision %u",
-    [LOG_EVENT_FACTORY_RESET] = "Factory reset completed - all flash pages invalidated",
+    [LOG_EVENT_FACTORY_RESET] = "Factory reset completed - all flash blocks invalidated",
     [LOG_EVENT_FLASH_INIT] = "Flash persistence initialized: partition ID=%u",
     [LOG_EVENT_FLASH_PARTITION_ID] = "Found partition ID %u",
     [LOG_EVENT_FLASH_PARTITION_OFFSET] = "Partition offset 0x%x",
-    [LOG_EVENT_FLASH_READ] = "Reading page %u from flash",
-    [LOG_EVENT_FLASH_WRITE] = "Writing flash page %u",
-    [LOG_EVENT_FLASH_PAGE_SCAN] = "Scanning ring buffer for valid config pages",
-    [LOG_EVENT_FLASH_PAGE_NUMBER] = "Page %u is valid",
-    [LOG_EVENT_FLASH_PAGE_REVISION] = "Page revision %u",
-    [LOG_EVENT_FLASH_PAGE_INVALID] = "Page %u: invalid - reason code %u", 
-    [LOG_EVENT_FLASH_BEST_PAGE_NUMBER] = "Best page is %u",
-    [LOG_EVENT_FLASH_BEST_PAGE_REV] = "Best page revision %u",
-    [LOG_EVENT_FLASH_ERASE] = "Invalidating flash page %u",
+    [LOG_EVENT_FLASH_READ] = "Reading block %u from flash",
+    [LOG_EVENT_FLASH_WRITE] = "Writing flash block %u",
+    [LOG_EVENT_FLASH_BLOCK_SCAN] = "Scanning ring buffer for valid config blocks",
+    [LOG_EVENT_FLASH_BLOCK_NUMBER] = "Block %u is valid",
+    [LOG_EVENT_FLASH_BLOCK_REVISION] = "Block revision %u",
+    [LOG_EVENT_FLASH_BLOCK_INVALID] = "Block invalid - reason code %u", 
+    [LOG_EVENT_FLASH_BEST_BLOCK_NUMBER] = "Best block is %u",
+    [LOG_EVENT_FLASH_BEST_BLOCK_REV] = "Best block revision %u",
+    [LOG_EVENT_FLASH_ERASE] = "Invalidating flash block %u",
+    [LOG_EVENT_FLASH_ERASE_FAILED] = "Invalidating flash block failed, ret: %d",
+    [LOG_EVENT_FLASH_READ_FAILED] = "Reading block %u from flash failed",    
     [LOG_EVENT_PERSISTENCE_START] = "Starting persistence operation",
     [LOG_EVENT_PERSISTENCE_END] = "Persistence operation completed",
     [LOG_EVENT_PERSISTENCE_NEEDED] = "Persistence needed - configuration changed",
     [LOG_EVENT_SHARED_MEMORY_REINIT] = "Shared memory re-initialized with factory defaults",
+    [LOG_EVENT_FACTORY_PARTITION_NOT_FOUND] = "Factory defaults partition not found",
+    [LOG_EVENT_FACTORY_PARTITION_TOO_SMALL] = "Factory defaults partition too small - size %u bytes",
+    [LOG_EVENT_FACTORY_DEFAULTS_CHECKSUM_FAILED] = "Factory defaults checksum validation failed",
+    [LOG_EVENT_FACTORY_DEFAULTS_LOADED] = "Factory defaults loaded - board type %u",
+    [LOG_EVENT_FACTORY_DEFAULTS_INVALID] = "Factory defaults invalid - using built-in defaults",
+    [LOG_EVENT_FACTORY_DEFAULTS_APPLIED] = "Factory defaults applied to configuration - board type %u",
+    [LOG_EVENT_FACTORY_DEFAULTS_APPLY_FAILED] = "Failed to apply factory defaults - shared memory unavailable",
     
     // OTA events (400-499)
     [LOG_EVENT_OTA_START] = "OTA update started - size %u bytes",
@@ -357,6 +367,10 @@ static bool write_log_entry(const log_entry_t* entry) {
     g_shared_layout->log_mgmt.write_index = next_write_index;
     // Update total count
     g_shared_layout->log_mgmt.total_events_logged++;
+
+    //update revision if needed
+    update_shared_memory_revision();
+
     spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
     
     /* this is a test to use atomic instead of spinlocks TBD: use or remove
@@ -566,7 +580,7 @@ static bool format_single_log_entry(const log_entry_t* entry, char* output_buffe
     
     // Enhanced format string validation with detailed debugging
     const char* first_percent = strchr(format, '%');
-    if (first_percent && first_percent[1] == 'u' && strchr(first_percent + 2, '%') == NULL) {
+    if (first_percent && (first_percent[1] == 'u' || first_percent[1] == 'x' )  ) {
         // Safe: exactly one %u parameter
         snprintf(safe_message, sizeof(safe_message), format, entry->event_extra_value);
     } else if (first_percent == NULL) {

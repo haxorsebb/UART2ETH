@@ -82,8 +82,6 @@ bool state_machine_init(void) {
         printf("Doorbells disabled - using stub values: core0_wakes_core1=%d, core1_wakes_core0=%d\n", 
                doorbell_core0_wakes_core1, doorbell_core1_wakes_core0);
     });
-    
-    
 
     return true;
 }
@@ -173,6 +171,10 @@ bool state_machine_process_main_event(main_state_event_t event) {
                     break;
                 case MAIN_EVENT_CONFIG_COMPLETE_CORE1:
                     if (check_core1_configuration_complete()) {
+
+                        printf("CHANGING TO OPERATIONAL!\r\n");
+                        
+
                         new_state = MAIN_STATE_OPERATIONAL;
                         //change substates, too
                         atomic_store(&g_core0_substate, CORE0_IDLE);
@@ -719,7 +721,8 @@ bool state_machine_process_core1_event(core1_event_t event) {
         // Log Core1 substate change (skip high-frequency network states)
         if (old_state != CORE1_CONFIG_NET_CHECK_DHCP && new_state != CORE1_CONFIG_NET_CHECK_DHCP &&
             old_state != CORE1_LOG_ACTIVE && new_state != CORE1_LOG_ACTIVE &&
-            old_state != CORE1_CONFIG_LOG_ACTIVE && new_state != CORE1_CONFIG_LOG_ACTIVE) {
+            old_state != CORE1_CONFIG_LOG_ACTIVE && new_state != CORE1_CONFIG_LOG_ACTIVE 
+        ) {
             log_event(EVENT_SOURCE_CORE1_SUBSTATE, LOG_LEVEL_DEBUG, 
                       LOG_CORE1_INIT_PERISTENCE + new_state, (uint32_t)old_state);
         }
@@ -771,7 +774,7 @@ static bool check_core0_initialization_complete(void) {
  * Check if system initialization is complete
  */
 static bool check_core1_initialization_complete(void) {
-    // This allows transition FROM INIT TO CONFIGURATION from core1 code (core1 must be CORE0_INIT_IDLE)
+    // This allows transition FROM INIT TO CONFIGURATION from core1 code (core must be CORE0_INIT_IDLE)
     DEBUG_ONLY({
         printf("check_core1_initialization_complete: \ng_core0_substate: %d\ng_core1_substate: %d\n", atomic_load(&g_core0_substate),atomic_load(&g_core1_substate));
     });
@@ -974,4 +977,3 @@ extern void shared_doorbell_irq() {
     // FIFO IRQ doesn't need manual clearing - it's level triggered
     // and will clear automatically when FIFO is empty
 }
-

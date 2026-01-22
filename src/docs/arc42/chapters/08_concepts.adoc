@@ -317,29 +317,33 @@ Each error category implements specific recovery procedures:
 Configuration data persistence uses raw binary storage with flash ring buffer management for wear leveling and power-loss safety:
 
 **Storage Format**
-* Raw binary copy of `g_shared_memory` structure written directly to flash
-* SHA256 checksum per flash page for integrity verification
+* Raw binary copy of `shared_memory_layout_t` structure written directly to flash
+* SHA256 checksum per flash block for integrity verification (checksum stored first in block for hash exclusion)
 * Revision counter incremented on each write operation
 * No JSON parsing or schema validation overhead
+* Shared memory statically allocated within a `flash_persistence_block_t` structure
 
 **Flash Ring Buffer Management**
-* 4 flash pages organized as circular ring buffer
-* Each page stores complete `g_shared_memory` snapshot + metadata
-* Write operations advance to next page in ring (wear leveling)
-* Power-loss safety through atomic page writes with checksums
+* 8 flash blocks (64KB each) organized as circular ring buffer
+* Each block stores complete `shared_memory_layout_t` snapshot + metadata
+* Write operations advance to next block in ring (wear leveling)
+* Sector-by-sector updates: only changed sectors reprogrammed for efficiency
+* Power-loss safety through `flash_safe_execute()` for interrupt-safe operations
 
 **Startup Recovery Process**
-* Read all 4 ring buffer pages from flash
-* Verify SHA256 checksum for each page
-* Select page with highest revision counter AND valid checksum
-* Load selected page data into `g_shared_memory`
-* Invalid pages ignored, fallback to factory defaults if no valid pages
+* Read all 8 ring buffer blocks from flash (partition ID=3)
+* Verify SHA256 checksum for each block
+* Select block with highest revision counter AND valid checksum
+* Load selected block data into `shared_memory_layout_t`
+* Invalid blocks ignored, fallback to factory defaults if no valid blocks
+* Device mode enforcement: GPIO pins and channel enables applied from device_mode.h
 
 **Write-Back Strategy**
 * Deferred writes executed by Core1 main loop
 * Write frequency limited to maximum once per 30 seconds
-* Write triggered only when `g_shared_memory` revision counter changes
-* Complete shared memory structure written atomically per page
+* Write triggered only when `shared_memory_layout.revision_counter` changes
+* Complete shared memory structure written per block with sector-level optimization
+* Write-in-progress tracking prevents concurrent write operations
 
 ==== Configuration Data Scope
 
@@ -352,14 +356,14 @@ Persistent configuration includes:
 ==== Factory Reset and Recovery
 
 **Factory Reset Process**
-* Erase all ring buffer pages
-* Initialize `g_shared_memory` with factory defaults
-* Force immediate write to establish initial page
+* Erase all 8 ring buffer blocks
+* Call `shared_memory_force_reinit()` to restore factory defaults
+* Log factory reset event as first entry in clean log system
 
 **Error Recovery**
-* Corrupted pages detected via SHA256 mismatch
-* Fallback to previous valid page if available
-* Complete factory reset if no valid pages found
+* Corrupted blocks detected via SHA256 mismatch
+* Fallback to previous valid block if available
+* Complete factory reset if no valid blocks found
 
 === Testing and Validation Strategy
 

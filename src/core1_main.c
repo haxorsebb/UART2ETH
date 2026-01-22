@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <pico/stdlib.h>
 #include <pico/multicore.h>
+#include <pico/flash.h>
 #include <hardware/timer.h>
 #include <hardware/irq.h>
 #include <hardware/gpio.h>
@@ -111,8 +112,8 @@ void core1_main(void) {
         
         // Minimal debug output - only every 10000 loops to avoid printf floods
         if (g_core1_loop_counter % 200000 == 0) {
-            // printf("DEBUG: Core1 loop=%u, states=%u, main=%d, sub=%d\n", g_core1_loop_counter, g_core1_state_reads, main_state, sub_state);
-            //enc28j60_dump_signal_quality_registers();
+            printf("DEBUG: Core1 loop=%u, states=%u, main=%d, sub=%d\n", g_core1_loop_counter, g_core1_state_reads, main_state, sub_state);
+            enc28j60_dump_signal_quality_registers();
         }
         
         // Big switch statement for main states
@@ -281,26 +282,26 @@ static bool core1_check_for_pending_work(void) {
 
     // Check for ringbuffer messages to transmit over network (medium priority, messages are cached)
     if(ringbuffer_get_count(RX_UART_TO_TCP) > 0) {
-        //DEBUG_ONLY({ 
+        DEBUG_ONLY({ 
             printf("Core1: ringbuffer has %u pending messages for network transmission\n", 
                              ringbuffer_get_count(RX_UART_TO_TCP)); 
-        //});
+        });
         state_machine_process_core1_event(CORE1_EVENT_RINGBUFFER_DATA_READY);
         return true;
     }
 
     //low priority tasks
-    if(false && log_manager_get_pending_count()) {
-        //DEBUG_ONLY({ 
+    if(log_manager_get_pending_count()) {
+        DEBUG_ONLY({ 
             printf("Logmanager has pending count %d\n",log_manager_get_pending_count()); 
-        //});
+        });
         state_machine_process_core1_event(CORE1_EVENT_LOG_START);
         return true;
     }
-    if(false && flash_persistence_save_needed()) {
-        //DEBUG_ONLY({ 
+    if(flash_persistence_save_needed()) {
+        DEBUG_ONLY({ 
             printf("persistence needed\n"); 
-        //});
+        });
         state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_START);
         return true;
     }
@@ -355,7 +356,8 @@ static void core1_idle_wait(void) {
  */
 static void core1_initialize(void) {
     // Minimal printf to avoid dual-core conflicts
-    printf("DEBUG: Core1 initialize() starting\n");
+    bool flash_safe = flash_safe_execute_core_init();
+    printf("DEBUG: Core1 initialize() starting. flash_safe: %d\n",flash_safe);
     
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
     
@@ -796,9 +798,9 @@ static void core1_process_network(void) {
  * @brief Process flash persistence operations
  */
 static void core1_process_persistence(void) {
-    // Placeholder for persistence operations
     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_START, 1);
     
+    flash_persistence_save_configuration_if_needed();
     // Complete persistence
     state_machine_process_core1_event(CORE1_EVENT_PERSISTENCE_END);
     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_PERSISTENCE_END, 0);

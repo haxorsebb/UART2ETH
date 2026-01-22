@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include "factory_defaults.h"
 
 // Network manager state
 static bool g_network_initialized = false;
@@ -330,13 +331,25 @@ void network_manager_get_default_config(network_config_t* config) {
     // FIXED MAC ADDRESS - no more dynamic generation to avoid ARP conflicts
     // pico_get_unique_board_id(&unique_id);  // Commented out
     
-    config->mac_address[0] = 0x02;  // Locally administered, unicast
-    config->mac_address[1] = 0x00;  // Fixed values
-    config->mac_address[2] = 0x00; 
-    config->mac_address[3] = 0x00;
-    config->mac_address[4] = 0x00;
-    config->mac_address[5] = 0x01;  // Simple fixed MAC: 02:00:00:00:00:01
-    
+    //TODO mixed minced meat HACK!
+    if(factory_defaults_is_valid()) {
+        const factory_defaults_t* defaults = factory_defaults_get();
+        config->mac_address[0] = defaults->mac_address[0];  
+        config->mac_address[1] = defaults->mac_address[1];  
+        config->mac_address[2] = defaults->mac_address[2];
+        config->mac_address[3] = defaults->mac_address[3];
+        config->mac_address[4] = defaults->mac_address[4];
+        config->mac_address[5] = defaults->mac_address[5];
+        
+    } else {    
+        config->mac_address[0] = 0x02;  // Locally administered, unicast
+        config->mac_address[1] = 0x00;  // Fixed values
+        config->mac_address[2] = 0x00; 
+        config->mac_address[3] = 0x00;
+        config->mac_address[4] = 0x00;
+        config->mac_address[5] = 0x01;  // Simple fixed MAC: 02:00:00:00:00:01
+    }
+
     DEBUG_ONLY({
         printf("Network Manager: Using FIXED MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
                config->mac_address[0], config->mac_address[1], config->mac_address[2],
@@ -526,7 +539,7 @@ bool network_manager_reconfigure(const network_config_t* config) {
            (int)((config->static_ip.addr >> 8) & 0xFF),
            (int)((config->static_ip.addr >> 16) & 0xFF),
            (int)((config->static_ip.addr >> 24) & 0xFF),
-           config->use_dhcp ? "ENABLED" : "DISABLED");
+           config->use_dhcp ? "ENABLED" : "Dnetwork_manager_reconfigureISABLED");
 
     // Update global configuration with new settings
     memcpy(&g_network_config, config, sizeof(network_config_t));
