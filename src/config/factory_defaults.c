@@ -183,7 +183,7 @@ static bool validate_factory_defaults_integrity(const factory_defaults_t* defaul
             printf("%02X,", calculated_checksum[idx]);
         }
         printf("\n");
-    })
+    });
 
     // Compare checksums
     return (memcmp(defaults->sha256_checksum, calculated_checksum, 32) == 0);
