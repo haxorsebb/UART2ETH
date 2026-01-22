@@ -20,6 +20,7 @@
 #include "hardware/flash.h"
 #include <stdio.h>
 #include <string.h>
+#include "debug.h"
 
 // Static storage for factory defaults
 static factory_defaults_t g_factory_defaults = {0};
@@ -28,12 +29,6 @@ static bool g_factory_defaults_valid = false;
 // Function prototypes
 static bool load_factory_defaults(void);
 static bool validate_factory_defaults_integrity(const factory_defaults_t* defaults);
-
-#ifdef FACTORY_INTERNAL_VERSION
-// Flash callback functions for safe multi-core flash access
-static void call_flash_range_erase(void *param);
-static void call_flash_range_program(void *param);
-#endif
 
 /**
  * Initialize factory defaults system and load from flash
@@ -104,6 +99,8 @@ void factory_defaults_apply_to_config(void) {
  * Get read-only pointer to factory defaults
  */
 const factory_defaults_t* factory_defaults_get(void) {
+
+    printf("FACTORY DEFAULTS GET: %d, 0x%08X %02d/%02d\n",g_factory_defaults_valid, &g_factory_defaults, g_factory_defaults.production_week, g_factory_defaults.production_year);
     if (!g_factory_defaults_valid) {
         return NULL;
     }
@@ -143,14 +140,13 @@ static bool load_factory_defaults(void) {
     // Validate integrity
     if (!validate_factory_defaults_integrity((const factory_defaults_t *)(XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE + partition_start))) {
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FACTORY_DEFAULTS_CHECKSUM_FAILED, 0);
+        printf("FACTORY DEFAULTS INTEGRITY FAILED!\n");
         return false;
     }
     
     // Read factory defaults from flash using XIP raw flash access
-    const uint8_t *flash_contents = (const uint8_t *)(XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE + partition_start);
+    factory_defaults_t* flash_contents = (factory_defaults_t*)(XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE + partition_start);
     memcpy(&g_factory_defaults, flash_contents, sizeof(factory_defaults_t));
-    
-
     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_FACTORY_DEFAULTS_LOADED, 
               g_factory_defaults.board_type);
     
@@ -166,7 +162,7 @@ static bool validate_factory_defaults_integrity(const factory_defaults_t* defaul
     }
     
     // Calculate SHA256 checksum of all fields after sha256_checksum using shared utility
-    const uint8_t* data_start = (const uint8_t*)&defaults->production_week;
+    const uint8_t* data_start = (const uint8_t*)&(defaults->production_week);
     size_t data_size = sizeof(factory_defaults_t) - offsetof(factory_defaults_t, production_week);
     
     uint8_t calculated_checksum[32];
@@ -174,6 +170,21 @@ static bool validate_factory_defaults_integrity(const factory_defaults_t* defaul
         return false;
     }
     
+    DEBUG_ONLY({
+        printf("Factory defaults read successfully\n");
+        
+        for(int idx=0; idx<32; idx++)
+        {
+            printf("%02X,", defaults->sha256_checksum[idx]);
+        }
+        printf("\n");
+        for(int idx=0; idx<32; idx++)
+        {
+            printf("%02X,", calculated_checksum[idx]);
+        }
+        printf("\n");
+    })
+
     // Compare checksums
     return (memcmp(defaults->sha256_checksum, calculated_checksum, 32) == 0);
 }
@@ -200,38 +211,47 @@ bool factory_defaults_write(const factory_defaults_t* defaults) {
         return false;
     }
     
-    // Create local copy with calculated checksum
-    factory_defaults_t write_data;
-    memcpy(&write_data, defaults, sizeof(factory_defaults_t));
-    
     // Calculate SHA256 checksum using shared utility
-    const uint8_t* data_start = (const uint8_t*)&write_data.production_week;
+    const uint8_t* data_start = (const uint8_t*)&(defaults->production_week);
     size_t data_size = sizeof(factory_defaults_t) - offsetof(factory_defaults_t, production_week);
     
-    if (flash_calculate_sha256(data_start, data_size, write_data.sha256_checksum) != 0) {
+    if (flash_calculate_sha256(data_start, data_size, (uint8_t*)(defaults->sha256_checksum)) != 0) {
         printf("ERROR: Failed to calculate checksum\n");
         return false;
     }
-    
-    // Erase partition first
-    if (!factory_defaults_erase()) {
-        printf("ERROR: Failed to erase factory defaults partition\n");
-        return false;
-    }
-    
-    // Write data to flash using flash_safe_execute for multi-core safety
+
+    // Erase partition (erase full 8KB = 2 sectors) using flash_safe_execute
     // Flash is "execute in place" and will be in use when code runs on either core.
     // flash_safe_execute disables interrupts and cooperates with the other core
-    // to ensure flash is not in use during the write operation.
-    uintptr_t params[] = { (uintptr_t)partition_start, (uintptr_t)&write_data };
-    int rc = flash_safe_execute(call_flash_range_program, params, UINT32_MAX);
-    
-    if (rc != PICO_OK) {
-        printf("ERROR: Flash program failed with error code %d\n", rc);
-        return false;
+    // to ensure flash is not in use during the erase operation.
+    for (uint32_t offset = 0; offset < partition_size; offset += FLASH_SECTOR_SIZE) {
+        int rc = flash_safe_execute(call_flash_range_erase, (void*)(partition_start + offset), UINT32_MAX);
+        
+        if (rc != PICO_OK) {
+            printf("ERROR: Flash erase failed at offset 0x%X with error code %d\n", 
+                   partition_start + offset, rc);
+            return false;
+        }
+
+        // Write data to flash using flash_safe_execute for multi-core safety
+        // Flash is "execute in place" and will be in use when code runs on either core.
+        // flash_safe_execute disables interrupts and cooperates with the other core
+        // to ensure flash is not in use during the write operation.
+        uintptr_t params[] = { (uintptr_t)(partition_start + offset), (uintptr_t)(((uint8_t*)defaults)+offset) };
+        rc = flash_safe_execute(call_flash_range_program, params, UINT32_MAX);
+        
+        if (rc != PICO_OK) {
+            printf("ERROR: Flash program failed with error code %d\n", rc);
+            return false;
+        }
     }
-    
+
     printf("Factory defaults written successfully\n");
+    for(int idx=0; idx<32; idx++)
+    {
+        printf("%08x,", defaults->sha256_checksum[idx]);
+    }
+
     return true;
 }
 
@@ -266,27 +286,6 @@ bool factory_defaults_erase(void) {
     
     printf("Factory defaults partition erased\n");
     return true;
-}
-
-// Flash callback functions (called by flash_safe_execute)
-
-/**
- * Callback function for flash_range_erase called from flash_safe_execute
- * This will be called when it's safe to erase flash (interrupts disabled, other core coordinated)
- */
-static void call_flash_range_erase(void *param) {
-    uint32_t offset = (uint32_t)param;
-    flash_range_erase(offset, FLASH_SECTOR_SIZE);
-}
-
-/**
- * Callback function for flash_range_program called from flash_safe_execute
- * This will be called when it's safe to program flash (interrupts disabled, other core coordinated)
- */
-static void call_flash_range_program(void *param) {
-    uint32_t offset = ((uintptr_t*)param)[0];
-    const uint8_t *data = (const uint8_t *)((uintptr_t*)param)[1];
-    flash_range_program(offset, data, FLASH_SECTOR_SIZE);
 }
 
 #endif // FACTORY_INTERNAL_VERSION

@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "hardware/flash.h"
+#include "shared_memory.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -13,6 +13,7 @@
 
 #include "shared_memory.h"
 #include "device_mode.h"
+#include "factory_defaults.h"
 #include "hardware/sync.h"
 #include <stdatomic.h>
 #include <string.h>
@@ -81,10 +82,8 @@ bool shared_memory_init(void) {
         printf("ERROR: Failed to initialize spinlock\n");
         return false;
     }
-    printf("DEBUG: Spinlock initialized successfully (lock_num=%u)\n", lock_num);
-    
     // Initialize shared memory structure
-    memset(g_shared_memory, 0, SHARED_MEMORY_BANK_SIZE);
+    memset(g_shared_memory, 0, TOTAL_SHARED_MEM_USABLE_SIZE);
     
     // Set up basic configuration defaults
     g_shared_memory->revision_counter = 1;
@@ -154,6 +153,9 @@ bool shared_memory_init(void) {
     g_shared_memory->config.log_level = 1;  // INFO
     g_shared_memory->config.watchdog_timeout_ms = 200;
     
+    printf("V: ");
+    factory_defaults_print_serial_number();
+   
     return true;
 }
 

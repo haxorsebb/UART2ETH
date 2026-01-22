@@ -18,6 +18,8 @@
 #ifndef SHARED_MEMORY_H
 #define SHARED_MEMORY_H
 
+//#include <cstddef>
+
 #include <hardware/sync/spin_lock.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -127,26 +129,30 @@ typedef struct {
 // Flash page structure for ring buffer persistence
 // Note: sha256_checksum is placed first to simplify exclusion during hash calculation.
 // The hash covers all fields after sha256_checksum (magic_number through padding).
-typedef struct {
-    uint8_t  sha256_checksum[32];                        // Page integrity verification (first for easy hash exclusion)
-    uint32_t magic_number;                               // Page validity marker
-    uint32_t revision_counter;                           // Write sequence number
-    uint32_t reserved[4];                                // Future use, alignment
-    
-    // Complete shared memory structure (raw binary copy)
-    shared_memory_layout_t shared_memory_data;
-    
+
+#define STRUCT_SIZE 65536
+
+#define PADDING_TO(size) \
+    uint8_t _padding[size - offsetof(struct my_data, _padding)]
+
+
+typedef union {
+    struct {
+        uint8_t  sha256_checksum[32];                        // Page integrity verification (first for easy hash exclusion)
+        uint32_t magic_number;                               // Page validity marker
+        uint32_t revision_counter;                           // Write sequence number
+        uint32_t reserved[4];                                // Future use, alignment
+        
+        // Complete shared memory structure (raw binary copy)
+        shared_memory_layout_t shared_memory_data;
+    };
     // Padding to ensure flash sector alignment and leave room for dynamic log entries
-    uint8_t padding[FLASH_PERSISTENCE_BLOCK_SIZE 
-        - 32*sizeof(uint8_t)  /*sha256_checksum*/
-        - sizeof(uint32_t)  /*magic_number*/
-        - sizeof(uint32_t)  /*revision_counter*/
-        - sizeof(uint32_t)  /*reserved[0]*/
-        - sizeof(uint32_t)  /*reserved[1]*/
-        - sizeof(uint32_t)  /*reserved[2]*/
-        - sizeof(uint32_t)  /*reserved[3]*/
-        - sizeof(shared_memory_layout_t)];
-} __attribute__((packed, aligned(FLASH_PERSISTENCE_PAGE_SIZE))) flash_persistence_block_t;
+    uint8_t _size[FLASH_PERSISTENCE_BLOCK_SIZE];        
+}__attribute__((aligned(FLASH_PERSISTENCE_PAGE_SIZE))) flash_persistence_block_t;
+
+#define TOTAL_SHARED_MEM_USABLE_SIZE (FLASH_PERSISTENCE_BLOCK_SIZE - offsetof(flash_persistence_block_t,shared_memory_data))
+
+
 
 // Function declarations - Core shared memory
 bool shared_memory_init(void);

@@ -22,6 +22,18 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+
+// Flash persistence constants - RP2350 Partition Table Approach
+#define FLASH_PERSISTENCE_RING_SIZE 8                    // 4 pages in ring buffer
+#define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
+#define FLASH_PERSISTENCE_BLOCK_SIZE 16*4096             // SRAM4 BANK SIZE
+#define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
+#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
+#define FLASH_PARTITION_FIRMWARE_A 0
+#define FLASH_PARTITION_FIRMWARE_B 1
+#define FLASH_PARTITION_FACTORY_DEFAULTS 2
+#define FLASH_PARTITION_CONFIGURATION_DATA 3
+
 // Flash persistence state management
 
 typedef struct {
@@ -66,5 +78,10 @@ bool flash_find_partition_info(uint32_t partition_id, uint32_t* start_addr, uint
  * @return 0 on success, -1 on error
  */
 int flash_calculate_sha256(const void* data, size_t size, uint8_t* checksum_out);
+
+// This function will be called when it's safe to call flash_range_erase
+void call_flash_range_erase(void *param);
+// This function will be called when it's safe to call flash_range_program
+void call_flash_range_program(void *param);
 
 #endif // FLASH_PERSISTENCE_H

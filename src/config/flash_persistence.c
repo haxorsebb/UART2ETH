@@ -75,8 +75,6 @@ static bool write_flash_block(uint32_t block_index, const flash_persistence_bloc
 static bool validate_block_integrity(const flash_persistence_block_t* block_data);
 static int find_best_valid_block(void);
 static void advance_ring_buffer_position(void);
-static void call_flash_range_erase(void *param);
-static void call_flash_range_program(void *param);
 static bool read_next_partition(pico_partition_table_t *pt, pico_partition_t *p); 
 static int read_partition_table(pico_partition_table_t *pt);
 
@@ -167,7 +165,7 @@ bool flash_persistence_load_configuration(void) {
     // Copy loaded configuration to shared memory
     shared_memory_layout_t* layout = shared_memory_get_layout();
     if (layout) {
-        memcpy(layout, &block_data.shared_memory_data, sizeof(shared_memory_layout_t));
+        memcpy(layout, &block_data.shared_memory_data, sizeof(TOTAL_SHARED_MEM_USABLE_SIZE));
         g_flash_state.last_written_revision = layout->revision_counter;
         g_flash_state.last_valid_block = best_block;
         
@@ -313,7 +311,7 @@ bool flash_persistence_force_save_configuration(void) {
     
     shadow_block_copy.revision_counter = layout->revision_counter;
     // Copy shared memory data
-    memcpy(&shadow_block_copy.shared_memory_data, layout, sizeof(shared_memory_layout_t));
+    memcpy(&shadow_block_copy.shared_memory_data, layout, sizeof(TOTAL_SHARED_MEM_USABLE_SIZE));
     
     //keep doing stuff while we finish this write
     restore_interrupts(ints);
@@ -767,13 +765,13 @@ static void advance_ring_buffer_position(void) {
 
 
 // This function will be called when it's safe to call flash_range_erase
-static void call_flash_range_erase(void *param) {
+void call_flash_range_erase(void *param) {
     uint32_t offset = (uint32_t)param;
     flash_range_erase(offset, FLASH_SECTOR_SIZE);
 }
 
 // This function will be called when it's safe to call flash_range_program
-static void call_flash_range_program(void *param) {
+void call_flash_range_program(void *param) {
     uint32_t offset = ((uintptr_t*)param)[0];
     const uint8_t *data = (const uint8_t *)((uintptr_t*)param)[1];
     flash_range_program(offset, data, FLASH_SECTOR_SIZE);

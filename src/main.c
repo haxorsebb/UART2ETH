@@ -82,6 +82,9 @@ int main() {
     sleep_ms(2000);
     printf("UART2ETH COPYRIGHT 2025 CASSEL MESSTECHNIK GMBH\nBUILD: ");
     printf(_TIMEZ_);
+#ifdef FACTORY_INTERNAL_VERSION
+    printf("\n!!!FACTORY INTERNAL VERSION!!!\n!!!NEVER TO BE SHIPPED!!!\n!!!TRAINED AND AUTHORIZED PERSONAL ONLY!!!\n");
+#endif
     printf("\n--------SOFTWARE START--------\n");
     
     // Initialize and display factory defaults (early boot)
@@ -93,7 +96,9 @@ int main() {
         //reset was requested by user        
         do_factory_reset(); // reset will happen druing flash persistence init 
     }
-
+    printf("AFTER FACTORY RESET\n");
+    factory_defaults_print_serial_number();
+   
     
     // Initialize shared memory system
     if (!shared_memory_init()) {
@@ -102,7 +107,10 @@ int main() {
             sleep_ms(1000);  // Halt system on critical error
         }
     }
-    
+    printf("AFTER SHARED\n");
+        
+    factory_defaults_print_serial_number();
+   
     // Initialize ring buffer for UART-TCP message bridging
     if (!ringbuffer_init()) {
         printf("ERROR: Ringbuffer init failed!\n");
@@ -110,7 +118,7 @@ int main() {
             sleep_ms(1000);  // Halt system on critical error - ringbuffer init failed
         }
     }
-    
+   
     // Initialize event-driven state machine
     if (!state_machine_init()) {
         printf("ERROR: State machine init failed!\n");
@@ -118,7 +126,7 @@ int main() {
             sleep_ms(1000);  // Halt system on critical error
         }
     }
-    
+   
     // Initialize log manager
     if (!log_manager_init()) {
         printf("ERROR: Log manager init failed!\n");
@@ -133,7 +141,7 @@ int main() {
         printf("ERROR: System clock too low (%u Hz), multicore unsafe\n", sys_clk);
         while(1) sleep_ms(1000);
     }
-
+   
     // Ensure all memory operations are complete before launching Core1
     __dsb();  // Data Synchronization Barrier
     __isb();  // Instruction Synchronization Barrier
@@ -153,7 +161,8 @@ int main() {
     __isb();  // Instruction Synchronization Barrier
     
     core0_main();
-    
+    factory_defaults_print_serial_number();
+   
     // Should never reach here
     while (true) {
         log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_CORE_EXIT_ERROR, 0);

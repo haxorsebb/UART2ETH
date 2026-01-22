@@ -606,9 +606,6 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         return;
     }
 
-    printf("X: ");
-    factory_defaults_print_serial_number();
-    
     // Get current IP address
     simple_ip_addr_t ip_addr;
     bool has_ip = network_manager_get_ip_address(&ip_addr);
