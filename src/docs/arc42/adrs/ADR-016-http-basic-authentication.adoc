@@ -99,7 +99,8 @@ Connection: close
 **All HTTP endpoints require authentication:**
 * `GET /` - Device status page
 * `GET /config` - Configuration page
-* `POST /` - Configuration update
+* `POST /` - Network/UART configuration update
+* `POST /change_password` - Password change endpoint
 * `GET /factory` - Factory defaults page (FACTORY_INTERNAL_VERSION only)
 * `POST /factory` - Factory defaults write (FACTORY_INTERNAL_VERSION only)
 * `GET /styles.css` - Stylesheet (included for consistency)
@@ -113,53 +114,96 @@ Connection: close
 ### Password Management
 
 **Password Change Interface**
-Add password change section to `/config` page:
+Add password change section to `/config` page as a separate form:
 ```html
-<div class="section">
-    <h3>Security Settings</h3>
-    <div class="form-group">
-        <label for="current_password">Current Password:</label>
-        <input type="password" id="current_password" name="current_password" required>
+<form method="POST" action="/change_password">
+    <div class="section">
+        <h3>Security Configuration</h3>
+        <div class="form-group">
+            <label for="current_password">Current Password:</label>
+            <input type="password" id="current_password" name="current_password" required>
+        </div>
+        <div class="form-group">
+            <label for="new_password">New Password (8-31 characters):</label>
+            <input type="password" id="new_password" name="new_password" 
+                   minlength="8" maxlength="31" required>
+        </div>
+        <div class="form-group">
+            <label for="confirm_password">Confirm New Password:</label>
+            <input type="password" id="confirm_password" name="confirm_password" 
+                   minlength="8" maxlength="31" required>
+        </div>
+        <button type="submit" class="button">Change Password</button>
     </div>
-    <div class="form-group">
-        <label for="new_password">New Password:</label>
-        <input type="password" id="new_password" name="new_password" maxlength="31">
-    </div>
-    <div class="form-group">
-        <label for="confirm_password">Confirm New Password:</label>
-        <input type="password" id="confirm_password" name="confirm_password" maxlength="31">
-    </div>
-</div>
+</form>
 ```
 
-**Password Change Validation**
-1. Verify current password matches stored password
-2. Verify new password and confirmation match
-3. Verify new password length ≤ 31 characters (allow null terminator)
-4. Update `config.admin_password`
-5. Increment revision counter
-6. Save configuration to flash
-7. Return success (user must re-authenticate with new password)
+**Password Change Validation Rules**
+1. **Current Password Verification**: Must match `config.admin_password` (case-sensitive)
+2. **New Password Length**: Minimum 8 characters, maximum 31 characters
+3. **Password Confirmation**: `new_password` must exactly match `confirm_password`
+4. **Character Set**: Any ASCII characters allowed (printable range 0x20-0x7E)
+5. **Error Handling**:
+   - Wrong current password → Show error, do not save
+   - New password too short (<8 chars) → Show error, do not save
+   - Passwords don't match → Show error, do not save
+   - Empty fields → Show error, do not save
+
+**Password Change Flow**
+1. User submits `/change_password` POST request with authentication header
+2. Server validates authentication (existing session)
+3. Parse POST data: `current_password`, `new_password`, `confirm_password`
+4. Validate current password matches stored password
+5. Validate new password length (8-31 characters)
+6. Validate new password matches confirmation
+7. On validation success:
+   - Update `config.admin_password` with new password
+   - Increment `revision_counter`
+   - Save configuration to flash via `flash_persistence_force_save_configuration()`
+   - Redirect to `/config` with success message
+   - Current session continues (user NOT logged out)
+8. On validation failure:
+   - Show error message on config page
+   - Do NOT save password
+   - Current session continues
+
+**Separate Endpoint for Password Change**
+Password changes use dedicated `/change_password` endpoint (POST only):
+* Keeps password change logic separate from network/UART configuration
+* Prevents accidental password changes during config updates
+* Allows specific validation and error messages for password changes
+* Config page (`/config`) contains two separate forms:
+  1. Network/UART Configuration → POST to `/`
+  2. Password Change → POST to `/change_password`
 
 **Password Reset Procedure**
 If password is forgotten:
-1. Perform factory reset (button during boot)
-2. Password reverts to factory default
-3. Access device with factory default password
-4. Change password to new value
+1. Perform factory reset (button during boot, or via `/factory` page)
+2. `factory_defaults_apply_to_config()` copies `factory_defaults.default_password` → `config.admin_password`
+3. Password reverts to factory default (e.g., "admin" or device-specific value)
+4. Access device with factory default password
+5. Change password to new secure value immediately
 
 ### Implementation Components
 
 **New Functions (http_server.c)**
-* `http_check_authentication()` - Validate Authorization header
-* `http_send_auth_required()` - Send 401 response
-* `http_base64_decode()` - Decode base64 credentials
-* `http_parse_password_change()` - Parse and validate password change form
+* `http_check_authentication()` - Validate Authorization header against stored password
+* `http_send_auth_required()` - Send 401 Unauthorized response with WWW-Authenticate header
+* `http_base64_decode()` - Decode base64-encoded credentials
+* `http_validate_password_change()` - Validate password change request (current password, new password, confirmation)
+* `http_handle_password_change()` - Handle POST to `/change_password` endpoint
 
 **Modified Functions**
-* `http_connection_recv_callback()` - Add authentication check before processing
-* `http_parse_post_data()` - Handle password change fields
-* `http_generate_config_page()` - Add password change section
+* `http_connection_recv_callback()` - Add authentication check before processing all requests
+* `http_generate_config_page()` - Add separate password change form with POST to `/change_password`
+* Request routing - Add `/change_password` endpoint handling
+
+**New HTTP Endpoint**
+* `POST /change_password` - Password change endpoint
+  - Input: `current_password`, `new_password`, `confirm_password` (form fields)
+  - Validation: Current password verification, length check, confirmation match
+  - Output: Redirect to `/config` with success/error message
+  - Authentication: Required (same as all endpoints)
 
 **Shared Memory Integration**
 * `shared_memory_init()` - Initialize `admin_password` from factory defaults
@@ -265,20 +309,34 @@ If password is forgotten:
 6. Implement `http_base64_decode()` helper function
 7. Add authentication check to `http_connection_recv_callback()`
 
-**Phase 2: Password Management**
-1. Add password change section to config page HTML
-2. Implement `http_parse_password_change()` function
-3. Update `http_parse_post_data()` to handle password changes
-4. Add password validation logic
-5. Test password change and persistence
+**Phase 2: Password Management (This Implementation)**
+1. Add `/change_password` endpoint to request routing in `http_connection_recv_callback()`
+2. Implement `http_validate_password_change()` - Validate all password change criteria
+3. Implement `http_handle_password_change()` - Process password change POST request
+4. Update `http_generate_config_page()` - Add separate password change form
+5. Add password change success/error message display on config page
+6. Test password validation (minimum length, confirmation match, current password)
+7. Test password persistence to flash
+8. Test factory reset restores factory default password
 
 **Phase 3: Testing**
-1. Unit tests for base64 decoding
-2. Unit tests for authentication validation
-3. Integration tests for authentication flow
-4. Test password change functionality
-5. Test factory reset password behavior
-6. Test flash persistence of password
+1. Unit tests for `http_validate_password_change()` function
+   - Test current password verification
+   - Test minimum length validation (8 characters)
+   - Test maximum length validation (31 characters)  
+   - Test confirmation matching
+   - Test empty field validation
+2. Integration tests for `/change_password` endpoint
+   - Test successful password change flow
+   - Test error handling for each validation failure
+   - Test flash persistence of new password
+3. Integration tests for factory reset
+   - Test `factory_defaults_apply_to_config()` restores default password
+   - Test authentication with factory default password after reset
+4. End-to-end browser testing
+   - Test password change via web UI
+   - Test re-authentication with new password
+   - Test session continuity (not logged out after password change)
 
 ### Documentation Updates
 * Update user manual with authentication requirements
