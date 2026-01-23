@@ -148,16 +148,20 @@ add_executable(test_http_authentication
 )
 
 # Link required libraries including HTTP server
+# Note: config_manager depends on network_manager, so network_manager is listed twice
+# to resolve circular dependencies (config_manager uses network_manager symbols)
 target_link_libraries(test_http_authentication
     unity
-    network_manager
+    http_server  # HTTP server library with authentication functions
+    config_manager
+    state_machine
+    log_manager
+    network_manager  # Listed after config_manager to resolve symbols
+    timer_subsystems
     pico_stdlib
     hardware_spi
     hardware_gpio
-    log_manager
-    state_machine
-    config_manager
-    timer_subsystems
+    utils
 )
 
 # Enable dual stdio for test output

@@ -562,10 +562,10 @@ int http_base64_decode(const char* input, char* output, size_t max_len) {
 static void http_send_auth_required(http_connection_t* conn) {
     static char auth_response[512];
     int len = snprintf(auth_response, sizeof(auth_response),
-        "HTTP/1.0 401 Unauthorized\r\n"
+        "HTTP/1.1 401 Unauthorized\r\n"
         "WWW-Authenticate: Basic realm=\"UART2ETH Device\"\r\n"
         "Content-Type: text/html\r\n"
-        "Connection: close\r\n"
+        "Content-Length: %d\r\n"
         "\r\n"
         "<!DOCTYPE html>\n"
         "<html>\n"
@@ -577,8 +577,33 @@ static void http_send_auth_required(http_connection_t* conn) {
         "</body>\n"
         "</html>\r\n");
     
+    // Calculate content length (HTML body only)
+    const char* content_start = strstr(auth_response, "\r\n\r\n");
+    if (content_start) {
+        content_start += 4; // Skip the \r\n\r\n
+        int content_len = strlen(content_start);
+        
+        // Rebuild with correct Content-Length
+        len = snprintf(auth_response, sizeof(auth_response),
+            "HTTP/1.1 401 Unauthorized\r\n"
+            "WWW-Authenticate: Basic realm=\"UART2ETH Device\"\r\n"
+            "Content-Type: text/html\r\n"
+            "Content-Length: %d\r\n"
+            "\r\n"
+            "<!DOCTYPE html>\n"
+            "<html>\n"
+            "<head><title>401 Unauthorized</title></head>\n"
+            "<body>\n"
+            "    <h1>401 Unauthorized</h1>\n"
+            "    <p>Access denied. Please provide valid credentials.</p>\n"
+            "    <p>Username: <strong>admin</strong></p>\n"
+            "</body>\n"
+            "</html>\r\n", content_len);
+    }
+
     http_send_response(conn, auth_response, len);
-    http_close_connection(conn);
+    // Don't close connection - let browser close it after receiving 401
+    // or reuse it for authenticated request
 }
 
 /**
