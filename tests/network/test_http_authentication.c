@@ -28,6 +28,26 @@
 extern int http_base64_decode(const char* input, char* output, size_t max_len);
 extern bool http_check_authentication(const char* request, const char* expected_password);
 
+/**
+ * Password change validation result codes
+ * Reference: ADR-016 HTTP Basic Authentication - Password Management
+ */
+typedef enum {
+    PWD_CHANGE_OK = 0,              // Password change validation successful
+    PWD_CHANGE_CURRENT_WRONG = 1,   // Current password doesn't match
+    PWD_CHANGE_TOO_SHORT = 2,       // New password too short (<8 chars)
+    PWD_CHANGE_TOO_LONG = 3,        // New password too long (>31 chars)
+    PWD_CHANGE_NO_MATCH = 4,        // New password != confirmation
+    PWD_CHANGE_EMPTY_FIELD = 5      // One or more fields empty
+} password_change_result_t;
+
+extern password_change_result_t http_validate_password_change(
+    const char* current_pwd,
+    const char* new_pwd,
+    const char* confirm_pwd,
+    const char* stored_pwd
+);
+
 void setUp(void) {
     // Initialize shared memory before each test
     shared_memory_init();
@@ -230,29 +250,261 @@ void test_password_initialized_from_factory_defaults(void) {
         "Password should be null-terminated within 32 bytes");
 }
 
+/**
+ * Test: Password validation should succeed with valid inputs
+ * 
+ * Tests that password change validation accepts properly formatted
+ * password change with all criteria met.
+ * 
+ * Reference: ADR-016 - Password Change Validation Rules
+ */
+void test_password_change_validation_success(void) {
+    // ARRANGE: Valid password change inputs
+    const char* current_pwd = "oldpassword";
+    const char* new_pwd = "newpassword123";  // 14 chars (valid: 8-31)
+    const char* confirm_pwd = "newpassword123";
+    const char* stored_pwd = "oldpassword";
+    
+    // ACT: Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_pwd, new_pwd, confirm_pwd, stored_pwd
+    );
+    
+    // ASSERT: Validation should succeed
+    TEST_ASSERT_EQUAL_MESSAGE(PWD_CHANGE_OK, result,
+        "Valid password change should pass validation");
+}
+
+/**
+ * Test: Password validation should reject wrong current password
+ * 
+ * Tests that validation fails when current password doesn't match.
+ * 
+ * Reference: ADR-016 - Password Change Validation Rules
+ */
+void test_password_change_wrong_current_password(void) {
+    // ARRANGE: Wrong current password
+    const char* current_pwd = "wrongpassword";
+    const char* new_pwd = "newpassword123";
+    const char* confirm_pwd = "newpassword123";
+    const char* stored_pwd = "correctpassword";
+    
+    // ACT: Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_pwd, new_pwd, confirm_pwd, stored_pwd
+    );
+    
+    // ASSERT: Validation should fail with CURRENT_WRONG
+    TEST_ASSERT_EQUAL_MESSAGE(PWD_CHANGE_CURRENT_WRONG, result,
+        "Wrong current password should fail validation");
+}
+
+/**
+ * Test: Password validation should reject password too short
+ * 
+ * Tests that validation enforces minimum password length of 8 characters.
+ * 
+ * Reference: ADR-016 - Password Change Validation Rules
+ */
+void test_password_change_too_short(void) {
+    // ARRANGE: New password too short (7 chars, need 8)
+    const char* current_pwd = "oldpass";
+    const char* new_pwd = "short12";  // 7 chars (too short)
+    const char* confirm_pwd = "short12";
+    const char* stored_pwd = "oldpass";
+    
+    // ACT: Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_pwd, new_pwd, confirm_pwd, stored_pwd
+    );
+    
+    // ASSERT: Validation should fail with TOO_SHORT
+    TEST_ASSERT_EQUAL_MESSAGE(PWD_CHANGE_TOO_SHORT, result,
+        "Password with 7 chars should be rejected as too short");
+}
+
+/**
+ * Test: Password validation should reject password too long
+ * 
+ * Tests that validation enforces maximum password length of 31 characters.
+ * 
+ * Reference: ADR-016 - Password Change Validation Rules
+ */
+void test_password_change_too_long(void) {
+    // ARRANGE: New password too long (32 chars, max is 31)
+    const char* current_pwd = "oldpass";
+    const char* new_pwd = "12345678901234567890123456789012";  // 32 chars
+    const char* confirm_pwd = "12345678901234567890123456789012";
+    const char* stored_pwd = "oldpass";
+    
+    // ACT: Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_pwd, new_pwd, confirm_pwd, stored_pwd
+    );
+    
+    // ASSERT: Validation should fail with TOO_LONG
+    TEST_ASSERT_EQUAL_MESSAGE(PWD_CHANGE_TOO_LONG, result,
+        "Password with 32 chars should be rejected as too long");
+}
+
+/**
+ * Test: Password validation should reject mismatched confirmation
+ * 
+ * Tests that new password and confirmation must match exactly.
+ * 
+ * Reference: ADR-016 - Password Change Validation Rules
+ */
+void test_password_change_confirmation_mismatch(void) {
+    // ARRANGE: New password and confirmation don't match
+    const char* current_pwd = "oldpass";
+    const char* new_pwd = "newpassword123";
+    const char* confirm_pwd = "newpassword456";  // Different!
+    const char* stored_pwd = "oldpass";
+    
+    // ACT: Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_pwd, new_pwd, confirm_pwd, stored_pwd
+    );
+    
+    // ASSERT: Validation should fail with NO_MATCH
+    TEST_ASSERT_EQUAL_MESSAGE(PWD_CHANGE_NO_MATCH, result,
+        "Mismatched password confirmation should fail validation");
+}
+
+/**
+ * Test: Password validation should reject empty current password
+ * 
+ * Tests that all fields must be non-empty.
+ * 
+ * Reference: ADR-016 - Password Change Validation Rules
+ */
+void test_password_change_empty_current_password(void) {
+    // ARRANGE: Empty current password
+    const char* current_pwd = "";
+    const char* new_pwd = "newpassword123";
+    const char* confirm_pwd = "newpassword123";
+    const char* stored_pwd = "oldpass";
+    
+    // ACT: Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_pwd, new_pwd, confirm_pwd, stored_pwd
+    );
+    
+    // ASSERT: Validation should fail with EMPTY_FIELD
+    TEST_ASSERT_EQUAL_MESSAGE(PWD_CHANGE_EMPTY_FIELD, result,
+        "Empty current password should fail validation");
+}
+
+/**
+ * Test: Password validation should reject empty new password
+ * 
+ * Tests that all fields must be non-empty.
+ * 
+ * Reference: ADR-016 - Password Change Validation Rules
+ */
+void test_password_change_empty_new_password(void) {
+    // ARRANGE: Empty new password
+    const char* current_pwd = "oldpass";
+    const char* new_pwd = "";
+    const char* confirm_pwd = "newpassword123";
+    const char* stored_pwd = "oldpass";
+    
+    // ACT: Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_pwd, new_pwd, confirm_pwd, stored_pwd
+    );
+    
+    // ASSERT: Validation should fail with EMPTY_FIELD
+    TEST_ASSERT_EQUAL_MESSAGE(PWD_CHANGE_EMPTY_FIELD, result,
+        "Empty new password should fail validation");
+}
+
+/**
+ * Test: Password validation with exactly 8 characters (boundary test)
+ * 
+ * Tests that minimum valid password length (8 chars) is accepted.
+ * 
+ * Reference: ADR-016 - Password Change Validation Rules
+ */
+void test_password_change_minimum_valid_length(void) {
+    // ARRANGE: New password exactly 8 chars (minimum valid)
+    const char* current_pwd = "oldpass";
+    const char* new_pwd = "12345678";  // Exactly 8 chars
+    const char* confirm_pwd = "12345678";
+    const char* stored_pwd = "oldpass";
+    
+    // ACT: Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_pwd, new_pwd, confirm_pwd, stored_pwd
+    );
+    
+    // ASSERT: Validation should succeed
+    TEST_ASSERT_EQUAL_MESSAGE(PWD_CHANGE_OK, result,
+        "8-character password should be accepted (minimum valid length)");
+}
+
+/**
+ * Test: Password validation with exactly 31 characters (boundary test)
+ * 
+ * Tests that maximum valid password length (31 chars) is accepted.
+ * 
+ * Reference: ADR-016 - Password Change Validation Rules
+ */
+void test_password_change_maximum_valid_length(void) {
+    // ARRANGE: New password exactly 31 chars (maximum valid)
+    const char* current_pwd = "oldpass";
+    const char* new_pwd = "1234567890123456789012345678901";  // Exactly 31 chars
+    const char* confirm_pwd = "1234567890123456789012345678901";
+    const char* stored_pwd = "oldpass";
+    
+    // ACT: Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_pwd, new_pwd, confirm_pwd, stored_pwd
+    );
+    
+    // ASSERT: Validation should succeed
+    TEST_ASSERT_EQUAL_MESSAGE(PWD_CHANGE_OK, result,
+        "31-character password should be accepted (maximum valid length)");
+}
+
 // Main test runner
 int main(void) {
     stdio_init_all();
     sleep_ms(2000);  // Wait for USB serial to stabilize
     
-    printf("\n=== HTTP Authentication Tests ===\n");
+    printf("\n=== HTTP Authentication and Password Management Tests ===\n");
     
     UNITY_BEGIN();
     
     // Base64 decoding tests
+    printf("\n--- Base64 Decoding Tests ---\n");
     RUN_TEST(test_base64_decode_simple_string);
     RUN_TEST(test_base64_decode_username_only);
     RUN_TEST(test_base64_decode_empty_string);
     RUN_TEST(test_base64_decode_invalid_input);
     
     // Authentication validation tests
+    printf("\n--- Authentication Validation Tests ---\n");
     RUN_TEST(test_authentication_valid_credentials);
     RUN_TEST(test_authentication_wrong_password);
     RUN_TEST(test_authentication_wrong_username);
     RUN_TEST(test_authentication_no_auth_header);
     
     // Password initialization test
+    printf("\n--- Password Initialization Tests ---\n");
     RUN_TEST(test_password_initialized_from_factory_defaults);
+    
+    // Password change validation tests
+    printf("\n--- Password Change Validation Tests ---\n");
+    RUN_TEST(test_password_change_validation_success);
+    RUN_TEST(test_password_change_wrong_current_password);
+    RUN_TEST(test_password_change_too_short);
+    RUN_TEST(test_password_change_too_long);
+    RUN_TEST(test_password_change_confirmation_mismatch);
+    RUN_TEST(test_password_change_empty_current_password);
+    RUN_TEST(test_password_change_empty_new_password);
+    RUN_TEST(test_password_change_minimum_valid_length);
+    RUN_TEST(test_password_change_maximum_valid_length);
     
     return UNITY_END();
 }
