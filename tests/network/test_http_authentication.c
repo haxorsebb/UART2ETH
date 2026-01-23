@@ -28,25 +28,8 @@
 extern int http_base64_decode(const char* input, char* output, size_t max_len);
 extern bool http_check_authentication(const char* request, const char* expected_password);
 
-/**
- * Password change validation result codes
- * Reference: ADR-016 HTTP Basic Authentication - Password Management
- */
-typedef enum {
-    PWD_CHANGE_OK = 0,              // Password change validation successful
-    PWD_CHANGE_CURRENT_WRONG = 1,   // Current password doesn't match
-    PWD_CHANGE_TOO_SHORT = 2,       // New password too short (<8 chars)
-    PWD_CHANGE_TOO_LONG = 3,        // New password too long (>31 chars)
-    PWD_CHANGE_NO_MATCH = 4,        // New password != confirmation
-    PWD_CHANGE_EMPTY_FIELD = 5      // One or more fields empty
-} password_change_result_t;
-
-extern password_change_result_t http_validate_password_change(
-    const char* current_pwd,
-    const char* new_pwd,
-    const char* confirm_pwd,
-    const char* stored_pwd
-);
+// Password change validation is now declared in http_server.h
+// No need to redeclare here
 
 void setUp(void) {
     // Initialize shared memory before each test
