@@ -67,6 +67,7 @@ static void http_generate_config_page(char* buffer, size_t buffer_size);
 static void http_generate_stylesheet(char* buffer, size_t buffer_size);
 static http_request_type_t http_parse_request_type(const char* request_data);
 static bool http_parse_post_data(const char* post_data, size_t data_len);
+static bool http_handle_password_change(const char* post_data, size_t data_len);
 static void http_send_redirect(http_connection_t* conn, const char* location);
 
 // HTTP Basic Authentication functions
@@ -313,8 +314,29 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     
     if (request_type == HTTP_POST) {
         // Determine which form was submitted based on the action URL
+        if (strstr(request_buffer, "POST /change_password") != NULL) {
+            // Handle password change
+            printf("HTTP Server: Processing password change\n");
+            
+            if (http_handle_password_change(request_buffer, copy_len)) {
+                // Password changed successfully - redirect to config page
+                http_send_redirect(conn, "/config");
+            } else {
+                // Error changing password - show error page
+                snprintf(response_buffer, sizeof(response_buffer),
+                    "HTTP/1.0 400 Bad Request\r\n"
+                    "Content-Type: text/html\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                    "<html><body><h1>Password Change Error</h1>"
+                    "<p>Failed to change password. Please check your current password and try again.</p>"
+                    "<p><a href=\"/config\">Return to configuration</a></p>"
+                    "</body></html>\r\n");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+            }
+        }
         #ifdef FACTORY_INTERNAL_VERSION
-        if (strstr(request_buffer, "POST /factory") != NULL) {
+        else if (strstr(request_buffer, "POST /factory") != NULL) {
             // Handle factory defaults write
             printf("HTTP Server: Processing factory defaults write\n");
             
@@ -326,9 +348,9 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             http_generate_factory_page(response_buffer, sizeof(response_buffer), error_msg, strlen(error_msg), success_msg , strlen(success_msg));
             http_send_response(conn, response_buffer, strlen(response_buffer));
             
-        } else
+        }
         #endif
-        {
+        else {
             // Handle configuration update
             printf("HTTP Server: Processing configuration update\n");
             
@@ -739,6 +761,95 @@ password_change_result_t http_validate_password_change(
     
     printf("HTTP Password Change: Validation successful\n");
     return PWD_CHANGE_OK;
+}
+
+/**
+ * @brief Handle password change request
+ * 
+ * Parses password change POST data, validates the request, and updates
+ * the stored password if validation passes.
+ * 
+ * @param post_data Raw POST request data
+ * @param data_len Length of POST data
+ * @return true if password was changed successfully, false otherwise
+ * 
+ * Reference: ADR-016 HTTP Basic Authentication - Password Management
+ */
+static bool http_handle_password_change(const char* post_data, size_t data_len) {
+    // Find start of form data (after double CRLF)
+    const char* form_start = strstr(post_data, "\r\n\r\n");
+    if (!form_start) {
+        printf("HTTP Password Change: No form data found\n");
+        return false;
+    }
+    form_start += 4; // Skip past \r\n\r\n
+    
+    printf("HTTP: Parsing password change form data\n");
+    
+    // Extract password fields from form data
+    char current_password[64] = {0};
+    char new_password[64] = {0};
+    char confirm_password[64] = {0};
+    
+    // Parse form fields - simple key=value&key=value parsing
+    char* form_copy = malloc(strlen(form_start) + 1);
+    if (!form_copy) {
+        printf("HTTP Password Change: Memory allocation failed\n");
+        return false;
+    }
+    strcpy(form_copy, form_start);
+    
+    char* token = strtok(form_copy, "&");
+    while (token) {
+        char* equals = strchr(token, '=');
+        if (equals) {
+            *equals = '\0';
+            char* key = token;
+            char* value = equals + 1;
+            
+            // Decode URL-encoded values (basic handling of %20, etc.)
+            // For simplicity, just copy directly for now
+            if (strcmp(key, "current_password") == 0) {
+                strncpy(current_password, value, sizeof(current_password) - 1);
+            } else if (strcmp(key, "new_password") == 0) {
+                strncpy(new_password, value, sizeof(new_password) - 1);
+            } else if (strcmp(key, "confirm_password") == 0) {
+                strncpy(confirm_password, value, sizeof(confirm_password) - 1);
+            }
+        }
+        token = strtok(NULL, "&");
+    }
+    
+    free(form_copy);
+    
+    // Get current configuration
+    shared_memory_layout_t* layout = shared_memory_get_layout();
+    
+    // Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_password,
+        new_password,
+        confirm_password,
+        layout->config.admin_password
+    );
+    
+    if (result != PWD_CHANGE_OK) {
+        printf("HTTP Password Change: Validation failed with code %d\n", result);
+        return false;
+    }
+    
+    // Password validation successful - update stored password
+    strncpy(layout->config.admin_password, new_password, sizeof(layout->config.admin_password) - 1);
+    layout->config.admin_password[sizeof(layout->config.admin_password) - 1] = '\0';
+    
+    // Increment revision counter and save to flash
+    layout->revision_counter++;
+    bool save_result = flash_persistence_force_save_configuration();
+    
+    printf("HTTP Password Change: Password updated successfully, flash save: %s\n", 
+           save_result ? "success" : "failed");
+    
+    return save_result;
 }
 
 /**
