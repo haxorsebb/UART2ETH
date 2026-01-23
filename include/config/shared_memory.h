@@ -67,6 +67,7 @@ typedef struct {
     network_config_t network;
     uint8_t log_level;             // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
     uint32_t watchdog_timeout_ms;  // Default 200ms
+    char admin_password[32];       // Admin password for HTTP Basic Authentication (null-terminated)
 } system_config_t;
 
 // Performance counters  

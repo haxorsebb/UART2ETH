@@ -153,6 +153,19 @@ bool shared_memory_init(void) {
     g_shared_memory->config.log_level = 1;  // INFO
     g_shared_memory->config.watchdog_timeout_ms = 200;
     
+    // Initialize admin password from factory defaults
+    const factory_defaults_t* factory = factory_defaults_get();
+    if (factory && factory_defaults_is_valid()) {
+        strncpy(g_shared_memory->config.admin_password, factory->default_password, 31);
+        g_shared_memory->config.admin_password[31] = '\0';  // Ensure null termination
+        printf("Admin password initialized from factory defaults\n");
+    } else {
+        // Fallback: Use hardcoded default if factory defaults not available
+        strncpy(g_shared_memory->config.admin_password, "admin", 31);
+        g_shared_memory->config.admin_password[31] = '\0';
+        printf("WARNING: Using fallback admin password (factory defaults not available)\n");
+    }
+    
     printf("V: ");
     factory_defaults_print_serial_number();
    
