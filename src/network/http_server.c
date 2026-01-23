@@ -289,6 +289,28 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     http_request_type_t request_type = http_parse_request_type(request_buffer);
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     
+    // Check HTTP Basic Authentication for ALL requests
+    // Get password from shared memory
+    shared_memory_layout_t* layout = shared_memory_get_layout();
+    if (!layout) {
+        printf("HTTP Auth: Failed to get shared memory layout\n");
+        http_send_auth_required(conn);
+        tcp_recved(tpcb, p->tot_len);
+        pbuf_free(p);
+        return ERR_OK;
+    }
+    
+    // Verify authentication
+    if (!http_check_authentication(request_buffer, layout->config.admin_password)) {
+        printf("HTTP Auth: Authentication failed, sending 401\n");
+        http_send_auth_required(conn);
+        tcp_recved(tpcb, p->tot_len);
+        pbuf_free(p);
+        return ERR_OK;
+    }
+    
+    printf("HTTP Auth: Request authenticated successfully\n");
+    
     if (request_type == HTTP_POST) {
         // Determine which form was submitted based on the action URL
         #ifdef FACTORY_INTERNAL_VERSION
