@@ -91,6 +91,29 @@ void http_server_get_stats(http_server_stats_t* stats);
  */
 void http_server_reset_stats(void);
 
+/**
+ * @brief HTTP Basic Authentication Functions
+ * 
+ * Reference: ADR-016 HTTP Basic Authentication
+ */
+
+/**
+ * Decode base64 string to plain text
+ * @param input Base64 encoded string
+ * @param output Buffer to store decoded output
+ * @param max_len Maximum length of output buffer
+ * @return Number of bytes decoded, or <=0 on error
+ */
+int http_base64_decode(const char* input, char* output, size_t max_len);
+
+/**
+ * Check HTTP Basic Authentication credentials
+ * @param request Full HTTP request string
+ * @param expected_password Password to validate against
+ * @return true if authenticated (username=admin, password matches), false otherwise
+ */
+bool http_check_authentication(const char* request, const char* expected_password);
+
 #ifdef __cplusplus
 }
 #endif
