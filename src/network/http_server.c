@@ -679,6 +679,69 @@ bool http_check_authentication(const char* request, const char* expected_passwor
 }
 
 /**
+ * @brief Validate password change request
+ * 
+ * Validates password change according to ADR-016 rules:
+ * - Current password must match stored password
+ * - New password must be 8-31 characters
+ * - New password must match confirmation
+ * - All fields must be non-empty
+ * 
+ * @param current_pwd Current password from form
+ * @param new_pwd New password from form
+ * @param confirm_pwd Confirmation password from form
+ * @param stored_pwd Stored password to validate against
+ * @return Validation result code
+ * 
+ * Reference: ADR-016 HTTP Basic Authentication - Password Management
+ */
+password_change_result_t http_validate_password_change(
+    const char* current_pwd,
+    const char* new_pwd,
+    const char* confirm_pwd,
+    const char* stored_pwd
+) {
+    // Check for NULL pointers
+    if (!current_pwd || !new_pwd || !confirm_pwd || !stored_pwd) {
+        return PWD_CHANGE_EMPTY_FIELD;
+    }
+    
+    // Check for empty fields
+    if (strlen(current_pwd) == 0 || strlen(new_pwd) == 0 || strlen(confirm_pwd) == 0) {
+        printf("HTTP Password Change: Empty field detected\n");
+        return PWD_CHANGE_EMPTY_FIELD;
+    }
+    
+    // Validate current password matches stored password
+    if (strcmp(current_pwd, stored_pwd) != 0) {
+        printf("HTTP Password Change: Current password incorrect\n");
+        return PWD_CHANGE_CURRENT_WRONG;
+    }
+    
+    // Validate new password length (minimum 8 characters)
+    size_t new_pwd_len = strlen(new_pwd);
+    if (new_pwd_len < 8) {
+        printf("HTTP Password Change: New password too short (%zu chars, need 8)\n", new_pwd_len);
+        return PWD_CHANGE_TOO_SHORT;
+    }
+    
+    // Validate new password length (maximum 31 characters)
+    if (new_pwd_len > 31) {
+        printf("HTTP Password Change: New password too long (%zu chars, max 31)\n", new_pwd_len);
+        return PWD_CHANGE_TOO_LONG;
+    }
+    
+    // Validate new password matches confirmation
+    if (strcmp(new_pwd, confirm_pwd) != 0) {
+        printf("HTTP Password Change: Password confirmation mismatch\n");
+        return PWD_CHANGE_NO_MATCH;
+    }
+    
+    printf("HTTP Password Change: Validation successful\n");
+    return PWD_CHANGE_OK;
+}
+
+/**
  * @brief Parse POST form data and update configuration
  */
 static bool http_parse_post_data(const char* post_data, size_t data_len) {

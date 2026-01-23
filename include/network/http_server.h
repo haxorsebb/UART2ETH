@@ -114,6 +114,46 @@ int http_base64_decode(const char* input, char* output, size_t max_len);
  */
 bool http_check_authentication(const char* request, const char* expected_password);
 
+/**
+ * @brief Password Change Validation
+ * 
+ * Reference: ADR-016 HTTP Basic Authentication - Password Management
+ */
+
+/**
+ * Password change validation result codes
+ */
+typedef enum {
+    PWD_CHANGE_OK = 0,              // Password change validation successful
+    PWD_CHANGE_CURRENT_WRONG = 1,   // Current password doesn't match
+    PWD_CHANGE_TOO_SHORT = 2,       // New password too short (<8 chars)
+    PWD_CHANGE_TOO_LONG = 3,        // New password too long (>31 chars)
+    PWD_CHANGE_NO_MATCH = 4,        // New password != confirmation
+    PWD_CHANGE_EMPTY_FIELD = 5      // One or more fields empty
+} password_change_result_t;
+
+/**
+ * Validate password change request
+ * 
+ * Validates password change according to rules:
+ * - Current password must match stored password
+ * - New password must be 8-31 characters
+ * - New password must match confirmation
+ * - All fields must be non-empty
+ * 
+ * @param current_pwd Current password from form
+ * @param new_pwd New password from form
+ * @param confirm_pwd Confirmation password from form
+ * @param stored_pwd Stored password to validate against
+ * @return Validation result code
+ */
+password_change_result_t http_validate_password_change(
+    const char* current_pwd,
+    const char* new_pwd,
+    const char* confirm_pwd,
+    const char* stored_pwd
+);
+
 #ifdef __cplusplus
 }
 #endif
