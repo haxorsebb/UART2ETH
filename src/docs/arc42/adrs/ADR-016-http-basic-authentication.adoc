@@ -1,0 +1,357 @@
+:jbake-title: ADR-016: HTTP Basic Authentication
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: adrs
+:jbake-order: 16
+:filename: /adrs/ADR-016-http-basic-authentication.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+= ADR-016: HTTP Basic Authentication
+
+== Status
+Accepted
+
+== Date
+2026-01-23
+
+== Context
+
+The HTTP server provides management interfaces for device configuration (`/config`) and factory defaults programming (`/factory`). Currently, these interfaces are accessible without authentication, which poses security risks:
+
+* Unauthorized users can modify device configuration
+* Network settings can be changed, potentially locking out legitimate administrators
+* Factory defaults can be reprogrammed (in factory builds)
+* No audit trail of who made configuration changes
+
+Security requirements:
+* Prevent unauthorized access to management interfaces
+* Simple authentication mechanism suitable for embedded systems
+* Minimal resource overhead (memory, CPU)
+* Compatible with standard web browsers and HTTP clients
+* Password persistence across reboots and firmware updates
+* Factory-configurable default password
+
+User experience requirements:
+* Standard browser authentication flow (no custom login page needed)
+* Password changeable via web interface
+* Failed authentication clearly communicated to user
+* No session management complexity
+
+== Decision
+
+We will implement HTTP Basic Authentication for all HTTP server endpoints using the following design:
+
+### Authentication Method
+
+**HTTP Basic Authentication (RFC 7617)**
+* Username: `admin` (hardcoded, not configurable)
+* Password: Stored in shared memory configuration, initialized from factory defaults
+* Authorization header format: `Authorization: Basic base64(admin:password)`
+* Realm: "UART2ETH Device"
+
+### Password Storage
+
+**Shared Memory Extension**
+Add password field to `system_config_t` structure in `shared_memory.h`:
+```c
+typedef struct {
+    channel_config_t channels[5];
+    network_config_t network;
+    uint8_t log_level;
+    uint32_t watchdog_timeout_ms;
+    char admin_password[32];  // NEW: Admin password (null-terminated)
+} system_config_t;
+```
+
+**Initialization Flow**
+1. During `shared_memory_init()`: Copy `default_password` from factory defaults to `admin_password`
+2. During `factory_defaults_apply_to_config()`: Apply factory default password
+3. Password changes via config page: Update shared memory and persist to flash
+
+### Authentication Flow
+
+**Request Processing**
+1. HTTP server receives request
+2. Extract `Authorization` header from HTTP request
+3. Decode base64 credentials
+4. Compare username against "admin" (case-sensitive)
+5. Compare password against `config.admin_password` (case-sensitive)
+6. On success: Process request normally
+7. On failure: Send `401 Unauthorized` with `WWW-Authenticate` header
+
+**Response on Authentication Failure**
+```
+HTTP/1.0 401 Unauthorized
+WWW-Authenticate: Basic realm="UART2ETH Device"
+Content-Type: text/html
+Connection: close
+
+<html>
+<body>
+<h1>401 Unauthorized</h1>
+<p>Access denied. Please provide valid credentials.</p>
+</body>
+</html>
+```
+
+### Protected Endpoints
+
+**All HTTP endpoints require authentication:**
+* `GET /` - Device status page
+* `GET /config` - Configuration page
+* `POST /` - Configuration update
+* `GET /factory` - Factory defaults page (FACTORY_INTERNAL_VERSION only)
+* `POST /factory` - Factory defaults write (FACTORY_INTERNAL_VERSION only)
+* `GET /styles.css` - Stylesheet (included for consistency)
+
+**Rationale for protecting all endpoints:**
+* Simplifies authentication logic (no endpoint-specific rules)
+* Prevents information disclosure via status page
+* Status page reveals network configuration and device details
+* Consistent security model (no "partially protected" confusion)
+
+### Password Management
+
+**Password Change Interface**
+Add password change section to `/config` page:
+```html
+<div class="section">
+    <h3>Security Settings</h3>
+    <div class="form-group">
+        <label for="current_password">Current Password:</label>
+        <input type="password" id="current_password" name="current_password" required>
+    </div>
+    <div class="form-group">
+        <label for="new_password">New Password:</label>
+        <input type="password" id="new_password" name="new_password" maxlength="31">
+    </div>
+    <div class="form-group">
+        <label for="confirm_password">Confirm New Password:</label>
+        <input type="password" id="confirm_password" name="confirm_password" maxlength="31">
+    </div>
+</div>
+```
+
+**Password Change Validation**
+1. Verify current password matches stored password
+2. Verify new password and confirmation match
+3. Verify new password length ≤ 31 characters (allow null terminator)
+4. Update `config.admin_password`
+5. Increment revision counter
+6. Save configuration to flash
+7. Return success (user must re-authenticate with new password)
+
+**Password Reset Procedure**
+If password is forgotten:
+1. Perform factory reset (button during boot)
+2. Password reverts to factory default
+3. Access device with factory default password
+4. Change password to new value
+
+### Implementation Components
+
+**New Functions (http_server.c)**
+* `http_check_authentication()` - Validate Authorization header
+* `http_send_auth_required()` - Send 401 response
+* `http_base64_decode()` - Decode base64 credentials
+* `http_parse_password_change()` - Parse and validate password change form
+
+**Modified Functions**
+* `http_connection_recv_callback()` - Add authentication check before processing
+* `http_parse_post_data()` - Handle password change fields
+* `http_generate_config_page()` - Add password change section
+
+**Shared Memory Integration**
+* `shared_memory_init()` - Initialize `admin_password` from factory defaults
+* `factory_defaults_apply_to_config()` - Apply default password
+
+### Security Considerations
+
+**Limitations**
+* HTTP Basic Authentication transmits credentials in base64 encoding (not encryption)
+* Credentials visible to network sniffers on unencrypted HTTP
+* No HTTPS/TLS support in embedded system (resource constraints)
+* Password stored in plain text in flash (no bcrypt/hashing)
+
+**Mitigations**
+* Target deployment: Private, trusted networks only
+* Document requirement for trusted network environment
+* Factory default password must be changed during deployment
+* Password length limited to prevent buffer overflow (31 chars + null)
+* No username enumeration (always show same 401 response)
+* No rate limiting (embedded system constraints)
+
+**Acceptable Trade-offs**
+* Plain text passwords acceptable for embedded device on trusted network
+* Base64 encoding sufficient for basic access control
+* No HTTPS acceptable given target environment (LAN deployment)
+* Simple authentication better than no authentication
+
+## Rationale
+
+### Advantages
+* **Standard Protocol**: HTTP Basic Auth supported by all browsers and HTTP clients
+* **Minimal Complexity**: No session management, cookies, or client-side JavaScript
+* **Low Resource Usage**: Minimal RAM/flash overhead (<100 bytes)
+* **Browser Integration**: Standard browser password manager support
+* **Factory Integration**: Password initialized from factory defaults system
+* **User Friendly**: Standard browser login dialog (no custom forms)
+* **Persistent**: Password saved to flash, survives reboots and updates
+* **Changeable**: Password can be updated via web interface
+
+### Rejected Alternatives
+
+**Digest Authentication**
+* Rejected: More complex implementation for embedded system
+* Requires server nonce generation and MD5 hashing
+* Minimal security improvement over Basic Auth on trusted networks
+* Higher code size and CPU overhead
+
+**Custom Session-Based Authentication**
+* Rejected: Requires session storage and management
+* Needs session timeout handling and cleanup
+* Higher RAM usage for session tracking
+* More complex implementation (login page, logout, session cookies)
+* Limited connections (2 max) make session management problematic
+
+**Token-Based Authentication (JWT, etc.)**
+* Rejected: Overkill for simple embedded device
+* Requires token parsing and validation libraries
+* Higher code size and complexity
+* Not needed for single-user management interface
+
+**Client Certificate Authentication**
+* Rejected: Requires TLS/HTTPS infrastructure
+* Certificate management too complex for embedded system
+* No TLS support in current network stack
+
+**No Authentication (Status Quo)**
+* Rejected: Unacceptable security risk
+* Allows unauthorized configuration changes
+* No access control for sensitive operations
+
+### Trade-offs
+* **Security vs Simplicity**: Basic Auth chosen for simplicity despite plain text transmission
+* **Network Trust**: Assumes deployment on trusted network (documented requirement)
+* **Resource Usage**: ~100 bytes RAM for password storage, minimal CPU for base64 decode
+* **User Experience**: Browser handles auth dialog (standard UX)
+
+== Consequences
+
+### Positive
+* **Access Control**: Management interface protected from unauthorized access
+* **Standard Compliance**: Uses widely-supported HTTP Basic Authentication
+* **Low Overhead**: Minimal resource usage suitable for embedded system
+* **Factory Integration**: Seamless integration with factory defaults system
+* **Password Management**: User-friendly password change via web interface
+* **Persistent Configuration**: Password saved to flash, survives updates
+* **Browser Compatibility**: Works with all standard browsers and HTTP clients
+
+### Negative
+* **Plain Text Transmission**: Credentials visible on network (mitigated by trusted network)
+* **No HTTPS**: No encryption available (resource constraints)
+* **Single User**: Only one username (`admin`) supported
+* **No Rate Limiting**: Susceptible to brute force on untrusted networks
+* **Flash Wear**: Password changes trigger flash write (mitigated by wear leveling)
+
+### Implementation Requirements
+
+**Phase 1: Core Authentication**
+1. Add `admin_password[32]` to `system_config_t` in shared_memory.h
+2. Update `shared_memory_init()` to initialize password from factory defaults
+3. Update `factory_defaults_apply_to_config()` to apply default password
+4. Implement `http_check_authentication()` function
+5. Implement `http_send_auth_required()` function
+6. Implement `http_base64_decode()` helper function
+7. Add authentication check to `http_connection_recv_callback()`
+
+**Phase 2: Password Management**
+1. Add password change section to config page HTML
+2. Implement `http_parse_password_change()` function
+3. Update `http_parse_post_data()` to handle password changes
+4. Add password validation logic
+5. Test password change and persistence
+
+**Phase 3: Testing**
+1. Unit tests for base64 decoding
+2. Unit tests for authentication validation
+3. Integration tests for authentication flow
+4. Test password change functionality
+5. Test factory reset password behavior
+6. Test flash persistence of password
+
+### Documentation Updates
+* Update user manual with authentication requirements
+* Document default credentials (username: admin, password: from factory defaults)
+* Document password change procedure
+* Document password reset via factory reset
+* Add security warnings about trusted network requirement
+* Update deployment guide with security recommendations
+
+### Deployment Impact
+* **Existing Devices**: Factory reset required to initialize password field
+* **New Devices**: Password programmed during manufacturing via `/factory` interface
+* **User Impact**: Users must enter credentials to access web interface
+* **Network Impact**: Trusted network deployment required (no change from current)
+
+== Implementation Notes
+
+### Base64 Decoding
+HTTP Basic Auth credentials format: `Basic base64(username:password)`
+Example: `Authorization: Basic YWRtaW46cGFzc3dvcmQ=` (admin:password)
+
+Implementation uses lookup table for base64 decoding:
+```c
+static const char base64_table[] = 
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static int http_base64_decode(const char* input, char* output, size_t max_len);
+```
+
+### Authentication Header Parsing
+Extract credentials from HTTP request:
+```c
+// Find "Authorization: Basic " header
+const char* auth_header = strstr(request, "Authorization: Basic ");
+if (!auth_header) {
+    return false;  // No auth header
+}
+
+// Extract base64 string (until CRLF)
+char base64_creds[128];
+// Decode to "username:password"
+char decoded[128];
+http_base64_decode(base64_creds, decoded, sizeof(decoded));
+
+// Split on ':'
+char* colon = strchr(decoded, ':');
+*colon = '\0';
+char* username = decoded;
+char* password = colon + 1;
+
+// Validate
+if (strcmp(username, "admin") != 0) return false;
+if (strcmp(password, config->admin_password) != 0) return false;
+
+return true;  // Authenticated
+```
+
+### Memory Impact
+* `admin_password[32]` in system_config_t: 32 bytes
+* Base64 decode buffer (stack): ~128 bytes temporary
+* Auth validation function: ~100 bytes code size
+* Total impact: ~260 bytes (negligible for RP2350)
+
+### Performance Impact
+* Base64 decode: ~50 CPU cycles per character
+* String comparison: ~10 CPU cycles per character
+* Total per request: <1000 CPU cycles (~10 microseconds at 133MHz)
+* Negligible performance impact
+
+## References
+* RFC 7617: The 'Basic' HTTP Authentication Scheme
+* RFC 7235: Hypertext Transfer Protocol (HTTP/1.1): Authentication
+* ADR-014: Factory Defaults Implementation (password storage)
+* ADR-015: Factory Defaults Web Interface (password programming)
+* arc42 Chapter 5: Building Block View - HTTP Server Module
+* arc42 Chapter 8: Security Concepts
