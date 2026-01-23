@@ -27,6 +27,7 @@
 #include "ringbuffer.h"
 #include "debug.h"
 #include "timestamp.h"
+#include "utils/selftest.h"
 #include <stdio.h>
 
 // Forward declarations for core main functions
@@ -67,6 +68,9 @@ int main() {
     // Initialize UART0 for debug output
     stdio_uart_init_full(uart0, 115200, 16, 17);
     
+    //perform a simple selftest, output the results to UART1 so that the BOARDTEST software can see it
+    selftest();
+
     // Configure GPIO21 to output 25 MHz clock for ENC28J60
     float clk_div = (float)clock_get_hz(clk_sys) / 25000000.0f;
     clock_gpio_init(21, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, clk_div);
