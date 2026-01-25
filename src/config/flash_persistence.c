@@ -165,9 +165,11 @@ bool flash_persistence_load_configuration(void) {
     // Copy loaded configuration to shared memory
     shared_memory_layout_t* layout = shared_memory_get_layout();
     if (layout) {
-        memcpy(layout, &block_data.shared_memory_data, sizeof(TOTAL_SHARED_MEM_USABLE_SIZE));
+        memcpy(layout, &block_data.shared_memory_data, TOTAL_SHARED_MEM_USABLE_SIZE);
         g_flash_state.last_written_revision = layout->revision_counter;
         g_flash_state.last_valid_block = best_block;
+        g_flash_state.current_write_block = best_block;
+        advance_ring_buffer_position();
         
         // Clear runtime flags that should not be persisted
         layout->config_change_pending = false;  // This is a runtime flag, not config
@@ -295,9 +297,7 @@ bool flash_persistence_force_save_configuration(void) {
 
 
 
-    // Prepare flash block data structure
-    shadow_block_copy.magic_number = FLASH_PERSISTENCE_MAGIC;
-
+    
     // Disable interrupts during flash operation
     // (this is core_local)
     uint32_t ints = save_and_disable_interrupts();
@@ -309,18 +309,19 @@ bool flash_persistence_force_save_configuration(void) {
     g_flash_state.write_in_progress = true;    
     //blocked now
     
-    shadow_block_copy.revision_counter = layout->revision_counter;
     // Copy shared memory data
-    memcpy(&shadow_block_copy.shared_memory_data, layout, sizeof(TOTAL_SHARED_MEM_USABLE_SIZE));
-    
+    memcpy(&shadow_block_copy.shared_memory_data, layout, TOTAL_SHARED_MEM_USABLE_SIZE);
+    // Prepare flash block data structure
+    shadow_block_copy.shared_memory_data.magic_number = FLASH_PERSISTENCE_MAGIC;
+
     //keep doing stuff while we finish this write
     restore_interrupts(ints);
         
     // Calculate SHA256 checksum of the complete block (excluding the checksum field itself)
     // Since sha256_checksum is at the start of the struct, hash from magic_number onwards
-    flash_calculate_sha256(&shadow_block_copy.magic_number,
-                           sizeof(flash_persistence_block_t) - sizeof(shadow_block_copy.sha256_checksum),
-                           shadow_block_copy.sha256_checksum);
+    flash_calculate_sha256(&shadow_block_copy.shared_memory_data.magic_number,
+                           sizeof(flash_persistence_block_t) - sizeof(shadow_block_copy.shared_memory_data.sha256_checksum),
+                           shadow_block_copy.shared_memory_data.sha256_checksum);
     
     // Write to next block in ring buffer
     if (!write_flash_block(g_flash_state.current_write_block, &shadow_block_copy)) {
@@ -336,7 +337,7 @@ bool flash_persistence_force_save_configuration(void) {
     }
     
     // Update persistence state
-    g_flash_state.last_written_revision = shadow_block_copy.revision_counter;
+    g_flash_state.last_written_revision = shadow_block_copy.shared_memory_data.revision_counter;
     g_flash_state.last_write_timestamp_ms = to_ms_since_boot(get_absolute_time());
     g_flash_state.total_writes_lifetime++;
     
@@ -457,7 +458,7 @@ bool flash_persistence_verify_ring_buffer_integrity(void) {
         flash_persistence_block_t block_data;
         if (read_flash_block(i, &block_data)) {
             // Skip uninitialized blocks (factory state)
-            if (block_data.magic_number == 0xFFFFFFFF) {
+            if (block_data.shared_memory_data.magic_number == 0xFFFFFFFF) {
                 continue;
             }
             
@@ -649,20 +650,20 @@ static bool validate_block_integrity(const flash_persistence_block_t* block_data
     }
     
     // Check magic number
-    if (block_data->magic_number != FLASH_PERSISTENCE_MAGIC) {
+    if (block_data->shared_memory_data.magic_number != FLASH_PERSISTENCE_MAGIC) {
         return false;
     }
     
     // Calculate and verify SHA256 checksum over the complete block (excluding checksum field)
     // Since sha256_checksum is at the start of the struct, hash from magic_number onwards
     uint8_t calculated_checksum[32];
-    if (flash_calculate_sha256(&block_data->magic_number,
-                               sizeof(flash_persistence_block_t) - sizeof(block_data->sha256_checksum),
+    if (flash_calculate_sha256(&block_data->shared_memory_data.magic_number,
+                               sizeof(flash_persistence_block_t) - sizeof(block_data->shared_memory_data.sha256_checksum),
                                calculated_checksum) != 0) {
         return false;
     }
     
-    return (memcmp(block_data->sha256_checksum, calculated_checksum, 32) == 0);
+    return (memcmp(block_data->shared_memory_data.sha256_checksum, calculated_checksum, 32) == 0);
 }
 
 /**
@@ -718,13 +719,13 @@ static int find_best_valid_block(void) {
         }
         
         // Check for uninitialized flash (all 0xFF)
-        if (block_data.magic_number == 0xFFFFFFFF) {
+        if (block_data.shared_memory_data.magic_number == 0xFFFFFFFF) {
             log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_BLOCK_INVALID, block_idx + 10);
             continue;
         }
         
         // Check magic number
-        if (block_data.magic_number != FLASH_PERSISTENCE_MAGIC) {
+        if (block_data.shared_memory_data.magic_number != FLASH_PERSISTENCE_MAGIC) {
             log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_BLOCK_INVALID, block_idx + 20);
             continue;
         }
@@ -737,11 +738,11 @@ static int find_best_valid_block(void) {
         
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_BLOCK_NUMBER, block_idx);
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_BLOCK_REVISION, 
-                  block_data.revision_counter);
+                  block_data.shared_memory_data.revision_counter);
         
         // Track highest revision
-        if (block_data.revision_counter > highest_revision) {
-            highest_revision = block_data.revision_counter;
+        if (block_data.shared_memory_data.revision_counter > highest_revision) {
+            highest_revision = block_data.shared_memory_data.revision_counter;
             best_block = block_idx;
         }
     }
