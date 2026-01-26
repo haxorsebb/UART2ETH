@@ -44,7 +44,7 @@ void selftest(void)
     uart_set_format(uart1, 8, 1, UART_PARITY_NONE);
     
     // Send selftest message
-    selftest_puts("RP2354 SELFTEST:START\r\n");
+    selftest_puts("RP2354 SELFTEST: START\r\n");
     
     //Note: UART1 will be reconfigured later by uart_manager_init().
     //The SDK's uart_init() can be called multiple times safely
