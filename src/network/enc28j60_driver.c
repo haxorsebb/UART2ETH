@@ -21,6 +21,7 @@
 
 #include "debug.h"
 #include "network/enc28j60_driver.h"
+#include "utils/selftest.h"
 #include "hardware/spi.h"
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
@@ -237,6 +238,7 @@ static bool enc28j60_wait_for_osc_ready(void) {
             DEBUG_ONLY({ 
                 printf("ENC28J60: Oscillator ready, estat: %d, timeout: %d\n", estat, timeout); 
             });
+            selftest_puts("RP2354 SELFTEST: ENC28J60 OSC PASS\r\n");
             return true;
         }
         
@@ -247,6 +249,7 @@ static bool enc28j60_wait_for_osc_ready(void) {
     DEBUG_ONLY({ 
         printf("ENC28J60: Oscillator timeout: %d\n", timeout); 
     });
+    selftest_puts("RP2354 SELFTEST: ENC28J60 OSC FAILED\r\n");
     return false;
 }
 
@@ -381,6 +384,8 @@ bool enc28j60_init(void) {
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 0);
     
     // Initialize SPI and GPIO first (RP2350-specific)
+    //selftest output
+    selftest_puts("RP2354 SELFTEST: INIT ENC28J60\r\n");
     enc28j60_spi_init();
     enc28j60_gpio_init();
     
@@ -392,6 +397,7 @@ bool enc28j60_init(void) {
     
     // 1. Perform software reset
     
+    selftest_puts("RP2354 SELFTEST: RESET ENC28J60\r\n");
     enc28j60_reset();
     
     // 2. Wait for oscillator ready
@@ -426,7 +432,7 @@ bool enc28j60_init(void) {
     enc28j60_set_register_bank_internal(MAADRX_BANK);
     uint8_t revid = enc28j60_read_register_internal(ENC28J60_EREVID);
     DEBUG_ONLY({ printf("ENC28J60: Chip revision = 0x%02X\n", revid); });
-     
+
     // Initialize driver state
     memset(&g_enc28j60_state, 0, sizeof(g_enc28j60_state));
     g_enc28j60_state.initialized = true;

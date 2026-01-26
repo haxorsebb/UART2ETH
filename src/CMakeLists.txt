@@ -145,12 +145,14 @@ target_link_libraries(uart_manager
 # utils - bits and pieces from the pico sdk and examples
 add_library(utils
     utils/uf2_family_ids.c
+    utils/selftest.c
 )
 target_include_directories(utils PUBLIC ../include)
 target_link_libraries(utils 
     pico_bootrom
     pico_stdlib
     hardware_flash
+    hardware_spi
     boot_uf2_headers
 )
 
