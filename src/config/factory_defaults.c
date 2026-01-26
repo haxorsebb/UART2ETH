@@ -90,7 +90,9 @@ void factory_defaults_apply_to_config(void) {
     // Apply MAC address
     memcpy(layout->config.network.mac_address, g_factory_defaults.mac_address, 6);
     
-    // TODO: Apply default password to user authentication system when implemented
+    // Apply default password to admin authentication
+    strncpy(layout->config.admin_password, g_factory_defaults.default_password, 31);
+    layout->config.admin_password[31] = '\0';  // Ensure null termination
     
     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_FACTORY_DEFAULTS_APPLIED, g_factory_defaults.board_type);
 }

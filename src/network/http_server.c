@@ -67,7 +67,13 @@ static void http_generate_config_page(char* buffer, size_t buffer_size);
 static void http_generate_stylesheet(char* buffer, size_t buffer_size);
 static http_request_type_t http_parse_request_type(const char* request_data);
 static bool http_parse_post_data(const char* post_data, size_t data_len);
+static bool http_handle_password_change(const char* post_data, size_t data_len);
 static void http_send_redirect(http_connection_t* conn, const char* location);
+
+// HTTP Basic Authentication functions
+int http_base64_decode(const char* input, char* output, size_t max_len);
+bool http_check_authentication(const char* request, const char* expected_password);
+static void http_send_auth_required(http_connection_t* conn);
 
 #ifdef FACTORY_INTERNAL_VERSION
 static void http_generate_factory_page(char* buffer, size_t buffer_size, const char* error_msg, size_t error_msg_size,  const char* success_msg, size_t success_msg_size);
@@ -284,10 +290,53 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     http_request_type_t request_type = http_parse_request_type(request_buffer);
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     
+    // Check HTTP Basic Authentication for ALL requests
+    // Get password from shared memory
+    shared_memory_layout_t* layout = shared_memory_get_layout();
+    if (!layout) {
+        printf("HTTP Auth: Failed to get shared memory layout\n");
+        http_send_auth_required(conn);
+        tcp_recved(tpcb, p->tot_len);
+        pbuf_free(p);
+        return ERR_OK;
+    }
+    
+    // Verify authentication
+    if (!http_check_authentication(request_buffer, layout->config.admin_password)) {
+        printf("HTTP Auth: Authentication failed, sending 401\n");
+        http_send_auth_required(conn);
+        tcp_recved(tpcb, p->tot_len);
+        pbuf_free(p);
+        return ERR_OK;
+    }
+    
+    printf("HTTP Auth: Request authenticated successfully\n");
+    
     if (request_type == HTTP_POST) {
         // Determine which form was submitted based on the action URL
+        if (strstr(request_buffer, "POST /change_password") != NULL) {
+            // Handle password change
+            printf("HTTP Server: Processing password change\n");
+            
+            if (http_handle_password_change(request_buffer, copy_len)) {
+                // Password changed successfully - redirect to config page
+                http_send_redirect(conn, "/config");
+            } else {
+                // Error changing password - show error page
+                snprintf(response_buffer, sizeof(response_buffer),
+                    "HTTP/1.0 400 Bad Request\r\n"
+                    "Content-Type: text/html\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                    "<html><body><h1>Password Change Error</h1>"
+                    "<p>Failed to change password. Please check your current password and try again.</p>"
+                    "<p><a href=\"/config\">Return to configuration</a></p>"
+                    "</body></html>\r\n");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+            }
+        }
         #ifdef FACTORY_INTERNAL_VERSION
-        if (strstr(request_buffer, "POST /factory") != NULL) {
+        else if (strstr(request_buffer, "POST /factory") != NULL) {
             // Handle factory defaults write
             printf("HTTP Server: Processing factory defaults write\n");
             
@@ -299,9 +348,9 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             http_generate_factory_page(response_buffer, sizeof(response_buffer), error_msg, strlen(error_msg), success_msg , strlen(success_msg));
             http_send_response(conn, response_buffer, strlen(response_buffer));
             
-        } else
+        }
         #endif
-        {
+        else {
             // Handle configuration update
             printf("HTTP Server: Processing configuration update\n");
             
@@ -459,6 +508,348 @@ static void http_send_redirect(http_connection_t* conn, const char* location) {
     
     http_send_response(conn, redirect_buffer, len);
     http_close_connection(conn);
+}
+
+/**
+ * @brief Decode base64 string
+ * 
+ * Decodes a base64 encoded string to plain text.
+ * Used for decoding HTTP Basic Authentication credentials.
+ * 
+ * @param input Base64 encoded string
+ * @param output Buffer to store decoded output
+ * @param max_len Maximum length of output buffer
+ * @return Number of bytes decoded, or <=0 on error
+ * 
+ * Reference: ADR-016 HTTP Basic Authentication
+ */
+int http_base64_decode(const char* input, char* output, size_t max_len) {
+    if (!input || !output || max_len == 0) {
+        return -1;
+    }
+    
+    // Base64 decode table
+    static const char base64_chars[] = 
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    
+    size_t input_len = strlen(input);
+    if (input_len == 0) {
+        output[0] = '\0';
+        return 0;
+    }
+    
+    size_t output_idx = 0;
+    uint32_t buf = 0;
+    int buf_len = 0;
+    
+    for (size_t i = 0; i < input_len && output_idx < max_len - 1; i++) {
+        char c = input[i];
+        
+        // Skip padding and whitespace
+        if (c == '=' || c == ' ' || c == '\r' || c == '\n') {
+            continue;
+        }
+        
+        // Find character in base64 table
+        const char* pos = strchr(base64_chars, c);
+        if (!pos) {
+            // Invalid character
+            return -1;
+        }
+        
+        int val = pos - base64_chars;
+        buf = (buf << 6) | val;
+        buf_len += 6;
+        
+        if (buf_len >= 8) {
+            buf_len -= 8;
+            output[output_idx++] = (buf >> buf_len) & 0xFF;
+        }
+    }
+    
+    output[output_idx] = '\0';
+    return output_idx;
+}
+
+/**
+ * @brief Send 401 Unauthorized response
+ * 
+ * Sends HTTP 401 response with WWW-Authenticate header to
+ * trigger browser authentication dialog.
+ * 
+ * @param conn HTTP connection to send response on
+ * 
+ * Reference: ADR-016 HTTP Basic Authentication
+ */
+static void http_send_auth_required(http_connection_t* conn) {
+    static char auth_response[512];
+    int len = snprintf(auth_response, sizeof(auth_response),
+        "HTTP/1.1 401 Unauthorized\r\n"
+        "WWW-Authenticate: Basic realm=\"UART2ETH Device\"\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: %d\r\n"
+        "\r\n"
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head><title>401 Unauthorized</title></head>\n"
+        "<body>\n"
+        "    <h1>401 Unauthorized</h1>\n"
+        "    <p>Access denied. Please provide valid credentials.</p>\n"
+        "    <p>Username: <strong>admin</strong></p>\n"
+        "</body>\n"
+        "</html>\r\n");
+    
+    // Calculate content length (HTML body only)
+    const char* content_start = strstr(auth_response, "\r\n\r\n");
+    if (content_start) {
+        content_start += 4; // Skip the \r\n\r\n
+        int content_len = strlen(content_start);
+        
+        // Rebuild with correct Content-Length
+        len = snprintf(auth_response, sizeof(auth_response),
+            "HTTP/1.1 401 Unauthorized\r\n"
+            "WWW-Authenticate: Basic realm=\"UART2ETH Device\"\r\n"
+            "Content-Type: text/html\r\n"
+            "Content-Length: %d\r\n"
+            "\r\n"
+            "<!DOCTYPE html>\n"
+            "<html>\n"
+            "<head><title>401 Unauthorized</title></head>\n"
+            "<body>\n"
+            "    <h1>401 Unauthorized</h1>\n"
+            "    <p>Access denied. Please provide valid credentials.</p>\n"
+            "    <p>Username: <strong>admin</strong></p>\n"
+            "</body>\n"
+            "</html>\r\n", content_len);
+    }
+
+    http_send_response(conn, auth_response, len);
+    // Don't close connection - let browser close it after receiving 401
+    // or reuse it for authenticated request
+}
+
+/**
+ * @brief Check HTTP Basic Authentication
+ * 
+ * Validates Authorization header against expected credentials.
+ * Username must be "admin" and password must match expected_password.
+ * 
+ * @param request Full HTTP request string
+ * @param expected_password Password to validate against
+ * @return true if authenticated, false otherwise
+ * 
+ * Reference: ADR-016 HTTP Basic Authentication
+ */
+bool http_check_authentication(const char* request, const char* expected_password) {
+    if (!request || !expected_password) {
+        return false;
+    }
+    
+    // Find Authorization header
+    const char* auth_header = strstr(request, "Authorization: Basic ");
+    if (!auth_header) {
+        printf("HTTP Auth: No Authorization header found\n");
+        return false;
+    }
+    
+    // Extract base64 credentials (skip "Authorization: Basic ")
+    auth_header += 21;  // strlen("Authorization: Basic ")
+    
+    // Find end of base64 string (CR or LF)
+    char base64_creds[128] = {0};
+    const char* end = auth_header;
+    while (*end && *end != '\r' && *end != '\n' && (end - auth_header) < 127) {
+        end++;
+    }
+    size_t cred_len = end - auth_header;
+    strncpy(base64_creds, auth_header, cred_len);
+    base64_creds[cred_len] = '\0';
+    
+    // Decode base64 to "username:password"
+    char decoded[128] = {0};
+    int decoded_len = http_base64_decode(base64_creds, decoded, sizeof(decoded));
+    if (decoded_len <= 0) {
+        printf("HTTP Auth: Base64 decode failed\n");
+        return false;
+    }
+    
+    // Split on ':' to extract username and password
+    char* colon = strchr(decoded, ':');
+    if (!colon) {
+        printf("HTTP Auth: No colon separator in credentials\n");
+        return false;
+    }
+    
+    *colon = '\0';  // Split string
+    char* username = decoded;
+    char* password = colon + 1;
+    
+    // Validate username (must be "admin")
+    if (strcmp(username, "admin") != 0) {
+        printf("HTTP Auth: Invalid username '%s'\n", username);
+        return false;
+    }
+    
+    // Validate password
+    if (strcmp(password, expected_password) != 0) {
+        printf("HTTP Auth: Invalid password\n");
+        return false;
+    }
+    
+    printf("HTTP Auth: Authentication successful for user 'admin'\n");
+    return true;
+}
+
+/**
+ * @brief Validate password change request
+ * 
+ * Validates password change according to ADR-016 rules:
+ * - Current password must match stored password
+ * - New password must be 8-31 characters
+ * - New password must match confirmation
+ * - All fields must be non-empty
+ * 
+ * @param current_pwd Current password from form
+ * @param new_pwd New password from form
+ * @param confirm_pwd Confirmation password from form
+ * @param stored_pwd Stored password to validate against
+ * @return Validation result code
+ * 
+ * Reference: ADR-016 HTTP Basic Authentication - Password Management
+ */
+password_change_result_t http_validate_password_change(
+    const char* current_pwd,
+    const char* new_pwd,
+    const char* confirm_pwd,
+    const char* stored_pwd
+) {
+    // Check for NULL pointers
+    if (!current_pwd || !new_pwd || !confirm_pwd || !stored_pwd) {
+        return PWD_CHANGE_EMPTY_FIELD;
+    }
+    
+    // Check for empty fields
+    if (strlen(current_pwd) == 0 || strlen(new_pwd) == 0 || strlen(confirm_pwd) == 0) {
+        printf("HTTP Password Change: Empty field detected\n");
+        return PWD_CHANGE_EMPTY_FIELD;
+    }
+    
+    // Validate current password matches stored password
+    if (strcmp(current_pwd, stored_pwd) != 0) {
+        printf("HTTP Password Change: Current password incorrect\n");
+        return PWD_CHANGE_CURRENT_WRONG;
+    }
+    
+    // Validate new password length (minimum 8 characters)
+    size_t new_pwd_len = strlen(new_pwd);
+    if (new_pwd_len < 8) {
+        printf("HTTP Password Change: New password too short (%zu chars, need 8)\n", new_pwd_len);
+        return PWD_CHANGE_TOO_SHORT;
+    }
+    
+    // Validate new password length (maximum 31 characters)
+    if (new_pwd_len > 31) {
+        printf("HTTP Password Change: New password too long (%zu chars, max 31)\n", new_pwd_len);
+        return PWD_CHANGE_TOO_LONG;
+    }
+    
+    // Validate new password matches confirmation
+    if (strcmp(new_pwd, confirm_pwd) != 0) {
+        printf("HTTP Password Change: Password confirmation mismatch\n");
+        return PWD_CHANGE_NO_MATCH;
+    }
+    
+    printf("HTTP Password Change: Validation successful\n");
+    return PWD_CHANGE_OK;
+}
+
+/**
+ * @brief Handle password change request
+ * 
+ * Parses password change POST data, validates the request, and updates
+ * the stored password if validation passes.
+ * 
+ * @param post_data Raw POST request data
+ * @param data_len Length of POST data
+ * @return true if password was changed successfully, false otherwise
+ * 
+ * Reference: ADR-016 HTTP Basic Authentication - Password Management
+ */
+static bool http_handle_password_change(const char* post_data, size_t data_len) {
+    // Find start of form data (after double CRLF)
+    const char* form_start = strstr(post_data, "\r\n\r\n");
+    if (!form_start) {
+        printf("HTTP Password Change: No form data found\n");
+        return false;
+    }
+    form_start += 4; // Skip past \r\n\r\n
+    
+    printf("HTTP: Parsing password change form data\n");
+    
+    // Extract password fields from form data
+    char current_password[64] = {0};
+    char new_password[64] = {0};
+    char confirm_password[64] = {0};
+    
+    // Parse form fields - simple key=value&key=value parsing
+    char* form_copy = malloc(strlen(form_start) + 1);
+    if (!form_copy) {
+        printf("HTTP Password Change: Memory allocation failed\n");
+        return false;
+    }
+    strcpy(form_copy, form_start);
+    
+    char* token = strtok(form_copy, "&");
+    while (token) {
+        char* equals = strchr(token, '=');
+        if (equals) {
+            *equals = '\0';
+            char* key = token;
+            char* value = equals + 1;
+            
+            // Decode URL-encoded values (basic handling of %20, etc.)
+            // For simplicity, just copy directly for now
+            if (strcmp(key, "current_password") == 0) {
+                strncpy(current_password, value, sizeof(current_password) - 1);
+            } else if (strcmp(key, "new_password") == 0) {
+                strncpy(new_password, value, sizeof(new_password) - 1);
+            } else if (strcmp(key, "confirm_password") == 0) {
+                strncpy(confirm_password, value, sizeof(confirm_password) - 1);
+            }
+        }
+        token = strtok(NULL, "&");
+    }
+    
+    free(form_copy);
+    
+    // Get current configuration
+    shared_memory_layout_t* layout = shared_memory_get_layout();
+    
+    // Validate password change
+    password_change_result_t result = http_validate_password_change(
+        current_password,
+        new_password,
+        confirm_password,
+        layout->config.admin_password
+    );
+    
+    if (result != PWD_CHANGE_OK) {
+        printf("HTTP Password Change: Validation failed with code %d\n", result);
+        return false;
+    }
+    
+    // Password validation successful - update stored password
+    strncpy(layout->config.admin_password, new_password, sizeof(layout->config.admin_password) - 1);
+    layout->config.admin_password[sizeof(layout->config.admin_password) - 1] = '\0';
+    
+    // Increment revision counter and save to flash
+    layout->revision_counter++;
+    bool save_result = flash_persistence_force_save_configuration();
+    
+    printf("HTTP Password Change: Password updated successfully, flash save: %s\n", 
+           save_result ? "success" : "failed");
+    
+    return save_result;
 }
 
 /**
@@ -1000,6 +1391,32 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
         "            </div>\n"
         "            \n"
         "        </form>\n"
+        "        \n"
+        "        <!-- Password Change Form (separate from network/UART config) -->\n"
+        "        <form method=\"POST\" action=\"/change_password\">\n"
+        "            <div class=\"section\">\n"
+        "                <h3>Security Configuration</h3>\n"
+        "                <p>Change the administrator password. The default username is <strong>admin</strong> and cannot be changed.</p>\n"
+        "                \n"
+        "                <div class=\"form-group\">\n"
+        "                    <label for=\"current_password\">Current Password:</label>\n"
+        "                    <input type=\"password\" id=\"current_password\" name=\"current_password\" required autocomplete=\"current-password\">\n"
+        "                </div>\n"
+        "                \n"
+        "                <div class=\"form-group\">\n"
+        "                    <label for=\"new_password\">New Password (8-31 characters):</label>\n"
+        "                    <input type=\"password\" id=\"new_password\" name=\"new_password\" minlength=\"8\" maxlength=\"31\" required autocomplete=\"new-password\">\n"
+        "                </div>\n"
+        "                \n"
+        "                <div class=\"form-group\">\n"
+        "                    <label for=\"confirm_password\">Confirm New Password:</label>\n"
+        "                    <input type=\"password\" id=\"confirm_password\" name=\"confirm_password\" minlength=\"8\" maxlength=\"31\" required autocomplete=\"new-password\">\n"
+        "                </div>\n"
+        "                \n"
+        "                <button type=\"submit\" class=\"button\">Change Password</button>\n"
+        "            </div>\n"
+        "        </form>\n"
+        "        \n"
         "    </div>\n"
         "</body>\n"
         "</html>\r\n",

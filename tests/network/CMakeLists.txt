@@ -141,3 +141,35 @@ pico_set_uf2_family(test_message_framing "rp2350-arm-s")
 
 # Create UF2 output
 pico_add_extra_outputs(test_message_framing)
+
+# Create test executable for HTTP authentication
+add_executable(test_http_authentication
+    test_http_authentication.c
+)
+
+# Link required libraries including HTTP server
+# Note: config_manager depends on network_manager, so network_manager is listed twice
+# to resolve circular dependencies (config_manager uses network_manager symbols)
+target_link_libraries(test_http_authentication
+    unity
+    http_server  # HTTP server library with authentication functions
+    config_manager
+    state_machine
+    log_manager
+    network_manager  # Listed after config_manager to resolve symbols
+    timer_subsystems
+    pico_stdlib
+    hardware_spi
+    hardware_gpio
+    utils
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_http_authentication 1)
+pico_enable_stdio_uart(test_http_authentication 1)
+
+# Set UF2 family for RP2350
+pico_set_uf2_family(test_http_authentication "rp2350-arm-s")
+
+# Create UF2 output
+pico_add_extra_outputs(test_http_authentication)

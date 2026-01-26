@@ -67,6 +67,7 @@ typedef struct {
     network_config_t network;
     uint8_t log_level;             // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
     uint32_t watchdog_timeout_ms;  // Default 200ms
+    char admin_password[32];       // Admin password for HTTP Basic Authentication (null-terminated)
 } system_config_t;
 
 // Performance counters  
@@ -98,9 +99,12 @@ typedef struct {
 // Complete shared memory layout
 typedef struct {
     // Revision and integrity (at start for easy access)
-    volatile uint32_t revision_counter;       // Incremented on each config change
-    volatile bool config_change_pending;      // Flag for Core1 to detect config changes
-    uint32_t reserved[8];                     // Reserved for future integrity features 
+    uint8_t  sha256_checksum[32];                        // Page integrity verification (first for easy hash exclusion)
+    uint32_t magic_number;                               // Page validity marker
+    uint32_t revision_counter;                           // Write sequence number
+    uint32_t config_change_pending;                // do we need to store data        
+    // Complete shared memory structure (raw binary copy)
+    uint32_t reserved[8];                                // Reserved for future integrity features 
     
     // Configuration structures
     system_config_t config;
@@ -132,18 +136,8 @@ typedef struct {
 
 #define STRUCT_SIZE 65536
 
-#define PADDING_TO(size) \
-    uint8_t _padding[size - offsetof(struct my_data, _padding)]
-
-
 typedef union {
     struct {
-        uint8_t  sha256_checksum[32];                        // Page integrity verification (first for easy hash exclusion)
-        uint32_t magic_number;                               // Page validity marker
-        uint32_t revision_counter;                           // Write sequence number
-        uint32_t reserved[4];                                // Future use, alignment
-        
-        // Complete shared memory structure (raw binary copy)
         shared_memory_layout_t shared_memory_data;
     };
     // Padding to ensure flash sector alignment and leave room for dynamic log entries
