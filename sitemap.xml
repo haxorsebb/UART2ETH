@@ -137,6 +137,11 @@
     </url>
 
     <url>
+    	<loc>http://jbake.org/arc42/adrs/ADR-016-http-basic-authentication.html</loc>
+    	<lastmod>2026-01-26</lastmod>
+    </url>
+
+    <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-008-hardware-pin-configuration.html</loc>
     	<lastmod>2026-01-26</lastmod>
     </url>

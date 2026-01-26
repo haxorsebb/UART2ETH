@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-014-factory-defaults-implementation.html -->
+    <!-- sourceuri: arc42/adrs/ADR-016-http-basic-authentication.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-014: Factory Defaults Implementation</title>
+    <title>ADR-016: HTTP Basic Authentication</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -327,7 +327,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/adrs/ADR-014-factory-defaults-implementation.html" title="ADR-014: Factory Defaults Implementation">ADR-014: Factory Defaults Implementation</a>
                                 
                             </li>
@@ -337,7 +337,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../../arc42/adrs/ADR-016-http-basic-authentication.html" title="ADR-016: HTTP Basic Authentication">ADR-016: HTTP Basic Authentication</a>
                                 
                             </li>
@@ -353,11 +353,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-014-factory-defaults-implementation.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-016-http-basic-authentication.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-014%3A+Factory+Defaults+Implementation%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-014-factory-defaults-implementation.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-016%3A+HTTP+Basic+Authentication%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-016-http-basic-authentication.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -367,18 +367,20 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel0">
-<li><a href="#_adr_014_factory_defaults_implementation">ADR-014: Factory Defaults Implementation</a>
+<li><a href="#_adr_016_http_basic_authentication">ADR-016: HTTP Basic Authentication</a>
 <ul class="sectlevel1">
 <li><a href="#_status">Status</a></li>
 <li><a href="#_date">Date</a></li>
 <li><a href="#_context">Context</a></li>
 <li><a href="#_decision">Decision</a>
 <ul class="sectlevel2">
-<li><a href="#_flash_partitioning_strategy">Flash Partitioning Strategy</a></li>
-<li><a href="#_storage_format">Storage Format</a></li>
-<li><a href="#_data_structure">Data Structure</a></li>
-<li><a href="#_integration_points">Integration Points</a></li>
-<li><a href="#_write_strategy_manufacturing_only">Write Strategy (Manufacturing Only)</a></li>
+<li><a href="#_authentication_method">Authentication Method</a></li>
+<li><a href="#_password_storage">Password Storage</a></li>
+<li><a href="#_authentication_flow">Authentication Flow</a></li>
+<li><a href="#_protected_endpoints">Protected Endpoints</a></li>
+<li><a href="#_password_management">Password Management</a></li>
+<li><a href="#_implementation_components">Implementation Components</a></li>
+<li><a href="#_security_considerations">Security Considerations</a></li>
 </ul>
 </li>
 <li><a href="#_rationale">Rationale</a>
@@ -393,20 +395,19 @@
 <li><a href="#_positive">Positive</a></li>
 <li><a href="#_negative">Negative</a></li>
 <li><a href="#_implementation_requirements">Implementation Requirements</a></li>
+<li><a href="#_documentation_updates">Documentation Updates</a></li>
+<li><a href="#_deployment_impact">Deployment Impact</a></li>
 </ul>
 </li>
-<li><a href="#_implementation_notes">Implementation Notes</a></li>
-<li><a href="#_detailed_implementation_strategy">Detailed Implementation Strategy</a>
+<li><a href="#_implementation_notes">Implementation Notes</a>
 <ul class="sectlevel2">
-<li><a href="#_partition_table_integration">Partition Table Integration</a></li>
-<li><a href="#_integrity_verification">Integrity Verification</a></li>
-<li><a href="#_early_boot_integration">Early Boot Integration</a></li>
-<li><a href="#_factory_reset_application">Factory Reset Application</a></li>
-<li><a href="#_function_interface_design">Function Interface Design</a></li>
-<li><a href="#_serial_number_format">Serial Number Format</a></li>
-<li><a href="#_implementation_constants">Implementation Constants</a></li>
+<li><a href="#_base64_decoding">Base64 Decoding</a></li>
+<li><a href="#_authentication_header_parsing">Authentication Header Parsing</a></li>
+<li><a href="#_memory_impact">Memory Impact</a></li>
+<li><a href="#_performance_impact">Performance Impact</a></li>
 </ul>
 </li>
+<li><a href="#_references">References</a></li>
 </ul>
 </li>
 </ul>
@@ -431,7 +432,7 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_014_factory_defaults_implementation" class="sect0">ADR-014: Factory Defaults Implementation</h1>
+<h1 id="_adr_016_http_basic_authentication" class="sect0">ADR-016: HTTP Basic Authentication</h1>
 <div class="sect1">
 <h2 id="_status">Status</h2>
 <div class="sectionbody">
@@ -444,7 +445,7 @@
 <h2 id="_date">Date</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>2026-01-20</p>
+<p>2026-01-23</p>
 </div>
 </div>
 </div>
@@ -452,31 +453,39 @@
 <h2 id="_context">Context</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>The UART2ETH system requires device-specific factory configuration data that must survive firmware updates and power cycles. This data includes:</p>
+<p>The HTTP server provides management interfaces for device configuration (<code>/config</code>) and factory defaults programming (<code>/factory</code>). Currently, these interfaces are accessible without authentication, which poses security risks:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>Manufacturing information (serial number, production date)</p>
+<p>Unauthorized users can modify device configuration</p>
 </li>
 <li>
-<p>Network identity (MAC address, default IP configuration)</p>
+<p>Network settings can be changed, potentially locking out legitimate administrators</p>
 </li>
 <li>
-<p>Board type identification (for variant support)</p>
+<p>Factory defaults can be reprogrammed (in factory builds)</p>
 </li>
 <li>
-<p>Security (factory default password)</p>
+<p>No audit trail of who made configuration changes</p>
 </li>
 </ul>
 </div>
 <div class="paragraph">
-<p>Key requirements:
-* Separate from user configuration (not affected by factory reset)
-* Written once during manufacturing (read-only from firmware perspective)
-* Early availability (needed before main system initialization)
-* Integrity protection (corruption detection)
-* Simple structure (direct memory mapping)</p>
+<p>Security requirements:
+* Prevent unauthorized access to management interfaces
+* Simple authentication mechanism suitable for embedded systems
+* Minimal resource overhead (memory, CPU)
+* Compatible with standard web browsers and HTTP clients
+* Password persistence across reboots and firmware updates
+* Factory-configurable default password</p>
+</div>
+<div class="paragraph">
+<p>User experience requirements:
+* Standard browser authentication flow (no custom login page needed)
+* Password changeable via web interface
+* Failed authentication clearly communicated to user
+* No session management complexity</p>
 </div>
 </div>
 </div>
@@ -484,111 +493,228 @@
 <h2 id="_decision">Decision</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>We will implement factory defaults using a dedicated flash partition with raw binary storage protected by SHA256 integrity verification:</p>
+<p>We will implement HTTP Basic Authentication for all HTTP server endpoints using the following design:</p>
 </div>
 <div class="sect2">
-<h3 id="_flash_partitioning_strategy">Flash Partitioning Strategy</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Dedicated Partition</strong>: FLASH_PARTITION_FACTORY_DEFAULTS (ID=2, 8KB)</p>
-</li>
-<li>
-<p><strong>Isolated from Configuration</strong>: Separate from FLASH_PARTITION_CONFIGURATION_DATA</p>
-</li>
-<li>
-<p><strong>A/B Firmware Safe</strong>: Factory defaults never touched during firmware updates</p>
-</li>
-<li>
-<p><strong>Single Instance</strong>: No ring buffer, only current factory data</p>
-</li>
-</ul>
+<h3 id="_authentication_method">Authentication Method</h3>
+<div class="paragraph">
+<p><strong>HTTP Basic Authentication (RFC 7617)</strong>
+* Username: <code>admin</code> (hardcoded, not configurable)
+* Password: Stored in shared memory configuration, initialized from factory defaults
+* Authorization header format: <code>Authorization: Basic base64(admin:password)</code>
+* Realm: "UART2ETH Device"</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_storage_format">Storage Format</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Raw Binary Storage</strong>: Direct copy of <code>factory_defaults_t</code> structure to flash</p>
-</li>
-<li>
-<p><strong>No Wear Leveling</strong>: Written once during manufacturing, read-only from firmware</p>
-</li>
-<li>
-<p><strong>SHA256 Integrity</strong>: Hash protection same as configuration persistence</p>
-</li>
-<li>
-<p><strong>Hash Placement</strong>: SHA256 checksum first in struct for easy exclusion during hash calculation</p>
-</li>
-</ul>
+<h3 id="_password_storage">Password Storage</h3>
+<div class="paragraph">
+<p><strong>Shared Memory Extension</strong>
+Add password field to <code>system_config_t</code> structure in <code>shared_memory.h</code>:</p>
 </div>
-</div>
-<div class="sect2">
-<h3 id="_data_structure">Data Structure</h3>
 <div class="listingblock">
 <div class="content">
 <pre class="prettyprint highlight"><code data-lang="c">typedef struct {
-    uint8_t sha256_checksum[32];       // First, for easy exclusion during hash
+    channel_config_t channels[5];
+    network_config_t network;
+    uint8_t log_level;
+    uint32_t watchdog_timeout_ms;
+    char admin_password[32];  // NEW: Admin password (null-terminated)
+} system_config_t;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Initialization Flow</strong>
+1. During <code>shared_memory_init()</code>: Copy <code>default_password</code> from factory defaults to <code>admin_password</code>
+2. During <code>factory_defaults_apply_to_config()</code>: Apply factory default password
+3. Password changes via config page: Update shared memory and persist to flash</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_authentication_flow">Authentication Flow</h3>
+<div class="paragraph">
+<p><strong>Request Processing</strong>
+1. HTTP server receives request
+2. Extract <code>Authorization</code> header from HTTP request
+3. Decode base64 credentials
+4. Compare username against "admin" (case-sensitive)
+5. Compare password against <code>config.admin_password</code> (case-sensitive)
+6. On success: Process request normally
+7. On failure: Send <code>401 Unauthorized</code> with <code>WWW-Authenticate</code> header</p>
+</div>
+<div class="paragraph">
+<p><strong>Response on Authentication Failure</strong></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code>HTTP/1.0 401 Unauthorized
+WWW-Authenticate: Basic realm="UART2ETH Device"
+Content-Type: text/html
+Connection: close
 
-    // Serial number (8 bytes total)
-    uint8_t production_week;           // Week number 1-52
-    uint8_t production_year;           // Years since 2000
-    uint8_t serial_number[6];          // 6-byte running number
-
-    // Network identity
-    uint8_t mac_address[6];            // Raw MAC address
-
-    // Board type
-    uint8_t board_type;                // Hardware variant identifier
-
-    // Default network configuration
-    uint32_t default_ip;               // Network byte order
-    uint32_t default_netmask;          // Network byte order
-    bool default_dhcp_enable;
-
-    // Security
-    char default_password[32];         // Including null-terminator
-} __attribute__((packed)) factory_defaults_t;</code></pre>
+&lt;html&gt;
+&lt;body&gt;
+&lt;h1&gt;401 Unauthorized&lt;/h1&gt;
+&lt;p&gt;Access denied. Please provide valid credentials.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
 </div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_integration_points">Integration Points</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Early Initialization</strong>: Load immediately after stdio init, before factory reset check</p>
-</li>
-<li>
-<p><strong>Serial Number Logging</strong>: Display in boot messages for field identification</p>
-</li>
-<li>
-<p><strong>Factory Reset Application</strong>: Copy defaults to shared memory on factory reset</p>
-</li>
-<li>
-<p><strong>Compile-Time Guarding</strong>: Write functions protected by FACTORY_INTERNAL_VERSION</p>
-</li>
-</ul>
+<h3 id="_protected_endpoints">Protected Endpoints</h3>
+<div class="paragraph">
+<p><strong>All HTTP endpoints require authentication:</strong>
+* <code>GET /</code> - Device status page
+* <code>GET /config</code> - Configuration page
+* <code>POST /</code> - Network/UART configuration update
+* <code>POST /change_password</code> - Password change endpoint
+* <code>GET /factory</code> - Factory defaults page (FACTORY_INTERNAL_VERSION only)
+* <code>POST /factory</code> - Factory defaults write (FACTORY_INTERNAL_VERSION only)
+* <code>GET /styles.css</code> - Stylesheet (included for consistency)</p>
+</div>
+<div class="paragraph">
+<p><strong>Rationale for protecting all endpoints:</strong>
+* Simplifies authentication logic (no endpoint-specific rules)
+* Prevents information disclosure via status page
+* Status page reveals network configuration and device details
+* Consistent security model (no "partially protected" confusion)</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_write_strategy_manufacturing_only">Write Strategy (Manufacturing Only)</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Protected Functions</strong>: <code>#ifdef FACTORY_INTERNAL_VERSION</code> compile guard</p>
-</li>
-<li>
-<p><strong>Single Write Operation</strong>: No update mechanism from normal firmware</p>
-</li>
-<li>
-<p><strong>External Programming</strong>: Manufacturing tools write partition directly</p>
-</li>
-<li>
-<p><strong>Verification</strong>: SHA256 checksum validated on every boot</p>
-</li>
-</ul>
+<h3 id="_password_management">Password Management</h3>
+<div class="paragraph">
+<p><strong>Password Change Interface</strong>
+Add password change section to <code>/config</code> page as a separate form:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="html">&lt;form method="POST" action="/change_password"&gt;
+    &lt;div class="section"&gt;
+        &lt;h3&gt;Security Configuration&lt;/h3&gt;
+        &lt;div class="form-group"&gt;
+            &lt;label for="current_password"&gt;Current Password:&lt;/label&gt;
+            &lt;input type="password" id="current_password" name="current_password" required&gt;
+        &lt;/div&gt;
+        &lt;div class="form-group"&gt;
+            &lt;label for="new_password"&gt;New Password (8-31 characters):&lt;/label&gt;
+            &lt;input type="password" id="new_password" name="new_password"
+                   minlength="8" maxlength="31" required&gt;
+        &lt;/div&gt;
+        &lt;div class="form-group"&gt;
+            &lt;label for="confirm_password"&gt;Confirm New Password:&lt;/label&gt;
+            &lt;input type="password" id="confirm_password" name="confirm_password"
+                   minlength="8" maxlength="31" required&gt;
+        &lt;/div&gt;
+        &lt;button type="submit" class="button"&gt;Change Password&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/form&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Password Change Validation Rules</strong>
+1. <strong>Current Password Verification</strong>: Must match <code>config.admin_password</code> (case-sensitive)
+2. <strong>New Password Length</strong>: Minimum 8 characters, maximum 31 characters
+3. <strong>Password Confirmation</strong>: <code>new_password</code> must exactly match <code>confirm_password</code>
+4. <strong>Character Set</strong>: Any ASCII characters allowed (printable range 0x20-0x7E)
+5. <strong>Error Handling</strong>:
+   - Wrong current password → Show error, do not save
+   - New password too short (&lt;8 chars) → Show error, do not save
+   - Passwords don&#8217;t match → Show error, do not save
+   - Empty fields → Show error, do not save</p>
+</div>
+<div class="paragraph">
+<p><strong>Password Change Flow</strong>
+1. User submits <code>/change_password</code> POST request with authentication header
+2. Server validates authentication (existing session)
+3. Parse POST data: <code>current_password</code>, <code>new_password</code>, <code>confirm_password</code>
+4. Validate current password matches stored password
+5. Validate new password length (8-31 characters)
+6. Validate new password matches confirmation
+7. On validation success:
+   - Update <code>config.admin_password</code> with new password
+   - Increment <code>revision_counter</code>
+   - Save configuration to flash via <code>flash_persistence_force_save_configuration()</code>
+   - Redirect to <code>/config</code> with success message
+   - Current session continues (user NOT logged out)
+8. On validation failure:
+   - Show error message on config page
+   - Do NOT save password
+   - Current session continues</p>
+</div>
+<div class="paragraph">
+<p><strong>Separate Endpoint for Password Change</strong>
+Password changes use dedicated <code>/change_password</code> endpoint (POST only):
+* Keeps password change logic separate from network/UART configuration
+* Prevents accidental password changes during config updates
+* Allows specific validation and error messages for password changes
+* Config page (<code>/config</code>) contains two separate forms:
+  1. Network/UART Configuration → POST to <code>/</code>
+  2. Password Change → POST to <code>/change_password</code></p>
+</div>
+<div class="paragraph">
+<p><strong>Password Reset Procedure</strong>
+If password is forgotten:
+1. Perform factory reset (button during boot, or via <code>/factory</code> page)
+2. <code>factory_defaults_apply_to_config()</code> copies <code>factory_defaults.default_password</code> → <code>config.admin_password</code>
+3. Password reverts to factory default (e.g., "admin" or device-specific value)
+4. Access device with factory default password
+5. Change password to new secure value immediately</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implementation_components">Implementation Components</h3>
+<div class="paragraph">
+<p><strong>New Functions (http_server.c)</strong>
+* <code>http_check_authentication()</code> - Validate Authorization header against stored password
+* <code>http_send_auth_required()</code> - Send 401 Unauthorized response with WWW-Authenticate header
+* <code>http_base64_decode()</code> - Decode base64-encoded credentials
+* <code>http_validate_password_change()</code> - Validate password change request (current password, new password, confirmation)
+* <code>http_handle_password_change()</code> - Handle POST to <code>/change_password</code> endpoint</p>
+</div>
+<div class="paragraph">
+<p><strong>Modified Functions</strong>
+* <code>http_connection_recv_callback()</code> - Add authentication check before processing all requests
+* <code>http_generate_config_page()</code> - Add separate password change form with POST to <code>/change_password</code>
+* Request routing - Add <code>/change_password</code> endpoint handling</p>
+</div>
+<div class="paragraph">
+<p><strong>New HTTP Endpoint</strong>
+* <code>POST /change_password</code> - Password change endpoint
+  - Input: <code>current_password</code>, <code>new_password</code>, <code>confirm_password</code> (form fields)
+  - Validation: Current password verification, length check, confirmation match
+  - Output: Redirect to <code>/config</code> with success/error message
+  - Authentication: Required (same as all endpoints)</p>
+</div>
+<div class="paragraph">
+<p><strong>Shared Memory Integration</strong>
+* <code>shared_memory_init()</code> - Initialize <code>admin_password</code> from factory defaults
+* <code>factory_defaults_apply_to_config()</code> - Apply default password</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_security_considerations">Security Considerations</h3>
+<div class="paragraph">
+<p><strong>Limitations</strong>
+* HTTP Basic Authentication transmits credentials in base64 encoding (not encryption)
+* Credentials visible to network sniffers on unencrypted HTTP
+* No HTTPS/TLS support in embedded system (resource constraints)
+* Password stored in plain text in flash (no bcrypt/hashing)</p>
+</div>
+<div class="paragraph">
+<p><strong>Mitigations</strong>
+* Target deployment: Private, trusted networks only
+* Document requirement for trusted network environment
+* Factory default password must be changed during deployment
+* Password length limited to prevent buffer overflow (31 chars + null)
+* No username enumeration (always show same 401 response)
+* No rate limiting (embedded system constraints)</p>
+</div>
+<div class="paragraph">
+<p><strong>Acceptable Trade-offs</strong>
+* Plain text passwords acceptable for embedded device on trusted network
+* Base64 encoding sufficient for basic access control
+* No HTTPS acceptable given target environment (LAN deployment)
+* Simple authentication better than no authentication</p>
 </div>
 </div>
 </div>
@@ -601,22 +727,28 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Separation of Concerns</strong>: Factory data isolated from user configuration</p>
+<p><strong>Standard Protocol</strong>: HTTP Basic Auth supported by all browsers and HTTP clients</p>
 </li>
 <li>
-<p><strong>Update Safety</strong>: Firmware updates never touch factory defaults</p>
+<p><strong>Minimal Complexity</strong>: No session management, cookies, or client-side JavaScript</p>
 </li>
 <li>
-<p><strong>Early Availability</strong>: Loaded before main system initialization</p>
+<p><strong>Low Resource Usage</strong>: Minimal RAM/flash overhead (&lt;100 bytes)</p>
 </li>
 <li>
-<p><strong>Field Identification</strong>: Serial number visible in boot logs</p>
+<p><strong>Browser Integration</strong>: Standard browser password manager support</p>
 </li>
 <li>
-<p><strong>Integrity Protection</strong>: SHA256 detects corruption</p>
+<p><strong>Factory Integration</strong>: Password initialized from factory defaults system</p>
 </li>
 <li>
-<p><strong>Simple Implementation</strong>: No complex wear leveling or ring buffer</p>
+<p><strong>User Friendly</strong>: Standard browser login dialog (no custom forms)</p>
+</li>
+<li>
+<p><strong>Persistent</strong>: Password saved to flash, survives reboots and updates</p>
+</li>
+<li>
+<p><strong>Changeable</strong>: Password can be updated via web interface</p>
 </li>
 </ul>
 </div>
@@ -624,22 +756,38 @@
 <div class="sect2">
 <h3 id="_rejected_alternatives">Rejected Alternatives</h3>
 <div class="paragraph">
-<p><strong>Embedding in Firmware</strong>
-* Rejected due to loss of per-device uniqueness during firmware updates
-* Would require separate firmware builds per device (manufacturing complexity)
-* Updates would overwrite device-specific data</p>
+<p><strong>Digest Authentication</strong>
+* Rejected: More complex implementation for embedded system
+* Requires server nonce generation and MD5 hashing
+* Minimal security improvement over Basic Auth on trusted networks
+* Higher code size and CPU overhead</p>
 </div>
 <div class="paragraph">
-<p><strong>Combined with User Configuration</strong>
-* Rejected to avoid factory reset affecting manufacturing data
-* Separation provides clearer architecture
-* Different lifecycle (write-once vs. write-many)</p>
+<p><strong>Custom Session-Based Authentication</strong>
+* Rejected: Requires session storage and management
+* Needs session timeout handling and cleanup
+* Higher RAM usage for session tracking
+* More complex implementation (login page, logout, session cookies)
+* Limited connections (2 max) make session management problematic</p>
 </div>
 <div class="paragraph">
-<p><strong>External EEPROM</strong>
-* Rejected to avoid additional hardware components
-* Increases BOM cost and PCB complexity
-* Internal flash sufficient for factory data</p>
+<p><strong>Token-Based Authentication (JWT, etc.)</strong>
+* Rejected: Overkill for simple embedded device
+* Requires token parsing and validation libraries
+* Higher code size and complexity
+* Not needed for single-user management interface</p>
+</div>
+<div class="paragraph">
+<p><strong>Client Certificate Authentication</strong>
+* Rejected: Requires TLS/HTTPS infrastructure
+* Certificate management too complex for embedded system
+* No TLS support in current network stack</p>
+</div>
+<div class="paragraph">
+<p><strong>No Authentication (Status Quo)</strong>
+* Rejected: Unacceptable security risk
+* Allows unauthorized configuration changes
+* No access control for sensitive operations</p>
 </div>
 </div>
 <div class="sect2">
@@ -647,13 +795,16 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Flash Usage</strong>: 8KB partition for factory defaults (acceptable overhead)</p>
+<p><strong>Security vs Simplicity</strong>: Basic Auth chosen for simplicity despite plain text transmission</p>
 </li>
 <li>
-<p><strong>Write Protection</strong>: No firmware-based write protection (acceptable for read-only use case)</p>
+<p><strong>Network Trust</strong>: Assumes deployment on trusted network (documented requirement)</p>
 </li>
 <li>
-<p><strong>Single Copy</strong>: No redundancy for factory defaults (acceptable with SHA256 integrity)</p>
+<p><strong>Resource Usage</strong>: ~100 bytes RAM for password storage, minimal CPU for base64 decode</p>
+</li>
+<li>
+<p><strong>User Experience</strong>: Browser handles auth dialog (standard UX)</p>
 </li>
 </ul>
 </div>
@@ -668,19 +819,25 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Partition Isolation</strong>: Factory data completely isolated from user configuration</p>
+<p><strong>Access Control</strong>: Management interface protected from unauthorized access</p>
 </li>
 <li>
-<p><strong>Update Safety</strong>: Firmware updates never risk factory data corruption</p>
+<p><strong>Standard Compliance</strong>: Uses widely-supported HTTP Basic Authentication</p>
 </li>
 <li>
-<p><strong>Field Support</strong>: Serial number visible in logs simplifies field support</p>
+<p><strong>Low Overhead</strong>: Minimal resource usage suitable for embedded system</p>
 </li>
 <li>
-<p><strong>Manufacturing Flexibility</strong>: Supports different board types with single firmware</p>
+<p><strong>Factory Integration</strong>: Seamless integration with factory defaults system</p>
 </li>
 <li>
-<p><strong>Simple Implementation</strong>: Direct flash read without complex logic</p>
+<p><strong>Password Management</strong>: User-friendly password change via web interface</p>
+</li>
+<li>
+<p><strong>Persistent Configuration</strong>: Password saved to flash, survives updates</p>
+</li>
+<li>
+<p><strong>Browser Compatibility</strong>: Works with all standard browsers and HTTP clients</p>
 </li>
 </ul>
 </div>
@@ -690,38 +847,107 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Manufacturing Tools</strong>: Requires external tools to program factory partition</p>
+<p><strong>Plain Text Transmission</strong>: Credentials visible on network (mitigated by trusted network)</p>
 </li>
 <li>
-<p><strong>No Firmware Write</strong>: Cannot update factory defaults from running firmware</p>
+<p><strong>No HTTPS</strong>: No encryption available (resource constraints)</p>
 </li>
 <li>
-<p><strong>Single Instance</strong>: No redundancy if flash sector fails (acceptable with integrity check)</p>
+<p><strong>Single User</strong>: Only one username (<code>admin</code>) supported</p>
+</li>
+<li>
+<p><strong>No Rate Limiting</strong>: Susceptible to brute force on untrusted networks</p>
+</li>
+<li>
+<p><strong>Flash Wear</strong>: Password changes trigger flash write (mitigated by wear leveling)</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_implementation_requirements">Implementation Requirements</h3>
+<div class="paragraph">
+<p><strong>Phase 1: Core Authentication</strong>
+1. Add <code>admin_password[32]</code> to <code>system_config_t</code> in shared_memory.h
+2. Update <code>shared_memory_init()</code> to initialize password from factory defaults
+3. Update <code>factory_defaults_apply_to_config()</code> to apply default password
+4. Implement <code>http_check_authentication()</code> function
+5. Implement <code>http_send_auth_required()</code> function
+6. Implement <code>http_base64_decode()</code> helper function
+7. Add authentication check to <code>http_connection_recv_callback()</code></p>
+</div>
+<div class="paragraph">
+<p><strong>Phase 2: Password Management (This Implementation)</strong>
+1. Add <code>/change_password</code> endpoint to request routing in <code>http_connection_recv_callback()</code>
+2. Implement <code>http_validate_password_change()</code> - Validate all password change criteria
+3. Implement <code>http_handle_password_change()</code> - Process password change POST request
+4. Update <code>http_generate_config_page()</code> - Add separate password change form
+5. Add password change success/error message display on config page
+6. Test password validation (minimum length, confirmation match, current password)
+7. Test password persistence to flash
+8. Test factory reset restores factory default password</p>
+</div>
+<div class="paragraph">
+<p><strong>Phase 3: Testing</strong>
+1. Unit tests for <code>http_validate_password_change()</code> function
+   - Test current password verification
+   - Test minimum length validation (8 characters)
+   - Test maximum length validation (31 characters)
+   - Test confirmation matching
+   - Test empty field validation
+2. Integration tests for <code>/change_password</code> endpoint
+   - Test successful password change flow
+   - Test error handling for each validation failure
+   - Test flash persistence of new password
+3. Integration tests for factory reset
+   - Test <code>factory_defaults_apply_to_config()</code> restores default password
+   - Test authentication with factory default password after reset
+4. End-to-end browser testing
+   - Test password change via web UI
+   - Test re-authentication with new password
+   - Test session continuity (not logged out after password change)</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_documentation_updates">Documentation Updates</h3>
 <div class="ulist">
 <ul>
 <li>
-<p>Factory defaults structure definition in header file</p>
+<p>Update user manual with authentication requirements</p>
 </li>
 <li>
-<p>Init function to load from flash partition early in boot</p>
+<p>Document default credentials (username: admin, password: from factory defaults)</p>
 </li>
 <li>
-<p>Serial number formatting and logging functions</p>
+<p>Document password change procedure</p>
 </li>
 <li>
-<p>Factory reset integration to copy defaults to config</p>
+<p>Document password reset via factory reset</p>
 </li>
 <li>
-<p>Compile-time guards for write functions</p>
+<p>Add security warnings about trusted network requirement</p>
 </li>
 <li>
-<p>Manufacturing tool documentation</p>
+<p>Update deployment guide with security recommendations</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_deployment_impact">Deployment Impact</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Existing Devices</strong>: Factory reset required to initialize password field</p>
+</li>
+<li>
+<p><strong>New Devices</strong>: Password programmed during manufacturing via <code>/factory</code> interface</p>
+</li>
+<li>
+<p><strong>User Impact</strong>: Users must enter credentials to access web interface</p>
+</li>
+<li>
+<p><strong>Network Impact</strong>: Trusted network deployment required (no change from current)</p>
 </li>
 </ul>
 </div>
@@ -731,138 +957,121 @@
 <div class="sect1">
 <h2 id="_implementation_notes">Implementation Notes</h2>
 <div class="sectionbody">
+<div class="sect2">
+<h3 id="_base64_decoding">Base64 Decoding</h3>
 <div class="paragraph">
-<p>The factory defaults system will be implemented as a separate module in the configuration subsystem. It follows the same integrity verification pattern as configuration persistence but without the ring buffer complexity.</p>
+<p>HTTP Basic Auth credentials format: <code>Basic base64(username:password)</code>
+Example: <code>Authorization: Basic YWRtaW46cGFzc3dvcmQ=</code> (admin:password)</p>
 </div>
 <div class="paragraph">
-<p>Integration points:
-1. <strong>main.c</strong>: Load factory defaults immediately after stdio_uart_init
-2. <strong>main.c</strong>: Log serial number after software version
-3. <strong>flash_persistence.c</strong>: Apply factory defaults during factory reset
-4. <strong>shared_memory.c</strong>: Reference factory defaults for default values</p>
+<p>Implementation uses lookup table for base64 decoding:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">static const char base64_table[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static int http_base64_decode(const char* input, char* output, size_t max_len);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_authentication_header_parsing">Authentication Header Parsing</h3>
+<div class="paragraph">
+<p>Extract credentials from HTTP request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Find "Authorization: Basic " header
+const char* auth_header = strstr(request, "Authorization: Basic ");
+if (!auth_header) {
+    return false;  // No auth header
+}
+
+// Extract base64 string (until CRLF)
+char base64_creds[128];
+// Decode to "username:password"
+char decoded[128];
+http_base64_decode(base64_creds, decoded, sizeof(decoded));
+
+// Split on ':'
+char* colon = strchr(decoded, ':');
+*colon = '\0';
+char* username = decoded;
+char* password = colon + 1;
+
+// Validate
+if (strcmp(username, "admin") != 0) return false;
+if (strcmp(password, config-&gt;admin_password) != 0) return false;
+
+return true;  // Authenticated</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_memory_impact">Memory Impact</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><code>admin_password[32]</code> in system_config_t: 32 bytes</p>
+</li>
+<li>
+<p>Base64 decode buffer (stack): ~128 bytes temporary</p>
+</li>
+<li>
+<p>Auth validation function: ~100 bytes code size</p>
+</li>
+<li>
+<p>Total impact: ~260 bytes (negligible for RP2350)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_performance_impact">Performance Impact</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Base64 decode: ~50 CPU cycles per character</p>
+</li>
+<li>
+<p>String comparison: ~10 CPU cycles per character</p>
+</li>
+<li>
+<p>Total per request: &lt;1000 CPU cycles (~10 microseconds at 133MHz)</p>
+</li>
+<li>
+<p>Negligible performance impact</p>
+</li>
+</ul>
+</div>
 </div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_detailed_implementation_strategy">Detailed Implementation Strategy</h2>
+<h2 id="_references">References</h2>
 <div class="sectionbody">
-<div class="sect2">
-<h3 id="_partition_table_integration">Partition Table Integration</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>RP2350 Bootrom APIs</strong>: Use <code>rom_get_partition_table_info()</code> for partition discovery</p>
+<p>RFC 7617: The 'Basic' HTTP Authentication Scheme</p>
 </li>
 <li>
-<p><strong>Partition Discovery</strong>: Use partition ID=2 (FLASH_PARTITION_FACTORY_DEFAULTS)</p>
+<p>RFC 7235: Hypertext Transfer Protocol (HTTP/1.1): Authentication</p>
 </li>
 <li>
-<p><strong>Safe Flash Operations</strong>: Use raw flash read (XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE)</p>
+<p>ADR-014: Factory Defaults Implementation (password storage)</p>
+</li>
+<li>
+<p>ADR-015: Factory Defaults Web Interface (password programming)</p>
+</li>
+<li>
+<p>arc42 Chapter 5: Building Block View - HTTP Server Module</p>
+</li>
+<li>
+<p>arc42 Chapter 8: Security Concepts</p>
 </li>
 </ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_integrity_verification">Integrity Verification</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>SHA256 Engine</strong>: Use pico-sdk <code>pico/sha256.h</code> hardware crypto APIs</p>
-</li>
-<li>
-<p><strong>Hash Coverage</strong>: SHA256 covers all fields after checksum (production_week through default_password)</p>
-</li>
-<li>
-<p><strong>Checksum Placement</strong>: SHA256 checksum placed first for easy exclusion</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_early_boot_integration">Early Boot Integration</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Load Sequence</strong>: stdio_uart_init → factory_defaults_init() → log_serial_number() → factory_reset_check()</p>
-</li>
-<li>
-<p><strong>Error Handling</strong>: Invalid factory defaults logged but not fatal (system continues)</p>
-</li>
-<li>
-<p><strong>Logging</strong>: Serial number displayed immediately after software version</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_factory_reset_application">Factory Reset Application</h3>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">void flash_persistence_factory_reset(void) {
-    // ... existing code ...
-
-    // Apply factory defaults to shared memory
-    factory_defaults_apply_to_config();
-
-    // Save configuration with factory defaults
-    flash_persistence_force_save_configuration();
-}</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_function_interface_design">Function Interface Design</h3>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Core factory defaults functions (factory_defaults.h)
-bool factory_defaults_init(void);
-void factory_defaults_print_serial_number(void);
-void factory_defaults_apply_to_config(void);
-const factory_defaults_t* factory_defaults_get(void);
-
-// Manufacturing functions (guarded by FACTORY_INTERNAL_VERSION)
-#ifdef FACTORY_INTERNAL_VERSION
-bool factory_defaults_write(const factory_defaults_t* defaults);
-bool factory_defaults_erase(void);
-#endif
-
-// Internal implementation (static in factory_defaults.c)
-static bool load_factory_defaults(void);
-static bool validate_factory_defaults_integrity(const factory_defaults_t* defaults);
-static uint32_t calculate_factory_defaults_checksum(const factory_defaults_t* defaults, uint8_t* checksum_out);
-static bool find_factory_partition_info(uint32_t* start_addr, uint32_t* size);</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_serial_number_format">Serial Number Format</h3>
-<div class="paragraph">
-<p>Serial number formatted as: <code>YYWW-NNNNNNNNNNNN</code> where:
-* YY = Year (2000 + production_year)
-* WW = Week (01-52)
-* NNNNNNNNNNNN = Running number (6 bytes, decimal, 12 digits with leading zeros)</p>
-</div>
-<div class="paragraph">
-<p>Example: <code>2601-000000000123</code> = Week 1 of 2026, serial number 123</p>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_implementation_constants">Implementation Constants</h3>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Factory defaults constants (shared_memory.h)
-#define FLASH_PARTITION_FACTORY_DEFAULTS 2              // Partition ID
-#define FACTORY_DEFAULTS_SIZE 8192                      // 8KB partition
-#define FACTORY_DEFAULTS_SERIAL_NUMBER_SIZE 6           // 6-byte running number
-
-// Board type enumeration
-typedef enum {
-    BOARD_TYPE_SHARK = 0,      // Default SHARK board (2 UARTs, ENC28J60)
-    BOARD_TYPE_PRIMARY = 1,    // Primary controller board
-    BOARD_TYPE_SECONDARY = 2   // Secondary controller board
-} board_type_t;</code></pre>
-</div>
-</div>
 </div>
 </div>
 </div>
@@ -893,11 +1102,11 @@ typedef enum {
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-014%3A+Factory+Defaults+Implementation%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-014-factory-defaults-implementation.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-016%3A+HTTP+Basic+Authentication%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-016-http-basic-authentication.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-014%3A+Factory+Defaults+Implementation%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-014-factory-defaults-implementation.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-016%3A+HTTP+Basic+Authentication%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-016-http-basic-authentication.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
