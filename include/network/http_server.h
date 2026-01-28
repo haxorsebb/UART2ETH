@@ -154,6 +154,37 @@ password_change_result_t http_validate_password_change(
     const char* stored_pwd
 );
 
+/**
+ * @brief Firmware Upload Functions
+ * 
+ * Reference: ADR-017 Update Module, ADR-016 Firmware Update Web Interface
+ */
+
+/**
+ * Start a firmware upload session
+ * @param expected_size Total expected size of firmware file (without multipart overhead)
+ * @return true if upload session started successfully, false otherwise
+ */
+bool http_upload_session_start(uint32_t expected_size);
+
+/**
+ * Feed a chunk of firmware data to the upload session
+ * @param bytes_received Number of bytes in this chunk
+ */
+void http_upload_receive_chunk(uint32_t bytes_received);
+
+/**
+ * Reset/abort the current upload session
+ */
+void http_upload_session_reset(void);
+
+/**
+ * Get upload session progress
+ * @param bytes_received Output: bytes received so far
+ * @param total_bytes Output: total expected bytes
+ */
+void http_upload_get_progress(uint32_t* bytes_received, uint32_t* total_bytes);
+
 #ifdef __cplusplus
 }
 #endif
