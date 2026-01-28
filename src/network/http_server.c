@@ -11,10 +11,13 @@
  */
 
 #include "network/http_server.h"
+#include "network/http_multipart.h"
 #include "network/network_manager.h"
 #include "shared_memory.h"
 #include "device_mode.h"
 #include "log_manager.h"
+#include "update/update_manager.h"
+#include "state_machine/state_machine.h"
 #include "debug.h"
 #include "pico/stdlib.h"
 #include "lwip/tcp.h"
@@ -23,6 +26,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+// HTML page templates
+#include "html/html_styles.h"
+#include "html/html_page_update.h"
 
 #ifdef FACTORY_INTERNAL_VERSION
 #include "factory_defaults.h"
@@ -39,11 +46,43 @@ static http_server_status_t g_server_status = HTTP_SERVER_STATUS_UNINITIALIZED;
 static http_server_stats_t g_server_stats;
 static absolute_time_t g_server_start_time;
 
-// Connection tracking
+// Firmware upload session state
+// Documentation Reference: ADR-016 - Firmware Update Web Interface, ADR-017 - Update Module
+typedef enum {
+    UPLOAD_STATE_IDLE,
+    UPLOAD_STATE_RECEIVING,
+    UPLOAD_STATE_COMPLETE,
+    UPLOAD_STATE_ERROR
+} upload_state_t;
+
+typedef struct {
+    upload_state_t state;
+    uint32_t total_expected_size;
+    uint32_t bytes_received;
+    uint32_t last_progress_report;
+} upload_session_t;
+
+static upload_session_t g_upload_session = {
+    .state = UPLOAD_STATE_IDLE,
+    .total_expected_size = 0,
+    .bytes_received = 0,
+    .last_progress_report = 0
+};
+
+// Connection tracking with upload state
 typedef struct http_connection {
     struct tcp_pcb* pcb;
     bool active;
     uint32_t start_time_ms;
+    
+    // Upload state for this connection (multipart/form-data handling)
+    bool is_upload;                      // True if this connection is handling a file upload
+    bool headers_parsed;                 // True if we've parsed the HTTP headers
+    uint32_t upload_total_size;          // Total expected upload size (actual file size, not multipart envelope)
+    uint32_t upload_bytes_received;      // Bytes received so far (actual file data only)
+    uint32_t headers_length;             // Length of HTTP + multipart headers (to skip them)
+    uint32_t multipart_bytes_skipped;    // Total multipart overhead bytes skipped
+    char boundary[128];                  // Multipart boundary string for detecting end
 } http_connection_t;
 
 static http_connection_t g_http_connections[HTTP_SERVER_MAX_CONNECTIONS];
@@ -64,10 +103,12 @@ static void http_close_connection(http_connection_t* conn);
 static void http_send_response(http_connection_t* conn, const char* response, size_t response_len);
 static void http_generate_device_page(char* buffer, size_t buffer_size);
 static void http_generate_config_page(char* buffer, size_t buffer_size);
+static void http_generate_update_page(char* buffer, size_t buffer_size, const char* message);
 static void http_generate_stylesheet(char* buffer, size_t buffer_size);
 static http_request_type_t http_parse_request_type(const char* request_data);
 static bool http_parse_post_data(const char* post_data, size_t data_len);
 static bool http_handle_password_change(const char* post_data, size_t data_len);
+static bool http_handle_reboot_request(const char* post_data, size_t data_len);
 static void http_send_redirect(http_connection_t* conn, const char* location);
 
 // HTTP Basic Authentication functions
@@ -350,6 +391,22 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             
         }
         #endif
+        else if (strstr(request_buffer, "POST /reboot") != NULL) {
+            // Handle reboot request
+            printf("HTTP Server: Processing reboot request\n");
+            
+            if (http_handle_reboot_request(request_buffer, copy_len)) {
+                // Reboot initiated - show confirmation page
+                http_generate_update_page(response_buffer, sizeof(response_buffer), 
+                    "Reboot initiated. Device will restart in a few seconds. Please wait and then refresh this page.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+            } else {
+                // Reboot failed
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Error: Failed to initiate reboot.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+            }
+        }
         else {
             // Handle configuration update
             printf("HTTP Server: Processing configuration update\n");
@@ -388,6 +445,11 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     else if (strstr(request_buffer, "GET /config") != NULL) {
         // Show configuration page
         http_generate_config_page(response_buffer, sizeof(response_buffer));
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+    }
+    else if (strstr(request_buffer, "GET /update") != NULL) {
+        // Show firmware update page
+        http_generate_update_page(response_buffer, sizeof(response_buffer), NULL);
         http_send_response(conn, response_buffer, strlen(response_buffer));
     }
     else {
@@ -1448,6 +1510,197 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
         printf("HTTP: Config HTML generation successful - %d bytes remaining\n", 
                (int)buffer_size - html_len);
     }
+}
+
+/**
+ * @brief Generate firmware update HTML page
+ * 
+ * Shows current firmware status with TBYB state and provides
+ * reboot button to trigger the update state machine.
+ * 
+ * Documentation Reference:
+ * - ADR-017: Update Module
+ */
+static void http_generate_update_page(char* buffer, size_t buffer_size, const char* message) {
+    if (!buffer || buffer_size == 0) {
+        return;
+    }
+    
+    // Get current update status
+    update_status_t status = update_get_status();
+    const char* state_str = "Unknown";
+    const char* state_class = "";
+    
+    switch (status.state) {
+        case UPDATE_STATE_IDLE:
+            state_str = "Idle - Ready for update";
+            state_class = "status-ok";
+            break;
+        case UPDATE_STATE_RECEIVING:
+            state_str = "Receiving firmware...";
+            state_class = "status-warning";
+            break;
+        case UPDATE_STATE_VERIFYING:
+            state_str = "Verifying firmware...";
+            state_class = "status-warning";
+            break;
+        case UPDATE_STATE_READY:
+            state_str = "Ready to apply update";
+            state_class = "status-ok";
+            break;
+        case UPDATE_STATE_APPLYING:
+            state_str = "Applying update...";
+            state_class = "status-warning";
+            break;
+        case UPDATE_STATE_ERROR:
+            state_str = "Error occurred";
+            state_class = "status-error";
+            break;
+    }
+    
+    // Check if TBYB is pending (new image not yet confirmed)
+    bool tbyb_pending = update_is_tbyb_pending();
+    
+    // Generate HTML response
+    int html_len = snprintf(buffer, buffer_size,
+        "HTTP/1.0 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head>\n"
+        "    <title>UART2ETH Firmware Update</title>\n"
+        "    <style>\n"
+        "        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }\n"
+        "        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 800px; }\n"
+        "        .header { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 30px; }\n"
+        "        .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 4px; }\n"
+        "        .section h3 { margin-top: 0; color: #2c3e50; }\n"
+        "        .nav-links { margin: 20px 0; text-align: center; }\n"
+        "        .nav-links a { display: inline-block; margin: 0 10px; padding: 10px 20px; background-color: #95a5a6; color: white; text-decoration: none; border-radius: 4px; }\n"
+        "        .nav-links a:hover { background-color: #7f8c8d; }\n"
+        "        .nav-links a.active { background-color: #3498db; }\n"
+        "        .button { background-color: #3498db; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }\n"
+        "        .button:hover { background-color: #2980b9; }\n"
+        "        .button-danger { background-color: #e74c3c; }\n"
+        "        .button-danger:hover { background-color: #c0392b; }\n"
+        "        .button-success { background-color: #27ae60; }\n"
+        "        .button-success:hover { background-color: #229954; }\n"
+        "        .status-ok { color: #27ae60; font-weight: bold; }\n"
+        "        .status-warning { color: #f39c12; font-weight: bold; }\n"
+        "        .status-error { color: #e74c3c; font-weight: bold; }\n"
+        "        .message { padding: 15px; border-radius: 4px; margin-bottom: 20px; }\n"
+        "        .message-info { background-color: #d5f5e3; border: 1px solid #27ae60; }\n"
+        "        .message-error { background-color: #fadbd8; border: 1px solid #e74c3c; }\n"
+        "        .tbyb-warning { background-color: #fef9e7; border: 2px solid #f39c12; padding: 15px; border-radius: 4px; margin-bottom: 20px; }\n"
+        "        .label { font-weight: bold; color: #34495e; }\n"
+        "        .value { color: #2980b9; font-family: monospace; }\n"
+        "    </style>\n"
+        "</head>\n"
+        "<body>\n"
+        "    <div class=\"container\">\n"
+        "        <div class=\"header\">\n"
+        "            <h1>Firmware Update</h1>\n"
+        "            <p>Manage device firmware and system updates</p>\n"
+        "        </div>\n"
+        "        \n"
+        "        <div class=\"nav-links\">\n"
+        "            <a href=\"/\">Status</a>\n"
+        "            <a href=\"/config\">Configuration</a>\n"
+        "            <a href=\"/update\" class=\"active\">Update</a>\n"
+        "        </div>\n"
+        "        \n"
+        "%s"  /* Message placeholder */
+        "        \n"
+        "%s"  /* TBYB warning placeholder */
+        "        \n"
+        "        <div class=\"section\">\n"
+        "            <h3>Firmware Status</h3>\n"
+        "            <p><span class=\"label\">Update State:</span> <span class=\"%s\">%s</span></p>\n"
+        "            <p><span class=\"label\">TBYB Pending:</span> <span class=\"value\">%s</span></p>\n"
+        "            <p><span class=\"label\">Bytes Received:</span> <span class=\"value\">%u</span></p>\n"
+        "        </div>\n"
+        "        \n"
+        "        <div class=\"section\">\n"
+        "            <h3>Device Reboot</h3>\n"
+        "            <p>Reboot the device to apply pending changes or recover from errors.</p>\n"
+        "            <p><strong>Warning:</strong> All active connections will be terminated.</p>\n"
+        "            <form method=\"POST\" action=\"/reboot\">\n"
+        "                <button type=\"submit\" class=\"button button-danger\">Reboot Device</button>\n"
+        "            </form>\n"
+        "        </div>\n"
+        "        \n"
+        "%s"  /* Buy button section for TBYB */
+        "        \n"
+        "    </div>\n"
+        "</body>\n"
+        "</html>\r\n",
+        /* Message */
+        message ? "<div class=\"message message-info\">" : "",
+        message ? message : "",
+        message ? "</div>" : "",
+        /* TBYB warning */
+        tbyb_pending ? 
+            "<div class=\"tbyb-warning\">"
+            "<strong>⚠️ Try-Before-You-Buy Active:</strong> "
+            "New firmware is running but not confirmed. "
+            "If you reboot without confirming, the device will revert to the previous firmware. "
+            "Click 'Confirm Update' below to make this firmware permanent."
+            "</div>" : "",
+        /* Status */
+        state_class, state_str,
+        tbyb_pending ? "Yes (confirm required)" : "No",
+        status.bytes_received,
+        /* Buy button */
+        tbyb_pending ?
+            "<div class=\"section\">"
+            "<h3>Confirm Update (TBYB)</h3>"
+            "<p>The new firmware is running. Click below to make it permanent.</p>"
+            "<form method=\"POST\" action=\"/reboot\">"
+            "<input type=\"hidden\" name=\"action\" value=\"buy\">"
+            "<button type=\"submit\" class=\"button button-success\">Confirm Update (Buy)</button>"
+            "</form>"
+            "</div>" : ""
+    );
+    
+    printf("HTTP: Generated update page (%d bytes)\n", html_len);
+}
+
+/**
+ * @brief Handle reboot request from web UI
+ * 
+ * Triggers a device reboot via the state machine. Can also handle
+ * TBYB "buy" action to confirm the current firmware.
+ * 
+ * Documentation Reference:
+ * - ADR-017: Update Module
+ */
+static bool http_handle_reboot_request(const char* post_data, size_t data_len) {
+    printf("HTTP: Processing reboot request\n");
+    
+    // Check for TBYB "buy" action
+    const char* form_start = strstr(post_data, "\r\n\r\n");
+    if (form_start) {
+        form_start += 4;
+        if (strstr(form_start, "action=buy") != NULL) {
+            printf("HTTP: TBYB Buy action requested\n");
+            // Send buy event to state machine
+            shared_memory_layout_t* layout = shared_memory_get_layout();
+            layout->core1_event_pending = true;
+            layout->core1_pending_event = CORE1_EVENT_BUY_UPDATE;
+            return true;
+        }
+    }
+    
+    // Regular reboot request - trigger state machine reboot
+    printf("HTTP: Triggering device reboot via state machine\n");
+    
+    // Signal reboot to the main state machine
+    shared_memory_layout_t* layout = shared_memory_get_layout();
+    layout->reboot_requested = true;
+    
+    return true;
 }
 
 /**

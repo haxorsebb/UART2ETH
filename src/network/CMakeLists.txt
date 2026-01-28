@@ -62,4 +62,5 @@ target_include_directories(http_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
+    ${CMAKE_CURRENT_SOURCE_DIR}/html  # HTML page templates
 )

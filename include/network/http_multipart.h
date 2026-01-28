@@ -1,19 +1,16 @@
 /**
  * @file http_multipart.h
- * @brief Generic HTTP multipart/form-data parser for file uploads
+ * @brief Generic HTTP multipart/form-data handler
  * 
- * Provides streaming multipart parser that can handle large file uploads
- * across multiple TCP callbacks without buffering entire file in RAM.
+ * Provides utilities for parsing and handling multipart/form-data uploads,
+ * including streaming large file uploads across multiple TCP callbacks.
  * 
- * Key features:
- * - Streaming parser (processes data as it arrives)
- * - Minimal memory footprint (no complete file buffering)
- * - Generic callback interface for data handling
- * - Boundary detection and multipart header parsing
+ * This module is designed to be generic and reusable for any type of file upload,
+ * not just firmware updates.
  * 
  * Documentation Reference:
  * - ADR-016: Firmware Update Web Interface
- * - ADR-017: Update Module
+ * - arc42 Chapter 5: HTTP Server Module
  */
 
 #ifndef HTTP_MULTIPART_H
@@ -27,117 +24,104 @@
 extern "C" {
 #endif
 
-// Maximum multipart boundary length (RFC 2046 specifies max 70 chars)
-#define HTTP_MULTIPART_BOUNDARY_MAX 128
+// Maximum boundary string length (RFC 2046)
+#define MULTIPART_BOUNDARY_MAX_LENGTH 70
 
 /**
- * @brief Multipart parser state
- */
-typedef enum {
-    MULTIPART_STATE_IDLE,           ///< Not parsing
-    MULTIPART_STATE_HEADERS,        ///< Parsing HTTP/multipart headers
-    MULTIPART_STATE_DATA,           ///< Processing file data
-    MULTIPART_STATE_COMPLETE,       ///< Upload complete
-    MULTIPART_STATE_ERROR           ///< Error occurred
-} multipart_state_t;
-
-/**
- * @brief Multipart session context
+ * @brief Multipart upload context
  * 
- * Tracks state for a single multipart upload session.
- * Should be allocated per-connection for concurrent uploads.
+ * Tracks state for a multipart upload across multiple callbacks
  */
 typedef struct {
-    multipart_state_t state;                    ///< Current parser state
-    char boundary[HTTP_MULTIPART_BOUNDARY_MAX]; ///< Multipart boundary string
-    uint32_t total_size;                        ///< Expected total file size
-    uint32_t bytes_received;                    ///< Actual file bytes received
-    uint32_t headers_length;                    ///< Length of HTTP + multipart headers
-    bool headers_parsed;                        ///< True if headers have been parsed
-    
-    // Callback for processing file data
-    void* user_data;                            ///< User data passed to callbacks
-} multipart_session_t;
+    bool active;                        ///< True if upload is in progress
+    bool headers_parsed;                ///< True if HTTP headers have been parsed
+    char boundary[MULTIPART_BOUNDARY_MAX_LENGTH]; ///< Multipart boundary string
+    uint32_t content_length;            ///< Total Content-Length from HTTP header
+    uint32_t file_size;                 ///< Actual file size (content_length - multipart overhead)
+    uint32_t bytes_received;            ///< File bytes received so far
+    uint32_t http_headers_length;       ///< Length of HTTP headers to skip
+    uint32_t multipart_overhead;        ///< Total multipart overhead bytes
+} multipart_context_t;
 
 /**
  * @brief Callback function for processing file data chunks
  * 
- * Called for each chunk of actual file data (after stripping multipart overhead).
+ * Called for each chunk of actual file data (excluding multipart overhead).
  * 
- * @param data Pointer to file data chunk
- * @param size Size of data chunk in bytes
+ * @param data Pointer to file data
+ * @param size Number of bytes in this chunk
  * @param finished True if this is the final chunk
- * @param user_data User data from multipart_session_t
- * @return true if chunk processed successfully, false on error
+ * @param user_data User-provided context pointer
+ * @return true if chunk was processed successfully, false on error
  */
-typedef bool (*multipart_data_callback_t)(const uint8_t* data, uint32_t size, 
-                                          bool finished, void* user_data);
+typedef bool (*multipart_chunk_callback_t)(const uint8_t* data, uint32_t size, bool finished, void* user_data);
 
 /**
- * @brief Initialize multipart session from HTTP request
+ * @brief Parse multipart boundary from Content-Type header
  * 
- * Parses Content-Type and Content-Length headers, extracts boundary,
- * and initializes session state.
+ * Extracts the boundary string from a Content-Type header like:
+ * "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary..."
  * 
- * @param session Session context to initialize
- * @param request_buffer HTTP request headers
- * @param request_len Length of request buffer
- * @param data_callback Callback for processing file data chunks
- * @param user_data User data to pass to callback
+ * @param request_buffer Full HTTP request buffer
+ * @param boundary Output buffer for boundary string (must be at least MULTIPART_BOUNDARY_MAX_LENGTH)
+ * @return true if boundary was found and extracted, false otherwise
+ */
+bool multipart_parse_boundary(const char* request_buffer, char* boundary);
+
+/**
+ * @brief Initialize multipart upload context from HTTP request
+ * 
+ * Parses HTTP headers, extracts boundary, calculates file size, and prepares
+ * the context for streaming upload.
+ * 
+ * @param ctx Multipart context to initialize
+ * @param request_buffer Full HTTP request buffer
+ * @param request_length Length of request buffer
  * @return true if initialization successful, false on error
  */
-bool multipart_session_init(multipart_session_t* session,
-                            const char* request_buffer,
-                            size_t request_len,
-                            multipart_data_callback_t data_callback,
-                            void* user_data);
+bool multipart_init_context(multipart_context_t* ctx, const char* request_buffer, size_t request_length);
 
 /**
- * @brief Process a chunk of incoming data
+ * @brief Process a chunk of data from TCP callback
  * 
- * Handles streaming processing of multipart data. Can be called multiple
- * times with sequential chunks from TCP callbacks.
+ * Handles stripping multipart overhead and feeding actual file data to the callback.
+ * Manages state across multiple TCP receive callbacks for large uploads.
  * 
- * @param session Session context
- * @param data Pointer to incoming data chunk
- * @param size Size of data chunk
- * @param callback Data callback for processed file data
+ * @param ctx Multipart context
+ * @param data Raw data from TCP callback
+ * @param length Length of raw data
+ * @param chunk_callback Callback to receive actual file data
+ * @param user_data User context to pass to callback
  * @return true if chunk processed successfully, false on error
  */
-bool multipart_process_chunk(multipart_session_t* session,
-                             const uint8_t* data,
-                             uint32_t size,
-                             multipart_data_callback_t callback);
+bool multipart_process_chunk(multipart_context_t* ctx, const uint8_t* data, size_t length,
+                             multipart_chunk_callback_t chunk_callback, void* user_data);
 
 /**
  * @brief Check if upload is complete
  * 
- * Checks if we've received all expected data and closing boundary.
- * 
- * @param session Session context
- * @return true if upload complete, false otherwise
+ * @param ctx Multipart context
+ * @return true if all expected file bytes have been received
  */
-bool multipart_is_complete(const multipart_session_t* session);
+bool multipart_is_complete(const multipart_context_t* ctx);
 
 /**
- * @brief Reset/abort multipart session
+ * @brief Reset multipart context
  * 
- * Cleans up session state. Safe to call at any time.
+ * Clears context to idle state. Call after upload completes or on error.
  * 
- * @param session Session context to reset
+ * @param ctx Multipart context to reset
  */
-void multipart_session_reset(multipart_session_t* session);
+void multipart_reset_context(multipart_context_t* ctx);
 
 /**
  * @brief Get upload progress
  * 
- * @param session Session context
+ * @param ctx Multipart context
  * @param bytes_received Output: bytes received so far
  * @param total_bytes Output: total expected bytes
  */
-void multipart_get_progress(const multipart_session_t* session,
-                            uint32_t* bytes_received,
-                            uint32_t* total_bytes);
+void multipart_get_progress(const multipart_context_t* ctx, uint32_t* bytes_received, uint32_t* total_bytes);
 
 #ifdef __cplusplus
 }

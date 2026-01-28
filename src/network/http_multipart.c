@@ -1,199 +1,206 @@
 /**
  * @file http_multipart.c
- * @brief Generic HTTP multipart/form-data parser implementation
- * 
- * Implements streaming multipart parser for large file uploads.
+ * @brief Generic HTTP multipart/form-data handler implementation
  * 
  * Documentation Reference:
  * - ADR-016: Firmware Update Web Interface
- * - ADR-017: Update Module
+ * - arc42 Chapter 5: HTTP Server Module
  */
 
 #include "network/http_multipart.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /**
- * @brief Initialize multipart session from HTTP request
+ * @brief Parse multipart boundary from Content-Type header
  */
-bool multipart_session_init(multipart_session_t* session,
-                            const char* request_buffer,
-                            size_t request_len,
-                            multipart_data_callback_t data_callback,
-                            void* user_data) {
-    if (!session || !request_buffer || request_len == 0) {
+bool multipart_parse_boundary(const char* request_buffer, char* boundary) {
+    if (!request_buffer || !boundary) {
         return false;
     }
     
-    // Reset session state
-    memset(session, 0, sizeof(multipart_session_t));
-    session->state = MULTIPART_STATE_HEADERS;
-    session->user_data = user_data;
+    // Find Content-Type header
+    const char* content_type = strstr(request_buffer, "Content-Type:");
+    if (!content_type) {
+        printf("MULTIPART: No Content-Type header found\n");
+        return false;
+    }
     
-    // Parse Content-Length header
-    const char* content_length_str = strstr(request_buffer, "Content-Length: ");
+    // Find boundary parameter
+    const char* boundary_param = strstr(content_type, "boundary=");
+    if (!boundary_param) {
+        printf("MULTIPART: No boundary parameter in Content-Type\n");
+        return false;
+    }
+    
+    // Extract boundary value (until CR/LF)
+    boundary_param += 9; // Skip "boundary="
+    int i = 0;
+    while (i < MULTIPART_BOUNDARY_MAX_LENGTH - 1 && 
+           boundary_param[i] != '\r' && boundary_param[i] != '\n' && boundary_param[i] != '\0') {
+        boundary[i] = boundary_param[i];
+        i++;
+    }
+    boundary[i] = '\0';
+    
+    if (i == 0) {
+        printf("MULTIPART: Empty boundary\n");
+        return false;
+    }
+    
+    printf("MULTIPART: Boundary extracted: '%s'\n", boundary);
+    return true;
+}
+
+/**
+ * @brief Initialize multipart upload context from HTTP request
+ */
+bool multipart_init_context(multipart_context_t* ctx, const char* request_buffer, size_t request_length) {
+    if (!ctx || !request_buffer || request_length == 0) {
+        return false;
+    }
+    
+    // Reset context
+    memset(ctx, 0, sizeof(multipart_context_t));
+    
+    // Parse Content-Length
+    const char* content_length_str = strstr(request_buffer, "Content-Length:");
     if (!content_length_str) {
-        printf("MULTIPART: Missing Content-Length header\n");
-        session->state = MULTIPART_STATE_ERROR;
+        printf("MULTIPART: No Content-Length header\n");
         return false;
     }
     
-    uint32_t content_length = 0;
-    if (sscanf(content_length_str + 16, "%u", &content_length) != 1) {
-        printf("MULTIPART: Invalid Content-Length header\n");
-        session->state = MULTIPART_STATE_ERROR;
+    if (sscanf(content_length_str + 15, "%u", &ctx->content_length) != 1) {
+        printf("MULTIPART: Invalid Content-Length\n");
         return false;
     }
     
-    printf("MULTIPART: Content-Length = %u bytes (multipart body)\n", content_length);
+    printf("MULTIPART: Content-Length=%u (multipart envelope)\n", ctx->content_length);
     
-    // Parse multipart boundary from Content-Type header
-    // Format: "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary..."
-    const char* content_type_str = strstr(request_buffer, "Content-Type:");
-    const char* boundary_str = NULL;
-    
-    if (content_type_str) {
-        boundary_str = strstr(content_type_str, "boundary=");
-        if (boundary_str) {
-            boundary_str += 9; // Skip "boundary="
-            // Copy boundary until \r or end of buffer
-            int i = 0;
-            while (i < HTTP_MULTIPART_BOUNDARY_MAX - 3 && 
-                   boundary_str[i] != '\r' && boundary_str[i] != '\n') {
-                session->boundary[i] = boundary_str[i];
-                i++;
-            }
-            session->boundary[i] = '\0';
-            printf("MULTIPART: Boundary: '%s'\n", session->boundary);
-        }
-    }
-    
-    if (strlen(session->boundary) == 0) {
-        printf("MULTIPART: Missing multipart boundary in Content-Type\n");
-        session->state = MULTIPART_STATE_ERROR;
+    // Parse boundary
+    if (!multipart_parse_boundary(request_buffer, ctx->boundary)) {
         return false;
     }
     
-    // Find end of HTTP headers (double CRLF)
-    const char* headers_end = strstr(request_buffer, "\r\n\r\n");
-    if (!headers_end) {
-        printf("MULTIPART: Malformed HTTP request\n");
-        session->state = MULTIPART_STATE_ERROR;
+    // Find start of HTTP body (after double CRLF)
+    const char* body_start = strstr(request_buffer, "\r\n\r\n");
+    if (!body_start) {
+        printf("MULTIPART: Malformed HTTP request (no header/body separator)\n");
         return false;
     }
+    body_start += 4;
+    ctx->http_headers_length = body_start - request_buffer;
     
-    const char* body_start = headers_end + 4;
+    // Calculate multipart overhead
+    // Opening boundary: --boundary\r\n
+    // Field headers: Content-Disposition: form-data; name="..."; filename="..."\r\nContent-Type: ...\r\n\r\n
+    // Closing boundary: \r\n--boundary--\r\n
     
-    // Find where actual file data starts (after opening boundary and field headers)
-    // Pattern: --boundary\r\nContent-Disposition...\r\nContent-Type...\r\n\r\n[FILE DATA]
-    char opening_boundary[HTTP_MULTIPART_BOUNDARY_MAX + 10];
-    snprintf(opening_boundary, sizeof(opening_boundary), "--%s", session->boundary);
+    // Try to find the start of actual file data
+    char opening_boundary[MULTIPART_BOUNDARY_MAX_LENGTH + 10];
+    snprintf(opening_boundary, sizeof(opening_boundary), "--%s", ctx->boundary);
     
-    const char* file_data_start = strstr(body_start, opening_boundary);
-    if (file_data_start) {
-        // Skip past boundary line
-        file_data_start = strstr(file_data_start, "\r\n");
-        if (file_data_start) {
-            file_data_start += 2; // Skip \r\n
-            // Find end of multipart field headers (blank line)
-            const char* field_headers_end = strstr(file_data_start, "\r\n\r\n");
-            if (field_headers_end) {
-                file_data_start = field_headers_end + 4; // Start of actual file
-                session->headers_length = file_data_start - request_buffer;
-                printf("MULTIPART: File data starts at offset %u\n", session->headers_length);
+    const char* field_start = strstr(body_start, opening_boundary);
+    if (field_start) {
+        // Skip to end of boundary line
+        const char* field_headers = strstr(field_start, "\r\n");
+        if (field_headers) {
+            field_headers += 2;
+            // Find end of field headers (blank line)
+            const char* file_data_start = strstr(field_headers, "\r\n\r\n");
+            if (file_data_start) {
+                file_data_start += 4;
+                uint32_t multipart_header_overhead = file_data_start - body_start;
+                
+                // Closing boundary: \r\n--boundary--\r\n (length = 2 + 2 + boundary_len + 2 + 2)
+                uint32_t closing_boundary_len = 2 + 2 + strlen(ctx->boundary) + 2 + 2;
+                
+                ctx->multipart_overhead = multipart_header_overhead + closing_boundary_len;
+                ctx->file_size = ctx->content_length - ctx->multipart_overhead;
+                
+                printf("MULTIPART: Overhead=%u bytes (header=%u, closing=%u)\n",
+                       ctx->multipart_overhead, multipart_header_overhead, closing_boundary_len);
+                printf("MULTIPART: Expected file size=%u bytes\n", ctx->file_size);
             }
         }
     }
     
-    // Calculate expected file size (Content-Length - multipart overhead)
-    // Overhead = opening boundary + field headers + closing boundary
-    // Closing boundary format: \r\n--boundary--\r\n
-    char closing_boundary[HTTP_MULTIPART_BOUNDARY_MAX + 10];
-    snprintf(closing_boundary, sizeof(closing_boundary), "\r\n--%s--", session->boundary);
-    uint32_t closing_boundary_size = strlen(closing_boundary) + 2; // +2 for final \r\n
+    if (ctx->file_size == 0) {
+        printf("MULTIPART: Failed to calculate file size\n");
+        return false;
+    }
     
-    uint32_t multipart_header_overhead = session->headers_length - (headers_end + 4 - request_buffer);
-    uint32_t total_overhead = multipart_header_overhead + closing_boundary_size;
-    uint32_t expected_file_size = content_length - total_overhead;
-    
-    printf("MULTIPART: Multipart overhead: %u bytes (header: %u, closing: %u)\n",
-           total_overhead, multipart_header_overhead, closing_boundary_size);
-    printf("MULTIPART: Expected file size: %u bytes\n", expected_file_size);
-    
-    session->total_size = expected_file_size;
-    session->bytes_received = 0;
+    ctx->active = true;
+    ctx->headers_parsed = false;
+    ctx->bytes_received = 0;
     
     return true;
 }
 
 /**
- * @brief Process a chunk of incoming data
+ * @brief Process a chunk of data from TCP callback
  */
-bool multipart_process_chunk(multipart_session_t* session,
-                             const uint8_t* data,
-                             uint32_t size,
-                             multipart_data_callback_t callback) {
-    if (!session || !data || size == 0 || !callback) {
+bool multipart_process_chunk(multipart_context_t* ctx, const uint8_t* data, size_t length,
+                             multipart_chunk_callback_t chunk_callback, void* user_data) {
+    if (!ctx || !ctx->active || !data || length == 0 || !chunk_callback) {
         return false;
     }
     
-    if (session->state != MULTIPART_STATE_HEADERS && 
-        session->state != MULTIPART_STATE_DATA) {
-        printf("MULTIPART: Invalid state for processing chunk\n");
-        return false;
-    }
+    uint32_t data_offset = 0;
+    uint32_t data_remaining = length;
     
-    // If still in headers state, we're processing first chunk
-    if (session->state == MULTIPART_STATE_HEADERS) {
-        // Skip headers in first chunk only
-        if (!session->headers_parsed) {
-            if (size <= session->headers_length) {
-                // This chunk is all headers, skip it
-                session->headers_parsed = true;
-                return true;
-            }
-            // Part of this chunk is headers, part is data
-            uint32_t header_bytes = session->headers_length;
-            uint32_t data_bytes = size - header_bytes;
-            
-            // Limit to expected file size
-            if (session->bytes_received + data_bytes > session->total_size) {
-                data_bytes = session->total_size - session->bytes_received;
-            }
-            
-            if (data_bytes > 0) {
-                bool finished = (session->bytes_received + data_bytes >= session->total_size);
-                if (!callback(data + header_bytes, data_bytes, finished, session->user_data)) {
-                    session->state = MULTIPART_STATE_ERROR;
-                    return false;
-                }
-                session->bytes_received += data_bytes;
-            }
-            
-            session->headers_parsed = true;
-            session->state = MULTIPART_STATE_DATA;
+    // First chunk: skip HTTP and multipart headers
+    if (!ctx->headers_parsed) {
+        // This chunk contains the HTTP headers and possibly multipart headers
+        // We need to skip to the actual file data
+        
+        // Calculate how much of this chunk is headers
+        uint32_t total_header_size = ctx->http_headers_length + 
+                                     (ctx->multipart_overhead - (ctx->multipart_overhead - ctx->http_headers_length));
+        
+        // For simplicity, skip the calculated multipart overhead from the body
+        // The http_headers_length already accounts for HTTP headers, but the first chunk
+        // after HTTP headers still contains the multipart field headers
+        
+        // Find actual file data start in the body portion
+        // We already know multipart header overhead from init
+        uint32_t skip_bytes = ctx->http_headers_length + 
+                             (ctx->multipart_overhead - (2 + 2 + strlen(ctx->boundary) + 2 + 2));
+        
+        if (length <= skip_bytes) {
+            // This entire chunk is headers, skip it
+            ctx->headers_parsed = true;
             return true;
         }
+        
+        // Part of this chunk is headers, rest is file data
+        data_offset = skip_bytes;
+        data_remaining = length - skip_bytes;
+        ctx->headers_parsed = true;
     }
     
-    // Process data chunk
-    uint32_t bytes_to_process = size;
-    
-    // Limit to not exceed expected file size (stop before multipart closing boundary)
-    if (session->bytes_received + bytes_to_process > session->total_size) {
-        bytes_to_process = session->total_size - session->bytes_received;
+    // Don't exceed expected file size (stop before closing boundary)
+    if (ctx->bytes_received + data_remaining > ctx->file_size) {
+        data_remaining = ctx->file_size - ctx->bytes_received;
     }
     
-    if (bytes_to_process > 0) {
-        bool finished = (session->bytes_received + bytes_to_process >= session->total_size);
-        if (!callback(data, bytes_to_process, finished, session->user_data)) {
-            session->state = MULTIPART_STATE_ERROR;
+    if (data_remaining > 0) {
+        bool is_last_chunk = (ctx->bytes_received + data_remaining >= ctx->file_size);
+        
+        // Call the callback with actual file data
+        if (!chunk_callback(data + data_offset, data_remaining, is_last_chunk, user_data)) {
+            printf("MULTIPART: Chunk callback failed\n");
             return false;
         }
-        session->bytes_received += bytes_to_process;
         
-        if (finished) {
-            session->state = MULTIPART_STATE_COMPLETE;
+        ctx->bytes_received += data_remaining;
+        
+        // Progress reporting (every 64KB or on completion)
+        if (is_last_chunk || (ctx->bytes_received % (64 * 1024)) < data_remaining) {
+            printf("MULTIPART: Progress %u / %u bytes (%u%%)\n",
+                   ctx->bytes_received, ctx->file_size,
+                   (ctx->bytes_received * 100) / ctx->file_size);
         }
     }
     
@@ -203,35 +210,28 @@ bool multipart_process_chunk(multipart_session_t* session,
 /**
  * @brief Check if upload is complete
  */
-bool multipart_is_complete(const multipart_session_t* session) {
-    if (!session) {
+bool multipart_is_complete(const multipart_context_t* ctx) {
+    if (!ctx || !ctx->active) {
         return false;
     }
-    return (session->state == MULTIPART_STATE_COMPLETE);
+    return (ctx->bytes_received >= ctx->file_size);
 }
 
 /**
- * @brief Reset/abort multipart session
+ * @brief Reset multipart context
  */
-void multipart_session_reset(multipart_session_t* session) {
-    if (session) {
-        memset(session, 0, sizeof(multipart_session_t));
-        session->state = MULTIPART_STATE_IDLE;
+void multipart_reset_context(multipart_context_t* ctx) {
+    if (ctx) {
+        memset(ctx, 0, sizeof(multipart_context_t));
     }
 }
 
 /**
  * @brief Get upload progress
  */
-void multipart_get_progress(const multipart_session_t* session,
-                            uint32_t* bytes_received,
-                            uint32_t* total_bytes) {
-    if (session) {
-        if (bytes_received) {
-            *bytes_received = session->bytes_received;
-        }
-        if (total_bytes) {
-            *total_bytes = session->total_size;
-        }
+void multipart_get_progress(const multipart_context_t* ctx, uint32_t* bytes_received, uint32_t* total_bytes) {
+    if (ctx) {
+        if (bytes_received) *bytes_received = ctx->bytes_received;
+        if (total_bytes) *total_bytes = ctx->file_size;
     }
 }
