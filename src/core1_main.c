@@ -39,6 +39,8 @@
 #include "network/multi_tcp_server.h"
 #include "network/http_server.h"
 #include "device_mode.h"
+#include "flash_persistence.h"
+#include "update/update_manager.h"
 
 
 
@@ -53,6 +55,11 @@ static void core1_init_hardware(void);
 static void core1_init_network(void);
 static void core1_wait_for_link_up(void);
 static void core1_init_complete(void);
+
+// Update/Reboot functions (ADR-017)
+static void core1_buy_update(void);
+static void core1_reboot_flush(void);
+static void core1_reboot_execute(void);
 
 // MAIN_STATE_CONFIGURATION functions
 static void core1_load_configuration(void);
@@ -210,6 +217,11 @@ void core1_main(void) {
                     case CORE1_IDLE: //check for work or sleep
                         core1_work_or_idle_wait();
                         break;
+                        
+                    case CORE1_BUY_UPDATE:
+                        // Buy the current firmware image (ADR-017)
+                        core1_buy_update();
+                        break;
 
                     default:
                         break;
@@ -219,6 +231,22 @@ void core1_main(void) {
             case MAIN_STATE_ERROR:
                 // Error handling
                 core1_handle_error();
+                break;
+                
+            case MAIN_STATE_REBOOT:
+                // Reboot handling (ADR-017)
+                switch (sub_state) {
+                    case CORE1_REBOOT_FLUSH:
+                        core1_reboot_flush();
+                        break;
+                    case CORE1_REBOOT_EXECUTE:
+                        core1_reboot_execute();
+                        break;
+                    default:
+                        // Wait in other states
+                        core1_idle_wait();
+                        break;
+                }
                 break;
         }
     }
@@ -503,6 +531,9 @@ static void core1_wait_for_link_up(void) {
  * @brief Complete initialization phase
  */
 static void core1_init_complete(void) {
+    // Initialize the update module (ADR-017)
+    update_init();
+
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 2);
     // Transition to configuration phase
     state_machine_process_main_event(MAIN_EVENT_INIT_COMPLETE_CORE1);
@@ -717,6 +748,71 @@ static void core1_configuration_complete(void) {
     //sleep if other core not yet ready (any event will do)
     state_machine_process_core1_event(CORE1_EVENT_CONFIG_NET_COMPLETE);
 
+}
+
+/**
+ * @brief Buy the current firmware image (ADR-017)
+ * 
+ * Called when entering OPERATIONAL state to confirm the firmware is good.
+ * If this is a flash update boot, performs explicit_buy to mark image as permanent.
+ */
+static void core1_buy_update(void) {
+    printf("Core1: Attempting to buy current firmware image\n");
+    
+    bool buy_result = update_buy_current_image();
+    
+    if (buy_result) {
+        printf("Core1: ✅ Firmware buy succeeded (or not needed)\n");
+        state_machine_process_core1_event(CORE1_EVENT_BUY_SUCCESS);
+    } else {
+        printf("Core1: ❌ Firmware buy FAILED - triggering reboot to old image\n");
+        update_set_reboot_reason(REBOOT_REASON_UPDATE_BUY_FAILED);
+        state_machine_process_main_event(MAIN_EVENT_REBOOT_REQUESTED);
+    }
+}
+
+/**
+ * @brief Flush logs and configuration before reboot (ADR-017)
+ */
+static void core1_reboot_flush(void) {
+    printf("Core1: Preparing for reboot - flushing data\n");
+    
+    // Log the reboot reason
+    reboot_reason_t reason = update_get_reboot_reason();
+    log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_SYSTEM_REBOOT, (uint32_t)reason);
+    
+    // Force save configuration to flash
+    printf("Core1: Flushing configuration to flash\n");
+    flash_persistence_force_save_configuration();
+    
+    // Format and output any pending logs
+    printf("Core1: Flushing pending log entries\n");
+    while (log_manager_get_pending_count() > 0) {
+        log_manager_format_pending();
+    }
+    
+    printf("Core1: Flush complete - ready for reboot\n");
+    state_machine_process_core1_event(CORE1_EVENT_REBOOT_FLUSH_COMPLETE);
+}
+
+/**
+ * @brief Execute the system reboot (ADR-017)
+ * 
+ * This function does not return - the system will reboot.
+ */
+static void core1_reboot_execute(void) {
+    printf("Core1: Executing reboot...\n");
+    
+    // Small delay to ensure printf is output
+    sleep_ms(100);
+    
+    // Execute reboot via update module
+    update_execute_reboot();
+    
+    // Should never reach here
+    while (1) {
+        tight_loop_contents();
+    }
 }
 
 

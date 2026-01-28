@@ -96,6 +96,7 @@ add_library(core_modules
     core1_main.c
 )
 target_include_directories(core_modules PUBLIC ../include)
+target_include_directories(core_modules PUBLIC ../include/update)
 target_link_libraries(core_modules 
     state_machine
     config_manager
@@ -103,6 +104,7 @@ target_link_libraries(core_modules
     network_manager
     tcp_socket_server
     http_server
+    update_manager
     timer_subsystems
     ringbuffer
     uart_manager
@@ -158,5 +160,8 @@ target_link_libraries(utils
 
 # Add network subdirectory
 add_subdirectory(network)
+
+# Add update subdirectory (ADR-017)
+add_subdirectory(update)
 
 # Main target will link against these libraries

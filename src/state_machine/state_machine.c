@@ -166,7 +166,8 @@ bool state_machine_process_main_event(main_state_event_t event) {
                         new_state = MAIN_STATE_OPERATIONAL;
                         //change substates, too
                         atomic_store(&g_core0_substate, CORE0_IDLE);
-                        atomic_store(&g_core1_substate, CORE1_NET_DISCONNECTED);
+                        // Core1 enters CORE1_BUY_UPDATE first to handle TBYB (ADR-017)
+                        atomic_store(&g_core1_substate, CORE1_BUY_UPDATE);
                     }
                     break;
                 case MAIN_EVENT_CONFIG_COMPLETE_CORE1:
@@ -178,7 +179,8 @@ bool state_machine_process_main_event(main_state_event_t event) {
                         new_state = MAIN_STATE_OPERATIONAL;
                         //change substates, too
                         atomic_store(&g_core0_substate, CORE0_IDLE);
-                        atomic_store(&g_core1_substate, CORE1_NET_DISCONNECTED);
+                        // Core1 enters CORE1_BUY_UPDATE first to handle TBYB (ADR-017)
+                        atomic_store(&g_core1_substate, CORE1_BUY_UPDATE);
                     }
                     break;
                 case MAIN_EVENT_SYSTEM_ERROR:
@@ -195,6 +197,13 @@ bool state_machine_process_main_event(main_state_event_t event) {
                 case MAIN_EVENT_SYSTEM_ERROR:
                     new_state = MAIN_STATE_ERROR;
                     break;
+                case MAIN_EVENT_REBOOT_REQUESTED:
+                    // Transition to REBOOT state (ADR-017)
+                    new_state = MAIN_STATE_REBOOT;
+                    // Set substates for reboot handling
+                    atomic_store(&g_core0_substate, CORE0_REBOOT_IDLE);
+                    atomic_store(&g_core1_substate, CORE1_REBOOT_FLUSH);
+                    break;
                 default:
                     // Invalid event for this state - ignore
                     break;
@@ -208,10 +217,20 @@ bool state_machine_process_main_event(main_state_event_t event) {
                         new_state = MAIN_STATE_OPERATIONAL;
                     }
                     break;
+                case MAIN_EVENT_REBOOT_REQUESTED:
+                    // Allow reboot from error state (ADR-017)
+                    new_state = MAIN_STATE_REBOOT;
+                    atomic_store(&g_core0_substate, CORE0_REBOOT_IDLE);
+                    atomic_store(&g_core1_substate, CORE1_REBOOT_FLUSH);
+                    break;
                 default:
                     // Invalid event for this state - ignore
                     break;
             }
+            break;
+            
+        case MAIN_STATE_REBOOT:
+            // Reboot state is terminal - no transitions out (device will reboot)
             break;
     }
     
@@ -370,6 +389,11 @@ bool state_machine_process_core0_event(core0_event_t event) {
                     // Invalid event for this state - ignore
                     break;
             }
+            break;
+            
+        case CORE0_REBOOT_IDLE:
+            // Reboot idle state - just WFI while Core1 handles reboot (ADR-017)
+            // No transitions - Core1 will execute the reboot
             break;
     }
     
@@ -711,6 +735,37 @@ bool state_machine_process_core1_event(core1_event_t event) {
     
         case CORE1_SHUTDOWN:
             break;  //main loop will be stopped in next looping
+            
+        // Buy update state (ADR-017)
+        case CORE1_BUY_UPDATE:
+            switch (event) {
+                case CORE1_EVENT_BUY_SUCCESS:
+                    // Buy succeeded, transition to normal idle
+                    new_state = CORE1_IDLE;
+                    break;
+                case CORE1_EVENT_BUY_FAILED:
+                    // Buy failed - this should trigger reboot via main event
+                    // Stay in this state until main state changes to REBOOT
+                    break;
+                default:
+                    break;
+            }
+            break;
+            
+        // Reboot states (ADR-017)
+        case CORE1_REBOOT_FLUSH:
+            switch (event) {
+                case CORE1_EVENT_REBOOT_FLUSH_COMPLETE:
+                    new_state = CORE1_REBOOT_EXECUTE;
+                    break;
+                default:
+                    break;
+            }
+            break;
+            
+        case CORE1_REBOOT_EXECUTE:
+            // Terminal state - reboot will be executed, no transitions
+            break;
     }
     
     // Apply atomic state change if needed
@@ -737,7 +792,7 @@ bool state_machine_process_core1_event(core1_event_t event) {
  * Validate main state machine event
  */
 static bool is_valid_main_event(main_state_event_t event) {
-    return (event >= MAIN_EVENT_INIT_COMPLETE_CORE0 && event <= MAIN_EVENT_ERROR_RECOVERED);
+    return (event >= MAIN_EVENT_INIT_COMPLETE_CORE0 && event <= MAIN_EVENT_REBOOT_REQUESTED);
 }
 
 /**
@@ -751,7 +806,7 @@ static bool is_valid_core0_event(core0_event_t event) {
  * Validate Core1 state machine event
  */
 static bool is_valid_core1_event(core1_event_t event) {
-    return (event >= CORE1_EVENT_NETWORK_UP && event <= CORE1_EVENT_LOG_END);
+    return (event >= CORE1_EVENT_INIT_PERSISTENCE_COMPLETE && event <= CORE1_EVENT_REBOOT_FLUSH_COMPLETE);
 }
 
 // Condition checking functions (security-hardened)
