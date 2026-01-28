@@ -76,13 +76,7 @@ typedef struct http_connection {
     uint32_t start_time_ms;
     
     // Upload state for this connection (multipart/form-data handling)
-    bool is_upload;                      // True if this connection is handling a file upload
-    bool headers_parsed;                 // True if we've parsed the HTTP headers
-    uint32_t upload_total_size;          // Total expected upload size (actual file size, not multipart envelope)
-    uint32_t upload_bytes_received;      // Bytes received so far (actual file data only)
-    uint32_t headers_length;             // Length of HTTP + multipart headers (to skip them)
-    uint32_t multipart_bytes_skipped;    // Total multipart overhead bytes skipped
-    char boundary[128];                  // Multipart boundary string for detecting end
+    multipart_context_t multipart_ctx;   // Multipart upload context
 } http_connection_t;
 
 static http_connection_t g_http_connections[HTTP_SERVER_MAX_CONNECTIONS];
@@ -542,6 +536,57 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
                 http_generate_update_page(response_buffer, sizeof(response_buffer),
                     "Error: Failed to initiate reboot.");
                 http_send_response(conn, response_buffer, strlen(response_buffer));
+            }
+        }
+        else if (strstr(request_buffer, "POST /update") != NULL) {
+            // Handle firmware upload
+            printf("HTTP Server: Processing firmware upload\n");
+            
+            // Initialize multipart context from request
+            if (!multipart_init_context(&conn->multipart_ctx, request_buffer, copy_len)) {
+                printf("HTTP Upload: Failed to initialize multipart context\n");
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Error: Failed to process upload. Invalid multipart data.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                return ERR_OK;
+            }
+            
+            // Start upload session in update_manager
+            if (!http_upload_session_start(conn->multipart_ctx.file_size)) {
+                printf("HTTP Upload: Failed to start upload session\n");
+                multipart_reset_context(&conn->multipart_ctx);
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Error: Failed to start firmware upload. Update manager not ready.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                return ERR_OK;
+            }
+            
+            // Process the initial chunk (HTTP headers + some data might be in this pbuf)
+            if (!multipart_process_chunk(&conn->multipart_ctx, (const uint8_t*)request_buffer, copy_len,
+                                        http_firmware_upload_callback, NULL)) {
+                printf("HTTP Upload: Failed to process initial chunk\n");
+                http_upload_session_reset();
+                multipart_reset_context(&conn->multipart_ctx);
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Error: Failed to process upload data.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                return ERR_OK;
+            }
+            
+            // Check if upload is already complete (small file in single packet)
+            if (multipart_is_complete(&conn->multipart_ctx)) {
+                printf("HTTP Upload: Upload complete in single packet\n");
+                multipart_reset_context(&conn->multipart_ctx);
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Firmware uploaded successfully! Device will reboot to apply the update.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                
+                // Trigger reboot after short delay (allow response to be sent)
+                // TODO: Schedule reboot via state machine
+            } else {
+                // Multi-packet upload - connection will stay open for more data
+                printf("HTTP Upload: Multi-packet upload in progress, waiting for more data...\n");
+                // Don't close connection or send response yet - more data coming
             }
         }
         else {
