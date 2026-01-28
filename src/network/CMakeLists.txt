@@ -46,12 +46,14 @@ target_include_directories(tcp_socket_server PUBLIC
 # Create HTTP server library
 add_library(http_server
     http_server.c
+    http_multipart.c
 )
 
 # Link required libraries including lwIP
 target_link_libraries(http_server
     pico_stdlib
     log_manager
+    update_manager      # For firmware upload handling
     pico_lwip_nosys     # lwIP NO_SYS implementation for raw API
 )
 
@@ -59,4 +61,5 @@ target_link_libraries(http_server
 target_include_directories(http_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
 )
