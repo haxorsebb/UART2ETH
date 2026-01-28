@@ -20,6 +20,7 @@
 #include "state_machine/state_machine.h"
 #include "debug.h"
 #include "pico/stdlib.h"
+#include "hardware/watchdog.h"
 #include "lwip/tcp.h"
 #include "lwip/pbuf.h"
 #include "lwip/err.h"
@@ -361,8 +362,8 @@ static bool http_firmware_upload_callback(const uint8_t* data, uint32_t size, bo
         return false;
     }
     
-    // Feed chunk to update manager
-    if (!update_write_block(data, size, finished)) {
+    // Feed chunk to update manager (cast away const - update_manager modifies workarea, not data)
+    if (!update_write_block((uint8_t*)data, size, finished)) {
         printf("HTTP Upload: Failed to write %u bytes to update manager\n", size);
         g_upload_session.state = UPLOAD_STATE_ERROR;
         return false;
@@ -1358,7 +1359,7 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
     });
     
     // Build HTML response with device-mode-aware channel list
-    int html_len = snprintf(buffer, buffer_size,
+    snprintf(buffer, buffer_size,
         "HTTP/1.0 200 OK\r\n"
         "Content-Type: text/html\r\n"
         "Connection: close\r\n"
@@ -1755,12 +1756,15 @@ static void http_generate_update_page(char* buffer, size_t buffer_size, const ch
         return;
     }
     
-    // Get current update status
-    update_status_t status = update_get_status();
+    // Get current update state and statistics
+    update_state_t state = update_get_state();
+    update_stats_t stats;
+    update_get_stats(&stats);
+    
     const char* state_str = "Unknown";
     const char* state_class = "";
     
-    switch (status.state) {
+    switch (state) {
         case UPDATE_STATE_IDLE:
             state_str = "Idle - Ready for update";
             state_class = "status-ok";
@@ -1769,26 +1773,15 @@ static void http_generate_update_page(char* buffer, size_t buffer_size, const ch
             state_str = "Receiving firmware...";
             state_class = "status-warning";
             break;
-        case UPDATE_STATE_VERIFYING:
-            state_str = "Verifying firmware...";
-            state_class = "status-warning";
-            break;
-        case UPDATE_STATE_READY:
-            state_str = "Ready to apply update";
+        case UPDATE_STATE_COMPLETE:
+            state_str = "Upload complete";
             state_class = "status-ok";
-            break;
-        case UPDATE_STATE_APPLYING:
-            state_str = "Applying update...";
-            state_class = "status-warning";
             break;
         case UPDATE_STATE_ERROR:
             state_str = "Error occurred";
             state_class = "status-error";
             break;
     }
-    
-    // Check if TBYB is pending (new image not yet confirmed)
-    bool tbyb_pending = update_is_tbyb_pending();
     
     // Generate HTML response
     int html_len = snprintf(buffer, buffer_size,
@@ -1842,25 +1835,34 @@ static void http_generate_update_page(char* buffer, size_t buffer_size, const ch
         "        \n"
         "%s"  /* Message placeholder */
         "        \n"
-        "%s"  /* TBYB warning placeholder */
-        "        \n"
         "        <div class=\"section\">\n"
         "            <h3>Firmware Status</h3>\n"
         "            <p><span class=\"label\">Update State:</span> <span class=\"%s\">%s</span></p>\n"
-        "            <p><span class=\"label\">TBYB Pending:</span> <span class=\"value\">%s</span></p>\n"
         "            <p><span class=\"label\">Bytes Received:</span> <span class=\"value\">%u</span></p>\n"
         "        </div>\n"
         "        \n"
         "        <div class=\"section\">\n"
-        "            <h3>Device Reboot</h3>\n"
+        "            <h3>📦 Upload Firmware</h3>\n"
+        "            <p>Upload a .uf2 firmware file for OTA update. Maximum size: 1024 KB</p>\n"
+        "            <div style=\"border: 2px dashed #3498db; padding: 30px; text-align: center; border-radius: 8px; margin: 20px 0;\">\n"
+        "                <form method=\"POST\" action=\"/update\" enctype=\"multipart/form-data\">\n"
+        "                    <p><strong>Select Firmware File:</strong></p>\n"
+        "                    <input type=\"file\" name=\"firmware\" accept=\".uf2\" required style=\"margin: 15px 0;\">\n"
+        "                    <br>\n"
+        "                    <button type=\"submit\" class=\"button\">Upload & Install</button>\n"
+        "                </form>\n"
+        "            </div>\n"
+        "            <p><em>Note: Device will automatically reboot to apply new firmware after successful upload.</em></p>\n"
+        "        </div>\n"
+        "        \n"
+        "        <div class=\"section\">\n"
+        "            <h3>🔄 Device Reboot</h3>\n"
         "            <p>Reboot the device to apply pending changes or recover from errors.</p>\n"
         "            <p><strong>Warning:</strong> All active connections will be terminated.</p>\n"
         "            <form method=\"POST\" action=\"/reboot\">\n"
         "                <button type=\"submit\" class=\"button button-danger\">Reboot Device</button>\n"
         "            </form>\n"
         "        </div>\n"
-        "        \n"
-        "%s"  /* Buy button section for TBYB */
         "        \n"
         "    </div>\n"
         "</body>\n"
@@ -1869,28 +1871,9 @@ static void http_generate_update_page(char* buffer, size_t buffer_size, const ch
         message ? "<div class=\"message message-info\">" : "",
         message ? message : "",
         message ? "</div>" : "",
-        /* TBYB warning */
-        tbyb_pending ? 
-            "<div class=\"tbyb-warning\">"
-            "<strong>⚠️ Try-Before-You-Buy Active:</strong> "
-            "New firmware is running but not confirmed. "
-            "If you reboot without confirming, the device will revert to the previous firmware. "
-            "Click 'Confirm Update' below to make this firmware permanent."
-            "</div>" : "",
         /* Status */
         state_class, state_str,
-        tbyb_pending ? "Yes (confirm required)" : "No",
-        status.bytes_received,
-        /* Buy button */
-        tbyb_pending ?
-            "<div class=\"section\">"
-            "<h3>Confirm Update (TBYB)</h3>"
-            "<p>The new firmware is running. Click below to make it permanent.</p>"
-            "<form method=\"POST\" action=\"/reboot\">"
-            "<input type=\"hidden\" name=\"action\" value=\"buy\">"
-            "<button type=\"submit\" class=\"button button-success\">Confirm Update (Buy)</button>"
-            "</form>"
-            "</div>" : ""
+        stats.bytes_received
     );
     
     printf("HTTP: Generated update page (%d bytes)\n", html_len);
@@ -1908,26 +1891,18 @@ static void http_generate_update_page(char* buffer, size_t buffer_size, const ch
 static bool http_handle_reboot_request(const char* post_data, size_t data_len) {
     printf("HTTP: Processing reboot request\n");
     
-    // Check for TBYB "buy" action
-    const char* form_start = strstr(post_data, "\r\n\r\n");
-    if (form_start) {
-        form_start += 4;
-        if (strstr(form_start, "action=buy") != NULL) {
-            printf("HTTP: TBYB Buy action requested\n");
-            // Send buy event to state machine
-            shared_memory_layout_t* layout = shared_memory_get_layout();
-            layout->core1_event_pending = true;
-            layout->core1_pending_event = CORE1_EVENT_BUY_UPDATE;
-            return true;
-        }
-    }
+    // TODO: Check for TBYB "buy" action when API is available
+    // For now, just trigger immediate reboot
     
-    // Regular reboot request - trigger state machine reboot
-    printf("HTTP: Triggering device reboot via state machine\n");
+    // Trigger watchdog reboot after short delay (allow HTTP response to be sent)
+    printf("HTTP: Scheduling device reboot in 2 seconds...\n");
     
-    // Signal reboot to the main state machine
-    shared_memory_layout_t* layout = shared_memory_get_layout();
-    layout->reboot_requested = true;
+    // Set reboot reason in persistent storage
+    update_set_reboot_reason(REBOOT_REASON_USER_REQUESTED);
+    
+    // Watchdog will trigger reboot automatically (hardware watchdog is always running)
+    // The 2-second delay allows the HTTP response to be sent before reboot
+    watchdog_reboot(0, 0, 2000);  // Reboot in 2000ms
     
     return true;
 }
