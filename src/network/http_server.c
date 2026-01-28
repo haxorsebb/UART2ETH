@@ -452,6 +452,53 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     
     printf("HTTP Server: Received %d bytes\n", p->tot_len);
     
+    // Check if this connection is in the middle of a firmware upload
+    if (conn->multipart_ctx.active && !multipart_is_complete(&conn->multipart_ctx)) {
+        printf("HTTP Upload: Received data packet for ongoing upload\n");
+        
+        // Copy data to buffer for multipart processing
+        static uint8_t upload_buffer[2048];
+        size_t copy_len = (p->tot_len < sizeof(upload_buffer)) ? p->tot_len : sizeof(upload_buffer);
+        pbuf_copy_partial(p, upload_buffer, copy_len, 0);
+        
+        // Process this chunk through multipart handler
+        if (!multipart_process_chunk(&conn->multipart_ctx, upload_buffer, copy_len,
+                                    http_firmware_upload_callback, NULL)) {
+            printf("HTTP Upload: Failed to process data chunk\n");
+            http_upload_session_reset();
+            multipart_reset_context(&conn->multipart_ctx);
+            
+            static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+            http_generate_update_page(response_buffer, sizeof(response_buffer),
+                "Error: Upload failed during data transfer.");
+            http_send_response(conn, response_buffer, strlen(response_buffer));
+            http_close_connection(conn);
+            
+            tcp_recved(tpcb, p->tot_len);
+            pbuf_free(p);
+            return ERR_OK;
+        }
+        
+        // Check if upload is now complete
+        if (multipart_is_complete(&conn->multipart_ctx)) {
+            printf("HTTP Upload: Upload completed successfully\n");
+            multipart_reset_context(&conn->multipart_ctx);
+            
+            static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+            http_generate_update_page(response_buffer, sizeof(response_buffer),
+                "Firmware uploaded successfully! Device will reboot to apply the update.");
+            http_send_response(conn, response_buffer, strlen(response_buffer));
+            http_close_connection(conn);
+            
+            // TODO: Schedule reboot via state machine
+        }
+        
+        tcp_recved(tpcb, p->tot_len);
+        pbuf_free(p);
+        return ERR_OK;
+    }
+    
+    // Normal HTTP request processing (not an upload continuation)
     // Copy request data to null-terminated string for parsing
     static char request_buffer[1024];
     size_t copy_len = (p->tot_len < sizeof(request_buffer) - 1) ? p->tot_len : sizeof(request_buffer) - 1;
