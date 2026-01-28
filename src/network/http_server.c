@@ -251,7 +251,144 @@ void http_server_reset_stats(void) {
     g_server_start_time = get_absolute_time();
 }
 
+// ============================================================================
+// Upload Session Management (Public API)
+// ============================================================================
+
+/**
+ * @brief Start a firmware upload session
+ * 
+ * Initializes the upload session and calls update_manager to prepare
+ * for receiving firmware data.
+ * 
+ * @param expected_size Expected size of firmware file (bytes)
+ * @return true if session started successfully, false otherwise
+ * 
+ * Documentation Reference: ADR-016, ADR-017
+ */
+bool http_upload_session_start(uint32_t expected_size) {
+    if (g_upload_session.state == UPLOAD_STATE_RECEIVING) {
+        printf("HTTP Upload: Session already in progress\n");
+        return false;
+    }
+    
+    printf("HTTP Upload: Starting session, expected size: %u bytes\n", expected_size);
+    
+    // Initialize update manager for this upload
+    if (!update_start_upload(expected_size)) {
+        printf("HTTP Upload: Failed to start update manager session\n");
+        g_upload_session.state = UPLOAD_STATE_ERROR;
+        return false;
+    }
+    
+    // Initialize session state
+    g_upload_session.state = UPLOAD_STATE_RECEIVING;
+    g_upload_session.total_expected_size = expected_size;
+    g_upload_session.bytes_received = 0;
+    g_upload_session.last_progress_report = 0;
+    
+    return true;
+}
+
+/**
+ * @brief Feed a chunk of firmware data to the upload session
+ * 
+ * @param bytes_received Number of bytes in this chunk
+ */
+void http_upload_receive_chunk(uint32_t bytes_received) {
+    if (g_upload_session.state != UPLOAD_STATE_RECEIVING) {
+        return;
+    }
+    
+    g_upload_session.bytes_received += bytes_received;
+    
+    // Progress reporting every 64KB
+    if ((g_upload_session.bytes_received - g_upload_session.last_progress_report) >= (64 * 1024)) {
+        printf("HTTP Upload: %u / %u KB (%u%%)\n",
+               g_upload_session.bytes_received / 1024,
+               g_upload_session.total_expected_size / 1024,
+               (g_upload_session.bytes_received * 100) / g_upload_session.total_expected_size);
+        g_upload_session.last_progress_report = g_upload_session.bytes_received;
+    }
+}
+
+/**
+ * @brief Reset/abort the current upload session
+ */
+void http_upload_session_reset(void) {
+    if (g_upload_session.state == UPLOAD_STATE_RECEIVING) {
+        printf("HTTP Upload: Aborting session\n");
+        update_abort_upload();
+    }
+    
+    g_upload_session.state = UPLOAD_STATE_IDLE;
+    g_upload_session.total_expected_size = 0;
+    g_upload_session.bytes_received = 0;
+    g_upload_session.last_progress_report = 0;
+}
+
+/**
+ * @brief Get upload session progress
+ * 
+ * @param bytes_received Output: bytes received so far
+ * @param total_bytes Output: total expected bytes
+ */
+void http_upload_get_progress(uint32_t* bytes_received, uint32_t* total_bytes) {
+    if (bytes_received) {
+        *bytes_received = g_upload_session.bytes_received;
+    }
+    if (total_bytes) {
+        *total_bytes = g_upload_session.total_expected_size;
+    }
+}
+
+// ============================================================================
+// Firmware Upload Callback (bridges multipart → update_manager)
+// ============================================================================
+
+/**
+ * @brief Callback for multipart handler to feed firmware data chunks
+ * 
+ * This is called by the multipart parser for each chunk of actual file data.
+ * It forwards the data to update_manager for writing to flash.
+ * 
+ * @param data Pointer to firmware data chunk
+ * @param size Size of chunk in bytes
+ * @param finished True if this is the final chunk
+ * @param user_data User context (unused)
+ * @return true if chunk was processed successfully, false on error
+ * 
+ * Documentation Reference: ADR-016, ADR-017
+ */
+static bool http_firmware_upload_callback(const uint8_t* data, uint32_t size, bool finished, void* user_data) {
+    (void)user_data;  // Unused
+    
+    if (!data || size == 0) {
+        return false;
+    }
+    
+    // Feed chunk to update manager
+    if (!update_write_block(data, size, finished)) {
+        printf("HTTP Upload: Failed to write %u bytes to update manager\n", size);
+        g_upload_session.state = UPLOAD_STATE_ERROR;
+        return false;
+    }
+    
+    // Update session progress
+    http_upload_receive_chunk(size);
+    
+    // Handle completion
+    if (finished) {
+        printf("HTTP Upload: Firmware upload complete (%u bytes)\n", g_upload_session.bytes_received);
+        g_upload_session.state = UPLOAD_STATE_COMPLETE;
+    }
+    
+    return true;
+}
+
+// ============================================================================
 // Private function implementations
+// ============================================================================
 
 /**
  * @brief HTTP accept callback
