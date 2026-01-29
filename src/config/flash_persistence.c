@@ -139,11 +139,12 @@ bool flash_persistence_load_configuration(void) {
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_INIT, 0);
         return false;
     }
-    
+
     // Find the best valid block among all ring buffer blocks
     int best_block = find_best_valid_block();
     
     if (best_block < 0 || factory_reset_needed() ) {
+        printf("FACTORY RESET IS NEEDED!!!!\n");
         // No valid blocks found - trigger factory reset
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_WARN, LOG_EVENT_FACTORY_RESET, 0);
         flash_persistence_factory_reset();

@@ -1496,15 +1496,6 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         layout->config.channels[CHANNEL_1].tcp_port
     );
     
-    // DEBUG: Check if HTML generation was successful
-    DEBUG_ONLY({
-        printf("HTTP: Generated HTML length: %d bytes (max: %d)\n", html_len, (int)buffer_size);
-        if (html_len >= buffer_size) {
-            printf("HTTP: WARNING - HTML truncated! Increase buffer size\n");
-        }
-        printf("HTTP: HTML contains all UART rows: %s\n", 
-               strstr(buffer, "UART3") ? "YES" : "NO");
-    });
 }
 
 /**

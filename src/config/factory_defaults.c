@@ -71,6 +71,7 @@ void factory_defaults_print_serial_number(void) {
  * Apply factory defaults to shared memory configuration
  */
 void factory_defaults_apply_to_config(void) {
+   
     if (!g_factory_defaults_valid) {
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_WARN, LOG_EVENT_FACTORY_DEFAULTS_INVALID, 0);
         return;
