@@ -10,10 +10,9 @@
   },
   "partitions": [
     {
-      "start": 0,
       "name": "Firmware A",
       "id": 0,
-      "size": "1788K",
+      "size": "1784K",
       "families": ["rp2350-arm-s"],
       "permissions": {
         "secure": "rw",
@@ -24,7 +23,7 @@
     {
       "name": "Firmware B", 
       "id": 1,
-      "size": "1788K",
+      "size": "1784K",
       "families": ["rp2350-arm-s"],
       "permissions": {
         "secure": "rw",
