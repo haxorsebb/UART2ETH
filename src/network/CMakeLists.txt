@@ -51,6 +51,7 @@ add_library(http_server
     http_server.c
     http_auth.c
     http_forms.c
+    http_router.c
     http_multipart.c
 )
 

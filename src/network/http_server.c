@@ -13,6 +13,7 @@
 #include "network/http_server.h"
 #include "network/http_auth.h"
 #include "network/http_forms.h"
+#include "network/http_router.h"
 #include "network/http_multipart.h"
 #include "network/network_manager.h"
 #include "shared_memory.h"
@@ -91,13 +92,6 @@ typedef struct http_connection {
 
 static http_connection_t g_http_connections[HTTP_SERVER_MAX_CONNECTIONS];
 
-// HTTP request types
-typedef enum {
-    HTTP_GET,
-    HTTP_POST,
-    HTTP_UNKNOWN
-} http_request_type_t;
-
 // Forward declarations
 static err_t http_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t err);
 static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, struct pbuf* p, err_t err);
@@ -105,9 +99,23 @@ static void http_connection_error_callback(void* arg, err_t err);
 static err_t http_connection_sent_callback(void* arg, struct tcp_pcb* tpcb, u16_t len);
 static void http_close_connection(http_connection_t* conn);
 // Page generation functions now in http_pages/ modules (ADR-018)
-static http_request_type_t http_parse_request_type(const char* request_data);
+// Request routing functions now in http_router module (ADR-018 Phase 4)
 static bool http_handle_reboot_request(const char* post_data, size_t data_len);
 static void http_send_redirect(http_connection_t* conn, const char* location);
+// Route handler forward declarations (ADR-018 Phase 4)
+static void http_handle_root_get(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+static void http_handle_config_get(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+static void http_handle_update_get(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+static void http_handle_styles_get(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+#ifdef FACTORY_INTERNAL_VERSION
+static void http_handle_factory_get(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+static void http_handle_factory_post(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+#endif
+static void http_handle_config_post(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+static void http_handle_password_post(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+static void http_handle_reboot_post(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+static void http_handle_update_post(http_connection_t* conn, const char* request_buffer, size_t buffer_len);
+static void http_handle_404(http_connection_t* conn);
 
 // HTTP Basic Authentication functions now in http_auth module (ADR-018 Phase 2)
 // HTTP Form handling functions now in http_forms module (ADR-018 Phase 3)
@@ -157,6 +165,26 @@ bool http_server_init(void) {
     
     // Set accept callback
     tcp_accept(g_http_server_pcb, http_server_accept_callback);
+    
+    // Initialize HTTP router and register routes (ADR-018 Phase 4)
+    http_router_init();
+    
+    // Register GET routes
+    http_router_register_route("/", HTTP_METHOD_GET, http_handle_root_get);
+    http_router_register_route("/config", HTTP_METHOD_GET, http_handle_config_get);
+    http_router_register_route("/update", HTTP_METHOD_GET, http_handle_update_get);
+    http_router_register_route("/styles.css", HTTP_METHOD_GET, http_handle_styles_get);
+    
+    #ifdef FACTORY_INTERNAL_VERSION
+    http_router_register_route("/factory", HTTP_METHOD_GET, http_handle_factory_get);
+    http_router_register_route("/factory", HTTP_METHOD_POST, http_handle_factory_post);
+    #endif
+    
+    // Register POST routes
+    http_router_register_route("/", HTTP_METHOD_POST, http_handle_config_post);
+    http_router_register_route("/change_password", HTTP_METHOD_POST, http_handle_password_post);
+    http_router_register_route("/reboot", HTTP_METHOD_POST, http_handle_reboot_post);
+    http_router_register_route("/update", HTTP_METHOD_POST, http_handle_update_post);
     
     g_server_status = HTTP_SERVER_STATUS_READY;
     printf("HTTP Server: Ready and listening on port %d\n", HTTP_SERVER_PORT);
@@ -429,6 +457,287 @@ static err_t http_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_
     return ERR_OK;
 }
 
+// ============================================================================
+// HTTP Route Handlers (ADR-018 Phase 4)
+// ============================================================================
+
+/**
+ * @brief Handler for GET /
+ * Serves the device status page
+ */
+static void http_handle_root_get(http_connection_t* conn, 
+                                  const char* request_buffer, 
+                                  size_t buffer_len) {
+    (void)request_buffer;  // Unused
+    (void)buffer_len;      // Unused
+    
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    http_generate_device_page(response_buffer, sizeof(response_buffer));
+    http_send_response(conn, response_buffer, strlen(response_buffer));
+}
+
+/**
+ * @brief Handler for GET /config
+ * Serves the configuration page
+ */
+static void http_handle_config_get(http_connection_t* conn, 
+                                    const char* request_buffer, 
+                                    size_t buffer_len) {
+    (void)request_buffer;  // Unused
+    (void)buffer_len;      // Unused
+    
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    http_generate_config_page(response_buffer, sizeof(response_buffer));
+    http_send_response(conn, response_buffer, strlen(response_buffer));
+}
+
+/**
+ * @brief Handler for GET /update
+ * Serves the firmware update page
+ */
+static void http_handle_update_get(http_connection_t* conn, 
+                                    const char* request_buffer, 
+                                    size_t buffer_len) {
+    (void)request_buffer;  // Unused
+    (void)buffer_len;      // Unused
+    
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    http_generate_update_page(response_buffer, sizeof(response_buffer), NULL);
+    http_send_response(conn, response_buffer, strlen(response_buffer));
+}
+
+/**
+ * @brief Handler for GET /styles.css
+ * Serves the CSS stylesheet
+ */
+static void http_handle_styles_get(http_connection_t* conn, 
+                                    const char* request_buffer, 
+                                    size_t buffer_len) {
+    (void)request_buffer;  // Unused
+    (void)buffer_len;      // Unused
+    
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    http_generate_stylesheet(response_buffer, sizeof(response_buffer));
+    http_send_response(conn, response_buffer, strlen(response_buffer));
+}
+
+#ifdef FACTORY_INTERNAL_VERSION
+/**
+ * @brief Handler for GET /factory
+ * Serves the factory defaults configuration page
+ */
+static void http_handle_factory_get(http_connection_t* conn, 
+                                     const char* request_buffer, 
+                                     size_t buffer_len) {
+    (void)request_buffer;  // Unused
+    (void)buffer_len;      // Unused
+    
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    http_generate_factory_page(response_buffer, sizeof(response_buffer), NULL, 0, NULL, 0);
+    http_send_response(conn, response_buffer, strlen(response_buffer));
+}
+
+/**
+ * @brief Handler for POST /factory
+ * Processes factory defaults write request
+ */
+static void http_handle_factory_post(http_connection_t* conn, 
+                                      const char* request_buffer, 
+                                      size_t buffer_len) {
+    printf("HTTP Server: Processing factory defaults write\n");
+    
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    char error_msg[128] = {0};
+    char success_msg[128] = {0};
+    
+    http_parse_factory_post_data(request_buffer, buffer_len, 
+                                  error_msg, sizeof(error_msg),
+                                  success_msg, sizeof(success_msg));
+    
+    // Regardless of error or not, send back same page with message
+    http_generate_factory_page(response_buffer, sizeof(response_buffer), 
+                                error_msg, strlen(error_msg), 
+                                success_msg, strlen(success_msg));
+    http_send_response(conn, response_buffer, strlen(response_buffer));
+}
+#endif
+
+/**
+ * @brief Handler for POST /
+ * Processes configuration update request
+ */
+static void http_handle_config_post(http_connection_t* conn, 
+                                     const char* request_buffer, 
+                                     size_t buffer_len) {
+    printf("HTTP Server: Processing configuration update\n");
+    
+    if (http_parse_post_data(request_buffer, buffer_len)) {
+        // Configuration updated successfully - redirect to main page
+        http_send_redirect(conn, "/");
+    } else {
+        // Error updating configuration - show error page
+        static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+        snprintf(response_buffer, sizeof(response_buffer),
+            "HTTP/1.0 400 Bad Request\r\n"
+            "Content-Type: text/html\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "<html><body><h1>Configuration Error</h1>"
+            "<p>Failed to update configuration. Please check your input values.</p>"
+            "<p><a href=\"/\">Return to main page</a></p>"
+            "</body></html>\r\n");
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+    }
+}
+
+/**
+ * @brief Handler for POST /change_password
+ * Processes password change request
+ */
+static void http_handle_password_post(http_connection_t* conn, 
+                                       const char* request_buffer, 
+                                       size_t buffer_len) {
+    printf("HTTP Server: Processing password change\n");
+    
+    if (http_handle_password_change(request_buffer, buffer_len)) {
+        // Password changed successfully - redirect to config page
+        http_send_redirect(conn, "/config");
+    } else {
+        // Error changing password - show error page
+        static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+        snprintf(response_buffer, sizeof(response_buffer),
+            "HTTP/1.0 400 Bad Request\r\n"
+            "Content-Type: text/html\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "<html><body><h1>Password Change Error</h1>"
+            "<p>Failed to change password. Please check your current password and try again.</p>"
+            "<p><a href=\"/config\">Return to configuration</a></p>"
+            "</body></html>\r\n");
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+    }
+}
+
+/**
+ * @brief Handler for POST /reboot
+ * Processes reboot request
+ */
+static void http_handle_reboot_post(http_connection_t* conn, 
+                                     const char* request_buffer, 
+                                     size_t buffer_len) {
+    printf("HTTP Server: Processing reboot request\n");
+    
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    if (http_handle_reboot_request(request_buffer, buffer_len)) {
+        // Reboot initiated - show confirmation page
+        http_generate_update_page(response_buffer, sizeof(response_buffer), 
+            "Reboot initiated. Device will restart in a few seconds. Please wait and then refresh this page.");
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+    } else {
+        // Reboot failed
+        http_generate_update_page(response_buffer, sizeof(response_buffer),
+            "Error: Failed to initiate reboot.");
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+    }
+}
+
+/**
+ * @brief Handler for POST /update
+ * Processes firmware upload request
+ */
+static void http_handle_update_post(http_connection_t* conn, 
+                                     const char* request_buffer, 
+                                     size_t buffer_len) {
+    printf("HTTP Server: Processing firmware upload\n");
+    
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    
+    // Initialize multipart context from request
+    if (!multipart_init_context(&conn->multipart_ctx, request_buffer, buffer_len)) {
+        printf("HTTP Upload: Failed to initialize multipart context\n");
+        http_generate_update_page(response_buffer, sizeof(response_buffer),
+            "Error: Failed to process upload. Invalid multipart data.");
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+        return;
+    }
+    
+    // Start upload session in update_manager
+    if (!http_upload_session_start(conn->multipart_ctx.file_size)) {
+        printf("HTTP Upload: Failed to start upload session\n");
+        multipart_reset_context(&conn->multipart_ctx);
+        http_generate_update_page(response_buffer, sizeof(response_buffer),
+            "Error: Failed to start firmware upload. Update manager not ready.");
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+        return;
+    }
+    
+    // Process the initial chunk (HTTP headers + some data might be in this pbuf)
+    if (!multipart_process_chunk(&conn->multipart_ctx, (const uint8_t*)request_buffer, buffer_len,
+                                http_firmware_upload_callback, NULL)) {
+        printf("HTTP Upload: Failed to process initial chunk\n");
+        http_upload_session_reset();
+        multipart_reset_context(&conn->multipart_ctx);
+        http_generate_update_page(response_buffer, sizeof(response_buffer),
+            "Error: Failed to process upload data.");
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+        return;
+    }
+    
+    // Check if upload is already complete (small file in single packet)
+    if (multipart_is_complete(&conn->multipart_ctx)) {
+        printf("HTTP Upload: Upload complete in single packet\n");
+        multipart_reset_context(&conn->multipart_ctx);
+        http_generate_update_page(response_buffer, sizeof(response_buffer),
+            "Firmware uploaded successfully! Device will reboot to apply the update.");
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+        
+        // Trigger reboot after short delay (allow response to be sent)
+        // TODO: Schedule reboot via state machine
+    } else {
+        // Multi-packet upload - connection will stay open for more data
+        printf("HTTP Upload: Multi-packet upload in progress, waiting for more data...\n");
+        // Don't close connection or send response yet - more data coming
+    }
+}
+
+/**
+ * @brief Handler for 404 Not Found
+ * Serves a humorous 404 error page
+ */
+static void http_handle_404(http_connection_t* conn) {
+    static char response_buffer[1024];
+    int len = snprintf(response_buffer, sizeof(response_buffer),
+        "HTTP/1.0 404 Not Found\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head><title>404 - Page Not Found</title></head>\n"
+        "<body style='font-family: monospace; text-align: center; padding-top: 50px;'>\n"
+        "<h1>404 - Page Not Found</h1>\n"
+        "<pre>\n"
+        "    _____ \n"
+        "   /     \\\n"
+        "  | () () |\n"
+        "   \\  ^  /\n"
+        "    |||||\n"
+        "    |||||\n"
+        "</pre>\n"
+        "<p><b>Oops! This page got lost in the serial buffer.</b></p>\n"
+        "<p>The page you're looking for wandered off through UART%d<br>\n"
+        "and hasn't been seen since. It's probably stuck in a TCP timeout somewhere.</p>\n"
+        "<p><i>Error Code: 0x%X (ENOPAGEFOUND)</i></p>\n"
+        "<p><a href='/'>← Return to Home</a> | <a href='/config'>Configuration</a> | <a href='/update'>Firmware Update</a></p>\n"
+        "</body>\n"
+        "</html>\n",
+        (int)(to_us_since_boot(get_absolute_time()) % 4),  // Random UART 0-3
+        0xDEADBEEF);  // Classic hex code
+    
+    http_send_response(conn, response_buffer, len);
+    http_close_connection(conn);
+}
+
 /**
  * @brief HTTP receive callback
  */
@@ -503,10 +812,6 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     pbuf_copy_partial(p, request_buffer, copy_len, 0);
     request_buffer[copy_len] = '\0';
     
-    // Parse request type
-    http_request_type_t request_type = http_parse_request_type(request_buffer);
-    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
-    
     // Check HTTP Basic Authentication for ALL requests
     // Get password from shared memory
     shared_memory_layout_t* layout = shared_memory_get_layout();
@@ -529,169 +834,17 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     
     printf("HTTP Auth: Request authenticated successfully\n");
     
-    if (request_type == HTTP_POST) {
-        // Determine which form was submitted based on the action URL
-        if (strstr(request_buffer, "POST /change_password") != NULL) {
-            // Handle password change
-            printf("HTTP Server: Processing password change\n");
-            
-            if (http_handle_password_change(request_buffer, copy_len)) {
-                // Password changed successfully - redirect to config page
-                http_send_redirect(conn, "/config");
-            } else {
-                // Error changing password - show error page
-                snprintf(response_buffer, sizeof(response_buffer),
-                    "HTTP/1.0 400 Bad Request\r\n"
-                    "Content-Type: text/html\r\n"
-                    "Connection: close\r\n"
-                    "\r\n"
-                    "<html><body><h1>Password Change Error</h1>"
-                    "<p>Failed to change password. Please check your current password and try again.</p>"
-                    "<p><a href=\"/config\">Return to configuration</a></p>"
-                    "</body></html>\r\n");
-                http_send_response(conn, response_buffer, strlen(response_buffer));
-            }
-        }
-        #ifdef FACTORY_INTERNAL_VERSION
-        else if (strstr(request_buffer, "POST /factory") != NULL) {
-            // Handle factory defaults write
-            printf("HTTP Server: Processing factory defaults write\n");
-            
-            char error_msg[128] = {0};
-            char success_msg[128] = {0};
-            
-            http_parse_factory_post_data(request_buffer, copy_len, error_msg, sizeof(error_msg),success_msg,sizeof(success_msg) );
-            //regardless of error or not, send back same page with message
-            http_generate_factory_page(response_buffer, sizeof(response_buffer), error_msg, strlen(error_msg), success_msg , strlen(success_msg));
-            http_send_response(conn, response_buffer, strlen(response_buffer));
-            
-        }
-        #endif
-        else if (strstr(request_buffer, "POST /reboot") != NULL) {
-            // Handle reboot request
-            printf("HTTP Server: Processing reboot request\n");
-            
-            if (http_handle_reboot_request(request_buffer, copy_len)) {
-                // Reboot initiated - show confirmation page
-                http_generate_update_page(response_buffer, sizeof(response_buffer), 
-                    "Reboot initiated. Device will restart in a few seconds. Please wait and then refresh this page.");
-                http_send_response(conn, response_buffer, strlen(response_buffer));
-            } else {
-                // Reboot failed
-                http_generate_update_page(response_buffer, sizeof(response_buffer),
-                    "Error: Failed to initiate reboot.");
-                http_send_response(conn, response_buffer, strlen(response_buffer));
-            }
-        }
-        else if (strstr(request_buffer, "POST /update") != NULL) {
-            // Handle firmware upload
-            printf("HTTP Server: Processing firmware upload\n");
-            
-            // Initialize multipart context from request
-            if (!multipart_init_context(&conn->multipart_ctx, request_buffer, copy_len)) {
-                printf("HTTP Upload: Failed to initialize multipart context\n");
-                http_generate_update_page(response_buffer, sizeof(response_buffer),
-                    "Error: Failed to process upload. Invalid multipart data.");
-                http_send_response(conn, response_buffer, strlen(response_buffer));
-                return ERR_OK;
-            }
-            
-            // Start upload session in update_manager
-            if (!http_upload_session_start(conn->multipart_ctx.file_size)) {
-                printf("HTTP Upload: Failed to start upload session\n");
-                multipart_reset_context(&conn->multipart_ctx);
-                http_generate_update_page(response_buffer, sizeof(response_buffer),
-                    "Error: Failed to start firmware upload. Update manager not ready.");
-                http_send_response(conn, response_buffer, strlen(response_buffer));
-                return ERR_OK;
-            }
-            
-            // Process the initial chunk (HTTP headers + some data might be in this pbuf)
-            if (!multipart_process_chunk(&conn->multipart_ctx, (const uint8_t*)request_buffer, copy_len,
-                                        http_firmware_upload_callback, NULL)) {
-                printf("HTTP Upload: Failed to process initial chunk\n");
-                http_upload_session_reset();
-                multipart_reset_context(&conn->multipart_ctx);
-                http_generate_update_page(response_buffer, sizeof(response_buffer),
-                    "Error: Failed to process upload data.");
-                http_send_response(conn, response_buffer, strlen(response_buffer));
-                return ERR_OK;
-            }
-            
-            // Check if upload is already complete (small file in single packet)
-            if (multipart_is_complete(&conn->multipart_ctx)) {
-                printf("HTTP Upload: Upload complete in single packet\n");
-                multipart_reset_context(&conn->multipart_ctx);
-                http_generate_update_page(response_buffer, sizeof(response_buffer),
-                    "Firmware uploaded successfully! Device will reboot to apply the update.");
-                http_send_response(conn, response_buffer, strlen(response_buffer));
-                
-                // Trigger reboot after short delay (allow response to be sent)
-                // TODO: Schedule reboot via state machine
-            } else {
-                // Multi-packet upload - connection will stay open for more data
-                printf("HTTP Upload: Multi-packet upload in progress, waiting for more data...\n");
-                // Don't close connection or send response yet - more data coming
-            }
-        }
-        else {
-            // Handle configuration update
-            printf("HTTP Server: Processing configuration update\n");
-            
-            // Parse POST data and update configuration
-            if (http_parse_post_data(request_buffer, copy_len)) {
-                // Configuration updated successfully - redirect to main page
-                http_send_redirect(conn, "/");
-            } else {
-                // Error updating configuration - show error page
-                snprintf(response_buffer, sizeof(response_buffer),
-                    "HTTP/1.0 400 Bad Request\r\n"
-                    "Content-Type: text/html\r\n"
-                    "Connection: close\r\n"
-                    "\r\n"
-                    "<html><body><h1>Configuration Error</h1>"
-                    "<p>Failed to update configuration. Please check your input values.</p>"
-                    "<p><a href=\"/\">Return to main page</a></p>"
-                    "</body></html>\r\n");
-                http_send_response(conn, response_buffer, strlen(response_buffer));
-            }
-        }
-    }
-    else if (strstr(request_buffer, "GET /styles.css") != NULL) {
-        // Serve CSS stylesheet
-        http_generate_stylesheet(response_buffer, sizeof(response_buffer));
-        http_send_response(conn, response_buffer, strlen(response_buffer));
-    }
-    #ifdef FACTORY_INTERNAL_VERSION
-    else if (strstr(request_buffer, "GET /factory") != NULL) {
-        // Show factory defaults configuration page
-        http_generate_factory_page(response_buffer, sizeof(response_buffer), NULL, 0, NULL, 0);
-        http_send_response(conn, response_buffer, strlen(response_buffer));
-    }
-    #endif
-    else if (strstr(request_buffer, "GET /config") != NULL) {
-        // Show configuration page
-        http_generate_config_page(response_buffer, sizeof(response_buffer));
-        http_send_response(conn, response_buffer, strlen(response_buffer));
-    }
-    else if (strstr(request_buffer, "GET /update") != NULL) {
-        // Show firmware update page
-        http_generate_update_page(response_buffer, sizeof(response_buffer), NULL);
-        http_send_response(conn, response_buffer, strlen(response_buffer));
-    }
-    else {
-        // Default - show device status page
-        http_generate_device_page(response_buffer, sizeof(response_buffer));
-        http_send_response(conn, response_buffer, strlen(response_buffer));
+    // Route request to appropriate handler (ADR-018 Phase 4)
+    http_route_handler_t handler = http_router_find_handler(request_buffer);
+    if (handler) {
+        handler(conn, request_buffer, copy_len);
+    } else {
+        // 404 Not Found
+        http_handle_404(conn);
     }
     
     tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
-    
-    // Close connection after sending response (HTTP/1.0 style)
-    if (request_type != HTTP_POST) {  // Don't close immediately for POST redirect
-        http_close_connection(conn);
-    }
     
     return ERR_OK;
 }
@@ -768,22 +921,7 @@ void http_send_response(http_connection_t* conn, const char* response, size_t re
     }
 }
 
-/**
- * @brief Parse HTTP request type (GET/POST)
- */
-static http_request_type_t http_parse_request_type(const char* request_data) {
-    if (!request_data) {
-        return HTTP_UNKNOWN;
-    }
-    
-    if (strncmp(request_data, "GET", 3) == 0) {
-        return HTTP_GET;
-    } else if (strncmp(request_data, "POST", 4) == 0) {
-        return HTTP_POST;
-    }
-    
-    return HTTP_UNKNOWN;
-}
+// Request parsing functions moved to http_router module (ADR-018 Phase 4)
 
 /**
  * @brief Send HTTP redirect response
