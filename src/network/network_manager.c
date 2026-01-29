@@ -317,9 +317,12 @@ bool network_manager_restart_interface(void) {
  */
 void network_manager_get_default_config(network_config_t* config) {
     if (!config) {
+        printf("UNABLE TO GET DEFAULT NETWORK CONFIG!");
         return;
     }
     
+    printf("GETTING DEFAULT NETWORK CONFIG!");
+
     memset(config, 0, sizeof(network_config_t));
     
     // Re-enable DHCP with fast ACD timeouts to prevent hangs
