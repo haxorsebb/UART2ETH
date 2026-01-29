@@ -10,6 +10,7 @@
  */
 
 #include "network/http_pages/page_device.h"
+#include "network/http_server.h"
 #include "network/network_manager.h"
 #include "shared_memory.h"
 #include "device_mode.h"

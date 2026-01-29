@@ -1,5 +1,8 @@
 # Network module CMakeLists.txt
 
+# Add HTTP pages subdirectory (ADR-018: HTTP Server Modularization)
+add_subdirectory(http_pages)
+
 # Create network library
 add_library(network_manager
     enc28j60_driver.c
@@ -54,6 +57,7 @@ target_link_libraries(http_server
     pico_stdlib
     log_manager
     update_manager      # For firmware upload handling
+    http_pages          # Page generation modules (ADR-018)
     pico_lwip_nosys     # lwIP NO_SYS implementation for raw API
 )
 
@@ -61,6 +65,7 @@ target_link_libraries(http_server
 target_include_directories(http_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network/http_pages
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
     ${CMAKE_CURRENT_SOURCE_DIR}/html  # HTML page templates
 )
