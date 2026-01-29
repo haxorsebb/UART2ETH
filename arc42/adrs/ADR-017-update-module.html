@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-003-programming-language-selection.html -->
+    <!-- sourceuri: arc42/adrs/ADR-017-update-module.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-003: Programming Language Selection for UART2ETH</title>
+    <title>ADR-017: Update Module Architecture</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -272,7 +272,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/adrs/ADR-003-programming-language-selection.html" title="ADR-003: Programming Language Selection for UART2ETH">ADR-003: Programming Language Selection for UART2ETH</a>
                                 
                             </li>
@@ -342,7 +342,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../../arc42/adrs/ADR-017-update-module.html" title="ADR-017: Update Module Architecture">ADR-017: Update Module Architecture</a>
                                 
                             </li>
@@ -358,11 +358,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-003-programming-language-selection.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-017-update-module.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-003%3A+Programming+Language+Selection+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-003-programming-language-selection.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-017%3A+Update+Module+Architecture%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-017-update-module.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -372,45 +372,37 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel0">
-<li><a href="#_adr_003_programming_language_selection_for_uart2eth">ADR-003: Programming Language Selection for UART2ETH</a>
+<li><a href="#_adr_017_update_module_architecture">ADR-017: Update Module Architecture</a>
 <ul class="sectlevel1">
+<li><a href="#_status">Status</a></li>
+<li><a href="#_date">Date</a></li>
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision_drivers">Decision Drivers</a>
+<li><a href="#_decision">Decision</a>
 <ul class="sectlevel2">
-<li><a href="#_primary_requirements">Primary Requirements</a></li>
-<li><a href="#_constraints">Constraints</a></li>
+<li><a href="#_module_structure">Module Structure</a></li>
+<li><a href="#_public_api">Public API</a></li>
+<li><a href="#_state_machine_integration">State Machine Integration</a></li>
+<li><a href="#_state_flow_diagrams">State Flow Diagrams</a></li>
+<li><a href="#_flash_operation_safety">Flash Operation Safety</a></li>
+<li><a href="#_partition_discovery">Partition Discovery</a></li>
+<li><a href="#_http_server_integration">HTTP Server Integration</a></li>
 </ul>
 </li>
-<li><a href="#_options_considered">Options Considered</a>
-<ul class="sectlevel2">
-<li><a href="#_option_a_c_programming_language">Option A: C Programming Language</a></li>
-<li><a href="#_option_b_rust_programming_language">Option B: Rust Programming Language</a></li>
-</ul>
-</li>
-<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
-<li><a href="#_decision">Decision</a></li>
 <li><a href="#_rationale">Rationale</a>
 <ul class="sectlevel2">
-<li><a href="#_why_c_over_rust">Why C Over Rust</a></li>
-<li><a href="#_memory_safety_strategy_in_c">Memory Safety Strategy in C</a></li>
-<li><a href="#_rust_advantages_acknowledged_but_outweighed">Rust Advantages Acknowledged But Outweighed</a></li>
+<li><a href="#_advantages">Advantages</a></li>
+<li><a href="#_rejected_alternatives">Rejected Alternatives</a></li>
 </ul>
 </li>
 <li><a href="#_consequences">Consequences</a>
 <ul class="sectlevel2">
 <li><a href="#_positive">Positive</a></li>
 <li><a href="#_negative">Negative</a></li>
-<li><a href="#_risks_and_mitigation">Risks and Mitigation</a></li>
+<li><a href="#_implementation_requirements">Implementation Requirements</a></li>
+<li><a href="#_dependencies">Dependencies</a></li>
 </ul>
 </li>
-<li><a href="#_implementation_notes">Implementation Notes</a>
-<ul class="sectlevel2">
-<li><a href="#_development_standards">Development Standards</a></li>
-<li><a href="#_testing_strategy">Testing Strategy</a></li>
-<li><a href="#_security_practices">Security Practices</a></li>
-</ul>
-</li>
-<li><a href="#_follow_up_actions">Follow-up Actions</a></li>
+<li><a href="#_references">References</a></li>
 </ul>
 </li>
 </ul>
@@ -435,297 +427,274 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_003_programming_language_selection_for_uart2eth" class="sect0">ADR-003: Programming Language Selection for UART2ETH</h1>
+<h1 id="_adr_017_update_module_architecture" class="sect0">ADR-017: Update Module Architecture</h1>
+<div class="sect1">
+<h2 id="_status">Status</h2>
+<div class="sectionbody">
 <div class="paragraph">
-<p><strong>Status:</strong> ACCEPTED<br>
-<strong>Date:</strong> 2025-07-26<br>
-<strong>Deciders:</strong> Architecture Team<br>
-<strong>Consulted:</strong> Senior Developer<br>
-<strong>Informed:</strong> Development Team</p>
+<p>Accepted</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_date">Date</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>2026-01-28</p>
+</div>
+</div>
 </div>
 <div class="sect1">
 <h2 id="_context">Context</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>The UART2ETH system requires selecting a programming language for firmware development on the RP2350 microcontroller. This decision directly impacts development velocity, system reliability, maintainability, and the ability to meet project delivery timelines.</p>
-</div>
-<div class="paragraph">
-<p>Based on hardware platform decisions (ADR-001: RP2350 selection, ADR-002: ENC28J60 selection), we need a programming language that can:</p>
+<p>The UART2ETH device implements secure OTA (Over-The-Air) firmware updates using the RP2350&#8217;s A/B partition scheme with Try-Before-You-Buy (TBYB) semantics. The firmware update functionality is currently scattered across multiple modules:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>Deliver industrial-grade reliability for 4 concurrent UART-to-TCP bridges</p>
+<p><code>http_server.c</code> - Upload handling, multipart parsing, chunk processing</p>
 </li>
 <li>
-<p>Support real-time performance requirements (500 kbps per port, sub-5ms latency)</p>
+<p><code>flash_persistence.c</code> - Contains <code>call_explicit_buy()</code> function</p>
 </li>
 <li>
-<p>Enable rapid development with existing team expertise</p>
-</li>
-<li>
-<p>Operate efficiently in severely memory-constrained environment (520KB SRAM, static allocation)</p>
-</li>
-<li>
-<p>Provide adequate safety guarantees for industrial deployment</p>
-</li>
-<li>
-<p>Meet aggressive project delivery timeline ("deliver yesterday")</p>
-</li>
-<li>
-<p>Must operate reliably in industrial environments (-40°C to +85°C) 😉</p>
+<p><code>core1_main.c</code> - Contains buy operation call in <code>core1_init_complete()</code></p>
 </li>
 </ul>
 </div>
 <div class="paragraph">
-<p>The programming language selection fundamentally determines development productivity, code maintainability, and the feasibility of meeting project deadlines with current team capabilities.</p>
+<p>This scattered implementation creates maintenance challenges and violates the single-responsibility principle. Additionally, the current implementation lacks proper state machine integration for the "buy" operation and system reboot handling.</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_decision_drivers">Decision Drivers</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_primary_requirements">Primary Requirements</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Development Velocity</strong>: Critical time-to-market pressure requiring immediate productivity</p>
-</li>
-<li>
-<p><strong>Team Expertise</strong>: Leveraging existing microcontroller team&#8217;s deep C experience</p>
-</li>
-<li>
-<p><strong>Industrial Reliability</strong>: Proven track record in embedded industrial applications</p>
-</li>
-<li>
-<p><strong>Memory Model Fit</strong>: Optimal performance in static memory allocation environment</p>
-</li>
-<li>
-<p><strong>Ecosystem Maturity</strong>: Comprehensive tooling, libraries, and vendor support</p>
-</li>
-<li>
-<p><strong>Real-time Determinism</strong>: Predictable behavior for latency-critical applications</p>
-</li>
-<li>
-<p><strong>Hardware Integration</strong>: Direct access to RP2350 and ENC28J60 peripherals</p>
-</li>
-<li>
-<p><strong>Debugging Capabilities</strong>: Mature debugging tools for embedded development</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_constraints">Constraints</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Aggressive delivery timeline with no room for learning curve delays</p>
-</li>
-<li>
-<p>Small project scope where complexity management is achievable</p>
-</li>
-<li>
-<p>Static memory allocation model (no dynamic allocation)</p>
-</li>
-<li>
-<p>Team expertise concentrated in C/C++ embedded development</p>
-</li>
-<li>
-<p>Must operate reliably in industrial environments (-40°C to +85°C) 😉</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_options_considered">Options Considered</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_option_a_c_programming_language">Option A: C Programming Language</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Ecosystem</strong>: Mature ecosystem with comprehensive RP2350 Pico SDK support</p>
-</li>
-<li>
-<p><strong>Team Expertise</strong>: Deep existing knowledge in microcontroller team</p>
-</li>
-<li>
-<p><strong>Development Velocity</strong>: Immediate productivity, no learning curve</p>
-</li>
-<li>
-<p><strong>Memory Model</strong>: Direct, predictable memory management with static allocation</p>
-</li>
-<li>
-<p><strong>Tooling</strong>: Mature debugging (GDB, OpenOCD), profiling, and analysis tools</p>
-</li>
-<li>
-<p><strong>Hardware Support</strong>: Full vendor support for RP2350 and ENC28J60</p>
-</li>
-<li>
-<p><strong>Industrial Track Record</strong>: Decades of proven deployment in embedded systems</p>
-</li>
-<li>
-<p><strong>Real-time Performance</strong>: Deterministic, low-level control over hardware</p>
-</li>
-<li>
-<p><strong>Memory Safety</strong>: Achievable through disciplined practices and comprehensive testing</p>
-</li>
-<li>
-<p><strong>Standards Compliance</strong>: MISRA-C guidelines for industrial safety</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_b_rust_programming_language">Option B: Rust Programming Language</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Ecosystem</strong>: Emerging ecosystem with excellent RP2350 day-one support (rp235x-hal)</p>
-</li>
-<li>
-<p><strong>Team Expertise</strong>: No existing knowledge, 6-12 month learning curve to proficiency</p>
-</li>
-<li>
-<p><strong>Development Velocity</strong>: Significant initial productivity loss during team transition</p>
-</li>
-<li>
-<p><strong>Memory Model</strong>: Memory safety guarantees less relevant in static allocation environment</p>
-</li>
-<li>
-<p><strong>Tooling</strong>: Improving but less mature debugging tools (probe-rs vs GDB)</p>
-</li>
-<li>
-<p><strong>Hardware Support</strong>: Good RP2350 support, limited ENC28J60 ecosystem</p>
-</li>
-<li>
-<p><strong>Industrial Track Record</strong>: Limited embedded deployment history</p>
-</li>
-<li>
-<p><strong>Real-time Performance</strong>: Embassy framework provides async capabilities</p>
-</li>
-<li>
-<p><strong>Memory Safety</strong>: Compile-time guarantees prevent entire classes of bugs</p>
-</li>
-<li>
-<p><strong>Modern Features</strong>: Advanced type system, zero-cost abstractions</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h2>
-<div class="sectionbody">
 <div class="paragraph">
-<p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
-<em>Baseline: C Programming Language (all scores = 0)</em></p>
+<p>Key requirements:
+* Consolidated update functionality in a dedicated module
+* Proper state machine integration for buy and reboot operations
+* Safe flash operations using <code>flash_safe_execute()</code> for dual-core coordination
+* Automatic partition discovery using ROM functions
+* Clean separation: HTTP server handles generic uploads, update module handles firmware-specific logic</p>
 </div>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 38.4615%;">
-<col style="width: 15.3846%;">
-<col style="width: 23.0769%;">
-<col style="width: 23.077%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
-<th class="tableblock halign-left valign-top"><strong>C Language</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Rust Language</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Velocity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (6-12 month learning curve)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Team Expertise</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (zero existing knowledge)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Time to Market</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (immediate productivity loss)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Ecosystem Maturity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (emerging, less comprehensive)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Safety in Static Environment</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (compile-time checks, limited benefit)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Track Record</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (limited embedded deployment)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Hardware Vendor Support</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (good RP2350, limited ENC28J60)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Debugging Maturity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (improving but less mature)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Real-time Determinism</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (comparable with Embassy)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Code Maintainability</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (better type system)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Future Proofing</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (modern language, industry trend)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>TOTAL WEIGHTED SCORE</strong></p></td>
-<td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>0</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>-13</strong></p></td>
-</tr>
-</tbody>
-</table>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_decision">Decision</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p><strong>Selected: C Programming Language</strong></p>
+<p>We will create a dedicated <code>update</code> module that consolidates all firmware update functionality and integrates properly with the state machine architecture.</p>
 </div>
+<div class="sect2">
+<h3 id="_module_structure">Module Structure</h3>
+<div class="listingblock">
+<div class="content">
+<pre>src/update/
+├── CMakeLists.txt
+├── update_manager.c
+
+include/update/
+├── update_manager.h</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_public_api">Public API</h3>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// update_manager.h
+
+typedef enum {
+    UPDATE_STATE_IDLE,
+    UPDATE_STATE_RECEIVING,
+    UPDATE_STATE_COMPLETE,
+    UPDATE_STATE_ERROR
+} update_state_t;
+
+typedef enum {
+    REBOOT_REASON_NONE = 0,
+    REBOOT_REASON_UPDATE_BUY_FAILED,     // Buy failed, bootloader reverts to old image
+    REBOOT_REASON_UPDATE_COMPLETE,        // Upload complete, reboot to try new image
+    REBOOT_REASON_USER_REQUESTED,         // User triggered reboot via web UI
+    REBOOT_REASON_ERROR_RECOVERY          // Unrecoverable error
+} reboot_reason_t;
+
+// Initialization
+bool update_init(void);
+
+// Upload handling (called by http_server for firmware uploads)
+bool update_start_upload(uint32_t expected_size);
+bool update_write_block(uint8_t* data, uint32_t size, bool finished);
+void update_abort_upload(void);
+update_state_t update_get_state(void);
+
+// Buy operation (called from CORE1_BUY_UPDATE state)
+bool update_buy_current_image(void);
+
+// Reboot handling (called from CORE1_REBOOT_* states)
+void update_set_reboot_reason(reboot_reason_t reason);
+reboot_reason_t update_get_reboot_reason(void);
+void update_execute_reboot(void);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_state_machine_integration">State Machine Integration</h3>
+<div class="sect3">
+<h4 id="_new_main_state">New Main State</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
+    MAIN_STATE_INIT = 0,
+    MAIN_STATE_CONFIGURATION = 1,
+    MAIN_STATE_OPERATIONAL = 2,
+    MAIN_STATE_ERROR = 3,
+    MAIN_STATE_REBOOT = 4           // NEW: System reboot state
+} main_state_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_new_main_event">New Main Event</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef enum {
+    // existing events...
+    MAIN_EVENT_REBOOT_REQUESTED        // NEW: Triggers transition to MAIN_STATE_REBOOT
+} main_state_event_t;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_new_core0_substates">New Core0 Substates</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Add to core0_substate_t:
+CORE0_REBOOT_IDLE               // WFI while Core1 handles reboot</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_new_core1_substates">New Core1 Substates</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Add to core1_substate_t:
+CORE1_BUY_UPDATE,               // Attempt to buy current image after entering OPERATIONAL
+CORE1_REBOOT_FLUSH,             // Log reason, flush shared_memory to flash
+CORE1_REBOOT_EXECUTE            // Execute SDK reboot</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_new_core1_events">New Core1 Events</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Add to core1_event_t:
+CORE1_EVENT_BUY_SUCCESS,        // Buy operation succeeded
+CORE1_EVENT_BUY_FAILED,         // Buy operation failed
+CORE1_EVENT_REBOOT_FLUSH_COMPLETE  // Flush complete, ready to reboot</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_state_flow_diagrams">State Flow Diagrams</h3>
+<div class="sect3">
+<h4 id="_operational_entry_with_buy">Operational Entry with Buy</h4>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/diag-35ce09e2c324450fa3c6a5f3db8b66ac.png" alt="Diagram" width="432" height="453">
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_reboot_state_flow">Reboot State Flow</h4>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/diag-dcf2a748d04d452016e69a91ebb0473d.png" alt="Diagram" width="503" height="487">
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_firmware_upload_flow">Firmware Upload Flow</h4>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/diag-578b3248cb1a778f88c8a132b193d55e.png" alt="Diagram" width="793" height="745">
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_flash_operation_safety">Flash Operation Safety</h3>
 <div class="paragraph">
-<p>The C programming language provides the optimal balance of development velocity, team productivity, and technical capability for the UART2ETH project, scoring significantly higher in our weighted analysis.</p>
+<p>All flash operations use <code>flash_safe_execute()</code> to coordinate with Core0:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Wrapper for flash erase (called via flash_safe_execute)
+static void call_flash_erase_for_update(void* param) {
+    update_flash_params_t* p = (update_flash_params_t*)param;
+    rom_flash_op(p-&gt;erase_flags, p-&gt;address, FLASH_SECTOR_ERASE_SIZE, NULL);
+}
+
+// Wrapper for flash program (called via flash_safe_execute)
+static void call_flash_program_for_update(void* param) {
+    update_flash_params_t* p = (update_flash_params_t*)param;
+    rom_flash_op(p-&gt;program_flags, p-&gt;address, p-&gt;size, p-&gt;data);
+}
+
+// Usage in update_write_block:
+int rc = flash_safe_execute(call_flash_erase_for_update, &amp;params, UINT32_MAX);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_partition_discovery">Partition Discovery</h3>
+<div class="paragraph">
+<p>Uses <code>rom_get_uf2_target_partition()</code> to automatically discover the target partition:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">bool update_start_upload(uint32_t expected_size) {
+    // Get target partition based on UF2 family ID
+    resident_partition_t target;
+    rom_get_uf2_target_partition(workarea, sizeof(workarea),
+                                  g_update_state.family_id, &amp;target);
+
+    // Extract partition boundaries
+    uint16_t first_sector = PART_LOC_FIRST(target.permissions_and_location);
+    uint16_t last_sector = PART_LOC_LAST(target.permissions_and_location);
+    g_update_state.partition_start = first_sector * FLASH_SECTOR_SIZE;
+    g_update_state.partition_end = (last_sector + 1) * FLASH_SECTOR_SIZE;
+
+    // Validate size fits in partition
+    if (expected_size &gt; (g_update_state.partition_end - g_update_state.partition_start)) {
+        return false;
+    }
+    // ...
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_http_server_integration">HTTP Server Integration</h3>
+<div class="paragraph">
+<p>The HTTP server remains responsible for generic upload handling (multipart parsing, session tracking, progress). For firmware uploads, it calls into the update module:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// In http_server.c, when handling POST /update:
+if (strstr(request_buffer, "POST /update") != NULL) {
+    // Parse multipart headers, extract file size...
+
+    if (!update_start_upload(expected_file_size)) {
+        // Error response
+    }
+
+    // For each data chunk:
+    if (!update_write_block(chunk_data, chunk_size, is_last_chunk)) {
+        // Error response
+    }
+}</code></pre>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -733,95 +702,46 @@
 <h2 id="_rationale">Rationale</h2>
 <div class="sectionbody">
 <div class="sect2">
-<h3 id="_why_c_over_rust">Why C Over Rust</h3>
+<h3 id="_advantages">Advantages</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Immediate Productivity</strong>: Team can begin productive development immediately without learning curve delays</p>
+<p><strong>Single Responsibility</strong>: Update module owns all firmware update logic</p>
 </li>
 <li>
-<p><strong>Time-Critical Delivery</strong>: Project timeline ("deliver yesterday") cannot accommodate 6-12 month Rust learning curve</p>
+<p><strong>State Machine Integration</strong>: Proper handling of buy and reboot through defined states</p>
 </li>
 <li>
-<p><strong>Static Memory Context</strong>: Rust&#8217;s primary advantages (memory safety) are significantly diminished in our static allocation environment where:</p>
-<div class="ulist">
-<ul>
-<li>
-<p>No dynamic allocation eliminates use-after-free, double-free, memory leaks</p>
+<p><strong>Dual-Core Safety</strong>: All flash operations wrapped in <code>flash_safe_execute()</code></p>
 </li>
 <li>
-<p>Fixed buffer sizes and lifetimes reduce dangling pointer risks</p>
+<p><strong>Automatic Partition Discovery</strong>: Uses ROM functions, no hardcoded partition addresses</p>
 </li>
 <li>
-<p>Predictable memory layout simplifies debugging and validation</p>
-</li>
-</ul>
-</div>
+<p><strong>Clean Separation</strong>: HTTP handles uploads generically, update module handles firmware specifics</p>
 </li>
 <li>
-<p><strong>Team Expertise Leverage</strong>: Deep microcontroller C experience translates to immediate high-quality code</p>
+<p><strong>Graceful Failure</strong>: Buy failure triggers controlled reboot to previous image</p>
 </li>
 <li>
-<p><strong>Ecosystem Maturity</strong>: Comprehensive vendor support, mature tooling, extensive industrial deployment history</p>
-</li>
-<li>
-<p><strong>Manageable Complexity</strong>: Small project scope where C complexity is controllable through:</p>
-<div class="ulist">
-<ul>
-<li>
-<p>Disciplined coding practices (MISRA-C guidelines)</p>
-</li>
-<li>
-<p>Comprehensive unit and integration testing</p>
-</li>
-<li>
-<p>Code reviews focused on memory safety patterns</p>
-</li>
-<li>
-<p>Static analysis tools</p>
-</li>
-</ul>
-</div>
+<p><strong>Extensibility</strong>: Reboot state can handle various reboot reasons uniformly</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_memory_safety_strategy_in_c">Memory Safety Strategy in C</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Static Allocation</strong>: All memory allocated at compile time, eliminating dynamic memory risks</p>
-</li>
-<li>
-<p><strong>Defensive Programming</strong>: Bounds checking, input validation, error handling</p>
-</li>
-<li>
-<p><strong>Testing Strategy</strong>: 100% code coverage, stress testing, hardware-in-the-loop validation</p>
-</li>
-<li>
-<p><strong>Code Standards</strong>: MISRA-C compliance for industrial safety</p>
-</li>
-<li>
-<p><strong>Review Process</strong>: Mandatory security-focused code reviews</p>
-</li>
-</ul>
+<h3 id="_rejected_alternatives">Rejected Alternatives</h3>
+<div class="paragraph">
+<p><strong>Keep scattered implementation</strong>
+* Rejected due to maintenance complexity and violation of single-responsibility principle</p>
 </div>
+<div class="paragraph">
+<p><strong>Direct flash operations without flash_safe_execute</strong>
+* Rejected for safety; must coordinate with Core0 to prevent flash access conflicts</p>
 </div>
-<div class="sect2">
-<h3 id="_rust_advantages_acknowledged_but_outweighed">Rust Advantages Acknowledged But Outweighed</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Compile-time Memory Safety</strong>: Valuable but less critical in static allocation environment</p>
-</li>
-<li>
-<p><strong>Modern Type System</strong>: Benefits outweighed by learning curve and timeline pressure</p>
-</li>
-<li>
-<p><strong>Future-proofing</strong>: Theoretical benefit cannot justify immediate delivery risk</p>
-</li>
-</ul>
+<div class="paragraph">
+<p><strong>Hardcoded partition addresses</strong>
+* Rejected; ROM functions provide correct partition based on UF2 family ID and current boot state</p>
 </div>
 </div>
 </div>
@@ -834,22 +754,19 @@
 <div class="ulist">
 <ul>
 <li>
-<p>✅ <strong>Immediate Development Start</strong>: No productivity loss during language transition</p>
+<p>Consolidated, maintainable update functionality</p>
 </li>
 <li>
-<p>✅ <strong>Team Expertise Utilized</strong>: Deep C knowledge translates to high-quality embedded code</p>
+<p>Proper state machine integration ensures predictable behavior</p>
 </li>
 <li>
-<p>✅ <strong>Mature Ecosystem</strong>: Full vendor support, comprehensive tooling, extensive libraries</p>
+<p>Safe flash operations prevent dual-core conflicts</p>
 </li>
 <li>
-<p>✅ <strong>Proven Industrial Reliability</strong>: Decades of successful embedded deployments</p>
+<p>Automatic partition handling works with A/B update scheme</p>
 </li>
 <li>
-<p>✅ <strong>Debugging Efficiency</strong>: Mature GDB/OpenOCD toolchain familiar to team</p>
-</li>
-<li>
-<p>✅ <strong>Timeline Compliance</strong>: Meets aggressive delivery requirements</p>
+<p>Reboot state provides clean shutdown path for various scenarios</p>
 </li>
 </ul>
 </div>
@@ -859,145 +776,91 @@
 <div class="ulist">
 <ul>
 <li>
-<p>⚠️ <strong>Manual Memory Management</strong>: Requires disciplined practices and comprehensive testing</p>
+<p>Additional module increases codebase size slightly</p>
 </li>
 <li>
-<p>⚠️ <strong>Potential Security Vulnerabilities</strong>: Manual bounds checking, pointer management</p>
+<p>State machine complexity increases with new states/events</p>
 </li>
 <li>
-<p>⚠️ <strong>Future Technology Debt</strong>: May require reevaluation for future projects</p>
-</li>
-<li>
-<p>⚠️ <strong>Missing Modern Features</strong>: Less expressive type system than Rust</p>
+<p>Must maintain coordination between http_server and update module</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_risks_and_mitigation">Risks and Mitigation</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Memory Safety Risk</strong>: Mitigate through MISRA-C compliance, static analysis, comprehensive testing</p>
-</li>
-<li>
-<p><strong>Code Quality Risk</strong>: Mitigate through mandatory code reviews, automated testing, continuous integration</p>
-</li>
-<li>
-<p><strong>Future Maintenance Risk</strong>: Document rationale, plan Rust evaluation for future projects</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_implementation_notes">Implementation Notes</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_development_standards">Development Standards</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>MISRA-C Compliance</strong>: Follow MISRA-C:2012 guidelines for industrial safety</p>
-</li>
-<li>
-<p><strong>Static Analysis</strong>: Integrate PC-lint, Cppcheck, or equivalent in CI pipeline</p>
-</li>
-<li>
-<p><strong>Memory Management</strong>: Strictly static allocation, no malloc/free usage</p>
-</li>
-<li>
-<p><strong>Error Handling</strong>: Consistent error codes, graceful degradation strategies</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_testing_strategy">Testing Strategy</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Unit Testing</strong>: 100% code coverage requirement</p>
-</li>
-<li>
-<p><strong>Integration Testing</strong>: Hardware-in-the-loop validation</p>
-</li>
-<li>
-<p><strong>Stress Testing</strong>: Extended operation under maximum load conditions</p>
-</li>
-<li>
-<p><strong>Memory Validation</strong>: Static analysis tools, runtime bounds checking in debug builds</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_security_practices">Security Practices</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Input Validation</strong>: All network and UART inputs validated</p>
-</li>
-<li>
-<p><strong>Buffer Management</strong>: Fixed-size buffers with explicit bounds checking</p>
-</li>
-<li>
-<p><strong>Secure Coding</strong>: Follow SEI CERT C guidelines</p>
-</li>
-<li>
-<p><strong>Code Reviews</strong>: Security-focused review process for all code changes</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_follow_up_actions">Follow-up Actions</h2>
-<div class="sectionbody">
+<h3 id="_implementation_requirements">Implementation Requirements</h3>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><strong>Development Environment</strong>: Configure MISRA-C checking in build system</p>
+<p>Create <code>src/update/</code> directory with <code>CMakeLists.txt</code> and <code>update_manager.c</code></p>
 </li>
 <li>
-<p><strong>Testing Framework</strong>: Establish unit testing framework with coverage reporting</p>
+<p>Create <code>include/update/update_manager.h</code> with public API</p>
 </li>
 <li>
-<p><strong>Code Standards</strong>: Document project-specific C coding guidelines</p>
+<p>Add new states and events to <code>state_machine.h</code></p>
 </li>
 <li>
-<p><strong>Static Analysis</strong>: Integrate static analysis tools in CI/CD pipeline</p>
+<p>Update state transition logic in <code>state_machine.c</code></p>
 </li>
 <li>
-<p><strong>Team Training</strong>: Brief refresher on secure C practices for embedded systems</p>
+<p>Move <code>call_explicit_buy()</code> from <code>flash_persistence.c</code> to update module</p>
 </li>
 <li>
-<p><strong>Future Evaluation</strong>: Plan Rust reassessment for next major project</p>
+<p>Update <code>core1_main.c</code> to handle new states</p>
+</li>
+<li>
+<p>Update <code>http_server.c</code> to call update module for firmware uploads</p>
+</li>
+<li>
+<p>Update <code>src/CMakeLists.txt</code> to include update module</p>
 </li>
 </ol>
 </div>
-<hr>
-<div class="paragraph">
-<p><strong>Review Notes:</strong></p>
 </div>
-<div class="ulist checklist">
-<ul class="checklist">
+<div class="sect2">
+<h3 id="_dependencies">Dependencies</h3>
+<div class="ulist">
+<ul>
 <li>
-<p>&#10063; Confirm MISRA-C compliance requirements with quality team</p>
+<p><code>pico_bootrom</code> - ROM functions for partition discovery and flash operations</p>
 </li>
 <li>
-<p>&#10063; Validate static analysis tool selection</p>
+<p><code>boot_uf2_headers</code> - UF2 block structure definitions</p>
 </li>
 <li>
-<p>&#10063; Review memory safety testing strategy</p>
+<p><code>hardware_flash</code> - Flash constants and types</p>
 </li>
 <li>
-<p>&#10063; Document specific secure coding guidelines</p>
+<p><code>pico_sha256</code> - Checksum verification (future)</p>
 </li>
 <li>
-<p>&#10063; Plan future Rust evaluation timeline</p>
+<p><code>log_manager</code> - Logging</p>
+</li>
+<li>
+<p><code>config_manager</code> - For <code>flash_safe_execute()</code> wrappers</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_references">References</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>RP2350 Datasheet Chapter 5 - Bootrom</p>
+</li>
+<li>
+<p>pico-examples/pico_w/wifi/ota_update/picow_ota_update.c - Reference OTA implementation</p>
+</li>
+<li>
+<p>ADR-006: Flash Persistence Strategy - <code>flash_safe_execute()</code> patterns</p>
+</li>
+<li>
+<p>ADR-007: State Machine Architecture - Event-driven state machine design</p>
 </li>
 </ul>
 </div>
@@ -1030,11 +893,11 @@
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-003%3A+Programming+Language+Selection+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-003-programming-language-selection.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-017%3A+Update+Module+Architecture%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-017-update-module.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-003%3A+Programming+Language+Selection+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-003-programming-language-selection.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-017%3A+Update+Module+Architecture%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-017-update-module.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
