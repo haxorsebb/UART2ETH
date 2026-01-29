@@ -50,6 +50,7 @@ target_include_directories(tcp_socket_server PUBLIC
 add_library(http_server
     http_server.c
     http_auth.c
+    http_forms.c
     http_multipart.c
 )
 
