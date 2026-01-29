@@ -200,10 +200,18 @@ typedef enum {
     LOG_EVENT_FACTORY_DEFAULTS_APPLIED,
     LOG_EVENT_FACTORY_DEFAULTS_APPLY_FAILED,
 
-    // OTA events (400-499)
+    // OTA/Update events (400-499)
     LOG_EVENT_OTA_START = 400,
     LOG_EVENT_OTA_COMPLETE,
     LOG_EVENT_OTA_ERROR,
+    
+    // Firmware update events (ADR-017)
+    LOG_EVENT_FIRMWARE_UPDATE_START = 410,
+    LOG_EVENT_FIRMWARE_UPDATE_COMPLETE,
+    LOG_EVENT_FIRMWARE_UPDATE_FAILED,
+    LOG_EVENT_FIRMWARE_BUY_SUCCESS,
+    LOG_EVENT_FIRMWARE_BUY_FAILED,
+    LOG_EVENT_SYSTEM_REBOOT,
     
     // Ringbuffer events (410-419) per ADR-012
     LOG_EVENT_RINGBUFFER_WORK_START = 410,      // Ringbuffer processing started
@@ -271,7 +279,18 @@ typedef enum {
     LOG_CORE1_RINGBUFFER_ACTIVE,
     LOG_CORE1_IDLE,
     LOG_CORE1_INIT_ERROR,
-    LOG_CORE1_SHUTDOWN
+    LOG_CORE1_SHUTDOWN,
+    
+    // New Core1 substates for update module (ADR-017)
+    LOG_CORE1_BUY_UPDATE,
+    LOG_CORE1_REBOOT_FLUSH,
+    LOG_CORE1_REBOOT_EXECUTE,
+    
+    // New Core0 substates for reboot (ADR-017)
+    LOG_CORE0_REBOOT_IDLE,
+    
+    // New Main state for reboot (ADR-017)
+    LOG_MAIN_STATE_REBOOT
 } event_type_t;
 
 // Base constants for state change logging

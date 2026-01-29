@@ -41,7 +41,8 @@ typedef enum {
     MAIN_STATE_INIT = 0,           // System initialization and hardware setup
     MAIN_STATE_CONFIGURATION = 1,  // Configuration loading and validation
     MAIN_STATE_OPERATIONAL = 2,    // Normal operation mode
-    MAIN_STATE_ERROR = 3           // Error state requiring recovery
+    MAIN_STATE_ERROR = 3,          // Error state requiring recovery
+    MAIN_STATE_REBOOT = 4          // System reboot state (ADR-017)
 } main_state_t;
 
 // Core0 sub-states (UART processing, ISR-safe)
@@ -62,7 +63,10 @@ typedef enum {
     CORE0_IDLE,             // Check for work or sleep (like Core1)
     CORE0_UART_ACTIVE,      // Processing UART hardware only
     CORE0_RINGBUFFER_ACTIVE, // Processing ringbuffer messages only
-    CORE0_UART_ERROR        // UART hardware error state
+    CORE0_UART_ERROR,       // UART hardware error state
+    
+    // Reboot sequence (ADR-017)
+    CORE0_REBOOT_IDLE       // WFI while Core1 handles reboot
 } core0_substate_t;
 
 // Core1 sub-states (Network and maintenance, ISR-safe)
@@ -93,18 +97,25 @@ typedef enum {
     CORE1_RINGBUFFER_ACTIVE,    // Processing ringbuffer messages for network transmission
     CORE1_IDLE,                 // we might sleep here or schedule new work
     CORE1_INIT_ERROR,           // unrecoverable init error
-    CORE1_SHUTDOWN              // stop main loop
+    CORE1_SHUTDOWN,             // stop main loop
+    
+    // Buy update sequence (ADR-017)
+    CORE1_BUY_UPDATE,           // Attempt to buy current image after entering OPERATIONAL
+    
+    // Reboot sequence (ADR-017)
+    CORE1_REBOOT_FLUSH,         // Log reason, flush shared_memory to flash
+    CORE1_REBOOT_EXECUTE        // Execute SDK reboot
 } core1_substate_t;
 
 // Main state machine events
 typedef enum {
     MAIN_EVENT_INIT_COMPLETE_CORE0,     // UART initialized
     MAIN_EVENT_INIT_COMPLETE_CORE1,     // Network interface initialized 
-    MAIN_EVENT_CONFIG_COMPLETE_CORE0,      // Configuration loaded and validated
-    MAIN_EVENT_CONFIG_COMPLETE_CORE1,      // Configuration loaded and validated
-    MAIN_EVENT_SYSTEM_ERROR,       // System error detected
-    MAIN_EVENT_ERROR_RECOVERED     // Recovery from error state complete
-    
+    MAIN_EVENT_CONFIG_COMPLETE_CORE0,   // Configuration loaded and validated
+    MAIN_EVENT_CONFIG_COMPLETE_CORE1,   // Configuration loaded and validated
+    MAIN_EVENT_SYSTEM_ERROR,            // System error detected
+    MAIN_EVENT_ERROR_RECOVERED,         // Recovery from error state complete
+    MAIN_EVENT_REBOOT_REQUESTED         // Triggers transition to MAIN_STATE_REBOOT (ADR-017)
 } main_state_event_t;
 
 // Core0 state machine events
@@ -166,7 +177,14 @@ typedef enum {
     CORE1_EVENT_LOG_END,            // Log processing completed
     CORE1_EVENT_RINGBUFFER_DATA_READY,    // Ringbuffer has messages for network transmission
     CORE1_EVENT_RINGBUFFER_WORK_COMPLETE, // Ringbuffer processing completed
-    CORE1_EVENT_AUTO_TRANSITION            // DUMMY EVENT FOR auto-state transition
+    CORE1_EVENT_AUTO_TRANSITION,          // DUMMY EVENT FOR auto-state transition
+    
+    // Buy update events (ADR-017)
+    CORE1_EVENT_BUY_SUCCESS,              // Buy operation succeeded
+    CORE1_EVENT_BUY_FAILED,               // Buy operation failed
+    
+    // Reboot events (ADR-017)
+    CORE1_EVENT_REBOOT_FLUSH_COMPLETE     // Flush complete, ready to reboot
 } core1_event_t;
 
 /**

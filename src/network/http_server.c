@@ -11,18 +11,26 @@
  */
 
 #include "network/http_server.h"
+#include "network/http_multipart.h"
 #include "network/network_manager.h"
 #include "shared_memory.h"
 #include "device_mode.h"
 #include "log_manager.h"
+#include "update/update_manager.h"
+#include "state_machine/state_machine.h"
 #include "debug.h"
 #include "pico/stdlib.h"
+#include "hardware/watchdog.h"
 #include "lwip/tcp.h"
 #include "lwip/pbuf.h"
 #include "lwip/err.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+// HTML page templates
+#include "html/html_styles.h"
+#include "html/html_page_update.h"
 
 #ifdef FACTORY_INTERNAL_VERSION
 #include "factory_defaults.h"
@@ -39,11 +47,37 @@ static http_server_status_t g_server_status = HTTP_SERVER_STATUS_UNINITIALIZED;
 static http_server_stats_t g_server_stats;
 static absolute_time_t g_server_start_time;
 
-// Connection tracking
+// Firmware upload session state
+// Documentation Reference: ADR-016 - Firmware Update Web Interface, ADR-017 - Update Module
+typedef enum {
+    UPLOAD_STATE_IDLE,
+    UPLOAD_STATE_RECEIVING,
+    UPLOAD_STATE_COMPLETE,
+    UPLOAD_STATE_ERROR
+} upload_state_t;
+
+typedef struct {
+    upload_state_t state;
+    uint32_t total_expected_size;
+    uint32_t bytes_received;
+    uint32_t last_progress_report;
+} upload_session_t;
+
+static upload_session_t g_upload_session = {
+    .state = UPLOAD_STATE_IDLE,
+    .total_expected_size = 0,
+    .bytes_received = 0,
+    .last_progress_report = 0
+};
+
+// Connection tracking with upload state
 typedef struct http_connection {
     struct tcp_pcb* pcb;
     bool active;
     uint32_t start_time_ms;
+    
+    // Upload state for this connection (multipart/form-data handling)
+    multipart_context_t multipart_ctx;   // Multipart upload context
 } http_connection_t;
 
 static http_connection_t g_http_connections[HTTP_SERVER_MAX_CONNECTIONS];
@@ -64,10 +98,12 @@ static void http_close_connection(http_connection_t* conn);
 static void http_send_response(http_connection_t* conn, const char* response, size_t response_len);
 static void http_generate_device_page(char* buffer, size_t buffer_size);
 static void http_generate_config_page(char* buffer, size_t buffer_size);
+static void http_generate_update_page(char* buffer, size_t buffer_size, const char* message);
 static void http_generate_stylesheet(char* buffer, size_t buffer_size);
 static http_request_type_t http_parse_request_type(const char* request_data);
 static bool http_parse_post_data(const char* post_data, size_t data_len);
 static bool http_handle_password_change(const char* post_data, size_t data_len);
+static bool http_handle_reboot_request(const char* post_data, size_t data_len);
 static void http_send_redirect(http_connection_t* conn, const char* location);
 
 // HTTP Basic Authentication functions
@@ -210,7 +246,144 @@ void http_server_reset_stats(void) {
     g_server_start_time = get_absolute_time();
 }
 
+// ============================================================================
+// Upload Session Management (Public API)
+// ============================================================================
+
+/**
+ * @brief Start a firmware upload session
+ * 
+ * Initializes the upload session and calls update_manager to prepare
+ * for receiving firmware data.
+ * 
+ * @param expected_size Expected size of firmware file (bytes)
+ * @return true if session started successfully, false otherwise
+ * 
+ * Documentation Reference: ADR-016, ADR-017
+ */
+bool http_upload_session_start(uint32_t expected_size) {
+    if (g_upload_session.state == UPLOAD_STATE_RECEIVING) {
+        printf("HTTP Upload: Session already in progress\n");
+        return false;
+    }
+    
+    printf("HTTP Upload: Starting session, expected size: %u bytes\n", expected_size);
+    
+    // Initialize update manager for this upload
+    if (!update_start_upload(expected_size)) {
+        printf("HTTP Upload: Failed to start update manager session\n");
+        g_upload_session.state = UPLOAD_STATE_ERROR;
+        return false;
+    }
+    
+    // Initialize session state
+    g_upload_session.state = UPLOAD_STATE_RECEIVING;
+    g_upload_session.total_expected_size = expected_size;
+    g_upload_session.bytes_received = 0;
+    g_upload_session.last_progress_report = 0;
+    
+    return true;
+}
+
+/**
+ * @brief Feed a chunk of firmware data to the upload session
+ * 
+ * @param bytes_received Number of bytes in this chunk
+ */
+void http_upload_receive_chunk(uint32_t bytes_received) {
+    if (g_upload_session.state != UPLOAD_STATE_RECEIVING) {
+        return;
+    }
+    
+    g_upload_session.bytes_received += bytes_received;
+    
+    // Progress reporting every 64KB
+    if ((g_upload_session.bytes_received - g_upload_session.last_progress_report) >= (64 * 1024)) {
+        printf("HTTP Upload: %u / %u KB (%u%%)\n",
+               g_upload_session.bytes_received / 1024,
+               g_upload_session.total_expected_size / 1024,
+               (g_upload_session.bytes_received * 100) / g_upload_session.total_expected_size);
+        g_upload_session.last_progress_report = g_upload_session.bytes_received;
+    }
+}
+
+/**
+ * @brief Reset/abort the current upload session
+ */
+void http_upload_session_reset(void) {
+    if (g_upload_session.state == UPLOAD_STATE_RECEIVING) {
+        printf("HTTP Upload: Aborting session\n");
+        update_abort_upload();
+    }
+    
+    g_upload_session.state = UPLOAD_STATE_IDLE;
+    g_upload_session.total_expected_size = 0;
+    g_upload_session.bytes_received = 0;
+    g_upload_session.last_progress_report = 0;
+}
+
+/**
+ * @brief Get upload session progress
+ * 
+ * @param bytes_received Output: bytes received so far
+ * @param total_bytes Output: total expected bytes
+ */
+void http_upload_get_progress(uint32_t* bytes_received, uint32_t* total_bytes) {
+    if (bytes_received) {
+        *bytes_received = g_upload_session.bytes_received;
+    }
+    if (total_bytes) {
+        *total_bytes = g_upload_session.total_expected_size;
+    }
+}
+
+// ============================================================================
+// Firmware Upload Callback (bridges multipart → update_manager)
+// ============================================================================
+
+/**
+ * @brief Callback for multipart handler to feed firmware data chunks
+ * 
+ * This is called by the multipart parser for each chunk of actual file data.
+ * It forwards the data to update_manager for writing to flash.
+ * 
+ * @param data Pointer to firmware data chunk
+ * @param size Size of chunk in bytes
+ * @param finished True if this is the final chunk
+ * @param user_data User context (unused)
+ * @return true if chunk was processed successfully, false on error
+ * 
+ * Documentation Reference: ADR-016, ADR-017
+ */
+static bool http_firmware_upload_callback(const uint8_t* data, uint32_t size, bool finished, void* user_data) {
+    (void)user_data;  // Unused
+    
+    if (!data || size == 0) {
+        return false;
+    }
+    
+    // Feed chunk to update manager (cast away const - update_manager modifies workarea, not data)
+    if (!update_write_block((uint8_t*)data, size, finished)) {
+        printf("HTTP Upload: Failed to write %u bytes to update manager\n", size);
+        g_upload_session.state = UPLOAD_STATE_ERROR;
+        return false;
+    }
+    
+    // Update session progress
+    http_upload_receive_chunk(size);
+    
+    // Handle completion
+    if (finished) {
+        printf("HTTP Upload: Firmware upload complete (%u bytes)\n", g_upload_session.bytes_received);
+        g_upload_session.state = UPLOAD_STATE_COMPLETE;
+    }
+    
+    return true;
+}
+
+// ============================================================================
 // Private function implementations
+// ============================================================================
 
 /**
  * @brief HTTP accept callback
@@ -280,6 +453,53 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     
     printf("HTTP Server: Received %d bytes\n", p->tot_len);
     
+    // Check if this connection is in the middle of a firmware upload
+    if (conn->multipart_ctx.active && !multipart_is_complete(&conn->multipart_ctx)) {
+        printf("HTTP Upload: Received data packet for ongoing upload\n");
+        
+        // Copy data to buffer for multipart processing
+        static uint8_t upload_buffer[2048];
+        size_t copy_len = (p->tot_len < sizeof(upload_buffer)) ? p->tot_len : sizeof(upload_buffer);
+        pbuf_copy_partial(p, upload_buffer, copy_len, 0);
+        
+        // Process this chunk through multipart handler
+        if (!multipart_process_chunk(&conn->multipart_ctx, upload_buffer, copy_len,
+                                    http_firmware_upload_callback, NULL)) {
+            printf("HTTP Upload: Failed to process data chunk\n");
+            http_upload_session_reset();
+            multipart_reset_context(&conn->multipart_ctx);
+            
+            static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+            http_generate_update_page(response_buffer, sizeof(response_buffer),
+                "Error: Upload failed during data transfer.");
+            http_send_response(conn, response_buffer, strlen(response_buffer));
+            http_close_connection(conn);
+            
+            tcp_recved(tpcb, p->tot_len);
+            pbuf_free(p);
+            return ERR_OK;
+        }
+        
+        // Check if upload is now complete
+        if (multipart_is_complete(&conn->multipart_ctx)) {
+            printf("HTTP Upload: Upload completed successfully\n");
+            multipart_reset_context(&conn->multipart_ctx);
+            
+            static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+            http_generate_update_page(response_buffer, sizeof(response_buffer),
+                "Firmware uploaded successfully! Device will reboot to apply the update.");
+            http_send_response(conn, response_buffer, strlen(response_buffer));
+            http_close_connection(conn);
+            
+            // TODO: Schedule reboot via state machine
+        }
+        
+        tcp_recved(tpcb, p->tot_len);
+        pbuf_free(p);
+        return ERR_OK;
+    }
+    
+    // Normal HTTP request processing (not an upload continuation)
     // Copy request data to null-terminated string for parsing
     static char request_buffer[1024];
     size_t copy_len = (p->tot_len < sizeof(request_buffer) - 1) ? p->tot_len : sizeof(request_buffer) - 1;
@@ -350,6 +570,73 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             
         }
         #endif
+        else if (strstr(request_buffer, "POST /reboot") != NULL) {
+            // Handle reboot request
+            printf("HTTP Server: Processing reboot request\n");
+            
+            if (http_handle_reboot_request(request_buffer, copy_len)) {
+                // Reboot initiated - show confirmation page
+                http_generate_update_page(response_buffer, sizeof(response_buffer), 
+                    "Reboot initiated. Device will restart in a few seconds. Please wait and then refresh this page.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+            } else {
+                // Reboot failed
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Error: Failed to initiate reboot.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+            }
+        }
+        else if (strstr(request_buffer, "POST /update") != NULL) {
+            // Handle firmware upload
+            printf("HTTP Server: Processing firmware upload\n");
+            
+            // Initialize multipart context from request
+            if (!multipart_init_context(&conn->multipart_ctx, request_buffer, copy_len)) {
+                printf("HTTP Upload: Failed to initialize multipart context\n");
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Error: Failed to process upload. Invalid multipart data.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                return ERR_OK;
+            }
+            
+            // Start upload session in update_manager
+            if (!http_upload_session_start(conn->multipart_ctx.file_size)) {
+                printf("HTTP Upload: Failed to start upload session\n");
+                multipart_reset_context(&conn->multipart_ctx);
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Error: Failed to start firmware upload. Update manager not ready.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                return ERR_OK;
+            }
+            
+            // Process the initial chunk (HTTP headers + some data might be in this pbuf)
+            if (!multipart_process_chunk(&conn->multipart_ctx, (const uint8_t*)request_buffer, copy_len,
+                                        http_firmware_upload_callback, NULL)) {
+                printf("HTTP Upload: Failed to process initial chunk\n");
+                http_upload_session_reset();
+                multipart_reset_context(&conn->multipart_ctx);
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Error: Failed to process upload data.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                return ERR_OK;
+            }
+            
+            // Check if upload is already complete (small file in single packet)
+            if (multipart_is_complete(&conn->multipart_ctx)) {
+                printf("HTTP Upload: Upload complete in single packet\n");
+                multipart_reset_context(&conn->multipart_ctx);
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Firmware uploaded successfully! Device will reboot to apply the update.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                
+                // Trigger reboot after short delay (allow response to be sent)
+                // TODO: Schedule reboot via state machine
+            } else {
+                // Multi-packet upload - connection will stay open for more data
+                printf("HTTP Upload: Multi-packet upload in progress, waiting for more data...\n");
+                // Don't close connection or send response yet - more data coming
+            }
+        }
         else {
             // Handle configuration update
             printf("HTTP Server: Processing configuration update\n");
@@ -388,6 +675,11 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     else if (strstr(request_buffer, "GET /config") != NULL) {
         // Show configuration page
         http_generate_config_page(response_buffer, sizeof(response_buffer));
+        http_send_response(conn, response_buffer, strlen(response_buffer));
+    }
+    else if (strstr(request_buffer, "GET /update") != NULL) {
+        // Show firmware update page
+        http_generate_update_page(response_buffer, sizeof(response_buffer), NULL);
         http_send_response(conn, response_buffer, strlen(response_buffer));
     }
     else {
@@ -1067,7 +1359,7 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
     });
     
     // Build HTML response with device-mode-aware channel list
-    int html_len = snprintf(buffer, buffer_size,
+    snprintf(buffer, buffer_size,
         "HTTP/1.0 200 OK\r\n"
         "Content-Type: text/html\r\n"
         "Connection: close\r\n"
@@ -1448,6 +1740,171 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
         printf("HTTP: Config HTML generation successful - %d bytes remaining\n", 
                (int)buffer_size - html_len);
     }
+}
+
+/**
+ * @brief Generate firmware update HTML page
+ * 
+ * Shows current firmware status with TBYB state and provides
+ * reboot button to trigger the update state machine.
+ * 
+ * Documentation Reference:
+ * - ADR-017: Update Module
+ */
+static void http_generate_update_page(char* buffer, size_t buffer_size, const char* message) {
+    if (!buffer || buffer_size == 0) {
+        return;
+    }
+    
+    // Get current update state and statistics
+    update_state_t state = update_get_state();
+    update_stats_t stats;
+    update_get_stats(&stats);
+    
+    const char* state_str = "Unknown";
+    const char* state_class = "";
+    
+    switch (state) {
+        case UPDATE_STATE_IDLE:
+            state_str = "Idle - Ready for update";
+            state_class = "status-ok";
+            break;
+        case UPDATE_STATE_RECEIVING:
+            state_str = "Receiving firmware...";
+            state_class = "status-warning";
+            break;
+        case UPDATE_STATE_COMPLETE:
+            state_str = "Upload complete";
+            state_class = "status-ok";
+            break;
+        case UPDATE_STATE_ERROR:
+            state_str = "Error occurred";
+            state_class = "status-error";
+            break;
+    }
+    
+    // Generate HTML response
+    int html_len = snprintf(buffer, buffer_size,
+        "HTTP/1.0 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head>\n"
+        "    <title>UART2ETH Firmware Update</title>\n"
+        "    <style>\n"
+        "        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }\n"
+        "        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 800px; }\n"
+        "        .header { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 30px; }\n"
+        "        .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 4px; }\n"
+        "        .section h3 { margin-top: 0; color: #2c3e50; }\n"
+        "        .nav-links { margin: 20px 0; text-align: center; }\n"
+        "        .nav-links a { display: inline-block; margin: 0 10px; padding: 10px 20px; background-color: #95a5a6; color: white; text-decoration: none; border-radius: 4px; }\n"
+        "        .nav-links a:hover { background-color: #7f8c8d; }\n"
+        "        .nav-links a.active { background-color: #3498db; }\n"
+        "        .button { background-color: #3498db; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }\n"
+        "        .button:hover { background-color: #2980b9; }\n"
+        "        .button-danger { background-color: #e74c3c; }\n"
+        "        .button-danger:hover { background-color: #c0392b; }\n"
+        "        .button-success { background-color: #27ae60; }\n"
+        "        .button-success:hover { background-color: #229954; }\n"
+        "        .status-ok { color: #27ae60; font-weight: bold; }\n"
+        "        .status-warning { color: #f39c12; font-weight: bold; }\n"
+        "        .status-error { color: #e74c3c; font-weight: bold; }\n"
+        "        .message { padding: 15px; border-radius: 4px; margin-bottom: 20px; }\n"
+        "        .message-info { background-color: #d5f5e3; border: 1px solid #27ae60; }\n"
+        "        .message-error { background-color: #fadbd8; border: 1px solid #e74c3c; }\n"
+        "        .tbyb-warning { background-color: #fef9e7; border: 2px solid #f39c12; padding: 15px; border-radius: 4px; margin-bottom: 20px; }\n"
+        "        .label { font-weight: bold; color: #34495e; }\n"
+        "        .value { color: #2980b9; font-family: monospace; }\n"
+        "    </style>\n"
+        "</head>\n"
+        "<body>\n"
+        "    <div class=\"container\">\n"
+        "        <div class=\"header\">\n"
+        "            <h1>Firmware Update</h1>\n"
+        "            <p>Manage device firmware and system updates</p>\n"
+        "        </div>\n"
+        "        \n"
+        "        <div class=\"nav-links\">\n"
+        "            <a href=\"/\">Status</a>\n"
+        "            <a href=\"/config\">Configuration</a>\n"
+        "            <a href=\"/update\" class=\"active\">Update</a>\n"
+        "        </div>\n"
+        "        \n"
+        "%s"  /* Message placeholder */
+        "        \n"
+        "        <div class=\"section\">\n"
+        "            <h3>Firmware Status</h3>\n"
+        "            <p><span class=\"label\">Update State:</span> <span class=\"%s\">%s</span></p>\n"
+        "            <p><span class=\"label\">Bytes Received:</span> <span class=\"value\">%u</span></p>\n"
+        "        </div>\n"
+        "        \n"
+        "        <div class=\"section\">\n"
+        "            <h3>📦 Upload Firmware</h3>\n"
+        "            <p>Upload a .uf2 firmware file for OTA update. Maximum size: 1024 KB</p>\n"
+        "            <div style=\"border: 2px dashed #3498db; padding: 30px; text-align: center; border-radius: 8px; margin: 20px 0;\">\n"
+        "                <form method=\"POST\" action=\"/update\" enctype=\"multipart/form-data\">\n"
+        "                    <p><strong>Select Firmware File:</strong></p>\n"
+        "                    <input type=\"file\" name=\"firmware\" accept=\".uf2\" required style=\"margin: 15px 0;\">\n"
+        "                    <br>\n"
+        "                    <button type=\"submit\" class=\"button\">Upload & Install</button>\n"
+        "                </form>\n"
+        "            </div>\n"
+        "            <p><em>Note: Device will automatically reboot to apply new firmware after successful upload.</em></p>\n"
+        "        </div>\n"
+        "        \n"
+        "        <div class=\"section\">\n"
+        "            <h3>🔄 Device Reboot</h3>\n"
+        "            <p>Reboot the device to apply pending changes or recover from errors.</p>\n"
+        "            <p><strong>Warning:</strong> All active connections will be terminated.</p>\n"
+        "            <form method=\"POST\" action=\"/reboot\">\n"
+        "                <button type=\"submit\" class=\"button button-danger\">Reboot Device</button>\n"
+        "            </form>\n"
+        "        </div>\n"
+        "        \n"
+        "    </div>\n"
+        "</body>\n"
+        "</html>\r\n",
+        /* Message */
+        message ? "<div class=\"message message-info\">" : "",
+        message ? message : "",
+        message ? "</div>" : "",
+        /* Status */
+        state_class, state_str,
+        stats.bytes_received
+    );
+    
+    printf("HTTP: Generated update page (%d bytes)\n", html_len);
+}
+
+/**
+ * @brief Handle reboot request from web UI
+ * 
+ * Triggers a device reboot via the state machine. Can also handle
+ * TBYB "buy" action to confirm the current firmware.
+ * 
+ * Documentation Reference:
+ * - ADR-017: Update Module
+ */
+static bool http_handle_reboot_request(const char* post_data, size_t data_len) {
+    printf("HTTP: Processing reboot request\n");
+    
+    // TODO: Check for TBYB "buy" action when API is available
+    // For now, just trigger immediate reboot
+    
+    // Trigger watchdog reboot after short delay (allow HTTP response to be sent)
+    printf("HTTP: Scheduling device reboot in 2 seconds...\n");
+    
+    // Set reboot reason in persistent storage
+    update_set_reboot_reason(REBOOT_REASON_USER_REQUESTED);
+    
+    // Watchdog will trigger reboot automatically (hardware watchdog is always running)
+    // The 2-second delay allows the HTTP response to be sent before reboot
+    watchdog_reboot(0, 0, 2000);  // Reboot in 2000ms
+    
+    return true;
 }
 
 /**

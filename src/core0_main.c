@@ -178,6 +178,11 @@ void core0_main(void) {
                 // Error handling
                 core0_handle_error();
                 break;
+                
+            case MAIN_STATE_REBOOT:
+                // Reboot handling (ADR-017) - Core0 just waits while Core1 handles reboot
+                core0_idle_wait();
+                break;
         }
     }
 }
