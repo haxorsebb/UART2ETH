@@ -49,6 +49,7 @@ target_include_directories(tcp_socket_server PUBLIC
 # Create HTTP server library
 add_library(http_server
     http_server.c
+    http_auth.c
     http_multipart.c
 )
 

@@ -27,6 +27,9 @@
 extern "C" {
 #endif
 
+// Forward declarations
+typedef struct http_connection http_connection_t;
+
 /**
  * @brief HTTP server status enumeration
  */
@@ -92,9 +95,24 @@ void http_server_get_stats(http_server_stats_t* stats);
 void http_server_reset_stats(void);
 
 /**
+ * @brief HTTP Response Sending (exposed for auth module)
+ * 
+ * Send HTTP response to client connection. Used by authentication
+ * and other modules that need to send responses.
+ * 
+ * @param conn HTTP connection to send response on
+ * @param response Response string to send
+ * @param response_len Length of response in bytes
+ * 
+ * Reference: ADR-018 HTTP Server Modularization
+ */
+void http_send_response(http_connection_t* conn, const char* response, size_t response_len);
+
+/**
  * @brief HTTP Basic Authentication Functions
  * 
  * Reference: ADR-016 HTTP Basic Authentication
+ * Note: These functions are now in http_auth module (ADR-018)
  */
 
 /**
