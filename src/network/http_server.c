@@ -85,6 +85,7 @@ typedef struct http_connection {
     struct tcp_pcb* pcb;
     bool active;
     uint32_t start_time_ms;
+    bool close_after_send;  // Flag to close connection after data is sent
     
     // Upload state for this connection (multipart/form-data handling)
     multipart_context_t multipart_ctx;   // Multipart upload context
@@ -98,6 +99,7 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
 static void http_connection_error_callback(void* arg, err_t err);
 static err_t http_connection_sent_callback(void* arg, struct tcp_pcb* tpcb, u16_t len);
 static void http_close_connection(http_connection_t* conn);
+static void http_close_connection_after_send(http_connection_t* conn);
 // Page generation functions now in http_pages/ modules (ADR-018)
 // Request routing functions now in http_router module (ADR-018 Phase 4)
 static bool http_handle_reboot_request(const char* post_data, size_t data_len);
@@ -474,6 +476,7 @@ static void http_handle_root_get(http_connection_t* conn,
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     http_generate_device_page(response_buffer, sizeof(response_buffer));
     http_send_response(conn, response_buffer, strlen(response_buffer));
+    http_close_connection_after_send(conn);
 }
 
 /**
@@ -489,6 +492,7 @@ static void http_handle_config_get(http_connection_t* conn,
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     http_generate_config_page(response_buffer, sizeof(response_buffer));
     http_send_response(conn, response_buffer, strlen(response_buffer));
+    http_close_connection_after_send(conn);
 }
 
 /**
@@ -504,6 +508,7 @@ static void http_handle_update_get(http_connection_t* conn,
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     http_generate_update_page(response_buffer, sizeof(response_buffer), NULL);
     http_send_response(conn, response_buffer, strlen(response_buffer));
+    http_close_connection_after_send(conn);
 }
 
 /**
@@ -519,6 +524,7 @@ static void http_handle_styles_get(http_connection_t* conn,
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     http_generate_stylesheet(response_buffer, sizeof(response_buffer));
     http_send_response(conn, response_buffer, strlen(response_buffer));
+    http_close_connection_after_send(conn);
 }
 
 #ifdef FACTORY_INTERNAL_VERSION
@@ -535,6 +541,7 @@ static void http_handle_factory_get(http_connection_t* conn,
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     http_generate_factory_page(response_buffer, sizeof(response_buffer), NULL, 0, NULL, 0);
     http_send_response(conn, response_buffer, strlen(response_buffer));
+    http_close_connection_after_send(conn);
 }
 
 /**
@@ -652,12 +659,24 @@ static void http_handle_update_post(http_connection_t* conn,
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     
+    // Check authentication (since we skipped it in recv callback for multipart uploads)
+    shared_memory_layout_t* layout = shared_memory_get_layout();
+    if (!layout || !http_check_authentication(request_buffer, layout->config.admin_password)) {
+        printf("HTTP Upload: Authentication failed\n");
+        http_send_auth_required(conn);
+        http_close_connection_after_send(conn);
+        return;
+    }
+    
+    printf("HTTP Upload: Authentication successful, processing upload\n");
+    
     // Initialize multipart context from request
     if (!multipart_init_context(&conn->multipart_ctx, request_buffer, buffer_len)) {
         printf("HTTP Upload: Failed to initialize multipart context\n");
         http_generate_update_page(response_buffer, sizeof(response_buffer),
             "Error: Failed to process upload. Invalid multipart data.");
         http_send_response(conn, response_buffer, strlen(response_buffer));
+        http_close_connection_after_send(conn);
         return;
     }
     
@@ -668,6 +687,7 @@ static void http_handle_update_post(http_connection_t* conn,
         http_generate_update_page(response_buffer, sizeof(response_buffer),
             "Error: Failed to start firmware upload. Update manager not ready.");
         http_send_response(conn, response_buffer, strlen(response_buffer));
+        http_close_connection_after_send(conn);
         return;
     }
     
@@ -680,6 +700,7 @@ static void http_handle_update_post(http_connection_t* conn,
         http_generate_update_page(response_buffer, sizeof(response_buffer),
             "Error: Failed to process upload data.");
         http_send_response(conn, response_buffer, strlen(response_buffer));
+        http_close_connection_after_send(conn);
         return;
     }
     
@@ -735,7 +756,7 @@ static void http_handle_404(http_connection_t* conn) {
         0xDEADBEEF);  // Classic hex code
     
     http_send_response(conn, response_buffer, len);
-    http_close_connection(conn);
+    http_close_connection_after_send(conn);
 }
 
 /**
@@ -759,6 +780,10 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     
     printf("HTTP Server: Received %d bytes\n", p->tot_len);
     
+    // Debug: Check multipart context state
+    printf("HTTP Server: multipart_ctx.active=%d, bytes_received=%u/%u\n", 
+           conn->multipart_ctx.active, conn->multipart_ctx.bytes_received, conn->multipart_ctx.file_size);
+    
     // Check if this connection is in the middle of a firmware upload
     if (conn->multipart_ctx.active && !multipart_is_complete(&conn->multipart_ctx)) {
         printf("HTTP Upload: Received data packet for ongoing upload\n");
@@ -779,7 +804,7 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             http_generate_update_page(response_buffer, sizeof(response_buffer),
                 "Error: Upload failed during data transfer.");
             http_send_response(conn, response_buffer, strlen(response_buffer));
-            http_close_connection(conn);
+            http_close_connection_after_send(conn);
             
             tcp_recved(tpcb, p->tot_len);
             pbuf_free(p);
@@ -795,7 +820,7 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             http_generate_update_page(response_buffer, sizeof(response_buffer),
                 "Firmware uploaded successfully! Device will reboot to apply the update.");
             http_send_response(conn, response_buffer, strlen(response_buffer));
-            http_close_connection(conn);
+            http_close_connection_after_send(conn);
             
             // TODO: Schedule reboot via state machine
         }
@@ -812,27 +837,36 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
     pbuf_copy_partial(p, request_buffer, copy_len, 0);
     request_buffer[copy_len] = '\0';
     
-    // Check HTTP Basic Authentication for ALL requests
-    // Get password from shared memory
-    shared_memory_layout_t* layout = shared_memory_get_layout();
-    if (!layout) {
-        printf("HTTP Auth: Failed to get shared memory layout\n");
-        http_send_auth_required(conn);
-        tcp_recved(tpcb, p->tot_len);
-        pbuf_free(p);
-        return ERR_OK;
-    }
+    // Check if this is a POST /update request (multipart upload)
+    // These requests may not include Authorization header in the form submission
+    // so we'll check authentication inside the route handler instead
+    bool is_upload_request = (strstr(request_buffer, "POST /update") != NULL);
     
-    // Verify authentication
-    if (!http_check_authentication(request_buffer, layout->config.admin_password)) {
-        printf("HTTP Auth: Authentication failed, sending 401\n");
-        http_send_auth_required(conn);
-        tcp_recved(tpcb, p->tot_len);
-        pbuf_free(p);
-        return ERR_OK;
+    if (!is_upload_request) {
+        // Check HTTP Basic Authentication for non-upload requests
+        // Get password from shared memory
+        shared_memory_layout_t* layout = shared_memory_get_layout();
+        if (!layout) {
+            printf("HTTP Auth: Failed to get shared memory layout\n");
+            http_send_auth_required(conn);
+            tcp_recved(tpcb, p->tot_len);
+            pbuf_free(p);
+            return ERR_OK;
+        }
+        
+        // Verify authentication
+        if (!http_check_authentication(request_buffer, layout->config.admin_password)) {
+            printf("HTTP Auth: Authentication failed, sending 401\n");
+            http_send_auth_required(conn);
+            tcp_recved(tpcb, p->tot_len);
+            pbuf_free(p);
+            return ERR_OK;
+        }
+        
+        printf("HTTP Auth: Request authenticated successfully\n");
+    } else {
+        printf("HTTP Auth: Skipping auth check for POST /update (will check in handler)\n");
     }
-    
-    printf("HTTP Auth: Request authenticated successfully\n");
     
     // Route request to appropriate handler (ADR-018 Phase 4)
     http_route_handler_t handler = http_router_find_handler(request_buffer);
@@ -876,6 +910,15 @@ static err_t http_connection_sent_callback(void* arg, struct tcp_pcb* tpcb, u16_
     if (conn) {
         g_server_stats.bytes_sent += len;
         printf("HTTP Server: Sent %d bytes\n", len);
+        
+        // Close connection if requested and all data has been sent
+        if (conn->close_after_send && conn->pcb) {
+            // Check if send buffer is empty (all data sent)
+            if (tcp_sndbuf(conn->pcb) == TCP_SND_BUF) {
+                printf("HTTP Server: All data sent, closing connection\n");
+                http_close_connection(conn);
+            }
+        }
     }
     
     return ERR_OK;
@@ -888,7 +931,7 @@ static void http_close_connection(http_connection_t* conn) {
     if (!conn || !conn->active) {
         return;
     }
-    
+
     if (conn->pcb) {
         tcp_arg(conn->pcb, NULL);
         tcp_recv(conn->pcb, NULL);
@@ -897,9 +940,26 @@ static void http_close_connection(http_connection_t* conn) {
         tcp_close(conn->pcb);
         conn->pcb = NULL;
     }
-    
+
     conn->active = false;
+    conn->close_after_send = false;
     printf("HTTP Server: Connection closed\n");
+}
+
+/**
+ * @brief Schedule connection close after response is sent
+ * 
+ * This should be called instead of http_close_connection() after sending
+ * a response to prevent "connection reset" errors. The connection will
+ * be closed automatically after all data is transmitted.
+ */
+static void http_close_connection_after_send(http_connection_t* conn) {
+    if (!conn || !conn->active) {
+        return;
+    }
+    
+    conn->close_after_send = true;
+    printf("HTTP Server: Connection will close after data is sent\n");
 }
 
 /**
@@ -936,7 +996,7 @@ static void http_send_redirect(http_connection_t* conn, const char* location) {
         location);
     
     http_send_response(conn, redirect_buffer, len);
-    http_close_connection(conn);
+    http_close_connection_after_send(conn);
 }
 
 // Authentication functions moved to http_auth module (ADR-018 Phase 2)

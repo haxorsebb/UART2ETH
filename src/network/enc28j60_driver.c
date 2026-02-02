@@ -369,6 +369,7 @@ static void enc28j60_configure_phy(void) {
     DEBUG_ONLY({ printf("ENC28J60: PHY configuration (using defaults)\n"); });
     // Use default PHY settings for basic operation
     // No PHY register writes needed for minimal functionality
+    
 }
 
 /**

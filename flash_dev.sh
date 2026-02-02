@@ -2,7 +2,7 @@
 set -e
 
 # Configuration
-BINARY="build/uart2eth_ota.bin"
+BINARY="build/uart2eth.bin"
 PT_SLOTS="partition_table_slots.bin"
 OPENOCD_DIR="$HOME/.pico-sdk/openocd/0.12.0+dev"  # Use $HOME instead of ~
 OPENOCD_INTERFACE="interface/cmsis-dap.cfg"
