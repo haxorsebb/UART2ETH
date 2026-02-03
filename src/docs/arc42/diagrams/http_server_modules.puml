@@ -1,0 +1,82 @@
+@startuml http_server_modules
+!theme plain
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+
+title HTTP Server Module Architecture (ADR-018)
+
+package "Network Layer" {
+  component [http_server.c\n964 lines] as http_server #LightBlue {
+    [HTTP Protocol\nHandling]
+    [Connection\nManagement]
+    [Multipart\nUpload]
+  }
+  
+  component [http_router.c\n180 lines] as http_router #LightGreen {
+    [Route Table\n(max 20 routes)]
+    [Handler\nDispatch]
+  }
+  
+  component [http_auth.c\n231 lines] as http_auth #LightYellow {
+    [Base64\nDecode]
+    [Credential\nCheck]
+    [401 Response]
+  }
+  
+  component [http_forms.c\n446 lines] as http_forms #LightCoral {
+    [URL Decode]
+    [Form Parser]
+    [Field\nValidation]
+  }
+  
+  package "http_pages\n1,090 lines" #LightGray {
+    component [page_device.c\n230 lines] as page_device
+    component [page_config.c\n250 lines] as page_config
+    component [page_update.c\n130 lines] as page_update
+    component [page_styles.c\n100 lines] as page_styles
+    component [page_factory.c\n380 lines\n<<conditional>>] as page_factory #DDDDDD
+  }
+}
+
+' Dependencies
+http_server --> http_router : registers routes\nat init
+http_router --> http_server : dispatches to\nhandlers
+http_server --> http_auth : checks\ncredentials
+http_server --> http_forms : parses\nform data
+http_server --> page_device : generates\nHTML
+http_server --> page_config : generates\nHTML
+http_server --> page_update : generates\nHTML
+http_server --> page_styles : generates\nCSS
+http_server --> page_factory : generates\nHTML
+
+note right of http_router
+  Route Handler Signature:
+  void handler(
+    http_connection_t* conn,
+    const char* request,
+    size_t length)
+end note
+
+note right of http_auth
+  HTTP Basic Authentication
+  Username: admin
+  Password: configurable
+end note
+
+note bottom of page_factory
+  Only compiled when
+  FACTORY_INTERNAL_VERSION
+  is defined
+end note
+
+legend bottom
+  |= Component |= Lines |= Purpose |
+  | http_server.c | 964 | Core HTTP protocol, connection management |
+  | http_router.c | 180 | Route registration and dispatch |
+  | http_auth.c | 231 | HTTP Basic Authentication |
+  | http_forms.c | 446 | Form parsing and validation |
+  | page_*.c | 1,090 | HTML/CSS page generation |
+  |= **Total** |= **2,911** |= **8 focused modules** |
+endlegend
+
+@enduml
