@@ -229,7 +229,7 @@ pico_enable_stdio_uart(uart2eth_ota 1)
 pico_set_uf2_family(uart2eth_ota "rp2350-arm-s")
 
 # Embed partition table for flash isolation (same as uart2eth)
-pico_embed_pt_in_binary(uart2eth_ota "${CMAKE_CURRENT_SOURCE_DIR}/partition_table.json")
+# pico_embed_pt_in_binary(uart2eth_ota "${CMAKE_CURRENT_SOURCE_DIR}/partition_table.json")
 
 # Hash binary for TBYB verification
 pico_hash_binary(uart2eth_ota)
@@ -288,7 +288,7 @@ pico_enable_stdio_uart(uart2eth_factory_internal 1)
 pico_set_uf2_family(uart2eth_factory_internal "rp2350-arm-s")
 
 # Embed partition table for flash isolation (same as uart2eth)
-pico_embed_pt_in_binary(uart2eth_factory_internal "${CMAKE_CURRENT_SOURCE_DIR}/partition_table.json")
+# pico_embed_pt_in_binary(uart2eth_factory_internal "${CMAKE_CURRENT_SOURCE_DIR}/partition_table.json")
 
 # Create UF2 output
 pico_add_extra_outputs(uart2eth_factory_internal)

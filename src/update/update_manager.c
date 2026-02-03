@@ -23,6 +23,7 @@
 #include "boot/picobin.h"
 #include "boot/uf2.h"
 
+#include <pico/error.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -33,7 +34,6 @@
 #define UPDATE_WORKAREA_SIZE        (4 * 1024)  // 4KB workarea for ROM functions
 #define UPDATE_BUFFER_SIZE          FLASH_SECTOR_SIZE  // 4KB sector buffer
 #define FLASH_SECTOR_ERASE_SIZE     4096
-#define FLASH_PAGE_SIZE             256
 
 // UF2 Family ID for RP2350 (from pico-examples)
 #define RP2350_FAMILY_ID            0xe48bff59
@@ -114,12 +114,7 @@ static bool flush_sector_buffer(void) {
     
     // Calculate flash address
     uint32_t flash_addr = g_update.partition_start + g_update.current_flash_offset;
-    
-    DEBUG_ONLY({
-        printf("UPDATE: Flushing %u bytes to flash offset 0x%08X\n", 
-               g_update.sector_buffer_offset, flash_addr);
-    });
-    
+
     // Prepare parameters for flash operations
     update_flash_params_t params;
     params.address = flash_addr + XIP_BASE;
@@ -145,10 +140,7 @@ static bool flush_sector_buffer(void) {
         }
         
         g_update.highest_erased_sector = current_sector;
-        
-        DEBUG_ONLY({
-            printf("UPDATE: Erased sector %u at 0x%08X\n", current_sector, flash_addr);
-        });
+
     }
     
     // Program the data (must be done in 256-byte pages)
@@ -179,7 +171,6 @@ static bool flush_sector_buffer(void) {
             g_update.last_error_code = (rc != PICO_OK) ? rc : params.result;
             return false;
         }
-        
         buffer_offset += chunk_size;
         bytes_remaining = (bytes_remaining > chunk_size) ? (bytes_remaining - chunk_size) : 0;
     }
@@ -268,7 +259,7 @@ bool update_start_upload(uint32_t expected_size) {
     
     int rc = rom_get_uf2_target_partition(g_update.workarea, sizeof(g_update.workarea),
                                           RP2350_FAMILY_ID, &target_partition);
-    if (rc != 0) {
+    if (rc < PICO_OK) {
         printf("UPDATE: Failed to get target partition (rc=%d)\n", rc);
         g_update.last_error_code = rc;
         return false;
@@ -366,12 +357,14 @@ bool update_write_block(uint8_t* data, uint32_t size, bool finished) {
         g_update.blocks_processed++;
         
         // Progress reporting every 64KB
+        /*
         if ((g_update.bytes_received % (64 * 1024)) < size) {
             printf("UPDATE: Progress %u / %u KB (%u%%)\n",
                    g_update.bytes_received / 1024,
                    g_update.expected_size / 1024,
                    (g_update.bytes_received * 100) / g_update.expected_size);
         }
+        */
     }
     
     // Handle finish

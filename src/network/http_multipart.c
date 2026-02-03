@@ -168,6 +168,7 @@ bool multipart_process_chunk(multipart_context_t* ctx, const uint8_t* data, size
         uint32_t skip_bytes = ctx->http_headers_length + 
                              (ctx->multipart_overhead - (2 + 2 + strlen(ctx->boundary) + 2 + 2));
         
+                                
         if (length <= skip_bytes) {
             // This entire chunk is headers, skip it
             ctx->headers_parsed = true;
@@ -188,6 +189,8 @@ bool multipart_process_chunk(multipart_context_t* ctx, const uint8_t* data, size
     if (data_remaining > 0) {
         bool is_last_chunk = (ctx->bytes_received + data_remaining >= ctx->file_size);
         
+        //printf("MULTIPART: DATA [%02X] [%02X] [%02X] [%02X] \n", *(data + data_offset), *(data + data_offset+1), *(data + data_offset+2), *(data + data_offset+3));
+            
         // Call the callback with actual file data
         if (!chunk_callback(data + data_offset, data_remaining, is_last_chunk, user_data)) {
             printf("MULTIPART: Chunk callback failed\n");
@@ -195,13 +198,15 @@ bool multipart_process_chunk(multipart_context_t* ctx, const uint8_t* data, size
         }
         
         ctx->bytes_received += data_remaining;
-        
+        /*
         // Progress reporting (every 64KB or on completion)
         if (is_last_chunk || (ctx->bytes_received % (64 * 1024)) < data_remaining) {
+
             printf("MULTIPART: Progress %u / %u bytes (%u%%)\n",
                    ctx->bytes_received, ctx->file_size,
                    (ctx->bytes_received * 100) / ctx->file_size);
         }
+        */
     }
     
     return true;
