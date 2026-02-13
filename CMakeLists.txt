@@ -273,7 +273,7 @@ target_link_libraries(uart2eth_factory_internal
     config_manager     # Our config manager library
     log_manager        # Our log manager library
     state_machine      # Our event-driven state machine library
-    network_manager    # Our network manager library (now with lwIP)
+    network_manager_factory_internal    # Our network manager library (now with lwIP)
     tcp_socket_server  # all sockets are handled here
     http_server        # HTTP server for device information web interface
     ringbuffer         # Ring buffer for UART-TCP message bridging

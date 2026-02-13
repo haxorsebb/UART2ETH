@@ -53,14 +53,14 @@
 
 #ifdef DEVICE_MODE_SHARK
     #define DEVICE_MODE_NAME            "SHARK"
-    #define DEVICE_NUM_UART_CHANNELS    2       // Channel 0 (debug) + Channel 1
-    #define DEVICE_NUM_DATA_CHANNELS    1       // Only Channel 1 for data
+    #define DEVICE_NUM_UART_CHANNELS    2       // Channel 0 (debug) + Channel 4
+    #define DEVICE_NUM_DATA_CHANNELS    1       // Only Channel 4 for data
     #define DEVICE_HAS_ETHERNET         1       // Has ENC28J60
     #define DEVICE_HAS_SPI_LINK         0       // No SPI link to other device
-    #define DEVICE_CHANNEL_1_ENABLED    1
+    #define DEVICE_CHANNEL_1_ENABLED    0       // HW UART1 disabled (GPIO24/25 not used)
     #define DEVICE_CHANNEL_2_ENABLED    0
     #define DEVICE_CHANNEL_3_ENABLED    0
-    #define DEVICE_CHANNEL_4_ENABLED    0       // For future PRIMARY/SECONDARY
+    #define DEVICE_CHANNEL_4_ENABLED    1       // PIO UART on GPIO5(TX)/GPIO4(RX)
 #endif
 
 #ifdef DEVICE_MODE_PRIMARY
@@ -111,9 +111,9 @@
 #define DEVICE_UART0_TX_GPIO        0
 #define DEVICE_UART0_RX_GPIO        1
 
-// UART Channel 1 - PL011 UART1
-#define DEVICE_UART1_TX_GPIO        4
-#define DEVICE_UART1_RX_GPIO        5
+// UART Channel 1 - PL011 UART1 (moved to GPIO24/25 due to board wiring)
+#define DEVICE_UART1_TX_GPIO        24
+#define DEVICE_UART1_RX_GPIO        25
 
 // UART Channel 2 - PIO UART (SHARK: not used)
 #define DEVICE_UART2_TX_GPIO        14
@@ -123,9 +123,9 @@
 #define DEVICE_UART3_TX_GPIO        22
 #define DEVICE_UART3_RX_GPIO        23
 
-// UART Channel 4 - PIO UART (PRIMARY/SECONDARY only)
-#define DEVICE_UART4_TX_GPIO        24
-#define DEVICE_UART4_RX_GPIO        25
+// UART Channel 4 - PIO UART (used for selftest output, GPIO4/5 swapped due to board wiring)
+#define DEVICE_UART4_TX_GPIO        5
+#define DEVICE_UART4_RX_GPIO        4
 
 // ============================================================================
 // SPI Configuration
@@ -140,7 +140,7 @@
 // SPI0 - Link to SECONDARY (PRIMARY only)
 #define DEVICE_SPI0_SCK_GPIO        2
 #define DEVICE_SPI0_MOSI_GPIO       3
-#define DEVICE_SPI0_MISO_GPIO       4   // Note: conflicts with UART1 TX - needs review
-#define DEVICE_SPI0_CS_GPIO         5   // Note: conflicts with UART1 RX - needs review
+#define DEVICE_SPI0_MISO_GPIO       4   // Note: conflicts with UART4 RX - needs review
+#define DEVICE_SPI0_CS_GPIO         5   // Note: conflicts with UART4 TX - needs review
 
 #endif // DEVICE_MODE_H

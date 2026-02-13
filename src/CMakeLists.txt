@@ -149,12 +149,18 @@ add_library(utils
     utils/uf2_family_ids.c
     utils/selftest.c
 )
+
+# Generate PIO header for selftest PIO UART TX
+pico_generate_pio_header(utils ${CMAKE_CURRENT_LIST_DIR}/uart/pio_uart_tx.pio)
+
 target_include_directories(utils PUBLIC ../include)
 target_link_libraries(utils 
     pico_bootrom
     pico_stdlib
     hardware_flash
     hardware_spi
+    hardware_pio
+    hardware_clocks
     boot_uf2_headers
 )
 
