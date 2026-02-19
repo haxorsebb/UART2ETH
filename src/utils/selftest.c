@@ -7,20 +7,27 @@
 #include "pico/stdlib.h"
 #include "network/enc28j60_driver.h"
 #include "pio_uart_tx.pio.h"
+#include "pio_uart_rx.pio.h"
 #include <stdio.h>
+#include <string.h>
 
 // Selftest baud rate
 #define SELFTEST_BAUD_RATE 234375
 
-// PIO instance and state machine for selftest TX
+// PIO instance and state machine for selftest TX/RX
 // Must use PIO2 to match Channel 4's PIO instance, otherwise GPIO5 gets
 // reassigned when uart_manager_init() initializes Channel 4's PIO UART.
 #define SELFTEST_PIO        pio2
 #define SELFTEST_TX_SM      0
+#define SELFTEST_RX_SM      1
 
-// Track if PIO TX is initialized
+// Track if PIO TX/RX is initialized
 static bool g_selftest_pio_initialized = false;
 static uint g_selftest_tx_offset = 0;
+static uint g_selftest_rx_offset = 0;
+
+// Expected trigger string from Blackfin
+#define SELFTEST_TRIGGER_STRING "RP2354 run\r\n"
 
 //define PRINT_SELFTEST_OUTPUT for selftest function in combination with boardtest software on the Blackfin DSP
 #define PRINT_SELFTEST_OUTPUT
@@ -55,14 +62,53 @@ void selftest(void)
     g_selftest_tx_offset = pio_add_program(SELFTEST_PIO, &pio_uart_tx_program);
     pio_uart_tx_program_init(SELFTEST_PIO, SELFTEST_TX_SM, g_selftest_tx_offset, 
                               DEVICE_UART4_TX_GPIO, SELFTEST_BAUD_RATE);
+    
+    // Load and initialize the PIO RX program
+    g_selftest_rx_offset = pio_add_program(SELFTEST_PIO, &pio_uart_rx_program);
+    pio_uart_rx_program_init(SELFTEST_PIO, SELFTEST_RX_SM, g_selftest_rx_offset,
+                              DEVICE_UART4_RX_GPIO, SELFTEST_BAUD_RATE);
+    
     g_selftest_pio_initialized = true;
 
-    // Wait for receiver to be ready before sending first message.
-    // The Blackfin DSP boardtest software needs time to initialize its UART.
-    sleep_ms(500);
-
+    // Wait until the Blackfin sends "RP2354 run\r\n"
+    // This synchronizes the selftest with the Blackfin boardtest software.
+    // The software will wait here forever until the trigger is received.
+    {
+        const char* trigger = SELFTEST_TRIGGER_STRING;
+        size_t trigger_len = strlen(trigger);
+        size_t match_pos = 0;
+        
+        printf("Selftest: Waiting for trigger 'RP2354 run\\r\\n'...\n");
+        
+        while (match_pos < trigger_len) {
+            // Check if RX FIFO has data
+            if (!pio_sm_is_rx_fifo_empty(SELFTEST_PIO, SELFTEST_RX_SM)) {
+                // Read byte from PIO RX FIFO (data is left-justified, take upper byte)
+                uint32_t word = pio_sm_get(SELFTEST_PIO, SELFTEST_RX_SM);
+                char c = (char)(word >> 24);
+                
+                // Check if character matches expected position in trigger string
+                if (c == trigger[match_pos]) {
+                    match_pos++;
+                } else {
+                    // Mismatch - reset matching
+                    match_pos = 0;
+                    // Check if this char matches start of trigger
+                    if (c == trigger[0]) {
+                        match_pos = 1;
+                    }
+                }
+            } else {
+                // No data - small delay to avoid busy-waiting
+                sleep_us(100);
+            }
+        }
+        
+        printf("Selftest: Trigger received, starting selftest\n");
+    }
+    
     // Send selftest message
-    selftest_puts("RP2354 SELFTEST: V0.80 START\r\n");
+    selftest_puts("RP2354 SELFTEST: V0.90 START\r\n");
     
     // Note: The PIO UART will be reconfigured later by uart_manager_init() if UART4 is used.
     // After uart_manager_init(), GPIO5 will be reassigned to PIO2, and selftest_puts()
