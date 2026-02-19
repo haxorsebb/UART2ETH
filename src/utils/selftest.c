@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 // Selftest baud rate
-#define SELFTEST_BAUD_RATE 230400
+#define SELFTEST_BAUD_RATE 234375
 
 // PIO instance and state machine for selftest TX
 // Must use PIO2 to match Channel 4's PIO instance, otherwise GPIO5 gets

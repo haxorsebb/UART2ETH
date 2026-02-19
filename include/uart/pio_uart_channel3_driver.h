@@ -22,7 +22,7 @@
 #define PIO_UART_CH3_PIO_INSTANCE    pio1
 #define PIO_UART_CH3_TX_SM           0      // State machine 0 for TX
 #define PIO_UART_CH3_RX_SM           1      // State machine 1 for RX
-#define PIO_UART_CH3_DEFAULT_BAUD    230400 // Default baud rate
+#define PIO_UART_CH3_DEFAULT_BAUD    234375 // Default baud rate
 
 // GPIO Pin Configuration for Channel 3
 #define PIO_UART_CH3_TX_GPIO         22     // Channel 3 TX

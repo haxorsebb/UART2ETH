@@ -99,7 +99,7 @@ bool shared_memory_init(void) {
     
     // Initialize communication channel defaults
     for (int channel_idx = CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++) {
-        g_shared_memory->config.channels[channel_idx].baud_rate = 230400;
+        g_shared_memory->config.channels[channel_idx].baud_rate = 234375;
         g_shared_memory->config.channels[channel_idx].data_bits = 8;
         g_shared_memory->config.channels[channel_idx].stop_bits = 1;
         g_shared_memory->config.channels[channel_idx].parity = 0;  // NONE

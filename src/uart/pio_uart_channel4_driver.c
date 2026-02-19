@@ -397,6 +397,9 @@ static void pio_uart_ch4_reset_stats(void* context) {
 }
 
 // PIO RX Interrupt handler for Channel 4 (PIO2)
+// CRITICAL: This handler must be fast to prevent FIFO overflow.
+// At 234375 baud, a byte arrives every ~42.7µs. With 8-deep FIFO,
+// we have ~341µs before overflow. No printf() or blocking calls allowed.
 static void pio_uart_ch4_pio_rx_irq_handler(void) {
     if (!pio_uart_ch4_context_initialized) {
         return;
@@ -404,29 +407,18 @@ static void pio_uart_ch4_pio_rx_irq_handler(void) {
     
     pio_uart_ch4_context_t* ctx = &pio_uart_ch4_context;
     
-    // Clear interrupt first
-    pio_interrupt_clear(ctx->pio_instance, pis_sm0_rx_fifo_not_empty + ctx->rx_sm);
+    // Note: FIFO-not-empty interrupt is level-sensitive and auto-clears
+    // when FIFO becomes empty. No manual clearing needed.
     
-    // Process available data from FIFO
-    int max_bytes = 32;
-    int bytes_read = 0;
-    
-    while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm) && max_bytes-- > 0) {
+    // Process all available data from FIFO as fast as possible
+    while (!pio_sm_is_rx_fifo_empty(ctx->pio_instance, ctx->rx_sm)) {
         uint32_t word = pio_sm_get(ctx->pio_instance, ctx->rx_sm);
         uint8_t byte = (uint8_t)(word >> 24);  // Extract byte from left-justified data
         
         // Put byte into ring buffer
-        bool success = uart_receive_buffer_put(&ctx->rx_ring, byte);
-        bytes_read++;
-        
-        if (!success) {
+        if (!uart_receive_buffer_put(&ctx->rx_ring, byte)) {
             ctx->state.overrun_errors++;
-            break;
+            // Continue draining FIFO even on overrun to prevent PIO stall
         }
-    }
-    
-    if (bytes_read > 0) {
-        printf("PIO CH4 RX IRQ: Got %d bytes from PIO%d SM%d\n", bytes_read,
-               ctx->pio_instance == pio0 ? 0 : (ctx->pio_instance == pio1 ? 1 : 2), ctx->rx_sm);
     }
 }

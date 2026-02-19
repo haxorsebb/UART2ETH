@@ -14,15 +14,16 @@ void uart_receive_buffer_init(uart_receive_buffer_t* rb, uint8_t* buffer, size_t
     rb->is_full = false;
 }
 
+// Note: This function may be called from IRQ context.
+// No printf() or blocking calls allowed.
 bool uart_receive_buffer_put(uart_receive_buffer_t* rb, uint8_t byte) {
 
-    size_t next_head = rb->head+1;
-    if(next_head >= rb->size) {
+    size_t next_head = rb->head + 1;
+    if (next_head >= rb->size) {
         next_head = 0;
     }
 
     if (rb->is_full) {
-        printf("UART_DEBUG: RX BUFFER FULL!\n");
         return false; // Buffer full
     }
         
