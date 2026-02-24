@@ -465,7 +465,7 @@ bool log_event(event_source_t event_source, log_level_t log_level,
     }
     
     // Check if this log level meets the minimum threshold
-    if (log_level < LOG_MINIMUM_LEVEL) {
+    if (log_level < LOG_LEVEL_ERROR /*LOG_MINIMUM_LEVEL*/) {
         // Silently drop logs below minimum level (not an error)
         return true;
     }

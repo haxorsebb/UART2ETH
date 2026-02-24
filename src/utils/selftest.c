@@ -103,7 +103,6 @@ void selftest(void)
                 sleep_us(100);
             }
         }
-        
         printf("Selftest: Trigger received, starting selftest\n");
     }
     

@@ -94,14 +94,16 @@ bool uart_config_protocol_init(void) {
 bool uart_config_is_command(const uint8_t* data, size_t length) {
     // Must have at least "#CFG:GET:" or "#CFG:SET:" (9 chars minimum)
     if (!data || length < CFG_PREFIX_LEN + CFG_CMD_LEN) {
-        printf("CFG_IS_CMD: too short, len=%zu, need=%d\n", length, CFG_PREFIX_LEN + CFG_CMD_LEN);
+        // printf("CFG_IS_CMD: too short, len=%zu, need=%d\n", length, CFG_PREFIX_LEN + CFG_CMD_LEN);
         return false;
     }
     
     // Check for #CFG: prefix
     if (memcmp(data, CFG_PREFIX, CFG_PREFIX_LEN) != 0) {
+        /*
         printf("CFG_IS_CMD: prefix mismatch, got='%.*s' (hex: %02X %02X %02X %02X %02X)\n", 
                CFG_PREFIX_LEN, data, data[0], data[1], data[2], data[3], data[4]);
+        */
         return false;
     }
     
@@ -111,8 +113,10 @@ bool uart_config_is_command(const uint8_t* data, size_t length) {
     bool is_set = (strncmp(cmd_part, CFG_CMD_SET, CFG_CMD_LEN) == 0);
     
     if (!is_get && !is_set) {
+        /*
         printf("CFG_IS_CMD: not GET/SET, got='%.*s' (hex: %02X %02X %02X %02X)\n",
                CFG_CMD_LEN, cmd_part, cmd_part[0], cmd_part[1], cmd_part[2], cmd_part[3]);
+        */
     }
     
     return is_get || is_set;

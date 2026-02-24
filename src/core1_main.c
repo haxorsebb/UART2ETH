@@ -286,13 +286,18 @@ static bool core1_check_for_pending_work(void) {
         return true; 
     }
     
+    // Network TX must be higher priority than ringbuffer to actually send queued packets
+    // and receive TCP ACKs, otherwise TCP buffer fills up
     if(network_manager_transmit_packets_pending()) {
-        DEBUG_ONLY({ 
-            printf("network has pending transmit packets\n"); 
-        });
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_SENDING_ACTIVE);
         core1_process_packet_tx();
         return true; 
+    }
+
+    // Check for ringbuffer messages to transmit over network
+    if(ringbuffer_get_count(RX_UART_TO_TCP) > 0) {
+        state_machine_process_core1_event(CORE1_EVENT_RINGBUFFER_DATA_READY);
+        return true;
     }
 
     if(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT))
@@ -305,16 +310,6 @@ static bool core1_check_for_pending_work(void) {
         if (sub_state == CORE1_CONFIG_NET_WAIT_FOR_DHCP || sub_state == CORE1_CONFIG_NET_CHECK_DHCP) {
             state_machine_process_core1_event(CORE1_EVENT_NETWORK_RECEIVE_ACTIVE);
         }
-        return true;
-    }
-
-    // Check for ringbuffer messages to transmit over network (medium priority, messages are cached)
-    if(ringbuffer_get_count(RX_UART_TO_TCP) > 0) {
-        DEBUG_ONLY({ 
-            printf("Core1: ringbuffer has %u pending messages for network transmission\n", 
-                             ringbuffer_get_count(RX_UART_TO_TCP)); 
-        });
-        state_machine_process_core1_event(CORE1_EVENT_RINGBUFFER_DATA_READY);
         return true;
     }
 
@@ -921,40 +916,60 @@ static void core1_process_logs(void) {
  * This implements the Core1 side of the UART→ringbuffer→network pipeline.
  */
 static void core1_process_ringbuffer(void) {
-    static uint32_t call_counter = 0;
-    call_counter++;
-    
-    log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_DEBUG, LOG_EVENT_RINGBUFFER_WORK_START, 1);
-    
     // Process ringbuffer messages - fetch from ringbuffer and send over network
-    // Implementation: fetch one message per call to avoid blocking other tasks
+    // Process up to 8 messages, then flush to ENC28J60, repeat
+    // NOTE: No log_event() in hot path - uses spin_lock which disables interrupts
     
-    ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP, CHANNEL_ANY, ENTRY_STATUS_READY);
+    const int MAX_MESSAGES_PER_BATCH = 8;
+    const int MAX_BATCHES = 4;
+    int total_processed = 0;
     
-    if (entry != NULL) {
-        printf("[CORE1-RING] Processing UART->TCP message: Channel %u, %u bytes\n", 
-               entry->channel, entry->fill_index);
+    for (int batch = 0; batch < MAX_BATCHES; batch++) {
+        int batch_processed = 0;
+        bool tcp_full = false;
         
-        // Send the message over the network via TCP socket server
-        bool sent = tcp_socket_server_send_to_channel(entry->channel, entry->payload, entry->fill_index);
-        
-        if (sent) {
-            printf("[CORE1-RING] Message sent to TCP - SUCCESS\n");
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_TX, entry->fill_index);
-        } else {
-            printf("[CORE1-RING] Message send to TCP - FAILED\n");
-            log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, entry->channel);
+        while (batch_processed < MAX_MESSAGES_PER_BATCH) {
+            ring_entry_t* entry = ringbuffer_dequeue_entry(RX_UART_TO_TCP, CHANNEL_ANY, ENTRY_STATUS_READY);
+            
+            if (entry == NULL) {
+                break;  // No more messages
+            }
+            
+            // Send the message over the network via TCP socket server
+            bool sent = tcp_socket_server_send_to_channel(entry->channel, entry->payload, entry->fill_index);
+            
+            if (sent) {
+                // Mark the entry as consumed to return it to the free pool
+                ringbuffer_mark_consumed(entry);
+                batch_processed++;
+                total_processed++;
+            } else {
+                // TCP buffer full - put entry back to READY state
+                entry->status = ENTRY_STATUS_READY;
+                tcp_full = true;
+                break;
+            }
         }
         
-        // Mark the entry as consumed to return it to the free pool
-        ringbuffer_mark_consumed(entry);
-    } else if (call_counter <= 5 || call_counter % 1000 == 0) {
-        printf("[CORE1-RING] No UART->TCP messages to process (call #%u)\n", call_counter);
+        // Flush queued packets to ENC28J60 after each batch
+        // This is critical - tcp_write only queues data, network_manager_process_tx actually sends it
+        if (batch_processed > 0 || tcp_full) {
+            network_manager_process_tx();
+        }
+        
+        // If no messages were processed this batch, we're done
+        if (batch_processed == 0) {
+            break;
+        }
+        
+        // Also process incoming packets (TCP ACKs) to free up send buffer
+        if (network_manager_receive_packets_pending()) {
+            network_manager_process();  // Handles RX via lwip_netif_enc28j60_process()
+        }
     }
         
     // Complete ringbuffer processing and return to idle for next work check
     state_machine_process_core1_event(CORE1_EVENT_RINGBUFFER_WORK_COMPLETE);
-    log_event(EVENT_SOURCE_RINGBUFFER, LOG_LEVEL_DEBUG, LOG_EVENT_RINGBUFFER_WORK_COMPLETE, 0);
 }
 
 

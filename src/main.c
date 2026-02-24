@@ -69,11 +69,11 @@ int main() {
   // Initialize UART0 for debug output
   stdio_uart_init_full(uart0, 115200, 16, 17);
 
-  // #ifdef FACTORY_INTERNAL_VERSION
+  #ifdef FACTORY_INTERNAL_VERSION
   // perform a simple selftest, output the results to UART1 so that the
   // BOARDTEST software can see it
   selftest();
-  // #endif
+  #endif
 
   // Configure GPIO21 to output 25 MHz clock for ENC28J60
   float clk_div = (float)clock_get_hz(clk_sys) / 25000000.0f;

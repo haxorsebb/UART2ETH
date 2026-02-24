@@ -308,8 +308,8 @@ void core0_process_uart(void) {
     bool work_done = false;
     
     // Process incoming UART data (UART → Ring Buffer → TCP)
+    // NOTE: No log_event in hot path - uses spin_lock which disables interrupts
     if (uart_manager_process_incoming_data()) {
-        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 1);
         work_done = true;
     }
     
@@ -486,7 +486,6 @@ bool core0_check_for_pending_work(void) {
     //buffered data can be handled later
     uint32_t tcp_to_uart_count = ringbuffer_get_count(RX_TCP_TO_UART);
     if (tcp_to_uart_count > 0) {
-        printf("[CORE0-WORK] Found %u TCP->UART messages in ringbuffer\n", tcp_to_uart_count);
         state_machine_process_core0_event(CORE0_EVENT_RINGBUFFER_DATA_READY);
         return true;
     }
@@ -519,13 +518,6 @@ void core0_work_or_idle_wait(void) {
  * Only processes ONE message per call to prevent blocking.
  */
 void core0_process_ringbuffer(void) {
-    static uint32_t call_counter = 0;
-    call_counter++;
-
-    if (call_counter <= 5 || call_counter % 1000 == 0) {
-        printf("[CORE0-RING] Processing call #%u\n", call_counter);
-    }
-
     uart_manager_process_outgoing_data();
     
     // NOTE: The old "turn around" code (Issue #68) was removed because it created

@@ -35,7 +35,7 @@ extern void* pio_ch4_create_context(uint8_t pio_num, uint8_t sm_num);
 extern void pio_ch4_destroy_context(void* context);
 
 // Line assembly for incoming data
-#define MINIMUM_MESSAGE_LENGTH 8  // '#0000!\r\n' minimum
+#define MINIMUM_MESSAGE_LENGTH 2  // minimum: one character + '\n'
 
 // Manager state
 typedef struct {
@@ -402,9 +402,8 @@ static bool process_channel_incoming_data(channel_id_t channel) {
     if (!entry || entry->fill_index >= RINGBUFFER_PAYLOAD_MAX_SIZE) {
         entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
         
-        // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
+        // Initialize fill_index for new entries (no memset needed - fill_index tracks valid data)
         if (entry) {
-            memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
             entry->fill_index = 0;
         }
     }
@@ -415,32 +414,18 @@ static bool process_channel_incoming_data(channel_id_t channel) {
             
     // Read data from UART
     size_t bytes_read = 0;
-    int rounds = 0;
-    int empty_rounds = 0;  // Count rounds with no data (for waiting on slow UARTs)
-    const int MAX_EMPTY_ROUNDS = 20;  // Max retries when waiting for more data (20ms total)
     
     do {
         bytes_read = uart->ops->read_data(uart->driver_context, buffer, sizeof(buffer));
         
-        // NOTE: No printf() allowed in this hot path!
-        // printf() uses spin_lock_blocking() which disables interrupts,
-        // causing PIO RX FIFO overflow and data loss.
+        // NOTE: No printf() or sleep allowed in this hot path!
+        // The IRQ handler continuously buffers incoming data, so we don't need to wait.
+        // If no complete message is ready, exit and let the entry stay in FILLING state.
+        // Next call will continue where we left off.
         
         if (bytes_read == 0) {
-            // No data available right now
-            if (entry && entry->fill_index > 0) {
-                // We have partial data - wait a bit for more to arrive (PIO UART timing)
-                empty_rounds++;
-                if (empty_rounds < MAX_EMPTY_ROUNDS) {
-                    sleep_us(1000);  // Wait 1ms for more data to arrive
-                    continue;
-                }
-                // Timeout waiting for more data - this is normal for end of message
-            }
-            break;  // No partial data or timeout - exit
+            break;  // No more data available right now
         }
-        
-        empty_rounds = 0;  // Reset empty counter when we get data
         
         for (size_t idx = 0; idx < bytes_read; idx++) {
             uint8_t byte = buffer[idx];
@@ -452,12 +437,17 @@ static bool process_channel_incoming_data(channel_id_t channel) {
                 if (!entry) {
                     return false; // Stop processing if no buffers available
                 }
-                // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
-                memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
                 entry->fill_index = 0;
             }
            
-            //we process incoming data directly into the ring buffer, using fill_index to track the progress
+            // Detect start of new packet while we have partial data from previous packet
+            // This handles the case where the previous packet was missing its '\n' terminator
+            if (byte == '#' && entry->fill_index > 0) {
+                // Start of new packet detected - discard incomplete previous packet
+                entry->fill_index = 0;
+            }
+            
+            // Process incoming data directly into the ring buffer
             entry->payload[entry->fill_index++] = byte;
             
             if(check_message_end(entry->payload, entry->fill_index)) {
@@ -481,7 +471,6 @@ static bool process_channel_incoming_data(channel_id_t channel) {
                     }
                     
                     // Don't forward config commands to TCP - just reset entry for reuse
-                    memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
                     entry->fill_index = 0;
                 } else {
                     // Normal message - enqueue for TCP transmission
@@ -497,30 +486,29 @@ static bool process_channel_incoming_data(channel_id_t channel) {
                 // If there's more data to process, get a new entry immediately
                 if(idx < bytes_read - 1 && entry == NULL) {
                     entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
-                    // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
                     if (entry) {
-                        memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
                         entry->fill_index = 0;
                     }
                 }
             }
             else if (entry->fill_index >= RINGBUFFER_PAYLOAD_MAX_SIZE) {
+                // Buffer overflow - enqueue what we have and get new entry
+                ringbuffer_enqueue_entry(entry);
                 entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
+                if (entry) {
+                    entry->fill_index = 0;
+                }
             }
         }
         
         // Ensure we have an entry for the next iteration if we're continuing
         if(bytes_read == sizeof(buffer) && !entry) {
             entry = ringbuffer_get_free_entry(RX_UART_TO_TCP, channel);
-            // BUFFER PADDING FIX: Ensure payload is completely clear for new entries
             if (entry) {
-                memset(entry->payload, 0, RINGBUFFER_PAYLOAD_MAX_SIZE);
                 entry->fill_index = 0;
             }
         }
-        
-        rounds++;
-    } while(bytes_read > 0 || (entry && entry->fill_index > 0 && empty_rounds < MAX_EMPTY_ROUNDS));
+    } while(bytes_read > 0);
 
     return true;
 }
@@ -576,7 +564,6 @@ bool check_message_end(const uint8_t* buffer, size_t length) {
         return false;
     }
     
-    return buffer[length-3] == '!' && 
-           buffer[length-2] == '\r' && 
-           buffer[length-1] == '\n';
+    // Any packet ending with '\n' is valid
+    return buffer[length-1] == '\n';
 }
