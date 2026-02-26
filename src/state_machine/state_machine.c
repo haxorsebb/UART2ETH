@@ -776,7 +776,8 @@ bool state_machine_process_core1_event(core1_event_t event) {
         // Log Core1 substate change (skip high-frequency network states)
         if (old_state != CORE1_CONFIG_NET_CHECK_DHCP && new_state != CORE1_CONFIG_NET_CHECK_DHCP &&
             old_state != CORE1_LOG_ACTIVE && new_state != CORE1_LOG_ACTIVE &&
-            old_state != CORE1_CONFIG_LOG_ACTIVE && new_state != CORE1_CONFIG_LOG_ACTIVE 
+            old_state != CORE1_CONFIG_LOG_ACTIVE && new_state != CORE1_CONFIG_LOG_ACTIVE &&
+            old_state != CORE1_NET_ACTIVE_RECEIVE && new_state != CORE1_NET_ACTIVE_RECEIVE 
         ) {
             log_event(EVENT_SOURCE_CORE1_SUBSTATE, LOG_LEVEL_DEBUG, 
                       LOG_CORE1_INIT_PERISTENCE + new_state, (uint32_t)old_state);

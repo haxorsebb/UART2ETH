@@ -1,0 +1,339 @@
+:jbake-title: ADR-018: HTTP Server Modularization
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 18
+:filename: /adrs/ADR-018-http-server-modularization.adoc
+
+= ADR-018: HTTP Server Modularization
+
+== Status
+
+Accepted
+
+== Context
+
+The current HTTP server implementation (`http_server.c`) has grown to 2,349 lines and violates the Single Responsibility Principle. It combines seven distinct responsibilities into a single monolithic file:
+
+1. HTTP Protocol Layer - lwIP callbacks, connection management (~400 lines)
+2. HTML Page Generation - 5 different pages (~1000 lines) 
+3. Authentication - Base64 decode, credential checking (~150 lines)
+4. Form Handling - POST parsing, validation (~300 lines)
+5. Business Logic - Password changes, config updates, factory defaults (~200 lines)
+6. Upload Management - Firmware upload session (~100 lines)
+7. Request Routing - GET/POST dispatching (~200 lines)
+
+This monolithic structure creates several problems:
+
+* **Maintainability**: Adding new pages or features requires editing a very large file
+* **Testability**: Cannot easily test individual components in isolation
+* **Code Review**: Large diffs make it difficult to review changes effectively
+* **Team Collaboration**: Multiple developers working on different features cause merge conflicts
+* **Cognitive Load**: Understanding the entire file requires mental tracking of many contexts
+* **Build Times**: Changes to any part trigger recompilation of the entire 2,349 line file
+
+== Decision
+
+We will refactor `http_server.c` into a modular structure following the Separation of Concerns principle:
+
+[source]
+----
+src/network/
+├── http_server.c              (~500 lines) - Core protocol & connection management
+├── http_router.c              (~200 lines) - Request routing & dispatch
+├── http_auth.c                (~200 lines) - Authentication & base64
+├── http_forms.c               (~300 lines) - Form parsing & validation  
+└── http_pages/
+    ├── page_device.c          (~250 lines) - Device status page
+    ├── page_config.c          (~250 lines) - Configuration page
+    ├── page_update.c          (~250 lines) - Firmware update page
+    ├── page_factory.c         (~250 lines) - Factory defaults page (FACTORY_INTERNAL_VERSION only)
+    └── page_styles.c          (~100 lines) - CSS stylesheet
+----
+
+=== Module Responsibilities
+
+==== http_server.c (Core Protocol Layer)
+* lwIP Raw TCP API callbacks and connection management
+* HTTP request/response handling at protocol level
+* Connection state tracking and cleanup
+* Server lifecycle (init, deinit, process)
+* Statistics collection
+* Exposes: `http_server_init()`, `http_server_process()`, `http_server_get_stats()`
+
+==== http_router.c (Request Routing)
+* URL path parsing and route matching
+* GET/POST request dispatching to appropriate handlers
+* Route registration and lookup
+* RESTful endpoint management
+* Exposes: `http_router_init()`, `http_router_route_request()`
+
+==== http_auth.c (Authentication)
+* HTTP Basic Authentication implementation
+* Base64 encoding/decoding
+* Credential validation
+* Session token management (if extended to JWT in future)
+* Exposes: `http_check_authentication()`, `http_send_auth_required()`
+
+==== http_forms.c (Form Handling)
+* POST data parsing (application/x-www-form-urlencoded)
+* Form field extraction and validation
+* URL decoding
+* Checkbox and input field processing
+* Exposes: `http_parse_form_data()`, `http_get_form_field()`
+
+==== http_pages/*.c (Page Generators)
+Each page module generates its HTML content independently:
+
+* `page_device.c` - Main device status page with network info and UART channel status
+* `page_config.c` - Configuration page with forms for network and UART settings
+* `page_update.c` - Firmware update page with upload form and reboot controls
+* `page_factory.c` - Factory defaults page (only compiled when FACTORY_INTERNAL_VERSION defined)
+* `page_styles.c` - Common CSS stylesheet shared by all pages
+
+Each page exposes: `generate_<name>_page(buffer, buffer_size, ...params)`
+
+=== Interface Design
+
+==== HTTP Server Core API
+[source,c]
+----
+// Server lifecycle
+bool http_server_init(void);
+void http_server_deinit(void);
+void http_server_process(void);
+bool http_server_is_running(void);
+http_server_status_t http_server_get_status(void);
+void http_server_get_stats(http_server_stats_t* stats);
+void http_server_reset_stats(void);
+
+// Upload session management (exposed for update module integration)
+bool http_upload_session_start(uint32_t expected_size);
+void http_upload_receive_chunk(uint32_t bytes_received);
+void http_upload_session_reset(void);
+void http_upload_get_progress(uint32_t* bytes_received, uint32_t* total_bytes);
+----
+
+==== HTTP Router API
+[source,c]
+----
+typedef void (*http_route_handler_t)(http_connection_t* conn, const char* request_data, size_t data_len);
+
+typedef struct {
+    const char* path;              // e.g., "/config"
+    http_request_type_t method;    // GET or POST
+    http_route_handler_t handler;  // Handler function
+} http_route_t;
+
+void http_router_init(void);
+bool http_router_register_route(const char* path, http_request_type_t method, http_route_handler_t handler);
+http_route_handler_t http_router_find_route(const char* path, http_request_type_t method);
+void http_router_route_request(http_connection_t* conn, const char* request_data, size_t data_len);
+----
+
+==== HTTP Authentication API
+[source,c]
+----
+bool http_check_authentication(const char* request, const char* expected_password);
+void http_send_auth_required(http_connection_t* conn);
+int http_base64_decode(const char* input, char* output, size_t max_len);
+int http_base64_encode(const uint8_t* input, size_t input_len, char* output, size_t max_len);
+----
+
+==== HTTP Forms API
+[source,c]
+----
+typedef struct {
+    const char* key;
+    const char* value;
+} http_form_field_t;
+
+bool http_parse_form_data(const char* form_data, http_form_field_t* fields, size_t max_fields, size_t* field_count);
+const char* http_get_form_field(const http_form_field_t* fields, size_t field_count, const char* key);
+bool http_form_field_equals(const http_form_field_t* fields, size_t field_count, const char* key, const char* value);
+void http_url_decode(char* str);
+----
+
+==== HTTP Page Generation API
+[source,c]
+----
+// Each page module exposes a generation function
+void http_generate_device_page(char* buffer, size_t buffer_size);
+void http_generate_config_page(char* buffer, size_t buffer_size);
+void http_generate_update_page(char* buffer, size_t buffer_size, const char* message);
+void http_generate_stylesheet(char* buffer, size_t buffer_size);
+
+#ifdef FACTORY_INTERNAL_VERSION
+void http_generate_factory_page(char* buffer, size_t buffer_size, 
+                                  const char* error_msg, size_t error_msg_size,
+                                  const char* success_msg, size_t success_msg_size);
+#endif
+----
+
+=== Migration Strategy
+
+The refactoring will be performed incrementally to maintain system stability:
+
+==== Phase 1: Extract Page Generation
+1. Create `http_pages/` directory and CMakeLists.txt
+2. Extract page generation functions to separate files
+3. Create header files with generation function declarations
+4. Update http_server.c to include new headers and call extracted functions
+5. Verify compilation and basic functionality
+
+==== Phase 2: Extract Authentication
+1. Create `http_auth.c` and `http_auth.h`
+2. Move authentication functions and Base64 codec
+3. Update http_server.c to use new authentication API
+4. Verify authentication still works correctly
+
+==== Phase 3: Extract Form Handling  
+1. Create `http_forms.c` and `http_forms.h`
+2. Move form parsing and validation functions
+3. Update POST handlers to use new forms API
+4. Verify configuration updates and password changes work
+
+==== Phase 4: Extract Request Routing
+1. Create `http_router.c` and `http_router.h`
+2. Implement route registration and dispatch system
+3. Register all existing routes during http_server_init()
+4. Replace manual URL parsing with router dispatch
+5. Verify all pages and endpoints remain accessible
+
+==== Phase 5: Cleanup and Documentation
+1. Remove extracted code from http_server.c
+2. Update function documentation and comments
+3. Update CMakeLists.txt with all new source files
+4. Run complete system test suite
+5. Update arc42 Building Block View diagram
+
+=== File Structure After Refactoring
+
+[source]
+----
+include/network/
+├── http_server.h              - Core server API and public interfaces
+├── http_router.h              - Route registration and dispatch API
+├── http_auth.h                - Authentication API
+├── http_forms.h               - Form parsing API
+└── http_pages/
+    ├── page_device.h          - Device page generation
+    ├── page_config.h          - Config page generation
+    ├── page_update.h          - Update page generation
+    ├── page_factory.h         - Factory page generation (conditional)
+    └── page_styles.h          - Stylesheet generation
+
+src/network/
+├── http_server.c              - Core protocol implementation
+├── http_router.c              - Request routing implementation
+├── http_auth.c                - Authentication implementation  
+├── http_forms.c               - Form parsing implementation
+├── http_pages/
+│   ├── CMakeLists.txt         - Page modules build configuration
+│   ├── page_device.c          - Device page implementation
+│   ├── page_config.c          - Config page implementation
+│   ├── page_update.c          - Update page implementation
+│   ├── page_factory.c         - Factory page implementation (conditional)
+│   └── page_styles.c          - Stylesheet implementation
+└── CMakeLists.txt             - Updated with subdirectory
+----
+
+== Consequences
+
+=== Positive
+
+* **Maintainability**: Each module has clear, single responsibility
+* **Testability**: Can unit test authentication, form parsing, page generation independently
+* **Extensibility**: Adding new pages requires only creating new page_*.c files
+* **Code Review**: Smaller, focused diffs easier to review
+* **Team Collaboration**: Reduced merge conflicts when multiple developers work on different features
+* **Build Performance**: Changes to individual pages don't trigger full recompilation
+* **Cognitive Load**: Developers can understand and modify individual components without mental overhead
+* **Separation of Concerns**: Clear boundaries between protocol, routing, auth, forms, and presentation
+
+=== Negative
+
+* **Initial Effort**: Refactoring requires significant upfront work
+* **Temporary Instability**: Risk of introducing bugs during migration
+* **More Files**: Increases project file count from 1 to ~15 files
+* **Indirection**: May require more navigation between files during debugging
+* **Learning Curve**: New developers must understand modular structure
+
+=== Mitigation
+
+* Perform refactoring incrementally in phases with testing after each phase
+* Maintain comprehensive test suite throughout migration
+* Document module responsibilities clearly in headers
+* Use consistent naming conventions (`http_<module>_<function>` pattern)
+* Keep hot-path functions (request processing) in http_server.c for performance
+
+== Compliance
+
+This refactoring aligns with:
+
+* **Coding Discipline**: "Writing code for readability and maintainability, not for performance or being brief"
+* **Architecture Documentation Discipline**: Clear module boundaries match arc42 building blocks
+* **Single Responsibility Principle**: Each module has one clear purpose
+* **Open/Closed Principle**: Easy to extend with new pages without modifying existing code
+
+== Related ADRs
+
+* ADR-015: Factory Defaults Web Interface - page_factory.c implements this feature
+* ADR-016: HTTP Basic Authentication - http_auth.c implements this feature  
+* ADR-017: Update Module - page_update.c provides UI for this feature
+
+== Implementation Notes
+
+=== CMakeLists.txt Changes
+
+Main CMakeLists.txt update:
+[source,cmake]
+----
+# Add subdirectory for HTTP pages
+add_subdirectory(http_pages)
+----
+
+New http_pages/CMakeLists.txt:
+[source,cmake]
+----
+add_library(http_pages INTERFACE)
+
+target_sources(http_pages INTERFACE
+    ${CMAKE_CURRENT_LIST_DIR}/page_device.c
+    ${CMAKE_CURRENT_LIST_DIR}/page_config.c
+    ${CMAKE_CURRENT_LIST_DIR}/page_update.c
+    ${CMAKE_CURRENT_LIST_DIR}/page_styles.c
+)
+
+# Conditional factory page compilation
+if(FACTORY_INTERNAL_VERSION)
+    target_sources(http_pages INTERFACE
+        ${CMAKE_CURRENT_LIST_DIR}/page_factory.c
+    )
+endif()
+
+target_include_directories(http_pages INTERFACE
+    ${CMAKE_SOURCE_DIR}/include
+)
+----
+
+=== Testing Strategy
+
+Each module will have focused tests:
+
+* `test_http_auth.c` - Authentication and Base64 codec
+* `test_http_forms.c` - Form parsing and validation
+* `test_http_router.c` - Route registration and dispatch
+* `test_http_pages.c` - Page generation (verify no buffer overflows)
+
+Integration tests verify:
+* End-to-end page rendering still works
+* Authentication still protects all endpoints
+* Form submissions update configuration correctly
+* Firmware upload flow remains functional
+
+== References
+
+* Current implementation: `src/network/http_server.c` (2,349 lines)
+* Related modules: `update_manager.c`, `network_manager.c`, `shared_memory.c`
+* Documentation: Chapter 5 Building Block View - Management Interface
