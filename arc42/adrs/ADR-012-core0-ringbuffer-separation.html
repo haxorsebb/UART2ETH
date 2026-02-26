@@ -618,7 +618,7 @@ static void core0_process_ringbuffer(void) {
 static void core0_process_uart_hardware(void) {
     // Handle actual UART hardware operations
     if (process_uart_data()) {
-        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 0);
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_TRACE, LOG_EVENT_UART_COMPLETE, 0);
         state_machine_process_core0_event(CORE0_EVENT_UART_WORK_COMPLETE);
     }
     // If processing not complete, remain in UART_ACTIVE state
