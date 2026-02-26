@@ -74,6 +74,14 @@ var documents = [
 
 {
     "id": 9,
+    "uri": "arc42/adrs/ADR-018-http-server-modularization.html",
+    "menu": "arc42",
+    "title": "ADR-018: HTTP Server Modularization",
+    "text": " Table of Contents ADR-018: HTTP Server Modularization Status Context Decision Module Responsibilities Interface Design Migration Strategy File Structure After Refactoring Consequences Positive Negative Mitigation Compliance Related ADRs Implementation Notes CMakeLists.txt Changes Testing Strategy References ADR-018: HTTP Server Modularization Status Accepted Context The current HTTP server implementation ( http_server.c ) has grown to 2,349 lines and violates the Single Responsibility Principle. It combines seven distinct responsibilities into a single monolithic file: HTTP Protocol Layer - lwIP callbacks, connection management (~400 lines) HTML Page Generation - 5 different pages (~1000 lines) Authentication - Base64 decode, credential checking (~150 lines) Form Handling - POST parsing, validation (~300 lines) Business Logic - Password changes, config updates, factory defaults (~200 lines) Upload Management - Firmware upload session (~100 lines) Request Routing - GET/POST dispatching (~200 lines) This monolithic structure creates several problems: Maintainability : Adding new pages or features requires editing a very large file Testability : Cannot easily test individual components in isolation Code Review : Large diffs make it difficult to review changes effectively Team Collaboration : Multiple developers working on different features cause merge conflicts Cognitive Load : Understanding the entire file requires mental tracking of many contexts Build Times : Changes to any part trigger recompilation of the entire 2,349 line file Decision We will refactor http_server.c into a modular structure following the Separation of Concerns principle: src/network/ ├── http_server.c (~500 lines) - Core protocol &amp; connection management ├── http_router.c (~200 lines) - Request routing &amp; dispatch ├── http_auth.c (~200 lines) - Authentication &amp; base64 ├── http_forms.c (~300 lines) - Form parsing &amp; validation └── http_pages/ ├── page_device.c (~250 lines) - Device status page ├── page_config.c (~250 lines) - Configuration page ├── page_update.c (~250 lines) - Firmware update page ├── page_factory.c (~250 lines) - Factory defaults page (FACTORY_INTERNAL_VERSION only) └── page_styles.c (~100 lines) - CSS stylesheet Module Responsibilities http_server.c (Core Protocol Layer) lwIP Raw TCP API callbacks and connection management HTTP request/response handling at protocol level Connection state tracking and cleanup Server lifecycle (init, deinit, process) Statistics collection Exposes: http_server_init() , http_server_process() , http_server_get_stats() http_router.c (Request Routing) URL path parsing and route matching GET/POST request dispatching to appropriate handlers Route registration and lookup RESTful endpoint management Exposes: http_router_init() , http_router_route_request() http_auth.c (Authentication) HTTP Basic Authentication implementation Base64 encoding/decoding Credential validation Session token management (if extended to JWT in future) Exposes: http_check_authentication() , http_send_auth_required() http_forms.c (Form Handling) POST data parsing (application/x-www-form-urlencoded) Form field extraction and validation URL decoding Checkbox and input field processing Exposes: http_parse_form_data() , http_get_form_field() http_pages/*.c (Page Generators) Each page module generates its HTML content independently: page_device.c - Main device status page with network info and UART channel status page_config.c - Configuration page with forms for network and UART settings page_update.c - Firmware update page with upload form and reboot controls page_factory.c - Factory defaults page (only compiled when FACTORY_INTERNAL_VERSION defined) page_styles.c - Common CSS stylesheet shared by all pages Each page exposes: generate_&lt;name&gt;_page(buffer, buffer_size, &#8230;&#8203;params) Interface Design HTTP Server Core API // Server lifecycle bool http_server_init(void); void http_server_deinit(void); void http_server_process(void); bool http_server_is_running(void); http_server_status_t http_server_get_status(void); void http_server_get_stats(http_server_stats_t* stats); void http_server_reset_stats(void); // Upload session management (exposed for update module integration) bool http_upload_session_start(uint32_t expected_size); void http_upload_receive_chunk(uint32_t bytes_received); void http_upload_session_reset(void); void http_upload_get_progress(uint32_t* bytes_received, uint32_t* total_bytes); HTTP Router API typedef void (*http_route_handler_t)(http_connection_t* conn, const char* request_data, size_t data_len); typedef struct { const char* path; // e.g., \"/config\" http_request_type_t method; // GET or POST http_route_handler_t handler; // Handler function } http_route_t; void http_router_init(void); bool http_router_register_route(const char* path, http_request_type_t method, http_route_handler_t handler); http_route_handler_t http_router_find_route(const char* path, http_request_type_t method); void http_router_route_request(http_connection_t* conn, const char* request_data, size_t data_len); HTTP Authentication API bool http_check_authentication(const char* request, const char* expected_password); void http_send_auth_required(http_connection_t* conn); int http_base64_decode(const char* input, char* output, size_t max_len); int http_base64_encode(const uint8_t* input, size_t input_len, char* output, size_t max_len); HTTP Forms API typedef struct { const char* key; const char* value; } http_form_field_t; bool http_parse_form_data(const char* form_data, http_form_field_t* fields, size_t max_fields, size_t* field_count); const char* http_get_form_field(const http_form_field_t* fields, size_t field_count, const char* key); bool http_form_field_equals(const http_form_field_t* fields, size_t field_count, const char* key, const char* value); void http_url_decode(char* str); HTTP Page Generation API // Each page module exposes a generation function void http_generate_device_page(char* buffer, size_t buffer_size); void http_generate_config_page(char* buffer, size_t buffer_size); void http_generate_update_page(char* buffer, size_t buffer_size, const char* message); void http_generate_stylesheet(char* buffer, size_t buffer_size); #ifdef FACTORY_INTERNAL_VERSION void http_generate_factory_page(char* buffer, size_t buffer_size, const char* error_msg, size_t error_msg_size, const char* success_msg, size_t success_msg_size); #endif Migration Strategy The refactoring will be performed incrementally to maintain system stability: Phase 1: Extract Page Generation Create http_pages/ directory and CMakeLists.txt Extract page generation functions to separate files Create header files with generation function declarations Update http_server.c to include new headers and call extracted functions Verify compilation and basic functionality Phase 2: Extract Authentication Create http_auth.c and http_auth.h Move authentication functions and Base64 codec Update http_server.c to use new authentication API Verify authentication still works correctly Phase 3: Extract Form Handling Create http_forms.c and http_forms.h Move form parsing and validation functions Update POST handlers to use new forms API Verify configuration updates and password changes work Phase 4: Extract Request Routing Create http_router.c and http_router.h Implement route registration and dispatch system Register all existing routes during http_server_init() Replace manual URL parsing with router dispatch Verify all pages and endpoints remain accessible Phase 5: Cleanup and Documentation Remove extracted code from http_server.c Update function documentation and comments Update CMakeLists.txt with all new source files Run complete system test suite Update arc42 Building Block View diagram File Structure After Refactoring include/network/ ├── http_server.h - Core server API and public interfaces ├── http_router.h - Route registration and dispatch API ├── http_auth.h - Authentication API ├── http_forms.h - Form parsing API └── http_pages/ ├── page_device.h - Device page generation ├── page_config.h - Config page generation ├── page_update.h - Update page generation ├── page_factory.h - Factory page generation (conditional) └── page_styles.h - Stylesheet generation src/network/ ├── http_server.c - Core protocol implementation ├── http_router.c - Request routing implementation ├── http_auth.c - Authentication implementation ├── http_forms.c - Form parsing implementation ├── http_pages/ │ ├── CMakeLists.txt - Page modules build configuration │ ├── page_device.c - Device page implementation │ ├── page_config.c - Config page implementation │ ├── page_update.c - Update page implementation │ ├── page_factory.c - Factory page implementation (conditional) │ └── page_styles.c - Stylesheet implementation └── CMakeLists.txt - Updated with subdirectory Consequences Positive Maintainability : Each module has clear, single responsibility Testability : Can unit test authentication, form parsing, page generation independently Extensibility : Adding new pages requires only creating new page_*.c files Code Review : Smaller, focused diffs easier to review Team Collaboration : Reduced merge conflicts when multiple developers work on different features Build Performance : Changes to individual pages don&#8217;t trigger full recompilation Cognitive Load : Developers can understand and modify individual components without mental overhead Separation of Concerns : Clear boundaries between protocol, routing, auth, forms, and presentation Negative Initial Effort : Refactoring requires significant upfront work Temporary Instability : Risk of introducing bugs during migration More Files : Increases project file count from 1 to ~15 files Indirection : May require more navigation between files during debugging Learning Curve : New developers must understand modular structure Mitigation Perform refactoring incrementally in phases with testing after each phase Maintain comprehensive test suite throughout migration Document module responsibilities clearly in headers Use consistent naming conventions ( http_&lt;module&gt;_&lt;function&gt; pattern) Keep hot-path functions (request processing) in http_server.c for performance Compliance This refactoring aligns with: Coding Discipline : \"Writing code for readability and maintainability, not for performance or being brief\" Architecture Documentation Discipline : Clear module boundaries match arc42 building blocks Single Responsibility Principle : Each module has one clear purpose Open/Closed Principle : Easy to extend with new pages without modifying existing code Related ADRs ADR-015: Factory Defaults Web Interface - page_factory.c implements this feature ADR-016: HTTP Basic Authentication - http_auth.c implements this feature ADR-017: Update Module - page_update.c provides UI for this feature Implementation Notes CMakeLists.txt Changes Main CMakeLists.txt update: # Add subdirectory for HTTP pages add_subdirectory(http_pages) New http_pages/CMakeLists.txt: add_library(http_pages INTERFACE) target_sources(http_pages INTERFACE ${CMAKE_CURRENT_LIST_DIR}/page_device.c ${CMAKE_CURRENT_LIST_DIR}/page_config.c ${CMAKE_CURRENT_LIST_DIR}/page_update.c ${CMAKE_CURRENT_LIST_DIR}/page_styles.c ) # Conditional factory page compilation if(FACTORY_INTERNAL_VERSION) target_sources(http_pages INTERFACE ${CMAKE_CURRENT_LIST_DIR}/page_factory.c ) endif() target_include_directories(http_pages INTERFACE ${CMAKE_SOURCE_DIR}/include ) Testing Strategy Each module will have focused tests: test_http_auth.c - Authentication and Base64 codec test_http_forms.c - Form parsing and validation test_http_router.c - Route registration and dispatch test_http_pages.c - Page generation (verify no buffer overflows) Integration tests verify: * End-to-end page rendering still works * Authentication still protects all endpoints * Form submissions update configuration correctly * Firmware upload flow remains functional References Current implementation: src/network/http_server.c (2,349 lines) Related modules: update_manager.c , network_manager.c , shared_memory.c Documentation: Chapter 5 Building Block View - Management Interface "
+},
+
+{
+    "id": 10,
     "uri": "arc42/adrs/ADR-014-factory-defaults-implementation.html",
     "menu": "adrs",
     "title": "ADR-014: Factory Defaults Implementation",
@@ -81,7 +89,7 @@ var documents = [
 },
 
 {
-    "id": 10,
+    "id": 11,
     "uri": "arc42/adrs/ADR-009-per-core-timer-subsystem.html",
     "menu": "adrs",
     "title": "ADR-009: Per Core Timer Subsystem",
@@ -89,7 +97,7 @@ var documents = [
 },
 
 {
-    "id": 11,
+    "id": 12,
     "uri": "arc42/adrs/ADR-012-core0-ringbuffer-separation.html",
     "menu": "adrs",
     "title": "ADR-012: Core0 Ringbuffer Processing Separation",
@@ -97,7 +105,7 @@ var documents = [
 },
 
 {
-    "id": 12,
+    "id": 13,
     "uri": "arc42/adrs/ADR-001-microcontroller-selection.html",
     "menu": "adrs",
     "title": "ADR-001: Microcontroller Platform Selection for UART2ETH",
@@ -105,7 +113,7 @@ var documents = [
 },
 
 {
-    "id": 13,
+    "id": 14,
     "uri": "arc42/adrs/ADR-005-buffer-allocation-strategy.html",
     "menu": "adrs",
     "title": "ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH",
@@ -113,7 +121,7 @@ var documents = [
 },
 
 {
-    "id": 14,
+    "id": 15,
     "uri": "arc42/adrs/ADR-013-pio-uart-implementation.html",
     "menu": "adrs",
     "title": "ADR-013: PIO UART Implementation for Channel 2",
@@ -121,7 +129,7 @@ var documents = [
 },
 
 {
-    "id": 15,
+    "id": 16,
     "uri": "arc42/adrs/ADR-017-update-module.html",
     "menu": "adrs",
     "title": "ADR-017: Update Module Architecture",
@@ -129,7 +137,7 @@ var documents = [
 },
 
 {
-    "id": 16,
+    "id": 17,
     "uri": "arc42/adrs/ADR-008-hardware-pin-configuration.html",
     "menu": "adrs",
     "title": "ADR-008: Hardware Pin Configuration",
@@ -137,7 +145,7 @@ var documents = [
 },
 
 {
-    "id": 17,
+    "id": 18,
     "uri": "arc42/chapters/00_architecture_communication_canvas.html",
     "menu": "arc42",
     "title": "Architecture Communication Canvas",
@@ -145,7 +153,7 @@ var documents = [
 },
 
 {
-    "id": 18,
+    "id": 19,
     "uri": "arc42/chapters/01_introduction_and_goals.html",
     "menu": "arc42",
     "title": "Introduction and Goals",
@@ -153,7 +161,7 @@ var documents = [
 },
 
 {
-    "id": 19,
+    "id": 20,
     "uri": "arc42/chapters/05_building_block_view.html",
     "menu": "arc42",
     "title": "Building Block View",
@@ -161,7 +169,7 @@ var documents = [
 },
 
 {
-    "id": 20,
+    "id": 21,
     "uri": "arc42/chapters/02_architecture_constraints.html",
     "menu": "arc42",
     "title": "Architecture Constraints",
@@ -169,7 +177,7 @@ var documents = [
 },
 
 {
-    "id": 21,
+    "id": 22,
     "uri": "arc42/chapters/08_concepts.html",
     "menu": "arc42",
     "title": "Cross-cutting Concepts",
@@ -177,7 +185,7 @@ var documents = [
 },
 
 {
-    "id": 22,
+    "id": 23,
     "uri": "arc42/chapters/03_context_and_scope.html",
     "menu": "arc42",
     "title": "Context and Scope",
@@ -185,7 +193,7 @@ var documents = [
 },
 
 {
-    "id": 23,
+    "id": 24,
     "uri": "arc42/chapters/12_glossary.html",
     "menu": "arc42",
     "title": "Glossary",
@@ -193,7 +201,7 @@ var documents = [
 },
 
 {
-    "id": 24,
+    "id": 25,
     "uri": "arc42/chapters/09_architecture_decisions.html",
     "menu": "arc42",
     "title": "Architecture Decisions",
@@ -201,7 +209,7 @@ var documents = [
 },
 
 {
-    "id": 25,
+    "id": 26,
     "uri": "arc42/chapters/06_runtime_view.html",
     "menu": "arc42",
     "title": "Runtime View",
@@ -209,7 +217,7 @@ var documents = [
 },
 
 {
-    "id": 26,
+    "id": 27,
     "uri": "arc42/chapters/10_quality_requirements.html",
     "menu": "arc42",
     "title": "Quality Requirements",
@@ -217,7 +225,7 @@ var documents = [
 },
 
 {
-    "id": 27,
+    "id": 28,
     "uri": "arc42/chapters/07_deployment_view.html",
     "menu": "arc42",
     "title": "Deployment View",
@@ -225,7 +233,7 @@ var documents = [
 },
 
 {
-    "id": 28,
+    "id": 29,
     "uri": "arc42/chapters/04_solution_strategy.html",
     "menu": "arc42",
     "title": "Solution Strategy",
@@ -233,7 +241,7 @@ var documents = [
 },
 
 {
-    "id": 29,
+    "id": 30,
     "uri": "arc42/chapters/11_technical_risks.html",
     "menu": "arc42",
     "title": "Risks and Technical Debts",
@@ -241,7 +249,7 @@ var documents = [
 },
 
 {
-    "id": 30,
+    "id": 31,
     "uri": "arc42/arc42.html",
     "menu": "-",
     "title": "image:arc42-logo.png[arc42] Template",
@@ -249,7 +257,7 @@ var documents = [
 },
 
 {
-    "id": 31,
+    "id": 32,
     "uri": "search.html",
     "menu": "-",
     "title": "search",
@@ -257,7 +265,7 @@ var documents = [
 },
 
 {
-    "id": 32,
+    "id": 33,
     "uri": "lunrjsindex.html",
     "menu": "-",
     "title": "null",

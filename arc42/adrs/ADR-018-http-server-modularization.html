@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-001-microcontroller-selection.html -->
+    <!-- sourceuri: arc42/adrs/ADR-018-http-server-modularization.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-001: Microcontroller Platform Selection for UART2ETH</title>
+    <title>ADR-018: HTTP Server Modularization</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -254,98 +254,89 @@
 
             <ul class="td-sidebar-nav__section">
                 <li class="td-sidebar-nav__section-title">
-                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">adrs</span>
+                    <span class="align-left pl-0 pr-2 pt-2 active td-sidebar-link td-sidebar-link__section">arc42</span>
                 </li>
                 <li>
                   <ul>
                       <li class="collapse show" id="docs">
                           
                         <ul class="td-sidebar-nav__section ul-0">
+<details id="d8b6e4f467a2500cfc57e1e4bb7bb7114"><summary><span class="label">adrs</span></summary>
+                        <ul class="ul-1">
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
-                                   href="../../arc42/adrs/ADR-001-microcontroller-selection.html" title="ADR-001: Microcontroller Platform Selection for UART2ETH">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
+                                   href="../../arc42/adrs/ADR-018-http-server-modularization.html" title="ADR-018: HTTP Server Modularization">ADR-018: HTTP Server Modularization</a>
+                                
+                            </li>
+                        </ul></details>
+<details id="d378c2e65b576318b7f785b537c424464"><summary><span class="label"><a style="margin-left: 0px;" class="" href="../../arc42/chapters/00_architecture_communication_canvas.html" title="Architecture Communication Canvas">Architecture Communication Canvas</a></span></summary>
+                        <ul class="ul-1">
+                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                   href="../../arc42/chapters/00_architecture_communication_canvas.html" title="Architecture Communication Canvas">Architecture Communication Canvas</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-002-ethernet-controller-selection.html" title="ADR-002: Ethernet Controller Selection for UART2ETH">ADR-002: Ethernet Controller Selection for UART2ETH</a>
+                                   href="../../arc42/chapters/01_introduction_and_goals.html" title="Introduction and Goals">Introduction and Goals</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-003-programming-language-selection.html" title="ADR-003: Programming Language Selection for UART2ETH">ADR-003: Programming Language Selection for UART2ETH</a>
+                                   href="../../arc42/chapters/02_architecture_constraints.html" title="Architecture Constraints">Architecture Constraints</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-004-development-ecosystem.html" title="ADR-004: Development Ecosystem Selection for UART2ETH">ADR-004: Development Ecosystem Selection for UART2ETH</a>
+                                   href="../../arc42/chapters/03_context_and_scope.html" title="Context and Scope">Context and Scope</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-005-buffer-allocation-strategy.html" title="ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</a>
+                                   href="../../arc42/chapters/04_solution_strategy.html" title="Solution Strategy">Solution Strategy</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-006-flash-persistence-strategy.html" title="ADR-006: Flash Persistence Strategy for UART2ETH">ADR-006: Flash Persistence Strategy for UART2ETH</a>
+                                   href="../../arc42/chapters/05_building_block_view.html" title="Building Block View">Building Block View</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-007-state-machine-architecture.html" title="ADR-007: State Machine Architecture for UART2ETH">ADR-007: State Machine Architecture for UART2ETH</a>
+                                   href="../../arc42/chapters/06_runtime_view.html" title="Runtime View">Runtime View</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-008-hardware-pin-configuration.html" title="ADR-008: Hardware Pin Configuration">ADR-008: Hardware Pin Configuration</a>
+                                   href="../../arc42/chapters/07_deployment_view.html" title="Deployment View">Deployment View</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-009-per-core-timer-subsystem.html" title="ADR-009: Per Core Timer Subsystem">ADR-009: Per Core Timer Subsystem</a>
+                                   href="../../arc42/chapters/08_concepts.html" title="Cross-cutting Concepts">Cross-cutting Concepts</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-010-external-protocol-validation-tool.html" title="ADR-010: External Protocol Validation Tool">ADR-010: External Protocol Validation Tool</a>
+                                   href="../../arc42/chapters/09_architecture_decisions.html" title="Architecture Decisions">Architecture Decisions</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-011-ringbuffer-implementation.html" title="ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging">ADR-011: Ring Buffer Implementation for UART-TCP Message Bridging</a>
+                                   href="../../arc42/chapters/10_quality_requirements.html" title="Quality Requirements">Quality Requirements</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-012-core0-ringbuffer-separation.html" title="ADR-012: Core0 Ringbuffer Processing Separation">ADR-012: Core0 Ringbuffer Processing Separation</a>
+                                   href="../../arc42/chapters/11_technical_risks.html" title="Risks and Technical Debts">Risks and Technical Debts</a>
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
                                 <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-013-pio-uart-implementation.html" title="ADR-013: PIO UART Implementation for Channel 2">ADR-013: PIO UART Implementation for Channel 2</a>
+                                   href="../../arc42/chapters/12_glossary.html" title="Glossary">Glossary</a>
                                 
                             </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-014-factory-defaults-implementation.html" title="ADR-014: Factory Defaults Implementation">ADR-014: Factory Defaults Implementation</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-015-factory-defaults-web-interface.html" title="ADR-015: Factory Defaults Web Interface">ADR-015: Factory Defaults Web Interface</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-016-http-basic-authentication.html" title="ADR-016: HTTP Basic Authentication">ADR-016: HTTP Basic Authentication</a>
-                                
-                            </li>
-                            <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
-                                   href="../../arc42/adrs/ADR-017-update-module.html" title="ADR-017: Update Module Architecture">ADR-017: Update Module Architecture</a>
-                                
-                            </li>
+                        </ul></details>
                         </ul>
                       </li>
                   </ul>
@@ -358,11 +349,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-001-microcontroller-selection.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-018-http-server-modularization.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-001%3A+Microcontroller+Platform+Selection+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-001-microcontroller-selection.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-018%3A+HTTP+Server+Modularization%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-018-http-server-modularization.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -372,38 +363,34 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel0">
-<li><a href="#_adr_001_microcontroller_platform_selection_for_uart2eth">ADR-001: Microcontroller Platform Selection for UART2ETH</a>
+<li><a href="#_adr_018_http_server_modularization">ADR-018: HTTP Server Modularization</a>
 <ul class="sectlevel1">
+<li><a href="#_status">Status</a></li>
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision_drivers">Decision Drivers</a>
+<li><a href="#_decision">Decision</a>
 <ul class="sectlevel2">
-<li><a href="#_primary_requirements">Primary Requirements</a></li>
-<li><a href="#_constraints">Constraints</a></li>
+<li><a href="#_module_responsibilities">Module Responsibilities</a></li>
+<li><a href="#_interface_design">Interface Design</a></li>
+<li><a href="#_migration_strategy">Migration Strategy</a></li>
+<li><a href="#_file_structure_after_refactoring">File Structure After Refactoring</a></li>
 </ul>
 </li>
-<li><a href="#_options_considered">Options Considered</a>
-<ul class="sectlevel2">
-<li><a href="#_option_a_raspberry_pi_rp2350">Option A: Raspberry Pi RP2350</a></li>
-<li><a href="#_option_b_atmega328p_baseline">Option B: ATMega328P (Baseline)</a></li>
-<li><a href="#_option_c_esp32">Option C: ESP32</a></li>
-</ul>
-</li>
-<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a></li>
-<li><a href="#_decision">Decision</a></li>
 <li><a href="#_consequences">Consequences</a>
 <ul class="sectlevel2">
 <li><a href="#_positive">Positive</a></li>
 <li><a href="#_negative">Negative</a></li>
-<li><a href="#_risks_and_mitigation">Risks and Mitigation</a></li>
+<li><a href="#_mitigation">Mitigation</a></li>
 </ul>
 </li>
+<li><a href="#_compliance">Compliance</a></li>
+<li><a href="#_related_adrs">Related ADRs</a></li>
 <li><a href="#_implementation_notes">Implementation Notes</a>
 <ul class="sectlevel2">
-<li><a href="#_required_external_components">Required External Components</a></li>
-<li><a href="#_architecture_implications">Architecture Implications</a></li>
+<li><a href="#_cmakelists_txt_changes">CMakeLists.txt Changes</a></li>
+<li><a href="#_testing_strategy">Testing Strategy</a></li>
 </ul>
 </li>
-<li><a href="#_follow_up_actions">Follow-up Actions</a></li>
+<li><a href="#_references">References</a></li>
 </ul>
 </li>
 </ul>
@@ -428,339 +415,445 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_001_microcontroller_platform_selection_for_uart2eth" class="sect0">ADR-001: Microcontroller Platform Selection for UART2ETH</h1>
+<h1 id="_adr_018_http_server_modularization" class="sect0">ADR-018: HTTP Server Modularization</h1>
+<div class="sect1">
+<h2 id="_status">Status</h2>
+<div class="sectionbody">
 <div class="paragraph">
-<p><strong>Status:</strong> ACCEPTED<br>
-<strong>Date:</strong> 2025-07-26<br>
-<strong>Deciders:</strong> Architecture Team<br>
-<strong>Consulted:</strong> Senior Developer<br>
-<strong>Informed:</strong> Development Team</p>
+<p>Accepted</p>
+</div>
+</div>
 </div>
 <div class="sect1">
 <h2 id="_context">Context</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>The UART2ETH system requires a microcontroller platform capable of:</p>
+<p>The current HTTP server implementation (<code>http_server.c</code>) has grown to 2,349 lines and violates the Single Responsibility Principle. It combines seven distinct responsibilities into a single monolithic file:</p>
 </div>
-<div class="ulist">
-<ul>
+<div class="olist arabic">
+<ol class="arabic">
 <li>
-<p>Supporting up to 4 concurrent UART interfaces</p>
+<p>HTTP Protocol Layer - lwIP callbacks, connection management (~400 lines)</p>
 </li>
 <li>
-<p>Processing TCP/IP networking with industrial reliability</p>
+<p>HTML Page Generation - 5 different pages (~1000 lines)</p>
 </li>
 <li>
-<p>Implementing secure OTA firmware updates with A/B partitioning</p>
+<p>Authentication - Base64 decode, credential checking (~150 lines)</p>
 </li>
 <li>
-<p>Operating in industrial environments (-40°C to +85°C)</p>
+<p>Form Handling - POST parsing, validation (~300 lines)</p>
 </li>
 <li>
-<p>Achieving 500 kbps sustained throughput per UART port with sub-5ms latency</p>
+<p>Business Logic - Password changes, config updates, factory defaults (~200 lines)</p>
 </li>
 <li>
-<p>Cost-effective solution for volume production</p>
+<p>Upload Management - Firmware upload session (~100 lines)</p>
 </li>
-</ul>
+<li>
+<p>Request Routing - GET/POST dispatching (~200 lines)</p>
+</li>
+</ol>
 </div>
 <div class="paragraph">
-<p>The microcontroller selection is a foundational decision that affects all system capabilities, development complexity, and long-term maintainability.</p>
+<p>This monolithic structure creates several problems:</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_decision_drivers">Decision Drivers</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_primary_requirements">Primary Requirements</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Multi-UART Support</strong>: Hardware support for multiple UARTs or flexible alternatives</p>
+<p><strong>Maintainability</strong>: Adding new pages or features requires editing a very large file</p>
 </li>
 <li>
-<p><strong>Network Processing</strong>: Sufficient processing power for TCP/IP stack and protocol filtering</p>
+<p><strong>Testability</strong>: Cannot easily test individual components in isolation</p>
 </li>
 <li>
-<p><strong>A/B Update Capability</strong>: Sufficient flash memory and architecture for dual firmware partitions</p>
+<p><strong>Code Review</strong>: Large diffs make it difficult to review changes effectively</p>
 </li>
 <li>
-<p><strong>Security Capabilities</strong>: Hardware support for cryptographic operations and secure boot</p>
+<p><strong>Team Collaboration</strong>: Multiple developers working on different features cause merge conflicts</p>
 </li>
 <li>
-<p><strong>Industrial Reliability</strong>: Temperature range, electrical robustness, proven track record</p>
+<p><strong>Cognitive Load</strong>: Understanding the entire file requires mental tracking of many contexts</p>
 </li>
 <li>
-<p><strong>Real-time Performance</strong>: Deterministic behavior for latency-critical applications</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Mature toolchain, documentation, community support</p>
-</li>
-<li>
-<p><strong>Cost Effectiveness</strong>: Component cost + external components for volume production</p>
+<p><strong>Build Times</strong>: Changes to any part trigger recompilation of the entire 2,349 line file</p>
 </li>
 </ul>
 </div>
-</div>
-<div class="sect2">
-<h3 id="_constraints">Constraints</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Must operate reliably in industrial environments</p>
-</li>
-<li>
-<p>GPL open source licensing compatibility</p>
-</li>
-<li>
-<p>Maximum system cost target: $10 for volume production</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_options_considered">Options Considered</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_option_a_raspberry_pi_rp2350">Option A: Raspberry Pi RP2350</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Architecture</strong>: Dual-core ARM Cortex-M33 @ 150MHz</p>
-</li>
-<li>
-<p><strong>Memory</strong>: 520KB SRAM, external flash required</p>
-</li>
-<li>
-<p><strong>UARTs</strong>: 2 hardware UARTs + 12 programmable I/O (PIO) state machines</p>
-</li>
-<li>
-<p><strong>Networking</strong>: Requires external Ethernet controller (ENC28J60)</p>
-</li>
-<li>
-<p><strong>Security</strong>: Hardware SHA-256, ARM TrustZone, secure boot capabilities</p>
-</li>
-<li>
-<p><strong>A/B Updates</strong>: External flash enables dual partitions + secure bootloader</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Good documentation, smaller community than Arduino</p>
-</li>
-<li>
-<p><strong>Industrial Track Record</strong>: None (released August 2024, zero field deployment)</p>
-</li>
-<li>
-<p><strong>Cost</strong>: ~$1.00 + ~$1.50 (ENC28J60) = <strong>$2.50 total</strong></p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_b_atmega328p_baseline">Option B: ATMega328P (Baseline)</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Architecture</strong>: Single-core 8-bit AVR @ 16MHz</p>
-</li>
-<li>
-<p><strong>Memory</strong>: 2KB SRAM, 32KB Flash</p>
-</li>
-<li>
-<p><strong>UARTs</strong>: 1 hardware UART</p>
-</li>
-<li>
-<p><strong>Networking</strong>: Requires external Ethernet controller (ENC28J60)</p>
-</li>
-<li>
-<p><strong>Security</strong>: No hardware security features</p>
-</li>
-<li>
-<p><strong>A/B Updates</strong>: Insufficient flash space (32KB) for dual firmware images</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Arduino platform - most accessible ecosystem ever created, millions of tutorials</p>
-</li>
-<li>
-<p><strong>Industrial Track Record</strong>: Decades of proven deployment in industrial environments</p>
-</li>
-<li>
-<p><strong>Cost</strong>: ~$2.50 + ~$1.50 (ENC28J60) = <strong>$4.00 total</strong></p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_c_esp32">Option C: ESP32</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Architecture</strong>: Dual-core Xtensa LX6 @ 240MHz</p>
-</li>
-<li>
-<p><strong>Memory</strong>: 520KB SRAM, 4MB Flash</p>
-</li>
-<li>
-<p><strong>UARTs</strong>: 3 hardware UARTs</p>
-</li>
-<li>
-<p><strong>Networking</strong>: Built-in WiFi/Bluetooth, requires external Ethernet for wired</p>
-</li>
-<li>
-<p><strong>Security</strong>: Hardware crypto acceleration, secure boot</p>
-</li>
-<li>
-<p><strong>A/B Updates</strong>: 4MB flash supports dual partitions + ESP-IDF OTA framework</p>
-</li>
-<li>
-<p><strong>Development Ecosystem</strong>: Good tools (ESP-IDF, Arduino IDE), solid community, smaller than Arduino</p>
-</li>
-<li>
-<p><strong>Industrial Track Record</strong>: 8+ years deployment (2016+), moderate industrial adoption, less proven than ATMega328P</p>
-</li>
-<li>
-<p><strong>Cost</strong>: ~$2.50 + ~$1.50 (ENC28J60) = <strong>$4.00 total</strong></p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h2>
-<div class="sectionbody">
-<div class="paragraph">
-<p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
-<em>Baseline: ATMega328P (all scores = 0)</em></p>
-</div>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 31.25%;">
-<col style="width: 12.5%;">
-<col style="width: 18.75%;">
-<col style="width: 18.75%;">
-<col style="width: 18.75%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
-<th class="tableblock halign-left valign-top"><strong>ATMega328P</strong></th>
-<th class="tableblock halign-left valign-top"><strong>RP2350</strong></th>
-<th class="tableblock halign-left valign-top"><strong>ESP32</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>UART Support</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (PIO flexibility)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (3 HW UARTs)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Processing Power</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (dual 32-bit @150MHz)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (dual 32-bit @240MHz)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Capacity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (260x more SRAM)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (260x more SRAM)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>A/B Update Support</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (external flash + secure boot)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (4MB flash + OTA framework)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security Features</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (HW SHA-256 + TrustZone)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (HW crypto only)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Real-time Determinism</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (PIO + dual-core)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (dual-core)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Ecosystem</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (smaller community, newer)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (good tools, smaller than Arduino)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Reliability</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (new platform, zero field history)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (8+ years, less than decades)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Cost Effectiveness</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (37% cost reduction)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (same cost)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Network Architecture</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (same - external PHY)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (WiFi overhead)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total Weighted PUGH Score</strong></p></td>
-<td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">30</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">22</p></td>
-</tr>
-</tbody>
-</table>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_decision">Decision</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p><strong>Selected: Raspberry Pi RP2350</strong></p>
+<p>We will refactor <code>http_server.c</code> into a modular structure following the Separation of Concerns principle:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code>src/network/
+├── http_server.c              (~500 lines) - Core protocol &amp; connection management
+├── http_router.c              (~200 lines) - Request routing &amp; dispatch
+├── http_auth.c                (~200 lines) - Authentication &amp; base64
+├── http_forms.c               (~300 lines) - Form parsing &amp; validation
+└── http_pages/
+    ├── page_device.c          (~250 lines) - Device status page
+    ├── page_config.c          (~250 lines) - Configuration page
+    ├── page_update.c          (~250 lines) - Firmware update page
+    ├── page_factory.c         (~250 lines) - Factory defaults page (FACTORY_INTERNAL_VERSION only)
+    └── page_styles.c          (~100 lines) - CSS stylesheet</code></pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_module_responsibilities">Module Responsibilities</h3>
+<div class="sect3">
+<h4 id="_http_server_c_core_protocol_layer">http_server.c (Core Protocol Layer)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>lwIP Raw TCP API callbacks and connection management</p>
+</li>
+<li>
+<p>HTTP request/response handling at protocol level</p>
+</li>
+<li>
+<p>Connection state tracking and cleanup</p>
+</li>
+<li>
+<p>Server lifecycle (init, deinit, process)</p>
+</li>
+<li>
+<p>Statistics collection</p>
+</li>
+<li>
+<p>Exposes: <code>http_server_init()</code>, <code>http_server_process()</code>, <code>http_server_get_stats()</code></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_http_router_c_request_routing">http_router.c (Request Routing)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>URL path parsing and route matching</p>
+</li>
+<li>
+<p>GET/POST request dispatching to appropriate handlers</p>
+</li>
+<li>
+<p>Route registration and lookup</p>
+</li>
+<li>
+<p>RESTful endpoint management</p>
+</li>
+<li>
+<p>Exposes: <code>http_router_init()</code>, <code>http_router_route_request()</code></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_http_auth_c_authentication">http_auth.c (Authentication)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>HTTP Basic Authentication implementation</p>
+</li>
+<li>
+<p>Base64 encoding/decoding</p>
+</li>
+<li>
+<p>Credential validation</p>
+</li>
+<li>
+<p>Session token management (if extended to JWT in future)</p>
+</li>
+<li>
+<p>Exposes: <code>http_check_authentication()</code>, <code>http_send_auth_required()</code></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_http_forms_c_form_handling">http_forms.c (Form Handling)</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>POST data parsing (application/x-www-form-urlencoded)</p>
+</li>
+<li>
+<p>Form field extraction and validation</p>
+</li>
+<li>
+<p>URL decoding</p>
+</li>
+<li>
+<p>Checkbox and input field processing</p>
+</li>
+<li>
+<p>Exposes: <code>http_parse_form_data()</code>, <code>http_get_form_field()</code></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_http_pages_c_page_generators">http_pages/*.c (Page Generators)</h4>
+<div class="paragraph">
+<p>Each page module generates its HTML content independently:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>page_device.c</code> - Main device status page with network info and UART channel status</p>
+</li>
+<li>
+<p><code>page_config.c</code> - Configuration page with forms for network and UART settings</p>
+</li>
+<li>
+<p><code>page_update.c</code> - Firmware update page with upload form and reboot controls</p>
+</li>
+<li>
+<p><code>page_factory.c</code> - Factory defaults page (only compiled when FACTORY_INTERNAL_VERSION defined)</p>
+</li>
+<li>
+<p><code>page_styles.c</code> - Common CSS stylesheet shared by all pages</p>
+</li>
+</ul>
 </div>
 <div class="paragraph">
-<p>The RP2350 scores significantly higher (+30 vs +22) in the weighted PUGH analysis, primarily due to:</p>
+<p>Each page exposes: <code>generate_&lt;name&gt;_page(buffer, buffer_size, &#8230;&#8203;params)</code></p>
 </div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_interface_design">Interface Design</h3>
+<div class="sect3">
+<h4 id="_http_server_core_api">HTTP Server Core API</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Server lifecycle
+bool http_server_init(void);
+void http_server_deinit(void);
+void http_server_process(void);
+bool http_server_is_running(void);
+http_server_status_t http_server_get_status(void);
+void http_server_get_stats(http_server_stats_t* stats);
+void http_server_reset_stats(void);
+
+// Upload session management (exposed for update module integration)
+bool http_upload_session_start(uint32_t expected_size);
+void http_upload_receive_chunk(uint32_t bytes_received);
+void http_upload_session_reset(void);
+void http_upload_get_progress(uint32_t* bytes_received, uint32_t* total_bytes);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_http_router_api">HTTP Router API</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef void (*http_route_handler_t)(http_connection_t* conn, const char* request_data, size_t data_len);
+
+typedef struct {
+    const char* path;              // e.g., "/config"
+    http_request_type_t method;    // GET or POST
+    http_route_handler_t handler;  // Handler function
+} http_route_t;
+
+void http_router_init(void);
+bool http_router_register_route(const char* path, http_request_type_t method, http_route_handler_t handler);
+http_route_handler_t http_router_find_route(const char* path, http_request_type_t method);
+void http_router_route_request(http_connection_t* conn, const char* request_data, size_t data_len);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_http_authentication_api">HTTP Authentication API</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">bool http_check_authentication(const char* request, const char* expected_password);
+void http_send_auth_required(http_connection_t* conn);
+int http_base64_decode(const char* input, char* output, size_t max_len);
+int http_base64_encode(const uint8_t* input, size_t input_len, char* output, size_t max_len);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_http_forms_api">HTTP Forms API</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">typedef struct {
+    const char* key;
+    const char* value;
+} http_form_field_t;
+
+bool http_parse_form_data(const char* form_data, http_form_field_t* fields, size_t max_fields, size_t* field_count);
+const char* http_get_form_field(const http_form_field_t* fields, size_t field_count, const char* key);
+bool http_form_field_equals(const http_form_field_t* fields, size_t field_count, const char* key, const char* value);
+void http_url_decode(char* str);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_http_page_generation_api">HTTP Page Generation API</h4>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Each page module exposes a generation function
+void http_generate_device_page(char* buffer, size_t buffer_size);
+void http_generate_config_page(char* buffer, size_t buffer_size);
+void http_generate_update_page(char* buffer, size_t buffer_size, const char* message);
+void http_generate_stylesheet(char* buffer, size_t buffer_size);
+
+#ifdef FACTORY_INTERNAL_VERSION
+void http_generate_factory_page(char* buffer, size_t buffer_size,
+                                  const char* error_msg, size_t error_msg_size,
+                                  const char* success_msg, size_t success_msg_size);
+#endif</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_migration_strategy">Migration Strategy</h3>
+<div class="paragraph">
+<p>The refactoring will be performed incrementally to maintain system stability:</p>
+</div>
+<div class="sect3">
+<h4 id="_phase_1_extract_page_generation">Phase 1: Extract Page Generation</h4>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><strong>Superior UART Flexibility</strong>: PIO state machines provide unmatched capability for implementing custom UART protocols</p>
+<p>Create <code>http_pages/</code> directory and CMakeLists.txt</p>
 </li>
 <li>
-<p><strong>A/B Update Architecture</strong>: External flash design enables reliable dual-partition firmware updates</p>
+<p>Extract page generation functions to separate files</p>
 </li>
 <li>
-<p><strong>Security Architecture</strong>: Hardware SHA-256 and TrustZone directly address secure OTA requirements</p>
+<p>Create header files with generation function declarations</p>
 </li>
 <li>
-<p><strong>Cost Advantage</strong>: 37% lower total system cost while providing better capabilities</p>
+<p>Update http_server.c to include new headers and call extracted functions</p>
 </li>
 <li>
-<p><strong>Real-time Determinism</strong>: PIO subsystem + dual-core architecture enables predictable performance</p>
+<p>Verify compilation and basic functionality</p>
 </li>
 </ol>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_phase_2_extract_authentication">Phase 2: Extract Authentication</h4>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Create <code>http_auth.c</code> and <code>http_auth.h</code></p>
+</li>
+<li>
+<p>Move authentication functions and Base64 codec</p>
+</li>
+<li>
+<p>Update http_server.c to use new authentication API</p>
+</li>
+<li>
+<p>Verify authentication still works correctly</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_phase_3_extract_form_handling">Phase 3: Extract Form Handling</h4>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Create <code>http_forms.c</code> and <code>http_forms.h</code></p>
+</li>
+<li>
+<p>Move form parsing and validation functions</p>
+</li>
+<li>
+<p>Update POST handlers to use new forms API</p>
+</li>
+<li>
+<p>Verify configuration updates and password changes work</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_phase_4_extract_request_routing">Phase 4: Extract Request Routing</h4>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Create <code>http_router.c</code> and <code>http_router.h</code></p>
+</li>
+<li>
+<p>Implement route registration and dispatch system</p>
+</li>
+<li>
+<p>Register all existing routes during http_server_init()</p>
+</li>
+<li>
+<p>Replace manual URL parsing with router dispatch</p>
+</li>
+<li>
+<p>Verify all pages and endpoints remain accessible</p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_phase_5_cleanup_and_documentation">Phase 5: Cleanup and Documentation</h4>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Remove extracted code from http_server.c</p>
+</li>
+<li>
+<p>Update function documentation and comments</p>
+</li>
+<li>
+<p>Update CMakeLists.txt with all new source files</p>
+</li>
+<li>
+<p>Run complete system test suite</p>
+</li>
+<li>
+<p>Update arc42 Building Block View diagram</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_file_structure_after_refactoring">File Structure After Refactoring</h3>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code>include/network/
+├── http_server.h              - Core server API and public interfaces
+├── http_router.h              - Route registration and dispatch API
+├── http_auth.h                - Authentication API
+├── http_forms.h               - Form parsing API
+└── http_pages/
+    ├── page_device.h          - Device page generation
+    ├── page_config.h          - Config page generation
+    ├── page_update.h          - Update page generation
+    ├── page_factory.h         - Factory page generation (conditional)
+    └── page_styles.h          - Stylesheet generation
+
+src/network/
+├── http_server.c              - Core protocol implementation
+├── http_router.c              - Request routing implementation
+├── http_auth.c                - Authentication implementation
+├── http_forms.c               - Form parsing implementation
+├── http_pages/
+│   ├── CMakeLists.txt         - Page modules build configuration
+│   ├── page_device.c          - Device page implementation
+│   ├── page_config.c          - Config page implementation
+│   ├── page_update.c          - Update page implementation
+│   ├── page_factory.c         - Factory page implementation (conditional)
+│   └── page_styles.c          - Stylesheet implementation
+└── CMakeLists.txt             - Updated with subdirectory</code></pre>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -772,19 +865,28 @@
 <div class="ulist">
 <ul>
 <li>
-<p>✅ <strong>Technical Capability</strong>: Meets all performance and functionality requirements</p>
+<p><strong>Maintainability</strong>: Each module has clear, single responsibility</p>
 </li>
 <li>
-<p>✅ <strong>Cost Optimization</strong>: Lowest total system cost among capable options</p>
+<p><strong>Testability</strong>: Can unit test authentication, form parsing, page generation independently</p>
 </li>
 <li>
-<p>✅ <strong>Security Compliance</strong>: Hardware support for all security requirements</p>
+<p><strong>Extensibility</strong>: Adding new pages requires only creating new page_*.c files</p>
 </li>
 <li>
-<p>✅ <strong>Development Efficiency</strong>: Excellent documentation and tooling ecosystem</p>
+<p><strong>Code Review</strong>: Smaller, focused diffs easier to review</p>
 </li>
 <li>
-<p>✅ <strong>Future Flexibility</strong>: PIO enables protocol extensions without redesign</p>
+<p><strong>Team Collaboration</strong>: Reduced merge conflicts when multiple developers work on different features</p>
+</li>
+<li>
+<p><strong>Build Performance</strong>: Changes to individual pages don&#8217;t trigger full recompilation</p>
+</li>
+<li>
+<p><strong>Cognitive Load</strong>: Developers can understand and modify individual components without mental overhead</p>
+</li>
+<li>
+<p><strong>Separation of Concerns</strong>: Clear boundaries between protocol, routing, auth, forms, and presentation</p>
 </li>
 </ul>
 </div>
@@ -794,41 +896,86 @@
 <div class="ulist">
 <ul>
 <li>
-<p>⚠️ <strong>External Dependency</strong>: Requires external Ethernet controller</p>
+<p><strong>Initial Effort</strong>: Refactoring requires significant upfront work</p>
 </li>
 <li>
-<p>⚠️ <strong>Industrial Deployment Risk</strong>: Zero field deployment history in industrial environments (released August 2024)</p>
+<p><strong>Temporary Instability</strong>: Risk of introducing bugs during migration</p>
 </li>
 <li>
-<p>⚠️ <strong>Platform Maturity</strong>: Less proven than ATMega328P&#8217;s decades of industrial use</p>
+<p><strong>More Files</strong>: Increases project file count from 1 to ~15 files</p>
 </li>
 <li>
-<p>⚠️ <strong>Development Ecosystem</strong>: Smaller community and fewer resources in Arduino&#8217;s massive ecosystem compared to ATMega328P</p>
+<p><strong>Indirection</strong>: May require more navigation between files during debugging</p>
 </li>
 <li>
-<p>⚠️ <strong>Custom Development</strong>: PIO programming requires specialized knowledge</p>
+<p><strong>Learning Curve</strong>: New developers must understand modular structure</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_risks_and_mitigation">Risks and Mitigation</h3>
+<h3 id="_mitigation">Mitigation</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Supply Chain Risk</strong>: Multiple suppliers available, stockpile strategy for critical components</p>
+<p>Perform refactoring incrementally in phases with testing after each phase</p>
 </li>
 <li>
-<p><strong>ENC28J60 Dependency</strong>: Well-established component with multiple sources and alternatives</p>
+<p>Maintain comprehensive test suite throughout migration</p>
 </li>
 <li>
-<p><strong>Industrial Reliability Risk</strong>: RP2350 has zero industrial field deployment history; mitigate with extensive environmental testing and validation program</p>
+<p>Document module responsibilities clearly in headers</p>
 </li>
 <li>
-<p><strong>Development Complexity</strong>: Comprehensive documentation and examples available</p>
+<p>Use consistent naming conventions (<code>http_&lt;module&gt;_&lt;function&gt;</code> pattern)</p>
+</li>
+<li>
+<p>Keep hot-path functions (request processing) in http_server.c for performance</p>
 </li>
 </ul>
 </div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_compliance">Compliance</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This refactoring aligns with:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Coding Discipline</strong>: "Writing code for readability and maintainability, not for performance or being brief"</p>
+</li>
+<li>
+<p><strong>Architecture Documentation Discipline</strong>: Clear module boundaries match arc42 building blocks</p>
+</li>
+<li>
+<p><strong>Single Responsibility Principle</strong>: Each module has one clear purpose</p>
+</li>
+<li>
+<p><strong>Open/Closed Principle</strong>: Easy to extend with new pages without modifying existing code</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_related_adrs">Related ADRs</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>ADR-015: Factory Defaults Web Interface - page_factory.c implements this feature</p>
+</li>
+<li>
+<p>ADR-016: HTTP Basic Authentication - http_auth.c implements this feature</p>
+</li>
+<li>
+<p>ADR-017: Update Module - page_update.c provides UI for this feature</p>
+</li>
+</ul>
 </div>
 </div>
 </div>
@@ -836,87 +983,87 @@
 <h2 id="_implementation_notes">Implementation Notes</h2>
 <div class="sectionbody">
 <div class="sect2">
-<h3 id="_required_external_components">Required External Components</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>external Ethernet Controller</strong>: Hardware Ethernet stack, SPI interface</p>
-</li>
-<li>
-<p><strong>Crystal/Oscillator</strong>: For precise timing if required by application</p>
-</li>
-<li>
-<p><strong>Power Supply</strong>: 3.3V regulation and filtering</p>
-</li>
-<li>
-<p><strong>Protection</strong>: ESD protection for industrial environments</p>
-</li>
-</ul>
+<h3 id="_cmakelists_txt_changes">CMakeLists.txt Changes</h3>
+<div class="paragraph">
+<p>Main CMakeLists.txt update:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="cmake"># Add subdirectory for HTTP pages
+add_subdirectory(http_pages)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>New http_pages/CMakeLists.txt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="cmake">add_library(http_pages INTERFACE)
+
+target_sources(http_pages INTERFACE
+    ${CMAKE_CURRENT_LIST_DIR}/page_device.c
+    ${CMAKE_CURRENT_LIST_DIR}/page_config.c
+    ${CMAKE_CURRENT_LIST_DIR}/page_update.c
+    ${CMAKE_CURRENT_LIST_DIR}/page_styles.c
+)
+
+# Conditional factory page compilation
+if(FACTORY_INTERNAL_VERSION)
+    target_sources(http_pages INTERFACE
+        ${CMAKE_CURRENT_LIST_DIR}/page_factory.c
+    )
+endif()
+
+target_include_directories(http_pages INTERFACE
+    ${CMAKE_SOURCE_DIR}/include
+)</code></pre>
+</div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_architecture_implications">Architecture Implications</h3>
+<h3 id="_testing_strategy">Testing Strategy</h3>
+<div class="paragraph">
+<p>Each module will have focused tests:</p>
+</div>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Dual-Core Utilization</strong>: Core 0 for real-time UART processing, Core 1 for networking</p>
+<p><code>test_http_auth.c</code> - Authentication and Base64 codec</p>
 </li>
 <li>
-<p><strong>Memory Management</strong>: Static allocation for predictable real-time behavior</p>
+<p><code>test_http_forms.c</code> - Form parsing and validation</p>
 </li>
 <li>
-<p><strong>Security Integration</strong>: TrustZone secure boot with hardware-accelerated crypto</p>
+<p><code>test_http_router.c</code> - Route registration and dispatch</p>
+</li>
+<li>
+<p><code>test_http_pages.c</code> - Page generation (verify no buffer overflows)</p>
 </li>
 </ul>
+</div>
+<div class="paragraph">
+<p>Integration tests verify:
+* End-to-end page rendering still works
+* Authentication still protects all endpoints
+* Form submissions update configuration correctly
+* Firmware upload flow remains functional</p>
 </div>
 </div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_follow_up_actions">Follow-up Actions</h2>
+<h2 id="_references">References</h2>
 <div class="sectionbody">
-<div class="olist arabic">
-<ol class="arabic">
+<div class="ulist">
+<ul>
 <li>
-<p><strong>Procurement</strong>: Establish supplier relationships for RP2350 and ENC28J60</p>
+<p>Current implementation: <code>src/network/http_server.c</code> (2,349 lines)</p>
 </li>
 <li>
-<p><strong>Industrial Validation</strong>: Comprehensive environmental testing program to validate RP2350 reliability in industrial conditions</p>
+<p>Related modules: <code>update_manager.c</code>, <code>network_manager.c</code>, <code>shared_memory.c</code></p>
 </li>
 <li>
-<p><strong>Prototyping</strong>: Develop basic hardware platform for validation testing</p>
-</li>
-<li>
-<p><strong>PIO Development</strong>: Create UART protocol templates using PIO state machines</p>
-</li>
-<li>
-<p><strong>Security Planning</strong>: Design secure boot and OTA update architecture</p>
-</li>
-<li>
-<p><strong>Testing Strategy</strong>: Define industrial environment validation procedures including EMI/EMC testing</p>
-</li>
-</ol>
-</div>
-<hr>
-<div class="paragraph">
-<p><strong>Review Notes:</strong></p>
-</div>
-<div class="ulist checklist">
-<ul class="checklist">
-<li>
-<p>&#10063; Confirm ENC28J60 vs W5500 preference</p>
-</li>
-<li>
-<p>&#10063; Validate cost estimates with current supplier pricing</p>
-</li>
-<li>
-<p>&#10063; Review A/B update architecture requirements vs RP2350 external flash approach</p>
-</li>
-<li>
-<p>&#10063; Confirm industrial temperature requirements vs RP2350 specs</p>
-</li>
-<li>
-<p>&#10063; Validate PUGH matrix criteria weights reflect actual project priorities</p>
+<p>Documentation: Chapter 5 Building Block View - Management Interface</p>
 </li>
 </ul>
 </div>
@@ -949,11 +1096,11 @@
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-001%3A+Microcontroller+Platform+Selection+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-001-microcontroller-selection.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-018%3A+HTTP+Server+Modularization%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-018-http-server-modularization.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-001%3A+Microcontroller+Platform+Selection+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-001-microcontroller-selection.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-018%3A+HTTP+Server+Modularization%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-018-http-server-modularization.adoc">tell
     us how we can improve</a>.
     </p>
 </div>
