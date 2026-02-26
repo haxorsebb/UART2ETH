@@ -1395,7 +1395,9 @@ static void http_generate_device_page(char* buffer, size_t buffer_size) {
         "        <div class=\"nav-links\">\n"
         "            <a href=\"/\">Status</a>\n"
         "            <a href=\"/config\">Configuration</a>\n"
+#ifdef FACTORY_INTERNAL_VERSION
         "            <a href=\"/factory\">FACTORY DEFAULTS</a>\n"
+#endif
         "        </div>\n"
         "        \n"
         "        <div class=\"section\">\n"
@@ -1597,12 +1599,12 @@ static void http_generate_config_page(char* buffer, size_t buffer_size) {
         "                \n"
         "                <div class=\"form-group\">\n"
         "                    <label for=\"static_ip\">Static IP Address (used when DHCP disabled):</label>\n"
-        "                    <input type=\"text\" id=\"static_ip\" name=\"static_ip\" value=\"%s\" placeholder=\"10.10.10.41\">\n"
+        "                    <input type=\"text\" id=\"static_ip\" name=\"static_ip\" value=\"%s\" placeholder=\"192.168.1.201\">\n"
         "                </div>\n"
         "                \n"
         "                <div class=\"form-group\">\n"
         "                    <label for=\"mac_addr\">MAC Address:</label>\n"
-        "                    <input type=\"text\" id=\"mac_addr\" name=\"mac_addr\" value=\"%s\" placeholder=\"02:00:00:00:00:01\" readonly>\n"
+        "                    <input type=\"text\" id=\"mac_addr\" name=\"mac_addr\" value=\"%s\" placeholder=\"34:D7:F5:30:00:01\" readonly>\n"
         "                </div>\n"
         "            </div>\n"
         "            \n"
@@ -1987,9 +1989,9 @@ static void http_generate_factory_page(char* buffer, size_t buffer_size, const c
 
     // Prepare current values for display
     char current_serial[32] = "Not Programmed";
-    char current_mac[18] = "00:00:00:00:00:00";
-    char current_ip[16] = "0.0.0.0";
-    char current_netmask[16] = "0.0.0.0";
+    char current_mac[18] = "34:D7:F5:30:00:00";
+    char current_ip[16] = "192.168.1.201";
+    char current_netmask[16] = "255.255.255.0";
     const char* current_dhcp = "No";
     const char* current_board_type = "Unknown";
     char current_password[32] = "Not Set";
@@ -2076,7 +2078,7 @@ static void http_generate_factory_page(char* buffer, size_t buffer_size, const c
         "</div>"
         "<div class=\"section\"><h3>Network Identity</h3>"
         "<div class=\"form-group\"><label for=\"mac_address\">MAC Address:</label>"
-        "<input type=\"text\" id=\"mac_address\" name=\"mac_address\" value=\"02:00:00:00:00:01\" required>"
+        "<input type=\"text\" id=\"mac_address\" name=\"mac_address\" value=\"34:D7:F5:30:00:01\" required>"
         "<small>Format: XX:XX:XX:XX:XX:XX</small></div>"
         "</div>"
         "<div class=\"section\"><h3>Board Type</h3>"
@@ -2090,12 +2092,12 @@ static void http_generate_factory_page(char* buffer, size_t buffer_size, const c
         "<div class=\"section\"><h3>Default Network</h3>"
         "<div class=\"form-row\">"
         "<div class=\"form-group\"><label for=\"default_ip\">Default IP:</label>"
-        "<input type=\"text\" id=\"default_ip\" name=\"default_ip\" value=\"192.168.1.100\" required></div>"
+        "<input type=\"text\" id=\"default_ip\" name=\"default_ip\" value=\"192.168.1.201\" required></div>"
         "<div class=\"form-group\"><label for=\"default_netmask\">Default Netmask:</label>"
         "<input type=\"text\" id=\"default_netmask\" name=\"default_netmask\" value=\"255.255.255.0\" required></div>"
         "</div>"
         "<div class=\"form-group\"><div class=\"checkbox-group\">"
-        "<input type=\"checkbox\" id=\"default_dhcp\" name=\"default_dhcp\" value=\"1\">"
+        "<input type=\"checkbox\" id=\"default_dhcp\" name=\"default_dhcp\" value=\"0\">"
         "<label for=\"default_dhcp\">Enable DHCP by default</label>"
         "</div></div>"
         "</div>"

@@ -92,3 +92,29 @@ target_include_directories(http_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
     ${CMAKE_CURRENT_SOURCE_DIR}/html  # HTML page templates
 )
+
+# Create HTTP server library (factory internal version)
+add_library(http_server_factory_internal
+    http_server.c
+    http_multipart.c
+)
+
+# Link required libraries including lwIP
+target_link_libraries(http_server_factory_internal
+    pico_stdlib
+    log_manager
+    update_manager      # For firmware upload handling
+    pico_lwip_nosys     # lwIP NO_SYS implementation for raw API
+)
+
+# Include directories
+target_include_directories(http_server_factory_internal PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
+    ${CMAKE_CURRENT_SOURCE_DIR}/html  # HTML page templates
+)
+
+target_compile_definitions(http_server_factory_internal PRIVATE
+    FACTORY_INTERNAL_VERSION=1
+)

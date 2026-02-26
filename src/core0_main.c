@@ -419,7 +419,7 @@ static bool process_uart_data(void) {
     log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_PROCESSING, g_uart_processing_cycles);
     
     if (g_uart_processing_cycles == 0) {
-        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_DEBUG, LOG_EVENT_UART_COMPLETE, 0);
+        log_event(EVENT_SOURCE_UART0, LOG_LEVEL_TRACE, LOG_EVENT_UART_COMPLETE, 0);
         return true;  // Processing complete
     }
     

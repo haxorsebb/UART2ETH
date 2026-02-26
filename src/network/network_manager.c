@@ -345,10 +345,10 @@ void network_manager_get_default_config(network_config_t* config) {
         config->mac_address[5] = defaults->mac_address[5];
         
     } else {    
-        config->mac_address[0] = 0x02;  // Locally administered, unicast
-        config->mac_address[1] = 0x00;  // Fixed values
-        config->mac_address[2] = 0x00; 
-        config->mac_address[3] = 0x00;
+        config->mac_address[0] = 0x34;  // Locally administered, unicast
+        config->mac_address[1] = 0xD7;  // Fixed values
+        config->mac_address[2] = 0xF5; 
+        config->mac_address[3] = 0x30;
         config->mac_address[4] = 0x00;
         config->mac_address[5] = 0x01;  // Simple fixed MAC: 02:00:00:00:00:01
     }
@@ -360,8 +360,8 @@ void network_manager_get_default_config(network_config_t* config) {
     });
 
     // Static IP configuration (only used when use_dhcp = false)
-    IP4_ADDR(&config->static_ip, 10, 10, 10, 41);       // Static IP: 10.10.10.41
-    IP4_ADDR(&config->static_gateway, 10, 10, 10, 1);   // Gateway: 10.10.10.1 (DHCP server)
+    IP4_ADDR(&config->static_ip, 192, 168, 1, 201);       // Static IP: 10.10.10.41
+    IP4_ADDR(&config->static_gateway, 192, 168, 1, 1);   // Gateway: 10.10.10.1 (DHCP server)
     IP4_ADDR(&config->static_netmask, 255, 255, 255, 0); // Netmask: 255.255.255.0
 
     config->management_port = 80;

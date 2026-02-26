@@ -27,6 +27,32 @@ target_link_libraries(config_manager
     boot_uf2_headers
 )
 
+# Configuration manager - factory internal version (includes factory_defaults_write)
+add_library(config_manager_factory_internal
+    config/shared_memory.c
+    config/flash_persistence.c
+    config/factory_defaults.c
+    config/uart_config_protocol.c
+)
+
+target_include_directories(config_manager_factory_internal PUBLIC ../include)
+target_include_directories(config_manager_factory_internal PUBLIC ../include/config)
+target_include_directories(config_manager_factory_internal PUBLIC ../include/log)
+target_link_libraries(config_manager_factory_internal 
+    pico_stdlib
+    pico_sha256
+    pico_sync 
+    hardware_sync
+    hardware_flash
+    hardware_watchdog
+    pico_bootrom
+    utils
+    boot_uf2_headers
+)
+target_compile_definitions(config_manager_factory_internal PRIVATE
+    FACTORY_INTERNAL_VERSION=1
+)
+
 # Log manager
 add_library(log_manager
     log/log_manager.c
@@ -114,6 +140,33 @@ target_link_libraries(core_modules
     hardware_sync
 )
 
+# Core processing modules - factory internal version
+add_library(core_modules_factory_internal
+    core0_main.c
+    core1_main.c
+)
+target_include_directories(core_modules_factory_internal PUBLIC ../include)
+target_include_directories(core_modules_factory_internal PUBLIC ../include/update)
+target_link_libraries(core_modules_factory_internal 
+    state_machine
+    config_manager_factory_internal
+    log_manager
+    network_manager_factory_internal
+    tcp_socket_server
+    http_server_factory_internal
+    update_manager
+    timer_subsystems
+    ringbuffer
+    uart_manager
+    pico_stdlib
+    pico_multicore
+    pico_sync
+    hardware_sync
+)
+target_compile_definitions(core_modules_factory_internal PRIVATE
+    FACTORY_INTERNAL_VERSION=1
+)
+
 # UART Manager - 4-channel UART management (includes PIO UART for Issue #82 and Channel 3)
 add_library(uart_manager
     uart/uart_manager.c
@@ -152,6 +205,7 @@ add_library(utils
 
 # Generate PIO header for selftest PIO UART TX
 pico_generate_pio_header(utils ${CMAKE_CURRENT_LIST_DIR}/uart/pio_uart_tx.pio)
+pico_generate_pio_header(utils ${CMAKE_CURRENT_LIST_DIR}/uart/pio_uart_rx.pio)
 
 target_include_directories(utils PUBLIC ../include)
 target_link_libraries(utils 
