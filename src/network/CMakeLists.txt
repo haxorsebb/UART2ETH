@@ -74,6 +74,7 @@ target_include_directories(tcp_socket_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/state_machine
 )
 
+
 # Create HTTP server library
 add_library(http_server
     http_server.c
@@ -82,6 +83,9 @@ add_library(http_server
     http_router.c
     http_multipart.c
 )
+
+ADD_DEPENDENCIES(http_server timestamp)
+INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
 
 # Link required libraries including lwIP
 target_link_libraries(http_server
@@ -99,6 +103,7 @@ target_include_directories(http_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network/http_pages
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
     ${CMAKE_CURRENT_SOURCE_DIR}/html  # HTML page templates
+    ${CMAKE_BINARY_DIR}/
 )
 
 # Create HTTP server library (factory internal version)
@@ -109,6 +114,9 @@ add_library(http_server_factory_internal
     http_router.c
     http_multipart.c
 )
+
+ADD_DEPENDENCIES(http_server_factory_internal timestamp)
+INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
 
 # Link required libraries including lwIP
 target_link_libraries(http_server_factory_internal
@@ -126,6 +134,7 @@ target_include_directories(http_server_factory_internal PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network/http_pages
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
     ${CMAKE_CURRENT_SOURCE_DIR}/html  # HTML page templates
+    ${CMAKE_BINARY_DIR}/
 )
 
 target_compile_definitions(http_server_factory_internal PRIVATE

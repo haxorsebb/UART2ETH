@@ -350,7 +350,7 @@ void network_manager_get_default_config(network_config_t* config) {
         config->mac_address[2] = 0xF5; 
         config->mac_address[3] = 0x30;
         config->mac_address[4] = 0x00;
-        config->mac_address[5] = 0x01;  // Simple fixed MAC: 02:00:00:00:00:01
+        config->mac_address[5] = 0x01;  // Simple fixed MAC: 34:D7:F5:30:00:01
     }
 
     DEBUG_ONLY({

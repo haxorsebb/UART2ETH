@@ -36,7 +36,7 @@
     "%s" /* Message placeholder */ \
     "        \n" \
     "        <div class=\"section\">\n" \
-    "            <h3>📦 Upload Firmware</h3>\n" \
+    "            <h3>Upload Firmware</h3>\n" \
     "            <p>Upload a .uf2 firmware file for OTA update. Maximum size: 1024 KB</p>\n" \
     "            <div class=\"upload-area\">\n" \
     "                <form method=\"POST\" action=\"/update\" enctype=\"multipart/form-data\">\n" \
@@ -50,7 +50,7 @@
     "        </div>\n" \
     "        \n" \
     "        <div class=\"section\">\n" \
-    "            <h3>🔄 Device Reboot</h3>\n" \
+    "            <h3>Device Reboot</h3>\n" \
     "            <p>Manually reboot the device to apply changes or recover from errors.</p>\n" \
     "            <p><strong>Warning:</strong> All active connections will be terminated.</p>\n" \
     "            <form method=\"POST\" action=\"/reboot\">\n" \

@@ -34,6 +34,7 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
     // Prepare current values for display
     char current_serial[32] = "Not Programmed";
     char current_mac[18] = "00:00:00:00:00:00";
+    char current_mac_suffix[9] = "0:00:00";
     char current_ip[16] = "0.0.0.0";
     char current_netmask[16] = "0.0.0.0";
     const char* current_dhcp = "No";
@@ -56,6 +57,12 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
                  current_factory->mac_address[0], current_factory->mac_address[1],
                  current_factory->mac_address[2], current_factory->mac_address[3],
                  current_factory->mac_address[4], current_factory->mac_address[5]);
+        
+        // Format MAC suffix (last 5 hex chars as X:XX:XX)
+        snprintf(current_mac_suffix, sizeof(current_mac_suffix), "%X:%02X:%02X",
+                 current_factory->mac_address[3] & 0x0F,
+                 current_factory->mac_address[4],
+                 current_factory->mac_address[5]);
         
         // Format IP addresses
         uint32_t ip = current_factory->default_ip;
@@ -92,7 +99,7 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         "<link rel=\"stylesheet\" href=\"/styles.css\"></head><body>"
         "<div class=\"container\">"
         "<div class=\"header warning\">"
-        "<h1>Factory Defaults<span class=\"warning-badge\">⚠️ FACTORY INTERNAL</span></h1>"
+        "<h1>Factory Defaults<span class=\"warning-badge\">FACTORY INTERNAL</span></h1>"
         "<p>Manufacturing Tool - Program Device Factory Configuration</p>"
         "</div>"
         "<div class=\"nav-links\"><a href=\"/\">Status</a><a href=\"/config\">Configuration</a><a href=\"/update\">Update</a></div>"
@@ -104,7 +111,7 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         "<p><strong>MAC:</strong> %s</p>"
         "<p><strong>Board:</strong> %s</p>"
         "<p><strong>IP:</strong> %s | <strong>Mask:</strong> %s | <strong>DHCP:</strong> %s</p>"
-        "<p><strong>Access:</strong>User:Admin | Password %s</p>"
+        "<p><strong>Access:</strong> User: admin | Password %s</p>"
         "</div>"
         "<form method=\"POST\" action=\"/factory\">"
         "<div class=\"section\"><h3>Serial Number</h3>"
@@ -122,8 +129,13 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         "</div>"
         "<div class=\"section\"><h3>Network Identity</h3>"
         "<div class=\"form-group\"><label for=\"mac_address\">MAC Address:</label>"
-        "<input type=\"text\" id=\"mac_address\" name=\"mac_address\" value=\"02:00:00:00:00:01\" required>"
-        "<small>Format: XX:XX:XX:XX:XX:XX</small></div>"
+        "<div style=\"display:flex;align-items:center;gap:4px;\">"
+        "<span style=\"font-family:monospace;font-size:14px;\">34:D7:F5:3</span>"
+        "<input type=\"text\" id=\"mac_address\" name=\"mac_address\" value=\"%s\" "
+        "pattern=\"[0-9A-Fa-f]:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}\" maxlength=\"8\" "
+        "style=\"width:80px;font-family:monospace;\" required>"
+        "</div>"
+        "<small>Enter last 5 hex digits as X:XX:XX (prefix 34:D7:F5:3 is fixed)</small></div>"
         "</div>"
         "<div class=\"section\"><h3>Board Type</h3>"
         "<div class=\"form-group\"><label for=\"board_type\">Hardware Variant:</label>"
@@ -136,7 +148,7 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         "<div class=\"section\"><h3>Default Network</h3>"
         "<div class=\"form-row\">"
         "<div class=\"form-group\"><label for=\"default_ip\">Default IP:</label>"
-        "<input type=\"text\" id=\"default_ip\" name=\"default_ip\" value=\"192.168.1.100\" required></div>"
+        "<input type=\"text\" id=\"default_ip\" name=\"default_ip\" value=\"192.168.1.201\" required></div>"
         "<div class=\"form-group\"><label for=\"default_netmask\">Default Netmask:</label>"
         "<input type=\"text\" id=\"default_netmask\" name=\"default_netmask\" value=\"255.255.255.0\" required></div>"
         "</div>"
@@ -165,7 +177,8 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         success_msg_size > 0 ? "</div>" : "",
         factory_valid ? "valid" : "invalid",
         current_serial, current_mac, current_board_type,
-        current_ip, current_netmask, current_dhcp, current_password
+        current_ip, current_netmask, current_dhcp, current_password,
+        current_mac_suffix
     );
     
     printf("HTTP: Generated factory page (%d bytes, %s)\n", html_len, error_msg ? "with error" : "OK");
@@ -244,16 +257,19 @@ bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* 
                 serial_number = sn;
                 has_serial = true;
             }
-            // Parse MAC address
+            // Parse MAC address (user enters X:XX:XX, we prepend 34:D7:F5:3)
             else if (strcmp(key, "mac_address") == 0) {
-                int m[6];
-                if (sscanf(value, "%02x%%3A%02x%%3A%02x%%3A%02x%%3A%02x%%3A%02x", 
-                          &m[0], &m[1], &m[2], &m[3], &m[4], &m[5]) == 6 ||
-                    sscanf(value, "%02x-%02x-%02x-%02x-%02x-%02x", 
-                          &m[0], &m[1], &m[2], &m[3], &m[4], &m[5]) == 6) {
-                    for (int i = 0; i < 6; i++) {
-                        factory_data.mac_address[i] = (uint8_t)m[i];
-                    }
+                int m3_low, m4, m5;
+                // Parse format "X:XX:XX" or URL-encoded "X%3AXX%3AXX"
+                if (sscanf(value, "%1x%%3A%02x%%3A%02x", &m3_low, &m4, &m5) == 3 ||
+                    sscanf(value, "%1x:%02x:%02x", &m3_low, &m4, &m5) == 3) {
+                    // Fixed prefix: 34:D7:F5:3X
+                    factory_data.mac_address[0] = 0x34;
+                    factory_data.mac_address[1] = 0xD7;
+                    factory_data.mac_address[2] = 0xF5;
+                    factory_data.mac_address[3] = (uint8_t)(0x30 | (m3_low & 0x0F));
+                    factory_data.mac_address[4] = (uint8_t)m4;
+                    factory_data.mac_address[5] = (uint8_t)m5;
                     has_mac = true;
                 }
             }
