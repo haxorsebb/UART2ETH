@@ -9,7 +9,6 @@ add_library(config_manager
     config/shared_memory.c
     config/flash_persistence.c
     config/factory_defaults.c
-    config/uart_config_protocol.c
 )
 
 target_include_directories(config_manager PUBLIC ../include)
@@ -32,7 +31,6 @@ add_library(config_manager_factory_internal
     config/shared_memory.c
     config/flash_persistence.c
     config/factory_defaults.c
-    config/uart_config_protocol.c
 )
 
 target_include_directories(config_manager_factory_internal PUBLIC ../include)

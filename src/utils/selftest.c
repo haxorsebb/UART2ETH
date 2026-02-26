@@ -29,9 +29,6 @@ static uint g_selftest_rx_offset = 0;
 // Expected trigger string from Blackfin
 #define SELFTEST_TRIGGER_STRING "RP2354 run\r\n"
 
-//define PRINT_SELFTEST_OUTPUT for selftest function in combination with boardtest software on the Blackfin DSP
-#define PRINT_SELFTEST_OUTPUT
-
 /**
  * @brief Send a string over PIO UART4 for selftest output
  * 
@@ -42,7 +39,6 @@ static uint g_selftest_rx_offset = 0;
  */
 void selftest_puts(const char* str)
 {
-#ifdef PRINT_SELFTEST_OUTPUT    
     while (*str) {
         printf("%c", *str);
         if (g_selftest_pio_initialized) {
@@ -50,7 +46,6 @@ void selftest_puts(const char* str)
         }
         str++;
     }
-#endif    
 }
 
 void selftest(void)

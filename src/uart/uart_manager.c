@@ -7,7 +7,6 @@
 #include "shared_memory.h"
 #include "device_mode.h"
 #include "uart/uart_interface.h"
-#include "uart_config_protocol.h"
 #include "ringbuffer.h"
 #include "log_manager.h"
 #include "pico/stdlib.h"
@@ -69,9 +68,6 @@ bool uart_manager_init(void) {
     memset(&g_manager, 0, sizeof(uart_manager_t));
     g_manager.stats.status = UART_MANAGER_STATUS_INITIALIZING;
     g_manager.start_time = to_ms_since_boot(get_absolute_time());
-    
-    // Initialize UART configuration protocol
-    uart_config_protocol_init();
     
     // Initialize UART channels
     bool success = true;
@@ -454,34 +450,14 @@ static bool process_channel_incoming_data(channel_id_t channel) {
                 // NOTE: No printf() allowed in this hot path!
                 // printf() disables interrupts, causing PIO RX FIFO overflow.
                 
-                // Check if this is a configuration command (except channel 0)
-                bool is_cfg_cmd = uart_config_is_command(entry->payload, entry->fill_index);
+                // Enqueue message for TCP transmission
+                ringbuffer_enqueue_entry(entry);
+                entry = NULL; // CRITICAL FIX: Clear entry pointer to force new allocation
                 
-                if (channel != CHANNEL_0 && is_cfg_cmd) {
-                    // Process config command and send response back via UART
-                    uint8_t response[CFG_MAX_RESPONSE];
-                    size_t response_len = 0;
-                    
-                    if (uart_config_process_command(channel, entry->payload, entry->fill_index,
-                                                     response, &response_len)) {
-                        // Send response back on the same UART channel
-                        if (response_len > 0 && uart->ops->send_data) {
-                            uart->ops->send_data(uart->driver_context, response, response_len);
-                        }
-                    }
-                    
-                    // Don't forward config commands to TCP - just reset entry for reuse
-                    entry->fill_index = 0;
-                } else {
-                    // Normal message - enqueue for TCP transmission
-                    ringbuffer_enqueue_entry(entry);
-                    entry = NULL; // CRITICAL FIX: Clear entry pointer to force new allocation
-                    
-                    // NOTE: Do NOT call clear_rx_buffer() here!
-                    // While processing this message, the IRQ handler may have already 
-                    // received the next message (or part of it) into the ring buffer.
-                    // Clearing it would discard that data and cause truncation.
-                }
+                // NOTE: Do NOT call clear_rx_buffer() here!
+                // While processing this message, the IRQ handler may have already 
+                // received the next message (or part of it) into the ring buffer.
+                // Clearing it would discard that data and cause truncation.
                 
                 // If there's more data to process, get a new entry immediately
                 if(idx < bytes_read - 1 && entry == NULL) {
