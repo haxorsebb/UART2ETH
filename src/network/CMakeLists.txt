@@ -104,6 +104,9 @@ target_include_directories(http_server PUBLIC
 # Create HTTP server library (factory internal version)
 add_library(http_server_factory_internal
     http_server.c
+    http_auth.c
+    http_forms.c
+    http_router.c
     http_multipart.c
 )
 
@@ -112,6 +115,7 @@ target_link_libraries(http_server_factory_internal
     pico_stdlib
     log_manager
     update_manager      # For firmware upload handling
+    http_pages_factory_internal  # Page generation modules (ADR-018) - factory version
     pico_lwip_nosys     # lwIP NO_SYS implementation for raw API
 )
 
@@ -119,6 +123,7 @@ target_link_libraries(http_server_factory_internal
 target_include_directories(http_server_factory_internal PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network/http_pages
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
     ${CMAKE_CURRENT_SOURCE_DIR}/html  # HTML page templates
 )
