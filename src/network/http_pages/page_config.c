@@ -13,6 +13,7 @@
 #include "network/network_manager.h"
 #include "shared_memory.h"
 #include "device_mode.h"
+#include "config/version.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -74,14 +75,21 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
         "<body>\n"
         "    <div class=\"container\">\n"
         "        <div class=\"header\">\n"
-        "            <h1>UART2ETH Configuration</h1>\n"
-        "            <p>Configure network settings and UART channels</p>\n"
+        "            <h1>UART2ETH Configuration"
+#ifdef FACTORY_INTERNAL_VERSION
+        " <span class=\"factory-badge\">⚠ FACTORY INTERNAL</span>"
+#endif
+        "</h1>\n"
+        "            <p>Configure network settings and UART channels | Firmware " FIRMWARE_VERSION_STRING "</p>\n"
         "        </div>\n"
         "        \n"
         "        <div class=\"nav-links\">\n"
         "            <a href=\"/\">Status</a>\n"
         "            <a href=\"/config\" class=\"active\">Configuration</a>\n"
         "            <a href=\"/update\">Update</a>\n"
+#ifdef FACTORY_INTERNAL_VERSION
+        "            <a href=\"/factory\">FACTORY DEFAULTS</a>\n"
+#endif
         "        </div>\n"
         "        \n"
         "        <div class=\"current-status\">\n"

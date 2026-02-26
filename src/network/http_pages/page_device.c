@@ -14,6 +14,7 @@
 #include "network/network_manager.h"
 #include "shared_memory.h"
 #include "device_mode.h"
+#include "config/version.h"
 #include "debug.h"
 #include <stdio.h>
 #include <string.h>
@@ -121,14 +122,21 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         "<body>\n"
         "    <div class=\"container\">\n"
         "        <div class=\"header\">\n"
-        "            <h1>UART2ETH Device Information <span class=\"mode-badge\">%s</span></h1>\n"
-        "            <p>Serial to Network Bridge - Device Status</p>\n"
+        "            <h1>UART2ETH Device Information <span class=\"mode-badge\">%s</span>"
+#ifdef FACTORY_INTERNAL_VERSION
+        " <span class=\"factory-badge\">⚠ FACTORY INTERNAL</span>"
+#endif
+        "</h1>\n"
+        "            <p>Serial to Network Bridge - Device Status | Firmware " FIRMWARE_VERSION_STRING "</p>\n"
         "        </div>\n"
         "        \n"
         "        <div class=\"nav-links\">\n"
         "            <a href=\"/\">Status</a>\n"
         "            <a href=\"/config\">Configuration</a>\n"
         "            <a href=\"/update\">Update</a>\n"
+#ifdef FACTORY_INTERNAL_VERSION
+        "            <a href=\"/factory\">FACTORY DEFAULTS</a>\n"
+#endif
         "        </div>\n"
         "        \n"
         "        <div class=\"section\">\n"
@@ -188,7 +196,8 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         "        \n"
         "        <div class=\"section\">\n"
         "            <h2>Device Information</h2>\n"
-        "            <p><span class=\"label\">Firmware:</span> <span class=\"value\">UART2ETH v1.0 (%s)</span></p>\n"
+        "            <p><span class=\"label\">Firmware:</span> <span class=\"value\">UART2ETH v" FIRMWARE_VERSION_STRING " (%s)</span></p>\n"
+        "            <p><span class=\"label\">Build Type:</span> <span class=\"value\">" FIRMWARE_BUILD_TYPE "</span></p>\n"
         "            <p><span class=\"label\">Hardware:</span> <span class=\"value\">RP2350 + ENC28J60</span></p>\n"
         "            <p><span class=\"label\">Uptime:</span> <span class=\"value\">%d seconds</span></p>\n"
         "        </div>\n"

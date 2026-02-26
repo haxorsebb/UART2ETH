@@ -53,6 +53,8 @@ void http_generate_stylesheet(char* buffer, size_t buffer_size) {
         ".nav-links a.active{background-color:#3498db}"
         ".mode-badge{display:inline-block;padding:4px 12px;background-color:#9b59b6;color:white;border-radius:12px;font-size:12px;margin-left:10px}"
         ".warning-badge{display:inline-block;padding:6px 15px;background-color:#e67e22;color:white;border-radius:4px;font-size:14px;font-weight:bold;margin-left:10px}"
+        ".factory-badge{display:inline-block;padding:6px 15px;background-color:#e74c3c;color:white;border-radius:4px;font-size:14px;font-weight:bold;margin-left:10px;animation:blink 1s infinite}"
+        "@keyframes blink{0%%,100%%{opacity:1}50%%{opacity:0.5}}"
         ".form-group{margin-bottom:15px}"
         ".form-group label{display:block;margin-bottom:5px;font-weight:bold;color:#34495e}"
         ".form-group input,.form-group select{width:100%%;padding:8px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box}"
