@@ -13,6 +13,7 @@
 #include "network/network_manager.h"
 #include "shared_memory.h"
 #include "device_mode.h"
+#include "config/version.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -74,14 +75,21 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
         "<body>\n"
         "    <div class=\"container\">\n"
         "        <div class=\"header\">\n"
-        "            <h1>UART2ETH Configuration</h1>\n"
-        "            <p>Configure network settings and UART channels</p>\n"
+        "            <h1>UART2ETH Configuration"
+#ifdef FACTORY_INTERNAL_VERSION
+        " <span class=\"factory-badge\">FACTORY INTERNAL</span>"
+#endif
+        "</h1>\n"
+        "            <p>Configure network settings and UART channels | Firmware " FIRMWARE_VERSION_STRING "</p>\n"
         "        </div>\n"
         "        \n"
         "        <div class=\"nav-links\">\n"
         "            <a href=\"/\">Status</a>\n"
         "            <a href=\"/config\" class=\"active\">Configuration</a>\n"
         "            <a href=\"/update\">Update</a>\n"
+#ifdef FACTORY_INTERNAL_VERSION
+        "            <a href=\"/factory\">FACTORY DEFAULTS</a>\n"
+#endif
         "        </div>\n"
         "        \n"
         "        <div class=\"current-status\">\n"
@@ -113,19 +121,7 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
         "            \n"
         "            <div class=\"section\">\n"
         "                <h3>UART Channel Configuration</h3>\n"
-        "                <p><em>UART0 is reserved for debug output and cannot be configured.</em></p>\n"
         "                \n"
-        "                <div class=\"uart-row\">\n"
-        "                    <div class=\"checkbox-group\">\n"
-        "                        <input type=\"checkbox\" id=\"ch1_enabled\" name=\"ch1_enabled\" value=\"1\" %s>\n"
-        "                        <label for=\"ch1_enabled\">UART1 Enabled</label>\n"
-        "                    </div>\n"
-        "                    <div class=\"form-group\" style=\"margin-bottom: 0;\">\n"
-        "                        <label for=\"ch1_port\">TCP Port:</label>\n"
-        "                        <input type=\"number\" id=\"ch1_port\" name=\"ch1_port\" value=\"%d\" min=\"1024\" max=\"65535\">\n"
-        "                    </div>\n"
-        "                    <div style=\"flex: 0.5; font-size: 14px; color: #7f8c8d;\">GP4/GP5</div>\n"
-        "                </div>\n"
 #if DEVICE_CHANNEL_2_ENABLED
         "                \n"
         "                <div class=\"uart-row\">\n"
@@ -165,7 +161,7 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
         "                        <label for=\"ch4_port\">TCP Port:</label>\n"
         "                        <input type=\"number\" id=\"ch4_port\" name=\"ch4_port\" value=\"%d\" min=\"1024\" max=\"65535\">\n"
         "                    </div>\n"
-        "                    <div style=\"flex: 0.5; font-size: 14px; color: #7f8c8d;\">GP24/GP25</div>\n"
+        "                    <div style=\"flex: 0.5; font-size: 14px; color: #7f8c8d;\">GP5/GP4</div>\n"
         "                </div>\n"
 #endif
         "            </div>\n"
@@ -211,17 +207,7 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
         current_ip_str, mac_str, layout->config.network.use_dhcp ? "Enabled" : "Disabled",
         layout->config.network.use_dhcp ? "checked" : "",
         static_ip_str,
-        mac_str,
-        layout->config.channels[CHANNEL_1].enabled ? "checked" : "",
-        layout->config.channels[CHANNEL_1].tcp_port
-#if DEVICE_CHANNEL_2_ENABLED
-        ,layout->config.channels[CHANNEL_2].enabled ? "checked" : "",
-        layout->config.channels[CHANNEL_2].tcp_port
-#endif
-#if DEVICE_CHANNEL_3_ENABLED
-        ,layout->config.channels[CHANNEL_3].enabled ? "checked" : "",
-        layout->config.channels[CHANNEL_3].tcp_port
-#endif
+        mac_str
 #if DEVICE_CHANNEL_4_ENABLED
         ,layout->config.channels[CHANNEL_4].enabled ? "checked" : "",
         layout->config.channels[CHANNEL_4].tcp_port

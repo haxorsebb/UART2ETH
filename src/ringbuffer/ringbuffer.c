@@ -25,7 +25,7 @@
 #include <limits.h>
 
 // Ring buffer configuration
-#define RINGBUFFER_CAPACITY 32  // Number of entries (must be power of 2 for efficiency)
+#define RINGBUFFER_CAPACITY 64  // Number of entries (must be power of 2 for efficiency)
 
 // Ring buffer state
 typedef struct {
@@ -196,17 +196,12 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
     // Get direction for doorbell signaling
     uint8_t direction = entry->direction;
     
-    printf("[RINGBUFFER-ENQUEUE] About to wake other core (direction=%s)\n", 
-           direction == RX_TCP_TO_UART ? "TCP->UART" : "UART->TCP");
-    
     if(direction==RX_TCP_TO_UART) {
         wake_other_core(CORE1_WAKES_CORE0);
     }
     else {
         wake_other_core(CORE0_WAKES_CORE1);
     }
-    
-    printf("[RINGBUFFER-ENQUEUE] Successfully woke other core and releasing mutex\n");
 
     mutex_exit(&g_ringbuffer.access_mutex);
 

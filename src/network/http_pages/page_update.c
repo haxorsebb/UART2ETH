@@ -12,6 +12,7 @@
 
 #include "network/http_pages/page_update.h"
 #include "update/update_manager.h"
+#include "config/version.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -77,14 +78,21 @@ void http_generate_update_page(char* buffer, size_t buffer_size, const char* mes
         "<body>\n"
         "    <div class=\"container\">\n"
         "        <div class=\"header\">\n"
-        "            <h1>Firmware Update</h1>\n"
-        "            <p>Manage device firmware and system updates</p>\n"
+        "            <h1>Firmware Update"
+#ifdef FACTORY_INTERNAL_VERSION
+        " <span class=\"factory-badge\">FACTORY INTERNAL</span>"
+#endif
+        "</h1>\n"
+        "            <p>Manage device firmware and system updates | Firmware " FIRMWARE_VERSION_STRING "</p>\n"
         "        </div>\n"
         "        \n"
         "        <div class=\"nav-links\">\n"
         "            <a href=\"/\">Status</a>\n"
         "            <a href=\"/config\">Configuration</a>\n"
         "            <a href=\"/update\" class=\"active\">Update</a>\n"
+#ifdef FACTORY_INTERNAL_VERSION
+        "            <a href=\"/factory\">FACTORY DEFAULTS</a>\n"
+#endif
         "        </div>\n"
         "        \n"
         "%s%s%s"  /* Message placeholder */
@@ -96,7 +104,7 @@ void http_generate_update_page(char* buffer, size_t buffer_size, const char* mes
         "        </div>\n"
         "        \n"
         "        <div class=\"section\">\n"
-        "            <h3>📦 Upload Firmware</h3>\n"
+        "            <h3>Upload Firmware</h3>\n"
         "            <p>Upload a .uf2 firmware file for OTA update. Maximum size: 1024 KB</p>\n"
         "            <div style=\"border: 2px dashed #3498db; padding: 30px; text-align: center; border-radius: 8px; margin: 20px 0;\">\n"
         "                <form method=\"POST\" action=\"/update\" enctype=\"multipart/form-data\">\n"
@@ -110,7 +118,7 @@ void http_generate_update_page(char* buffer, size_t buffer_size, const char* mes
         "        </div>\n"
         "        \n"
         "        <div class=\"section\">\n"
-        "            <h3>🔄 Device Reboot</h3>\n"
+        "            <h3>Device Reboot</h3>\n"
         "            <p>Reboot the device to apply pending changes or recover from errors.</p>\n"
         "            <p><strong>Warning:</strong> All active connections will be terminated.</p>\n"
         "            <form method=\"POST\" action=\"/reboot\">\n"

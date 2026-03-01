@@ -25,6 +25,34 @@ target_include_directories(network_manager PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
 )
 
+
+# Create network library
+add_library(network_manager_factory_internal
+    enc28j60_driver.c
+    network_manager.c
+    lwip_netif_enc28j60.c  # lwIP network interface for ENC28J60
+)
+
+# Link required libraries including lwIP
+target_link_libraries(network_manager_factory_internal
+    pico_stdlib
+    hardware_spi
+    hardware_gpio
+    log_manager
+    pico_lwip_nosys     # lwIP NO_SYS implementation for raw API
+)
+
+# Include directories
+target_include_directories(network_manager_factory_internal PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
+)
+
+target_compile_definitions(network_manager_factory_internal PRIVATE
+    FACTORY_INTERNAL_VERSION=1
+)
+
+
 # Create TCP socket server library
 add_library(tcp_socket_server
     tcp_socket_server.c
@@ -46,6 +74,7 @@ target_include_directories(tcp_socket_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/state_machine
 )
 
+
 # Create HTTP server library
 add_library(http_server
     http_server.c
@@ -54,6 +83,9 @@ add_library(http_server
     http_router.c
     http_multipart.c
 )
+
+ADD_DEPENDENCIES(http_server timestamp)
+INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
 
 # Link required libraries including lwIP
 target_link_libraries(http_server
@@ -71,4 +103,40 @@ target_include_directories(http_server PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network/http_pages
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
     ${CMAKE_CURRENT_SOURCE_DIR}/html  # HTML page templates
+    ${CMAKE_BINARY_DIR}/
+)
+
+# Create HTTP server library (factory internal version)
+add_library(http_server_factory_internal
+    http_server.c
+    http_auth.c
+    http_forms.c
+    http_router.c
+    http_multipart.c
+)
+
+ADD_DEPENDENCIES(http_server_factory_internal timestamp)
+INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
+
+# Link required libraries including lwIP
+target_link_libraries(http_server_factory_internal
+    pico_stdlib
+    log_manager
+    update_manager      # For firmware upload handling
+    http_pages_factory_internal  # Page generation modules (ADR-018) - factory version
+    pico_lwip_nosys     # lwIP NO_SYS implementation for raw API
+)
+
+# Include directories
+target_include_directories(http_server_factory_internal PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/network/http_pages
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/update
+    ${CMAKE_CURRENT_SOURCE_DIR}/html  # HTML page templates
+    ${CMAKE_BINARY_DIR}/
+)
+
+target_compile_definitions(http_server_factory_internal PRIVATE
+    FACTORY_INTERNAL_VERSION=1
 )

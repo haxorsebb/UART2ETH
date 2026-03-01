@@ -3,7 +3,8 @@
  * @brief Firmware update module implementation
  * 
  * Implements OTA firmware updates using RP2350's Try-Before-You-Buy (TBYB)
- * mechanism with A/B partition support.
+ * mechanism with A/B partition support. Properly parses UF2 file format
+ * and writes firmware blocks to the correct flash addresses.
  * 
  * Documentation Reference:
  * - ADR-017: Update Module Architecture
@@ -36,7 +37,7 @@
 #define UPDATE_BUFFER_SIZE          FLASH_SECTOR_SIZE  // 4KB sector buffer
 #define FLASH_SECTOR_ERASE_SIZE     4096
 
-// UF2 Family ID for RP2350 (from pico-examples)
+// UF2 Family ID for RP2350-ARM-S (secure ARM mode)
 #define RP2350_FAMILY_ID            0xe48bff59
 
 typedef struct uf2_block uf2_block_t;
@@ -63,7 +64,7 @@ typedef struct {
     // Initialization state
     bool initialized;
     
-    // Partition information (discovered via ROM)
+    // Partition information (discovered via ROM on first UF2 block)
     uint32_t partition_start;       ///< Partition start address (flash offset)
     uint32_t partition_end;         ///< Partition end address (flash offset)
     uint32_t partition_size;        ///< Partition size in bytes
@@ -80,8 +81,11 @@ typedef struct {
     uint32_t bytes_received;
     uint32_t bytes_written;
     uint32_t blocks_processed;
+    uint32_t num_blocks;            ///< Total UF2 blocks expected (from first block)
     uint32_t highest_erased_sector;
     uint32_t last_error_code;
+    uint32_t family_id;             ///< UF2 family ID (validated)
+    bool first_block_done;          ///< True after first UF2 block processed
     
     // Reboot handling
     reboot_reason_t reboot_reason;
@@ -94,6 +98,9 @@ typedef struct {
 } update_state_internal_t;
 
 static update_state_internal_t g_update = {0};
+
+// Use the uf2_block struct from the SDK
+typedef struct uf2_block uf2_block_t;
 
 // ============================================================================
 // Forward Declarations (flash_safe_execute callbacks)
@@ -108,10 +115,12 @@ static void call_explicit_buy_internal(void* param);
 // ============================================================================
 
 /**
- * @brief Flush the sector buffer to flash
+ * @brief Write a single UF2 block's payload to flash
  * 
- * Erases the sector if needed and programs the buffered data.
+ * Erases the sector if needed and programs the 256-byte payload.
+ * Uses flash_safe_execute for dual-core safety.
  * 
+ * @param block Pointer to the UF2 block
  * @return true on success, false on error
  */
 static bool flush_sector_buffer(void) {
@@ -228,8 +237,13 @@ static bool flush_sector_buffer(void) {
     g_update.bytes_written += g_update.sector_buffer_offset;
     g_update.sector_buffer_offset = 0;
     
-    // Clear buffer for next sector
-    memset(g_update.sector_buffer, 0xFF, UPDATE_BUFFER_SIZE);
+    // Progress reporting every 64 blocks (~16KB)
+    if ((g_update.blocks_processed % 64) == 0 || 
+        g_update.blocks_processed == g_update.num_blocks) {
+        printf("UPDATE: Progress %u / %u blocks (%u%%)\n",
+               g_update.blocks_processed, g_update.num_blocks,
+               (g_update.blocks_processed * 100) / g_update.num_blocks);
+    }
     
     return true;
 }
@@ -277,9 +291,6 @@ bool update_init(void) {
     memset(&g_update, 0, sizeof(g_update));
     g_update.state = UPDATE_STATE_IDLE;
     g_update.reboot_reason = REBOOT_REASON_NONE;
-    
-    // Pre-fill sector buffer with 0xFF (erased flash state)
-    memset(g_update.sector_buffer, 0xFF, UPDATE_BUFFER_SIZE);
     
     g_update.initialized = true;
     
@@ -349,6 +360,7 @@ bool update_start_upload(uint32_t expected_size) {
     g_update.bytes_received = 0;
     g_update.bytes_written = 0;
     g_update.blocks_processed = 0;
+    g_update.num_blocks = 0;
     g_update.highest_erased_sector = 0;
     g_update.last_error_code = 0;
     g_update.sector_buffer_offset = 0;
@@ -375,30 +387,38 @@ bool update_write_block(uint8_t* data, uint32_t size, bool finished) {
     if (data != NULL && size > 0) {
         g_update.bytes_received += size;
         
-        // Copy data to sector buffer
-        uint32_t bytes_remaining = size;
+        // Buffer incoming data and process complete UF2 blocks
         uint32_t data_offset = 0;
         
-        while (bytes_remaining > 0) {
-            // Calculate how much we can copy to current sector buffer
-            uint32_t space_in_buffer = UPDATE_BUFFER_SIZE - g_update.sector_buffer_offset;
-            uint32_t copy_size = (bytes_remaining > space_in_buffer) ? space_in_buffer : bytes_remaining;
+        while (data_offset < size) {
+            // Calculate how much we can copy to UF2 buffer
+            uint32_t space_in_buffer = UF2_BLOCK_SIZE - g_update.uf2_buffer_offset;
+            uint32_t copy_size = size - data_offset;
+            if (copy_size > space_in_buffer) {
+                copy_size = space_in_buffer;
+            }
             
-            memcpy(g_update.sector_buffer + g_update.sector_buffer_offset, 
+            // Copy to UF2 buffer
+            memcpy(g_update.uf2_buffer + g_update.uf2_buffer_offset, 
                    data + data_offset, copy_size);
             
-            g_update.sector_buffer_offset += copy_size;
+            g_update.uf2_buffer_offset += copy_size;
             data_offset += copy_size;
-            bytes_remaining -= copy_size;
             
-            // If sector buffer is full, flush it to flash
-            if (g_update.sector_buffer_offset >= UPDATE_BUFFER_SIZE) {
-                if (!flush_sector_buffer()) {
+            // If we have a complete UF2 block, process it
+            if (g_update.uf2_buffer_offset >= UF2_BLOCK_SIZE) {
+                uf2_block_t* block = (uf2_block_t*)g_update.uf2_buffer;
+                
+                if (!process_uf2_block(block)) {
                     g_update.state = UPDATE_STATE_ERROR;
                     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, 
                               LOG_EVENT_FIRMWARE_UPDATE_FAILED, g_update.last_error_code);
                     return false;
                 }
+                
+                // Reset buffer for next block
+                g_update.uf2_buffer_offset = 0;
+                memset(g_update.uf2_buffer, 0, UF2_BLOCK_SIZE);
             }
         }
         
@@ -417,18 +437,14 @@ bool update_write_block(uint8_t* data, uint32_t size, bool finished) {
     
     // Handle finish
     if (finished) {
-        // Flush any remaining data
-        if (g_update.sector_buffer_offset > 0) {
-            if (!flush_sector_buffer()) {
-                g_update.state = UPDATE_STATE_ERROR;
-                log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR,
-                          LOG_EVENT_FIRMWARE_UPDATE_FAILED, g_update.last_error_code);
-                return false;
-            }
+        // Check if we processed all expected blocks
+        if (g_update.num_blocks > 0 && g_update.blocks_processed < g_update.num_blocks) {
+            printf("UPDATE: Warning - only %u/%u blocks received\n",
+                   g_update.blocks_processed, g_update.num_blocks);
         }
         
-        printf("UPDATE: Upload complete - %u bytes received, %u bytes written\n",
-               g_update.bytes_received, g_update.bytes_written);
+        printf("UPDATE: Upload complete - %u bytes received, %u blocks processed, %u bytes written\n",
+               g_update.bytes_received, g_update.blocks_processed, g_update.bytes_written);
         
         g_update.state = UPDATE_STATE_COMPLETE;
         log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, 
@@ -450,8 +466,10 @@ void update_abort_upload(void) {
     g_update.state = UPDATE_STATE_IDLE;
     g_update.bytes_received = 0;
     g_update.bytes_written = 0;
-    g_update.sector_buffer_offset = 0;
-    memset(g_update.sector_buffer, 0xFF, UPDATE_BUFFER_SIZE);
+    g_update.blocks_processed = 0;
+    g_update.uf2_buffer_offset = 0;
+    g_update.first_block_done = false;
+    memset(g_update.uf2_buffer, 0, UF2_BLOCK_SIZE);
 }
 
 update_state_t update_get_state(void) {
@@ -531,7 +549,26 @@ void update_execute_reboot(void) {
     printf("UPDATE: Executing reboot (reason: %s)\n", 
            update_reboot_reason_to_string(g_update.reboot_reason));
     
-    // Log the reboot
+    // Check if this is a firmware update reboot
+    if (g_update.reboot_reason == REBOOT_REASON_UPDATE_COMPLETE && 
+        g_update.state == UPDATE_STATE_COMPLETE &&
+        g_update.flash_update_addr != 0) {
+        
+        printf("UPDATE: Triggering flash update reboot to 0x%08X\n", g_update.flash_update_addr);
+        log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_REBOOT, 
+                  (uint32_t)g_update.reboot_reason);
+        
+        // Small delay to allow log to flush
+        sleep_ms(100);
+        
+        // Reboot into the new firmware using TBYB mechanism
+        int ret = rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_FLASH_UPDATE, 500, g_update.flash_update_addr, 0);
+        
+        // If we get here, reboot failed
+        printf("UPDATE: Flash update reboot failed (ret=%d), falling back to watchdog\n", ret);
+    }
+    
+    // Regular reboot or fallback
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_SYSTEM_REBOOT, 
               (uint32_t)g_update.reboot_reason);
     
@@ -539,7 +576,6 @@ void update_execute_reboot(void) {
     sleep_ms(100);
     
     // Use watchdog reboot for clean reset
-    // Delay of 0 means immediate reboot
     watchdog_reboot(0, 0, 0);
     
     // Should never reach here

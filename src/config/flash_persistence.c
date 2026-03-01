@@ -176,17 +176,27 @@ bool flash_persistence_load_configuration(void) {
         layout->config_change_pending = false;  // This is a runtime flag, not config
         
         // Enforce device mode channel restrictions
-        // Disable channels that are not available in current device mode
-#if !DEVICE_CHANNEL_1_ENABLED
+        // Enable/disable channels according to device mode (overrides persisted config)
+#if DEVICE_CHANNEL_1_ENABLED
+        layout->config.channels[CHANNEL_1].enabled = true;
+#else
         layout->config.channels[CHANNEL_1].enabled = false;
 #endif
-#if !DEVICE_CHANNEL_2_ENABLED
+#if DEVICE_CHANNEL_2_ENABLED
+        layout->config.channels[CHANNEL_2].enabled = true;
+#else
         layout->config.channels[CHANNEL_2].enabled = false;
 #endif
-#if !DEVICE_CHANNEL_3_ENABLED
+#if DEVICE_CHANNEL_3_ENABLED
+        layout->config.channels[CHANNEL_3].enabled = true;
+#else
         layout->config.channels[CHANNEL_3].enabled = false;
 #endif
-#if !DEVICE_CHANNEL_4_ENABLED
+#if DEVICE_CHANNEL_4_ENABLED
+        layout->config.channels[CHANNEL_4].enabled = true;
+        // In SHARK mode, Channel 4 is the primary data channel - use port 4002
+        layout->config.channels[CHANNEL_4].tcp_port = 4002;
+#else
         layout->config.channels[CHANNEL_4].enabled = false;
 #endif
         
@@ -211,6 +221,13 @@ bool flash_persistence_load_configuration(void) {
         layout->config.channels[CHANNEL_3].rx_gpio = DEVICE_UART3_RX_GPIO;
         layout->config.channels[CHANNEL_4].tx_gpio = DEVICE_UART4_TX_GPIO;
         layout->config.channels[CHANNEL_4].rx_gpio = DEVICE_UART4_RX_GPIO;
+        
+        // ALWAYS enforce UART types (hardware-specific, not configurable)
+        layout->config.channels[CHANNEL_0].type = UART_TYPE_PL011;
+        layout->config.channels[CHANNEL_1].type = UART_TYPE_PL011;
+        layout->config.channels[CHANNEL_2].type = UART_TYPE_PIO;
+        layout->config.channels[CHANNEL_3].type = UART_TYPE_PIO;
+        layout->config.channels[CHANNEL_4].type = UART_TYPE_PIO;
         
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_LOADED, 
                   layout->revision_counter);

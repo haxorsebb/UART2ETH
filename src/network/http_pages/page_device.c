@@ -14,9 +14,11 @@
 #include "network/network_manager.h"
 #include "shared_memory.h"
 #include "device_mode.h"
+#include "config/version.h"
 #include "debug.h"
 #include <stdio.h>
 #include <string.h>
+#include "timestamp.h"
 
 // External reference to server statistics (from http_server.c)
 extern http_server_stats_t g_server_stats;
@@ -52,17 +54,6 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
     
     // Get device configuration
     shared_memory_layout_t* layout = shared_memory_get_layout();
-    
-    // Generate GPIO pin strings for each UART channel
-    char uart1_pins[16];
-    
-    if (layout->config.channels[CHANNEL_1].enabled) {
-        snprintf(uart1_pins, sizeof(uart1_pins), "GP%d/GP%d", 
-                layout->config.channels[CHANNEL_1].tx_gpio,
-                layout->config.channels[CHANNEL_1].rx_gpio);
-    } else {
-        strcpy(uart1_pins, "-");
-    }
     
 #if DEVICE_CHANNEL_2_ENABLED
     char uart2_pins[16];
@@ -121,14 +112,21 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         "<body>\n"
         "    <div class=\"container\">\n"
         "        <div class=\"header\">\n"
-        "            <h1>UART2ETH Device Information <span class=\"mode-badge\">%s</span></h1>\n"
-        "            <p>Serial to Network Bridge - Device Status</p>\n"
+        "            <h1>UART2ETH Device Information <span class=\"mode-badge\">%s</span>"
+#ifdef FACTORY_INTERNAL_VERSION
+        " <span class=\"factory-badge\">FACTORY INTERNAL</span>"
+#endif
+        "</h1>\n"
+        "            <p>Serial to Network Bridge - Device Status | 2Firmware " FIRMWARE_VERSION_STRING " - " _TIMEZ_"</p>\n"
         "        </div>\n"
         "        \n"
         "        <div class=\"nav-links\">\n"
         "            <a href=\"/\">Status</a>\n"
         "            <a href=\"/config\">Configuration</a>\n"
         "            <a href=\"/update\">Update</a>\n"
+#ifdef FACTORY_INTERNAL_VERSION
+        "            <a href=\"/factory\">FACTORY DEFAULTS</a>\n"
+#endif
         "        </div>\n"
         "        \n"
         "        <div class=\"section\">\n"
@@ -147,34 +145,6 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         "                    <th>Status</th>\n"
         "                    <th>GPIO Pins</th>\n"
         "                </tr>\n"
-        "                <tr>\n"
-        "                    <td>UART0 (Debug)</td>\n"
-        "                    <td>4001</td>\n"
-        "                    <td>%s</td>\n"
-        "                    <td>GP0/GP1</td>\n"
-        "                </tr>\n"
-        "                <tr>\n"
-        "                    <td>UART1</td>\n"
-        "                    <td>%d</td>\n"
-        "                    <td>%s</td>\n"
-        "                    <td>%s</td>\n"
-        "                </tr>\n"
-#if DEVICE_CHANNEL_2_ENABLED
-        "                <tr>\n"
-        "                    <td>UART2</td>\n"
-        "                    <td>%d</td>\n"
-        "                    <td>%s</td>\n"
-        "                    <td>%s</td>\n"
-        "                </tr>\n"
-#endif
-#if DEVICE_CHANNEL_3_ENABLED
-        "                <tr>\n"
-        "                    <td>UART3</td>\n"
-        "                    <td>%d</td>\n"
-        "                    <td>%s</td>\n"
-        "                    <td>%s</td>\n"
-        "                </tr>\n"
-#endif
 #if DEVICE_CHANNEL_4_ENABLED
         "                <tr>\n"
         "                    <td>UART4</td>\n"
@@ -188,7 +158,8 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         "        \n"
         "        <div class=\"section\">\n"
         "            <h2>Device Information</h2>\n"
-        "            <p><span class=\"label\">Firmware:</span> <span class=\"value\">UART2ETH v1.0 (%s)</span></p>\n"
+        "            <p><span class=\"label\">Firmware:</span> <span class=\"value\">UART2ETH v" FIRMWARE_VERSION_STRING " (%s)</span></p>\n"
+        "            <p><span class=\"label\">Build Type:</span> <span class=\"value\">" FIRMWARE_BUILD_TYPE "</span></p>\n"
         "            <p><span class=\"label\">Hardware:</span> <span class=\"value\">RP2350 + ENC28J60</span></p>\n"
         "            <p><span class=\"label\">Uptime:</span> <span class=\"value\">%d seconds</span></p>\n"
         "        </div>\n"
@@ -204,20 +175,6 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         ip_str,
         mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5],
         layout->config.network.use_dhcp ? "Enabled" : "Static",
-        layout->config.channels[CHANNEL_0].enabled ? "Active" : "Disabled",
-        layout->config.channels[CHANNEL_1].tcp_port,
-        layout->config.channels[CHANNEL_1].enabled ? "Active" : "Disabled",
-        uart1_pins,
-#if DEVICE_CHANNEL_2_ENABLED
-        layout->config.channels[CHANNEL_2].tcp_port,
-        layout->config.channels[CHANNEL_2].enabled ? "Active" : "Disabled",
-        uart2_pins,
-#endif
-#if DEVICE_CHANNEL_3_ENABLED
-        layout->config.channels[CHANNEL_3].tcp_port,
-        layout->config.channels[CHANNEL_3].enabled ? "Active" : "Disabled",
-        uart3_pins,
-#endif
 #if DEVICE_CHANNEL_4_ENABLED
         layout->config.channels[CHANNEL_4].tcp_port,
         layout->config.channels[CHANNEL_4].enabled ? "Active" : "Disabled",
@@ -226,6 +183,6 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         DEVICE_MODE_NAME,
         (int)g_server_stats.uptime_seconds,
         ip_str,
-        layout->config.channels[CHANNEL_1].tcp_port
+        layout->config.channels[CHANNEL_4].tcp_port
     );
 }

@@ -31,8 +31,8 @@
 /* Memory alignment */
 #define MEM_ALIGNMENT              4
 
-/* Heap memory size for lwIP (8KB) */
-#define MEM_SIZE                   8192
+/* Heap memory size for lwIP (16KB for high-throughput) */
+#define MEM_SIZE                   16384
 
 /* Enable custom memory pools */
 #define MEMP_MEM_MALLOC            0
@@ -47,10 +47,10 @@
 #define MEMP_NUM_UDP_PCB           4
 
 /* Number of network buffers */
-#define MEMP_NUM_PBUF              16
+#define MEMP_NUM_PBUF              32   // Increased for high-throughput UART→TCP
 
 /* Number of network buffer pools */
-#define MEMP_NUM_PBUF_POOL         16
+#define MEMP_NUM_PBUF_POOL         32   // Increased for high-throughput UART→TCP
 
 /**
  * @brief Protocol support configuration
@@ -84,15 +84,15 @@
 /* TCP Maximum Segment Size */
 #define TCP_MSS                    1460
 
-/* TCP send buffer size - increased to handle HTTP responses */
-#define TCP_SND_BUF                8192
+/* TCP send buffer size - increased for high-throughput UART→TCP */
+#define TCP_SND_BUF                16384
 
 /* TCP receive window size - increased to match send buffer */
-#define TCP_WND                    8192
+#define TCP_WND                    16384
 
 /* TCP memory pool settings for larger buffers */
-#define MEMP_NUM_TCP_SEG           40   // Increase TCP segments for larger send buffer
-#define TCP_SND_QUEUELEN           32   // Increase send queue length for 8KB buffer
+#define MEMP_NUM_TCP_SEG           64   // TCP segments for send buffer
+#define TCP_SND_QUEUELEN           64   // Send queue length for high-throughput UART→TCP
 
 /* Enable TCP keepalive */
 #define LWIP_TCP_KEEPALIVE         1
@@ -109,7 +109,7 @@
  */
 
 /* Network buffer size for single packet */
-#define PBUF_POOL_SIZE             16
+#define PBUF_POOL_SIZE             32   // Increased for high-throughput UART→TCP
 
 /* Size of each buffer in the pool */
 #define PBUF_POOL_BUFSIZE          592

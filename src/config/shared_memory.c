@@ -99,7 +99,7 @@ bool shared_memory_init(void) {
     
     // Initialize communication channel defaults
     for (int channel_idx = CHANNEL_0; channel_idx < CHANNEL_MAX; channel_idx++) {
-        g_shared_memory->config.channels[channel_idx].baud_rate = 230400;
+        g_shared_memory->config.channels[channel_idx].baud_rate = 234375;
         g_shared_memory->config.channels[channel_idx].data_bits = 8;
         g_shared_memory->config.channels[channel_idx].stop_bits = 1;
         g_shared_memory->config.channels[channel_idx].parity = 0;  // NONE
@@ -136,12 +136,14 @@ bool shared_memory_init(void) {
     g_shared_memory->config.channels[CHANNEL_3].enabled = true;
 #endif
     
-    // Channel 4 - PIO UART on PIO2 (disabled in SHARK mode)
+    // Channel 4 - PIO UART on PIO2 (GPIO5 TX / GPIO4 RX due to board wiring swap)
     g_shared_memory->config.channels[CHANNEL_4].tx_gpio = DEVICE_UART4_TX_GPIO;
     g_shared_memory->config.channels[CHANNEL_4].rx_gpio = DEVICE_UART4_RX_GPIO;
     g_shared_memory->config.channels[CHANNEL_4].type = UART_TYPE_PIO;
 #if DEVICE_CHANNEL_4_ENABLED
     g_shared_memory->config.channels[CHANNEL_4].enabled = true;
+    // In SHARK mode, Channel 4 is the primary data channel - use port 4002
+    g_shared_memory->config.channels[CHANNEL_4].tcp_port = 4002;
 #endif
     
     printf("Device mode: %s (channels: %d data, ethernet: %s)\n", 

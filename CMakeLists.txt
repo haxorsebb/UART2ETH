@@ -259,7 +259,7 @@ target_compile_definitions(uart2eth_factory_internal PRIVATE
 # Retrieved 2026-01-17, License - CC BY-SA 3.0
 ADD_DEPENDENCIES(uart2eth_factory_internal timestamp)
 
-# Link libraries (same as uart2eth)
+# Link libraries (factory internal version uses *_factory_internal variants)
 target_link_libraries(uart2eth_factory_internal 
     pico_stdlib        # Basic functionality
     hardware_gpio      # For LED control
@@ -270,15 +270,15 @@ target_link_libraries(uart2eth_factory_internal
     hardware_spi
     hardware_watchdog  # Watchdog for stability
     pico_lwip_nosys    # lwIP NO_SYS implementation for raw API
-    config_manager     # Our config manager library
+    config_manager_factory_internal  # Factory internal config manager
     log_manager        # Our log manager library
     state_machine      # Our event-driven state machine library
-    network_manager    # Our network manager library (now with lwIP)
+    network_manager_factory_internal    # Our network manager library (now with lwIP)
     tcp_socket_server  # all sockets are handled here
-    http_server        # HTTP server for device information web interface
+    http_server_factory_internal        # HTTP server with factory page enabled
     ringbuffer         # Ring buffer for UART-TCP message bridging
     uart_manager       # New 4-channel UART manager
-    core_modules       # Core0 and Core1 main functions
+    core_modules_factory_internal       # Core0 and Core1 main functions (factory version)
 )
 
 # Enable stdio: UART0 for debugging (same as uart2eth)

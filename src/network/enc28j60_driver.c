@@ -238,7 +238,9 @@ static bool enc28j60_wait_for_osc_ready(void) {
             DEBUG_ONLY({ 
                 printf("ENC28J60: Oscillator ready, estat: %d, timeout: %d\n", estat, timeout); 
             });
+#ifdef FACTORY_INTERNAL_VERSION
             selftest_puts("RP2354 SELFTEST: ENC28J60 OSC PASS\r\n");
+#endif
             return true;
         }
         
@@ -249,7 +251,9 @@ static bool enc28j60_wait_for_osc_ready(void) {
     DEBUG_ONLY({ 
         printf("ENC28J60: Oscillator timeout: %d\n", timeout); 
     });
+#ifdef FACTORY_INTERNAL_VERSION
     selftest_puts("RP2354 SELFTEST: ENC28J60 OSC FAILED\r\n");
+#endif
     return false;
 }
 
@@ -376,7 +380,7 @@ static void enc28j60_configure_phy(void) {
  * @brief Initialize ENC28J60 driver (Arduino reference exact sequence)
  */
 bool enc28j60_init(void) {
-    
+//#define FACTORY_INTERNAL_VERSION    
     if (g_driver_initialized) {
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_DEBUG, LOG_EVENT_NETWORK_INIT, 1);
         return true;
@@ -386,7 +390,9 @@ bool enc28j60_init(void) {
     
     // Initialize SPI and GPIO first (RP2350-specific)
     //selftest output
+#ifdef FACTORY_INTERNAL_VERSION
     selftest_puts("RP2354 SELFTEST: INIT ENC28J60\r\n");
+#endif
     enc28j60_spi_init();
     enc28j60_gpio_init();
     
@@ -398,7 +404,9 @@ bool enc28j60_init(void) {
     
     // 1. Perform software reset
     
+#ifdef FACTORY_INTERNAL_VERSION
     selftest_puts("RP2354 SELFTEST: RESET ENC28J60\r\n");
+#endif
     enc28j60_reset();
     
     // 2. Wait for oscillator ready

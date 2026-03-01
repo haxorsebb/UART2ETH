@@ -22,7 +22,7 @@
 #define PIO_UART_CH4_PIO_INSTANCE    pio2
 #define PIO_UART_CH4_TX_SM           0      // State machine 0 for TX
 #define PIO_UART_CH4_RX_SM           1      // State machine 1 for RX
-#define PIO_UART_CH4_DEFAULT_BAUD    230400 // Default baud rate
+#define PIO_UART_CH4_DEFAULT_BAUD    234375 // Default baud rate
 
 // GPIO Pin Configuration for Channel 4
 #define PIO_UART_CH4_TX_GPIO         24     // Channel 4 TX

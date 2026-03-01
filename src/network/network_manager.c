@@ -345,12 +345,12 @@ void network_manager_get_default_config(network_config_t* config) {
         config->mac_address[5] = defaults->mac_address[5];
         
     } else {    
-        config->mac_address[0] = 0x02;  // Locally administered, unicast
-        config->mac_address[1] = 0x00;  // Fixed values
-        config->mac_address[2] = 0x00; 
-        config->mac_address[3] = 0x00;
+        config->mac_address[0] = 0x34;  // Locally administered, unicast
+        config->mac_address[1] = 0xD7;  // Fixed values
+        config->mac_address[2] = 0xF5; 
+        config->mac_address[3] = 0x30;
         config->mac_address[4] = 0x00;
-        config->mac_address[5] = 0x01;  // Simple fixed MAC: 02:00:00:00:00:01
+        config->mac_address[5] = 0x01;  // Simple fixed MAC: 34:D7:F5:30:00:01
     }
 
     DEBUG_ONLY({
@@ -360,8 +360,8 @@ void network_manager_get_default_config(network_config_t* config) {
     });
 
     // Static IP configuration (only used when use_dhcp = false)
-    IP4_ADDR(&config->static_ip, 10, 10, 10, 41);       // Static IP: 10.10.10.41
-    IP4_ADDR(&config->static_gateway, 10, 10, 10, 1);   // Gateway: 10.10.10.1 (DHCP server)
+    IP4_ADDR(&config->static_ip, 192, 168, 1, 201);       // Static IP: 10.10.10.41
+    IP4_ADDR(&config->static_gateway, 192, 168, 1, 1);   // Gateway: 10.10.10.1 (DHCP server)
     IP4_ADDR(&config->static_netmask, 255, 255, 255, 0); // Netmask: 255.255.255.0
 
     config->management_port = 80;
@@ -633,6 +633,8 @@ bool network_manager_process_dhcp(void) {
         }
         printf("DHCP: dhcp_start() returned OK\n");
         
+        // Record DHCP start time for general timeout detection
+        g_dhcp_start_time = to_ms_since_boot(get_absolute_time());
         core1_timer_set(CORE1_TIMER_DHCP_DISCOVER, g_network_config.dhcp_timeout_ms);
         // CRITICAL: Also set network timeout timer so sys_check_timeouts() gets called
         // This is needed for DHCP and ACD timers to advance properly
@@ -673,6 +675,8 @@ bool network_manager_check_dhcp_status(void) {
                 dhcp_stop(g_netif);
             }
             dhcp_start(g_netif);
+            // Record DHCP start time for general timeout detection
+            g_dhcp_start_time = to_ms_since_boot(get_absolute_time());
             core1_timer_set(CORE1_TIMER_DHCP_DISCOVER, g_network_config.dhcp_timeout_ms);
             g_network_stats.dhcp_requests++;
         } else {
@@ -683,7 +687,50 @@ bool network_manager_check_dhcp_status(void) {
     }
     
     // If link is down, don't bother checking DHCP status
+    // BUT still check for general DHCP timeout to apply static IP fallback
     if (!current_link_status) {
+        // Even with link down, check if we should fall back to static IP
+        // This ensures we have an IP configured when link eventually comes up
+        uint32_t current_time = to_ms_since_boot(get_absolute_time());
+        if (g_dhcp_start_time != 0 && !dhcp_supplied_address(g_netif)) {
+            uint32_t dhcp_elapsed = current_time - g_dhcp_start_time;
+            if (dhcp_elapsed > g_network_config.dhcp_timeout_ms) {
+                printf("DHCP: General timeout after %u ms (link down, no DHCP response)\n", dhcp_elapsed);
+                printf("DHCP: Falling back to configured static IP\n");
+                
+                // Stop DHCP
+                dhcp_stop(g_netif);
+                
+                // Apply configured static IP as fallback
+                ip4_addr_t static_ip, gateway, netmask;
+                static_ip.addr = g_network_config.static_ip.addr;
+                gateway.addr = g_network_config.static_gateway.addr;
+                netmask.addr = g_network_config.static_netmask.addr;
+                
+                netif_set_ipaddr(g_netif, &static_ip);
+                netif_set_netmask(g_netif, &netmask);
+                netif_set_gw(g_netif, &gateway);
+                
+                // Bring the interface up for TCP to work
+                netif_set_link_up(g_netif);
+                netif_set_up(g_netif);
+                
+                printf("DHCP: Static IP fallback applied: %d.%d.%d.%d\n",
+                       (int)((static_ip.addr >> 0) & 0xFF),
+                       (int)((static_ip.addr >> 8) & 0xFF),
+                       (int)((static_ip.addr >> 16) & 0xFF),
+                       (int)((static_ip.addr >> 24) & 0xFF));
+                
+                // Clear DHCP start time to prevent repeated fallback attempts
+                g_dhcp_start_time = 0;
+                
+                // Cancel DHCP timer and start network timeout timer
+                core1_timer_cancel(CORE1_TIMER_DHCP_DISCOVER);
+                core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, sys_timeouts_sleeptime());
+                
+                return true;  // Network is now ready with static IP
+            }
+        }
         return false;
     }
     
@@ -732,6 +779,10 @@ bool network_manager_check_dhcp_status(void) {
             netif_set_netmask(g_netif, &netmask);
             netif_set_gw(g_netif, &gateway);
             
+            // Bring the interface up for TCP to work
+            netif_set_link_up(g_netif);
+            netif_set_up(g_netif);
+
             printf("DHCP: DHCP timeout - falling back to CONFIGURED static IP: %d.%d.%d.%d\n",
                    (static_ip.addr >> 0) & 0xFF,
                    (static_ip.addr >> 8) & 0xFF,
@@ -750,6 +801,50 @@ bool network_manager_check_dhcp_status(void) {
         if (state_8_start_time != 0) {
             state_8_start_time = 0;
             state_8_timeout_triggered = false;
+        }
+    }
+    
+    // General DHCP timeout check - falls back to static IP if no DHCP response
+    // This handles the case where no DHCP server is present at all
+    if (g_dhcp_start_time != 0 && !dhcp_supplied_address(g_netif)) {
+        uint32_t dhcp_elapsed = current_time - g_dhcp_start_time;
+        if (dhcp_elapsed > g_network_config.dhcp_timeout_ms) {
+            printf("DHCP: General timeout after %u ms (no DHCP server response)\n", dhcp_elapsed);
+            printf("DHCP: Falling back to configured static IP\n");
+            
+            // Stop DHCP
+            dhcp_stop(g_netif);
+            
+            // Apply configured static IP as fallback
+            ip4_addr_t static_ip, gateway, netmask;
+            static_ip.addr = g_network_config.static_ip.addr;
+            gateway.addr = g_network_config.static_gateway.addr;
+            netmask.addr = g_network_config.static_netmask.addr;
+            
+            netif_set_ipaddr(g_netif, &static_ip);
+            netif_set_netmask(g_netif, &netmask);
+            netif_set_gw(g_netif, &gateway);
+            
+            // Bring the interface up for TCP to work
+            netif_set_link_up(g_netif);
+            netif_set_up(g_netif);
+            
+            printf("DHCP: Static IP fallback applied: %d.%d.%d.%d\n",
+                   (int)((static_ip.addr >> 0) & 0xFF),
+                   (int)((static_ip.addr >> 8) & 0xFF),
+                   (int)((static_ip.addr >> 16) & 0xFF),
+                   (int)((static_ip.addr >> 24) & 0xFF));
+            printf("DHCP: netif flags=0x%02X, up=%d, link_up=%d\n", 
+                   g_netif->flags, netif_is_up(g_netif), netif_is_link_up(g_netif));
+            
+            // Clear DHCP start time to prevent repeated fallback attempts
+            g_dhcp_start_time = 0;
+            
+            // Cancel DHCP timer and start network timeout timer
+            core1_timer_cancel(CORE1_TIMER_DHCP_DISCOVER);
+            core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, sys_timeouts_sleeptime());
+            
+            return true;  // Network is now ready with static IP
         }
     }
     

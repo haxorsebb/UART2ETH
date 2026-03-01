@@ -26,7 +26,7 @@
 #define PIO_UART_PIO_INSTANCE    pio0
 #define PIO_UART_TX_SM          0      // State machine 0 for TX
 #define PIO_UART_RX_SM          1      // State machine 1 for RX
-#define PIO_UART_DEFAULT_BAUD   230400 // Default test baud rate
+#define PIO_UART_DEFAULT_BAUD   234375 // Default baud rate
 
 // GPIO Pin Configuration (as per ADR-008)
 #define PIO_UART_TX_GPIO        14     // Channel 2 TX
