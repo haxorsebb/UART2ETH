@@ -2138,6 +2138,320 @@ static const channel_config_t channel_configs[4] = {
 </div>
 </div>
 <div class="sect3">
+<h4 id="_whitebox_http_server_and_management_interface">Whitebox HTTP Server and Management Interface</h4>
+<div class="paragraph">
+<p>The HTTP Server has been refactored from a monolithic 2,349-line file into 8 focused modules as described in ADR-018. This modularization provides clear separation of concerns, improved maintainability, and enables independent testing of components.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>Failed to generate image: PlantUML preprocessing failed: [From &lt;input&gt; (line 9) ]
+
+@startuml http_server_modules
+
+
+
+
+...
+... ( skipping 129 lines )
+...
+}
+skinparam StereotypeI {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam StereotypeN {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam UseCaseStereoType {
+  FontColor black
+  FontName Verdana
+}
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+
+title HTTP Server Module Architecture (ADR-018)
+
+package "Network Layer" {
+  component [http_server.c\n964 lines] as http_server #LightBlue {
+^^^^^
+ Syntax Error?
+
+@startuml http_server_modules
+!theme plain
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+
+title HTTP Server Module Architecture (ADR-018)
+
+package "Network Layer" {
+  component [http_server.c\n964 lines] as http_server #LightBlue {
+    [HTTP Protocol\nHandling]
+    [Connection\nManagement]
+    [Multipart\nUpload]
+  }
+
+  component [http_router.c\n180 lines] as http_router #LightGreen {
+    [Route Table\n(max 20 routes)]
+    [Handler\nDispatch]
+  }
+
+  component [http_auth.c\n231 lines] as http_auth #LightYellow {
+    [Base64\nDecode]
+    [Credential\nCheck]
+    [401 Response]
+  }
+
+  component [http_forms.c\n446 lines] as http_forms #LightCoral {
+    [URL Decode]
+    [Form Parser]
+    [Field\nValidation]
+  }
+
+  package "http_pages\n1,090 lines" #LightGray {
+    component [page_device.c\n230 lines] as page_device
+    component [page_config.c\n250 lines] as page_config
+    component [page_update.c\n130 lines] as page_update
+    component [page_styles.c\n100 lines] as page_styles
+    component [page_factory.c\n380 lines\n&lt;&lt;conditional&gt;&gt;] as page_factory #DDDDDD
+  }
+}
+
+' Dependencies
+http_server --&gt; http_router : registers routes\nat init
+http_router --&gt; http_server : dispatches to\nhandlers
+http_server --&gt; http_auth : checks\ncredentials
+http_server --&gt; http_forms : parses\nform data
+http_server --&gt; page_device : generates\nHTML
+http_server --&gt; page_config : generates\nHTML
+http_server --&gt; page_update : generates\nHTML
+http_server --&gt; page_styles : generates\nCSS
+http_server --&gt; page_factory : generates\nHTML
+
+note right of http_router
+  Route Handler Signature:
+  void handler(
+    http_connection_t* conn,
+    const char* request,
+    size_t length)
+end note
+
+note right of http_auth
+  HTTP Basic Authentication
+  Username: admin
+  Password: configurable
+end note
+
+note bottom of page_factory
+  Only compiled when
+  FACTORY_INTERNAL_VERSION
+  is defined
+end note
+
+legend bottom
+  |= Component |= Lines |= Purpose |
+  | http_server.c | 964 | Core HTTP protocol, connection management |
+  | http_router.c | 180 | Route registration and dispatch |
+  | http_auth.c | 231 | HTTP Basic Authentication |
+  | http_forms.c | 446 | Form parsing and validation |
+  | page_*.c | 1,090 | HTML/CSS page generation |
+  |= **Total** |= **2,911** |= **8 focused modules** |
+endlegend
+
+@enduml</pre>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_motivation_13">Motivation</h5>
+<div class="paragraph">
+<p>The HTTP server refactoring addresses the Single Responsibility Principle violations in the original monolithic implementation. Each module now has a clear, focused responsibility, making the codebase more maintainable, testable, and extensible.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_contained_building_blocks_13">Contained Building Blocks</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>http_server.c (964 lines)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Core HTTP protocol handling, connection management via lwIP callbacks, multipart file upload support, and TCP connection lifecycle. Provides receive callback, send callback, error handling, and connection timeout management.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>http_router.c (180 lines)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Route registration and request dispatch using a route table (max 20 routes). Maps HTTP method + path to handler functions, provides 404 handling for unmatched routes, and enables modular page handling.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>http_auth.c (231 lines)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP Basic Authentication implementation with Base64 encoding/decoding, credential verification against shared memory admin password, 401 response generation with WWW-Authenticate header, and session-less authentication on each request.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>http_forms.c (446 lines)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Form data parsing and validation including URL-encoded POST data parsing, field extraction and validation, configuration update processing, and factory reset handling with conditional compilation.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>page_device.c (230 lines)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device status page generation showing system information, network status, UART channel status, ring buffer statistics, and uptime information in HTML format.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>page_config.c (250 lines)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration page generation and form handling for UART channel settings, network configuration, password changes, and configuration persistence operations.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>page_update.c (130 lines)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Firmware update page generation with file upload form, multipart form processing, OTA update integration, and update status reporting.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>page_styles.c (100 lines)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CSS stylesheet generation providing consistent styling across all web pages, responsive design elements, and modern UI appearance.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>page_factory.c (380 lines)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Factory defaults page (conditional compilation under FACTORY_INTERNAL_VERSION) for internal development and factory configuration operations.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect4">
+<h5 id="_important_interfaces_4">Important Interfaces</h5>
+<div class="sect5">
+<h6 id="_http_router_interface">HTTP Router Interface</h6>
+<div class="paragraph">
+<p>The router provides a simple registration and dispatch mechanism:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Route handler signature
+typedef void (*http_route_handler_t)(
+    http_connection_t* conn,
+    const char* request_buffer,
+    size_t buffer_len
+);
+
+// Route registration
+void http_router_register_route(
+    const char* method,     // "GET" or "POST"
+    const char* path,       // "/", "/config", "/update", etc.
+    http_route_handler_t handler
+);
+
+// Request dispatch
+http_route_handler_t http_router_find_handler(const char* request_buffer);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_http_authentication_interface">HTTP Authentication Interface</h6>
+<div class="paragraph">
+<p>Authentication is checked on every request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Check authentication against shared memory password
+bool http_check_authentication(
+    const char* request_buffer,
+    const char* admin_password
+);
+
+// Send 401 Unauthorized response
+void http_send_auth_required(http_connection_t* conn);</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_connection_management">Connection Management</h6>
+<div class="paragraph">
+<p>Connection lifecycle is managed through specific close functions:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// Immediate connection close (use sparingly)
+void http_close_connection(http_connection_t* conn);
+
+// Close after send complete (preferred for responses)
+void http_close_connection_after_send(http_connection_t* conn);
+
+// TCP callbacks from lwIP
+static err_t http_connection_recv_callback(
+    void* arg,
+    struct tcp_pcb* tpcb,
+    struct pbuf* p,
+    err_t err
+);
+
+static err_t http_connection_sent_callback(
+    void* arg,
+    struct tcp_pcb* tpcb,
+    u16_t len
+);</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_http_server_refactoring_benefits">HTTP Server Refactoring Benefits</h5>
+<div class="paragraph">
+<p><strong>Code Organization:</strong>
+- Reduced largest file from 2,349 lines to 964 lines (-59%)
+- Created 8 focused modules with average 255 lines each
+- Clear module boundaries enable parallel development</p>
+</div>
+<div class="paragraph">
+<p><strong>Maintainability:</strong>
+- Single Responsibility Principle enforced per module
+- Easy to locate and modify specific functionality
+- Reduced cognitive load when working on features</p>
+</div>
+<div class="paragraph">
+<p><strong>Testability:</strong>
+- Each module can be tested independently
+- Mock interfaces enable isolated unit testing
+- Integration testing more focused and reliable</p>
+</div>
+<div class="paragraph">
+<p><strong>Extensibility:</strong>
+- New pages add new page_*.c files without touching core
+- New routes registered independently
+- Authentication and form parsing reusable across pages</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_critical_bug_fixes_during_refactoring">Critical Bug Fixes During Refactoring</h5>
+<div class="paragraph">
+<p>Three critical bugs were discovered and fixed during Phase 5 hardware testing:</p>
+</div>
+<div class="paragraph">
+<p><strong>Bug 1: Connection Reset on Page Load</strong>
+- Issue: <code>http_close_connection()</code> called immediately after send
+- Impact: Browser received incomplete data
+- Fix: Changed to <code>http_close_connection_after_send()</code>
+- Status: ✅ Fixed in http_server.c lines 482, 498, 514</p>
+</div>
+<div class="paragraph">
+<p><strong>Bug 2: 401 Unauthorized on File Upload</strong>
+- Issue: Browser doesn&#8217;t send Authorization header with multipart forms
+- Impact: Upload always failed authentication
+- Fix: Refactored receive callback for chunked processing
+- Status: ✅ Fixed in http_server.c receive callback</p>
+</div>
+<div class="paragraph">
+<p><strong>Bug 3: Orphaned Connections on Upload Errors</strong>
+- Issue: Error handlers didn&#8217;t close connections
+- Impact: Subsequent packets caused authentication failures
+- Fix: Added connection close to all error paths
+- Status: ✅ Fixed in http_server.c lines 682, 693, 706</p>
+</div>
+</div>
+</div>
+<div class="sect3">
 <h4 id="_whitebox_flash_persistence_system">Whitebox Flash Persistence System</h4>
 <div class="paragraph">
 <p>The Flash Persistence System provides reliable storage and recovery of the complete shared memory structure using a flash ring buffer approach that ensures wear leveling and power-loss safety for embedded systems.</p>
@@ -2148,13 +2462,13 @@ static const channel_config_t channel_configs[4] = {
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_13">Motivation</h5>
+<h5 id="_motivation_14">Motivation</h5>
 <div class="paragraph">
 <p>Flash persistence ensures configuration survival across power cycles while preventing flash wear-out and corruption. The ring buffer approach provides automatic wear leveling and power-loss safety without complex file systems.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_13">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_14">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -2195,7 +2509,7 @@ static const channel_config_t channel_configs[4] = {
 </table>
 </div>
 <div class="sect4">
-<h5 id="_important_interfaces_4">Important Interfaces</h5>
+<h5 id="_important_interfaces_5">Important Interfaces</h5>
 <div class="sect5">
 <h6 id="_flash_block_structure">Flash Block Structure</h6>
 <div class="ulist">
@@ -2586,13 +2900,13 @@ bool validate_session_token(const char* token);</code></pre>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_motivation_14">Motivation</h5>
+<h5 id="_motivation_15">Motivation</h5>
 <div class="paragraph">
 <p>The event-driven architecture prevents invalid state transitions by eliminating direct state manipulation. Three independent state machines provide lock-free operation with atomic main state coordination and ISR-safe sub-state management. This design ensures predictable system behavior through validated state transitions while maintaining high performance for real-time operations.</p>
 </div>
 </div>
 <div class="sect4">
-<h5 id="_contained_building_blocks_14">Contained Building Blocks</h5>
+<h5 id="_contained_building_blocks_15">Contained Building Blocks</h5>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 25%;">
@@ -2641,7 +2955,7 @@ bool validate_session_token(const char* token);</code></pre>
 </table>
 </div>
 <div class="sect4">
-<h5 id="_important_interfaces_5">Important Interfaces</h5>
+<h5 id="_important_interfaces_6">Important Interfaces</h5>
 <div class="sect5">
 <h6 id="_main_state_definitions">Main State Definitions</h6>
 <div class="listingblock">

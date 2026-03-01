@@ -390,6 +390,17 @@
 <li><a href="#_testing_strategy">Testing Strategy</a></li>
 </ul>
 </li>
+<li><a href="#_implementation_notes_2">Implementation Notes</a>
+<ul class="sectlevel2">
+<li><a href="#_implementation_timeline">Implementation Timeline</a></li>
+<li><a href="#_actual_module_sizes">Actual Module Sizes</a></li>
+<li><a href="#_critical_bug_fixes_during_phase_5">Critical Bug Fixes During Phase 5</a></li>
+<li><a href="#_hardware_test_results">Hardware Test Results</a></li>
+<li><a href="#_component_diagram">Component Diagram</a></li>
+<li><a href="#_performance_characteristics">Performance Characteristics</a></li>
+<li><a href="#_lessons_learned">Lessons Learned</a></li>
+</ul>
+</li>
 <li><a href="#_references">References</a></li>
 </ul>
 </li>
@@ -1052,18 +1063,433 @@ target_include_directories(http_pages INTERFACE
 </div>
 </div>
 <div class="sect1">
+<h2 id="_implementation_notes_2">Implementation Notes</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_implementation_timeline">Implementation Timeline</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Phase 1</strong>: Router and Authentication extraction (completed)</p>
+</li>
+<li>
+<p><strong>Phase 2</strong>: Forms and Pages extraction (completed)</p>
+</li>
+<li>
+<p><strong>Phase 3</strong>: Build system integration (completed)</p>
+</li>
+<li>
+<p><strong>Phase 4</strong>: Final cleanup and testing (completed)</p>
+</li>
+<li>
+<p><strong>Phase 5</strong>: Bug fixes and documentation (completed)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_actual_module_sizes">Actual Module Sizes</h3>
+<div class="paragraph">
+<p>After implementation, the actual module sizes are:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 16.6666%;">
+<col style="width: 50.0001%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Module</th>
+<th class="tableblock halign-left valign-top">Lines</th>
+<th class="tableblock halign-left valign-top">Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>http_server.c</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">964</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Core HTTP protocol, connection management, multipart upload handling</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>http_router.c</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">180</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Route table (max 20), handler registration and dispatch</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>http_auth.c</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">231</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP Basic Authentication, Base64 codec</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>http_forms.c</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">446</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">URL decode, form parsing, field validation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>page_device.c</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">230</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Device status page generation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>page_config.c</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">250</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration page with form handling</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>page_update.c</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">130</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Firmware update page</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>page_styles.c</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">100</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CSS stylesheet generation</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>page_factory.c</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">380</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Factory defaults page (conditional compilation)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Total</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>2,911</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Well-organized, 8 focused modules</strong></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p><strong>Key Achievement</strong>: Reduced largest single file from 2,349 lines to 964 lines (-59%).</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_critical_bug_fixes_during_phase_5">Critical Bug Fixes During Phase 5</h3>
+<div class="paragraph">
+<p>During hardware testing, three critical bugs were discovered and fixed:</p>
+</div>
+<div class="sect3">
+<h4 id="_bug_1_connection_reset_on_page_load">Bug 1: Connection Reset on Page Load</h4>
+<div class="paragraph">
+<p><strong>Symptom</strong>: Browser showed "connection reset" when loading pages (/, /config, /update).</p>
+</div>
+<div class="paragraph">
+<p><strong>Root Cause</strong>: Route handlers called <code>http_close_connection()</code> immediately after <code>http_send_response()</code>, closing TCP connection before data fully transmitted.</p>
+</div>
+<div class="paragraph">
+<p><strong>Solution</strong>: Changed to <code>http_close_connection_after_send()</code> which waits for TCP sent callback.</p>
+</div>
+<div class="paragraph">
+<p><strong>Files Changed</strong>: <code>http_server.c</code> (lines 482, 498, 514)</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_bug_2_401_unauthorized_on_file_upload">Bug 2: 401 Unauthorized on File Upload</h4>
+<div class="paragraph">
+<p><strong>Symptom</strong>: POST /update always returned 401 Unauthorized.</p>
+</div>
+<div class="paragraph">
+<p><strong>Root Cause</strong>: Browser doesn&#8217;t send Authorization header with multipart form submissions. Continuation packets (file data chunks) were rejected.</p>
+</div>
+<div class="paragraph">
+<p><strong>Solution</strong>:
+* Refactored receive callback to process packets in chunks
+* Multipart upload packets bypass authentication in receive callback
+* Authentication performed in route handler instead</p>
+</div>
+<div class="paragraph">
+<p><strong>Files Changed</strong>: <code>http_server.c</code> (receive callback refactored)</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_bug_3_orphaned_connections_on_upload_errors">Bug 3: Orphaned Connections on Upload Errors</h4>
+<div class="paragraph">
+<p><strong>Symptom</strong>: Upload errors left connections open, causing subsequent authentication failures.</p>
+</div>
+<div class="paragraph">
+<p><strong>Root Cause</strong>: Error handlers sent response but didn&#8217;t close connection.</p>
+</div>
+<div class="paragraph">
+<p><strong>Solution</strong>: Added <code>http_close_connection_after_send()</code> to all error paths.</p>
+</div>
+<div class="paragraph">
+<p><strong>Files Changed</strong>: <code>http_server.c</code> (lines 682, 693, 706)</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_hardware_test_results">Hardware Test Results</h3>
+<div class="paragraph">
+<p><strong>Test Date</strong>: 2026-02-03<br>
+<strong>Device</strong>: RP2350 at 10.207.121.117<br>
+<strong>Branch</strong>: feature/http-server-refactoring<br>
+<strong>Commit</strong>: 1f13d37</p>
+</div>
+<div class="sect3">
+<h4 id="_tests_passed">Tests Passed ✓</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>GET / (device status) - loads completely</p>
+</li>
+<li>
+<p>GET /config (configuration) - loads completely</p>
+</li>
+<li>
+<p>GET /update (firmware update) - loads completely</p>
+</li>
+<li>
+<p>GET /styles.css (stylesheet) - loads correctly</p>
+</li>
+<li>
+<p>POST /update (file upload) - authentication works</p>
+</li>
+<li>
+<p>HTTP Basic Authentication - works on all routes</p>
+</li>
+<li>
+<p>Connection management - no orphaned connections</p>
+</li>
+<li>
+<p>Error handling - connections close properly</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_known_issue">Known Issue</h4>
+<div class="paragraph">
+<p><strong>UPDATE: Failed to get target partition (rc=1)</strong></p>
+</div>
+<div class="paragraph">
+<p>This is a pre-existing issue in <code>update_manager.c</code> unrelated to HTTP server refactoring. The ROM function <code>rom_get_uf2_target_partition()</code> fails. Requires separate investigation of partition table configuration. Does not block HTTP server refactoring completion.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_component_diagram">Component Diagram</h3>
+<div class="paragraph">
+<p>See: <code>src/docs/arc42/diagrams/http_server_modules.puml</code></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>Failed to generate image: PlantUML preprocessing failed: [From &lt;input&gt; (line 9) ]
+
+@startuml http_server_modules
+
+
+
+
+...
+... ( skipping 129 lines )
+...
+}
+skinparam StereotypeI {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam StereotypeN {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam UseCaseStereoType {
+  FontColor black
+  FontName Verdana
+}
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+
+title HTTP Server Module Architecture (ADR-018)
+
+package "Network Layer" {
+  component [http_server.c\n964 lines] as http_server #LightBlue {
+^^^^^
+ Syntax Error?
+
+@startuml http_server_modules
+!theme plain
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+
+title HTTP Server Module Architecture (ADR-018)
+
+package "Network Layer" {
+  component [http_server.c\n964 lines] as http_server #LightBlue {
+    [HTTP Protocol\nHandling]
+    [Connection\nManagement]
+    [Multipart\nUpload]
+  }
+
+  component [http_router.c\n180 lines] as http_router #LightGreen {
+    [Route Table\n(max 20 routes)]
+    [Handler\nDispatch]
+  }
+
+  component [http_auth.c\n231 lines] as http_auth #LightYellow {
+    [Base64\nDecode]
+    [Credential\nCheck]
+    [401 Response]
+  }
+
+  component [http_forms.c\n446 lines] as http_forms #LightCoral {
+    [URL Decode]
+    [Form Parser]
+    [Field\nValidation]
+  }
+
+  package "http_pages\n1,090 lines" #LightGray {
+    component [page_device.c\n230 lines] as page_device
+    component [page_config.c\n250 lines] as page_config
+    component [page_update.c\n130 lines] as page_update
+    component [page_styles.c\n100 lines] as page_styles
+    component [page_factory.c\n380 lines\n&lt;&lt;conditional&gt;&gt;] as page_factory #DDDDDD
+  }
+}
+
+' Dependencies
+http_server --&gt; http_router : registers routes\nat init
+http_router --&gt; http_server : dispatches to\nhandlers
+http_server --&gt; http_auth : checks\ncredentials
+http_server --&gt; http_forms : parses\nform data
+http_server --&gt; page_device : generates\nHTML
+http_server --&gt; page_config : generates\nHTML
+http_server --&gt; page_update : generates\nHTML
+http_server --&gt; page_styles : generates\nCSS
+http_server --&gt; page_factory : generates\nHTML
+
+note right of http_router
+  Route Handler Signature:
+  void handler(
+    http_connection_t* conn,
+    const char* request,
+    size_t length)
+end note
+
+note right of http_auth
+  HTTP Basic Authentication
+  Username: admin
+  Password: configurable
+end note
+
+note bottom of page_factory
+  Only compiled when
+  FACTORY_INTERNAL_VERSION
+  is defined
+end note
+
+legend bottom
+  |= Component |= Lines |= Purpose |
+  | http_server.c | 964 | Core HTTP protocol, connection management |
+  | http_router.c | 180 | Route registration and dispatch |
+  | http_auth.c | 231 | HTTP Basic Authentication |
+  | http_forms.c | 446 | Form parsing and validation |
+  | page_*.c | 1,090 | HTML/CSS page generation |
+  |= **Total** |= **2,911** |= **8 focused modules** |
+endlegend
+
+@enduml</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_performance_characteristics">Performance Characteristics</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Connection Limit</strong>: 4 concurrent connections (unchanged)</p>
+</li>
+<li>
+<p><strong>Request Buffer</strong>: 1024 bytes per request</p>
+</li>
+<li>
+<p><strong>Upload Buffer</strong>: Chunked processing for large files</p>
+</li>
+<li>
+<p><strong>Memory Overhead</strong>: Minimal increase (~200 bytes for router table)</p>
+</li>
+<li>
+<p><strong>CPU Overhead</strong>: Negligible increase from dispatch layer</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_lessons_learned">Lessons Learned</h3>
+<div class="sect3">
+<h4 id="_what_went_well">What Went Well</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Incremental Approach</strong>: Extracting modules one phase at a time prevented breakage</p>
+</li>
+<li>
+<p><strong>Hardware Testing</strong>: Caught critical bugs before merge</p>
+</li>
+<li>
+<p><strong>Clear Module Boundaries</strong>: Each module has single, well-defined responsibility</p>
+</li>
+<li>
+<p><strong>Build System</strong>: CMake interface libraries worked excellently</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_challenges_encountered">Challenges Encountered</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Multipart Upload Authentication</strong>: Browser behavior with form submissions required refactoring receive callback</p>
+</li>
+<li>
+<p><strong>Connection Lifecycle</strong>: Needed careful management of close timing to avoid resets</p>
+</li>
+<li>
+<p><strong>Large Packet Handling</strong>: Required chunked processing to handle packets &gt;1024 bytes</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_future_improvements">Future Improvements</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Unit Tests</strong>: Add focused tests for each module</p>
+</li>
+<li>
+<p><strong>Integration Tests</strong>: Automate hardware testing scenarios</p>
+</li>
+<li>
+<p><strong>Metrics Collection</strong>: Track request latency, connection duration</p>
+</li>
+<li>
+<p><strong>Error Logging</strong>: More detailed logging for debugging</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
 <h2 id="_references">References</h2>
 <div class="sectionbody">
 <div class="ulist">
 <ul>
 <li>
-<p>Current implementation: <code>src/network/http_server.c</code> (2,349 lines)</p>
+<p>Implementation: <code>src/network/http_server.c</code> and related modules</p>
+</li>
+<li>
+<p>Original monolith: 2,349 lines → 8 modules totaling 2,911 lines</p>
 </li>
 <li>
 <p>Related modules: <code>update_manager.c</code>, <code>network_manager.c</code>, <code>shared_memory.c</code></p>
 </li>
 <li>
 <p>Documentation: Chapter 5 Building Block View - Management Interface</p>
+</li>
+<li>
+<p>Test Results: <code>PHASE_5_SUMMARY.md</code></p>
 </li>
 </ul>
 </div>
