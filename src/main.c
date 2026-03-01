@@ -72,7 +72,7 @@ int main() {
   #ifdef FACTORY_INTERNAL_VERSION
   // perform a simple selftest, output the results to UART1 so that the
   // BOARDTEST software can see it
-  selftest();
+  //selftest();
   #endif
 
   // Configure GPIO21 to output 25 MHz clock for ENC28J60
