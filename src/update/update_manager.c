@@ -22,9 +22,10 @@
 #include "hardware/sync.h"
 #include "hardware/watchdog.h"
 #include "boot/picobin.h"
-#include "boot/picoboot_constants.h"
+#include "boot/picoboot.h"
 #include "boot/uf2.h"
 
+#include <pico/error.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -33,11 +34,13 @@
 // ============================================================================
 
 #define UPDATE_WORKAREA_SIZE        (4 * 1024)  // 4KB workarea for ROM functions
-#define UF2_BLOCK_SIZE              512         // Size of one UF2 block
-#define UF2_PAYLOAD_SIZE            256         // Actual data payload per UF2 block
+#define UPDATE_BUFFER_SIZE          FLASH_SECTOR_SIZE  // 4KB sector buffer
+#define FLASH_SECTOR_ERASE_SIZE     4096
 
 // UF2 Family ID for RP2350-ARM-S (secure ARM mode)
 #define RP2350_FAMILY_ID            0xe48bff59
+
+typedef struct uf2_block uf2_block_t;
 
 // ============================================================================
 // Internal State
@@ -65,9 +68,13 @@ typedef struct {
     uint32_t partition_start;       ///< Partition start address (flash offset)
     uint32_t partition_end;         ///< Partition end address (flash offset)
     uint32_t partition_size;        ///< Partition size in bytes
+    uint32_t num_blocks;            // how many UF2 blocks are in this update
+    uint32_t blocks_done;           // how many blocks are already flashed
+    uint32_t family_id;             // what system is this update for?
+    uint32_t flash_update;          // base address of update in memory (flash is mapped)
     int32_t write_offset;           ///< Offset between UF2 target addr and actual storage
-    uint32_t flash_update_addr;     ///< Address for reboot (partition_start + XIP_BASE)
-    
+    uint32_t write_size;            // sizeof current write operation
+
     // Upload session state
     update_state_t state;
     uint32_t expected_size;
@@ -85,10 +92,8 @@ typedef struct {
     
     // Workareas (must be word-aligned)
     __attribute__((aligned(4))) uint8_t workarea[UPDATE_WORKAREA_SIZE];
-    
-    // UF2 block assembly buffer
-    __attribute__((aligned(4))) uint8_t uf2_buffer[UF2_BLOCK_SIZE];
-    uint32_t uf2_buffer_offset;     ///< Current offset within UF2 buffer
+    __attribute__((aligned(4))) uint8_t sector_buffer[UPDATE_BUFFER_SIZE];
+    uint32_t sector_buffer_offset;  ///< Current offset within sector buffer
     
 } update_state_internal_t;
 
@@ -118,166 +123,119 @@ static void call_explicit_buy_internal(void* param);
  * @param block Pointer to the UF2 block
  * @return true on success, false on error
  */
-static bool write_uf2_block_to_flash(const uf2_block_t* block) {
-    // Calculate the actual flash address for this block
-    uint32_t flash_addr = block->target_addr + g_update.write_offset;
-    
-    DEBUG_ONLY({
-        printf("UPDATE: Writing UF2 block %u/%u to 0x%08X (target_addr=0x%08X)\n",
-               block->block_no + 1, block->num_blocks, flash_addr, block->target_addr);
-    });
+static bool flush_sector_buffer(void) {
+    if (g_update.sector_buffer_offset == 0) {
+        return true;  // Nothing to flush
+    }
     
     // Prepare parameters for flash operations
     update_flash_params_t params;
     params.result = 0;
     
-    // Check if we need to erase this sector (using target_addr for sector calculation)
-    uint32_t current_sector = block->target_addr / FLASH_SECTOR_SIZE;
-    if (current_sector > g_update.highest_erased_sector || g_update.highest_erased_sector == 0) {
-        // Erase the sector at the actual flash location
-        uint32_t erase_addr = block->target_addr + g_update.write_offset;
-        params.address = erase_addr;
-        params.size = FLASH_SECTOR_SIZE;
+    
+    // Program in page-sized chunks
+    uint32_t bytes_remaining = g_update.sector_buffer_offset;
+    uint32_t buffer_offset = 0;
+    uint32_t uf2_block_size = sizeof(uf2_block_t);
+    
+    while (bytes_remaining > 0) {
+        uint32_t chunk_size = (bytes_remaining > uf2_block_size) ? uf2_block_size : bytes_remaining;
+        // Round up to page boundary for programming
+        if (chunk_size % uf2_block_size!= 0) {
+            chunk_size = ((chunk_size / uf2_block_size) + 1) * uf2_block_size;
+        }
+        
+        uf2_block_t* block;
+        block = (uf2_block_t*)(g_update.sector_buffer + buffer_offset);
+
+        if (g_update.num_blocks == 0) {
+            g_update.num_blocks = block->num_blocks;
+            g_update.family_id = block->file_size; // or familyID;
+
+            resident_partition_t uf2_target_partition;
+            rom_flash_flush_cache();
+            rom_get_uf2_target_partition(g_update.workarea, sizeof(g_update.workarea), g_update.family_id, &uf2_target_partition);
+            printf("Code Target partition is %lx %lx\n", uf2_target_partition.permissions_and_location, uf2_target_partition.permissions_and_flags);
+
+            uint16_t first_sector_number = (uf2_target_partition.permissions_and_location & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB;
+            uint16_t last_sector_number = (uf2_target_partition.permissions_and_location & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB;
+            uint32_t code_start_addr = first_sector_number * 0x1000;
+            uint32_t code_end_addr = (last_sector_number + 1) * 0x1000;
+            uint32_t code_size = code_end_addr - code_start_addr;
+            printf("Start %lx, End %lx, Size %lx\n", code_start_addr, code_end_addr, code_size);
+
+            g_update.flash_update = code_start_addr + XIP_BASE;
+            g_update.write_offset = code_start_addr + XIP_BASE - block->target_addr;
+            g_update.write_size = code_size;
+            printf("UPDATE: Write Offset %lx, Size %lx\n", g_update.write_offset, g_update.write_size);
+        }
+
+        //validation
+        if (g_update.blocks_done != block->block_no) {
+            printf("block number mismatch - expected %d, got %d\n", g_update.blocks_done, block->block_no);
+            return false;
+        }
+        if (g_update.family_id != block->file_size) {
+            printf("family id mismatch\n");
+            return(false);
+        }
+
+        // program the payload of the block to flash
+        // first, check if we need to erase this sector
+        uint32_t current_sector = block->target_addr / FLASH_SECTOR_ERASE_SIZE;
+        if (current_sector > g_update.highest_erased_sector || g_update.highest_erased_sector == 0) {
+            // Erase the sector
+            params.flags.flags = 
+                (CFLASH_OP_VALUE_ERASE << CFLASH_OP_LSB) |
+                (CFLASH_SECLEVEL_VALUE_SECURE << CFLASH_SECLEVEL_LSB) |
+                (CFLASH_ASPACE_VALUE_STORAGE << CFLASH_ASPACE_LSB);
+            
+            params.address = block->target_addr + g_update.write_offset;
+            params.size = FLASH_SECTOR_ERASE_SIZE;
+            params.data = NULL;
+
+            int rc = flash_safe_execute(call_flash_erase_for_update, &params, UINT32_MAX);
+            if (rc != PICO_OK || params.result != 0) {
+                printf("UPDATE: Flash erase FAILED at 0x%08X (rc=%d, result=%d)\n", 
+                     params.address, rc, params.result);
+                g_update.last_error_code = (rc != PICO_OK) ? rc : params.result;
+                return false;
+            }
+            g_update.highest_erased_sector = current_sector;
+
+        }
+        
+        // Program the data (must be done in 256-byte pages)
         params.flags.flags = 
-            (CFLASH_OP_VALUE_ERASE << CFLASH_OP_LSB) |
+            (CFLASH_OP_VALUE_PROGRAM << CFLASH_OP_LSB) |
             (CFLASH_SECLEVEL_VALUE_SECURE << CFLASH_SECLEVEL_LSB) |
             (CFLASH_ASPACE_VALUE_STORAGE << CFLASH_ASPACE_LSB);
-        
-        int rc = flash_safe_execute(call_flash_erase_for_update, &params, UINT32_MAX);
-        if (rc != PICO_OK || params.result != 0) {
-            printf("UPDATE: Flash erase FAILED at 0x%08X (rc=%d, result=%d)\n", 
-                   params.address, rc, params.result);
-            g_update.last_error_code = (rc != PICO_OK) ? (uint32_t)rc : (uint32_t)params.result;
-            return false;
-        }
-        
-        g_update.highest_erased_sector = current_sector;
-        
-        DEBUG_ONLY({
-            printf("UPDATE: Erased sector %u at 0x%08X\n", current_sector, erase_addr);
-        });
-    }
-    
-    // Program the 256-byte payload
-    params.address = flash_addr;
-    params.size = UF2_PAYLOAD_SIZE;
-    params.data = (uint8_t*)block->data;  // Cast away const - data is not modified
-    params.flags.flags = 
-        (CFLASH_OP_VALUE_PROGRAM << CFLASH_OP_LSB) |
-        (CFLASH_SECLEVEL_VALUE_SECURE << CFLASH_SECLEVEL_LSB) |
-        (CFLASH_ASPACE_VALUE_STORAGE << CFLASH_ASPACE_LSB);
-    
-    int rc = flash_safe_execute(call_flash_program_for_update, &params, UINT32_MAX);
-    if (rc != PICO_OK || params.result != 0) {
-        printf("UPDATE: Flash program FAILED at 0x%08X (rc=%d, result=%d)\n",
-               flash_addr, rc, params.result);
-        g_update.last_error_code = (rc != PICO_OK) ? (uint32_t)rc : (uint32_t)params.result;
-        return false;
-    }
-    
-    g_update.bytes_written += UF2_PAYLOAD_SIZE;
-    
-    return true;
-}
 
-/**
- * @brief Process a complete UF2 block
- * 
- * Validates the UF2 block structure, extracts partition info on first block,
- * and writes the payload to flash.
- * 
- * @param block Pointer to the UF2 block
- * @return true on success, false on error
- */
-static bool process_uf2_block(const uf2_block_t* block) {
-    // Validate UF2 magic numbers
-    if (block->magic_start0 != UF2_MAGIC_START0 ||
-        block->magic_start1 != UF2_MAGIC_START1 ||
-        block->magic_end != UF2_MAGIC_END) {
-        printf("UPDATE: Invalid UF2 magic numbers (0x%08X 0x%08X ... 0x%08X)\n",
-               block->magic_start0, block->magic_start1, block->magic_end);
-        g_update.last_error_code = 0xBAD1;
-        return false;
-    }
-    
-    // First block: extract partition info and calculate write offset
-    if (!g_update.first_block_done) {
-        g_update.num_blocks = block->num_blocks;
-        g_update.family_id = block->file_size;  // file_size field is family ID when flag set
+        params.address =  block->target_addr + g_update.write_offset;
+        params.size = block->payload_size;
+        params.data = block->data;
         
-        printf("UPDATE: First UF2 block - %u total blocks, family_id=0x%08X\n",
-               g_update.num_blocks, g_update.family_id);
-        
-        // Validate family ID (should be RP2350-ARM-S)
-        if (g_update.family_id != RP2350_FAMILY_ID) {
-            printf("UPDATE: Warning - unexpected family ID 0x%08X (expected 0x%08X)\n",
-                   g_update.family_id, RP2350_FAMILY_ID);
-            // Continue anyway - might be a different valid RP2350 variant
-        }
-        
-        // Get target partition using ROM function
-        resident_partition_t target_partition;
-        rom_flash_flush_cache();
-        
-        int rc = rom_get_uf2_target_partition(g_update.workarea, sizeof(g_update.workarea),
-                                              g_update.family_id, &target_partition);
-        if (rc != 0) {
-            printf("UPDATE: Failed to get target partition (rc=%d)\n", rc);
-            g_update.last_error_code = (uint32_t)rc;
+        printf("UPDATE: Flash program of %u bytes, remaining: %u, START [%c][%c][%c]\n",
+                   block->payload_size, bytes_remaining, 
+                (g_update.sector_buffer + buffer_offset)[0],
+                (g_update.sector_buffer + buffer_offset)[1],
+                (g_update.sector_buffer + buffer_offset)[2]);
+            
+        int rc = flash_safe_execute(call_flash_program_for_update, &params, UINT32_MAX);
+        if (rc != PICO_OK || params.result != 0) {
+            printf("UPDATE: Flash program FAILED at 0x%08X (rc=%d, result=%d)\n",
+                   params.address, rc, params.result);
+            g_update.last_error_code = (rc != PICO_OK) ? rc : params.result;
             return false;
         }
-        
-        printf("UPDATE: Target partition: permissions_and_location=0x%08lX\n",
-               (unsigned long)target_partition.permissions_and_location);
-        
-        // Extract partition boundaries
-        uint16_t first_sector = (target_partition.permissions_and_location & 
-                                 PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> 
-                                 PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB;
-        uint16_t last_sector = (target_partition.permissions_and_location & 
-                                PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> 
-                                PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB;
-        
-        g_update.partition_start = first_sector * FLASH_SECTOR_SIZE;
-        g_update.partition_end = (last_sector + 1) * FLASH_SECTOR_SIZE;
-        g_update.partition_size = g_update.partition_end - g_update.partition_start;
-        g_update.flash_update_addr = g_update.partition_start + XIP_BASE;
-        
-        printf("UPDATE: Partition: 0x%08X - 0x%08X (%u KB)\n",
-               g_update.partition_start, g_update.partition_end, 
-               g_update.partition_size / 1024);
-        
-        // Calculate write offset: where UF2 blocks think they're writing vs actual location
-        // This is exactly how the official pico example does it
-        g_update.write_offset = g_update.partition_start + XIP_BASE - block->target_addr;
-        
-        printf("UPDATE: Write offset: 0x%08X (target_addr=0x%08X)\n",
-               g_update.write_offset, block->target_addr);
-        
-        g_update.first_block_done = true;
+        buffer_offset += chunk_size;
+        bytes_remaining = (bytes_remaining > chunk_size) ? (bytes_remaining - chunk_size) : 0;
+
+        g_update.blocks_done++;
     }
     
-    // Validate block number sequence
-    if (block->block_no != g_update.blocks_processed) {
-        printf("UPDATE: Block number mismatch - expected %u, got %u\n",
-               g_update.blocks_processed, block->block_no);
-        g_update.last_error_code = 0xBAD2;
-        return false;
-    }
-    
-    // Validate family ID consistency
-    if (block->file_size != g_update.family_id) {
-        printf("UPDATE: Family ID mismatch in block %u\n", block->block_no);
-        g_update.last_error_code = 0xBAD3;
-        return false;
-    }
-    
-    // Write the block to flash
-    if (!write_uf2_block_to_flash(block)) {
-        return false;
-    }
-    
-    g_update.blocks_processed++;
+    g_update.bytes_written += g_update.sector_buffer_offset;
+    g_update.sector_buffer_offset = 0;
     
     // Progress reporting every 64 blocks (~16KB)
     if ((g_update.blocks_processed % 64) == 0 || 
@@ -355,6 +313,47 @@ bool update_start_upload(uint32_t expected_size) {
     
     printf("UPDATE: Starting upload, expected size: %u bytes\n", expected_size);
     
+    // Get target partition using ROM function
+    resident_partition_t target_partition;
+    rom_flash_flush_cache();
+    
+    int rc = rom_get_uf2_target_partition(g_update.workarea, sizeof(g_update.workarea),
+                                          RP2350_FAMILY_ID, &target_partition);
+    if (rc < PICO_OK) {
+        printf("UPDATE: Failed to get target partition (rc=%d)\n", rc);
+        g_update.last_error_code = rc;
+        return false;
+    }
+    
+    // Extract partition boundaries
+    uint16_t first_sector = (target_partition.permissions_and_location & 
+                             PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> 
+                             PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB;
+    uint16_t last_sector = (target_partition.permissions_and_location & 
+                            PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> 
+                            PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB;
+    
+    g_update.partition_start = first_sector * FLASH_SECTOR_ERASE_SIZE;
+    g_update.partition_end = (last_sector + 1) * FLASH_SECTOR_ERASE_SIZE;
+    g_update.partition_size = g_update.partition_end - g_update.partition_start;
+    
+    printf("UPDATE: Target partition: 0x%08X - 0x%08X (%u KB)\n",
+           g_update.partition_start, g_update.partition_end, 
+           g_update.partition_size / 1024);
+    
+    // Validate size fits in partition
+    if (expected_size > g_update.partition_size) {
+        printf("UPDATE: Firmware too large (%u > %u bytes)\n", 
+               expected_size, g_update.partition_size);
+        g_update.last_error_code = -1;
+        return false;
+    }
+    
+    // Calculate write offset (UF2 blocks target 0x10000000, but we write elsewhere)
+    g_update.write_offset = g_update.partition_start + XIP_BASE - 0x10000000;
+    
+    printf("UPDATE: Write offset: 0x%08X\n", g_update.write_offset);
+    
     // Initialize upload session state
     g_update.state = UPDATE_STATE_RECEIVING;
     g_update.expected_size = expected_size;
@@ -364,17 +363,10 @@ bool update_start_upload(uint32_t expected_size) {
     g_update.num_blocks = 0;
     g_update.highest_erased_sector = 0;
     g_update.last_error_code = 0;
-    g_update.first_block_done = false;
-    g_update.uf2_buffer_offset = 0;
-    g_update.family_id = 0;
-    g_update.write_offset = 0;
-    g_update.partition_start = 0;
-    g_update.partition_end = 0;
-    g_update.partition_size = 0;
-    g_update.flash_update_addr = 0;
+    g_update.sector_buffer_offset = 0;
     
-    // Clear UF2 buffer
-    memset(g_update.uf2_buffer, 0, UF2_BLOCK_SIZE);
+    // Clear sector buffer
+    memset(g_update.sector_buffer, 0xFF, UPDATE_BUFFER_SIZE);
     
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_FIRMWARE_UPDATE_START, expected_size);
     
@@ -429,6 +421,18 @@ bool update_write_block(uint8_t* data, uint32_t size, bool finished) {
                 memset(g_update.uf2_buffer, 0, UF2_BLOCK_SIZE);
             }
         }
+        
+        g_update.blocks_processed++;
+        
+        // Progress reporting every 64KB
+        /*
+        if ((g_update.bytes_received % (64 * 1024)) < size) {
+            printf("UPDATE: Progress %u / %u KB (%u%%)\n",
+                   g_update.bytes_received / 1024,
+                   g_update.expected_size / 1024,
+                   (g_update.bytes_received * 100) / g_update.expected_size);
+        }
+        */
     }
     
     // Handle finish
@@ -445,6 +449,9 @@ bool update_write_block(uint8_t* data, uint32_t size, bool finished) {
         g_update.state = UPDATE_STATE_COMPLETE;
         log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, 
                   LOG_EVENT_FIRMWARE_UPDATE_COMPLETE, g_update.bytes_written);
+
+        int ret = rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_FLASH_UPDATE, 1000, g_update.flash_update, 0);
+        printf("Done - rebooting for a flash update boot %d\n", ret);
     }
     
     return true;

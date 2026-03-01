@@ -20,7 +20,7 @@ verify_image build/uart2eth.bin 0x10002000
 # 3. Erase first sector of partition 1 (invalidate any old firmware)
 # Adjust 0x10100000 if your partition 1 starts elsewhere
 echo "Erasing partition 1 first sector..."
-#flash erase_address 0x1C0000 0x1000
+flash erase_address 0x101C0000 0x1000
 
 # 4. Reset and run
 echo "Flashing complete, rebooting..."

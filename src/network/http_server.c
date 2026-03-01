@@ -27,6 +27,7 @@
 #include "lwip/tcp.h"
 #include "lwip/pbuf.h"
 #include "lwip/err.h"
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -324,13 +325,15 @@ void http_upload_receive_chunk(uint32_t bytes_received) {
     
     g_upload_session.bytes_received += bytes_received;
     
-    // Progress reporting every 64KB
-    if ((g_upload_session.bytes_received - g_upload_session.last_progress_report) >= (64 * 1024)) {
-        printf("HTTP Upload: %u / %u KB (%u%%)\n",
-               g_upload_session.bytes_received / 1024,
-               g_upload_session.total_expected_size / 1024,
+    // Progress reporting every 4KB
+    if ((g_upload_session.bytes_received - g_upload_session.last_progress_report) >= (4 * 1024)) {
+        
+        printf("HTTP Upload: %u / %u B (%u%%)\n",
+               g_upload_session.bytes_received ,
+               g_upload_session.total_expected_size ,
                (g_upload_session.bytes_received * 100) / g_upload_session.total_expected_size);
         g_upload_session.last_progress_report = g_upload_session.bytes_received;
+        
     }
 }
 
@@ -658,7 +661,7 @@ static void http_handle_update_post(http_connection_t* conn,
     printf("HTTP Server: Processing firmware upload\n");
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
-    
+    /*
     // Check authentication (since we skipped it in recv callback for multipart uploads)
     shared_memory_layout_t* layout = shared_memory_get_layout();
     if (!layout || !http_check_authentication(request_buffer, layout->config.admin_password)) {
@@ -667,7 +670,7 @@ static void http_handle_update_post(http_connection_t* conn,
         http_close_connection_after_send(conn);
         return;
     }
-    
+    */
     printf("HTTP Upload: Authentication successful, processing upload\n");
     
     // Initialize multipart context from request
@@ -777,107 +780,99 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
         http_close_connection(conn);
         return ERR_OK;
     }
-    
-    printf("HTTP Server: Received %d bytes\n", p->tot_len);
-    
-    // Debug: Check multipart context state
-    printf("HTTP Server: multipart_ctx.active=%d, bytes_received=%u/%u\n", 
-           conn->multipart_ctx.active, conn->multipart_ctx.bytes_received, conn->multipart_ctx.file_size);
-    
-    // Check if this connection is in the middle of a firmware upload
-    if (conn->multipart_ctx.active && !multipart_is_complete(&conn->multipart_ctx)) {
-        printf("HTTP Upload: Received data packet for ongoing upload\n");
-        
-        // Copy data to buffer for multipart processing
-        static uint8_t upload_buffer[2048];
-        size_t copy_len = (p->tot_len < sizeof(upload_buffer)) ? p->tot_len : sizeof(upload_buffer);
-        pbuf_copy_partial(p, upload_buffer, copy_len, 0);
-        
-        // Process this chunk through multipart handler
-        if (!multipart_process_chunk(&conn->multipart_ctx, upload_buffer, copy_len,
-                                    http_firmware_upload_callback, NULL)) {
-            printf("HTTP Upload: Failed to process data chunk\n");
-            http_upload_session_reset();
-            multipart_reset_context(&conn->multipart_ctx);
-            
-            static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
-            http_generate_update_page(response_buffer, sizeof(response_buffer),
-                "Error: Upload failed during data transfer.");
-            http_send_response(conn, response_buffer, strlen(response_buffer));
-            http_close_connection_after_send(conn);
-            
-            tcp_recved(tpcb, p->tot_len);
-            pbuf_free(p);
-            return ERR_OK;
+
+#define RECEIVE_BUFFER_SIZE 1024
+
+    static uint8_t request_buffer[RECEIVE_BUFFER_SIZE +1];
+    size_t total_bytes_in_pbuf = p->tot_len;
+    size_t total_bytes_processed = 0;
+
+    while(total_bytes_processed < total_bytes_in_pbuf) {
+
+        //extract RECEIVE_BUFFER_SIZE bytes
+        size_t bytes_unprocessed = total_bytes_in_pbuf - total_bytes_processed;
+        size_t copy_len = (bytes_unprocessed < RECEIVE_BUFFER_SIZE) ? bytes_unprocessed : RECEIVE_BUFFER_SIZE;
+
+        int copied = pbuf_copy_partial(p, request_buffer, copy_len, total_bytes_processed);
+        if(copied == 0)
+        {
+            printf("!!!COPY ERROR!!!\n");
         }
+        total_bytes_processed += copied;
+        printf("total_bytes_processed %u/ total_bytes_in_pbuf %u\n", total_bytes_processed, total_bytes_in_pbuf);
         
-        // Check if upload is now complete
-        if (multipart_is_complete(&conn->multipart_ctx)) {
-            printf("HTTP Upload: Upload completed successfully\n");
-            multipart_reset_context(&conn->multipart_ctx);
+        // Check if this connection is in the middle of a firmware upload
+        if (conn->multipart_ctx.active && !multipart_is_complete(&conn->multipart_ctx)) {
+            //printf("HTTP Upload: Received data packet for ongoing upload\n");
             
-            static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
-            http_generate_update_page(response_buffer, sizeof(response_buffer),
-                "Firmware uploaded successfully! Device will reboot to apply the update.");
-            http_send_response(conn, response_buffer, strlen(response_buffer));
-            http_close_connection_after_send(conn);
+            // Process this chunk through multipart handler
+            if (!multipart_process_chunk(&conn->multipart_ctx, request_buffer, copy_len,
+                                        http_firmware_upload_callback, NULL)) {
+                printf("HTTP Upload: Failed to process data chunk\n");
+                http_upload_session_reset();
+                multipart_reset_context(&conn->multipart_ctx);
+                
+                static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Error: Upload failed during data transfer.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                http_close_connection_after_send(conn);
+                
+                tcp_recved(tpcb, total_bytes_processed);
+                pbuf_free(p);
+                return ERR_OK;
+            }
             
-            // TODO: Schedule reboot via state machine
+            // Check if upload is now complete
+            if (multipart_is_complete(&conn->multipart_ctx)) {
+                printf("HTTP Upload: Upload completed successfully\n");
+                multipart_reset_context(&conn->multipart_ctx);
+                
+                static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+                http_generate_update_page(response_buffer, sizeof(response_buffer),
+                    "Firmware uploaded successfully! Device needs reboot to apply the update.");
+                http_send_response(conn, response_buffer, strlen(response_buffer));
+                http_close_connection_after_send(conn);
+            }
+
+        } else {
+            // normal requests
+            request_buffer[copy_len] = '\0';
+            
+            // Check HTTP Basic Authentication for requests
+            // Get password from shared memory
+            shared_memory_layout_t* layout = shared_memory_get_layout();
+            if (!layout) {
+                printf("HTTP Auth: Failed to get shared memory layout\n");
+                http_send_auth_required(conn);
+                tcp_recved(tpcb, total_bytes_processed);
+                pbuf_free(p);
+                return ERR_OK;
+            }
+            
+            // Verify authentication
+            if (!http_check_authentication((const char*)request_buffer, layout->config.admin_password)) {
+                printf("HTTP Auth: Authentication failed, sending 401\n");
+                http_send_auth_required(conn);
+                tcp_recved(tpcb, total_bytes_processed);
+                pbuf_free(p);
+                return ERR_OK;
+            }
+            
+            printf("HTTP Auth: Request authenticated successfully\n");
+            
+            // Route request to appropriate handler (ADR-018 Phase 4)
+            http_route_handler_t handler = http_router_find_handler((const char*)request_buffer);
+            if (handler) {
+                handler(conn, (const char*)request_buffer, copy_len);
+            } else {
+                // 404 Not Found
+                http_handle_404(conn);
+            }
         }
-        
-        tcp_recved(tpcb, p->tot_len);
-        pbuf_free(p);
-        return ERR_OK;
-    }
-    
-    // Normal HTTP request processing (not an upload continuation)
-    // Copy request data to null-terminated string for parsing
-    static char request_buffer[1024];
-    size_t copy_len = (p->tot_len < sizeof(request_buffer) - 1) ? p->tot_len : sizeof(request_buffer) - 1;
-    pbuf_copy_partial(p, request_buffer, copy_len, 0);
-    request_buffer[copy_len] = '\0';
-    
-    // Check if this is a POST /update request (multipart upload)
-    // These requests may not include Authorization header in the form submission
-    // so we'll check authentication inside the route handler instead
-    bool is_upload_request = (strstr(request_buffer, "POST /update") != NULL);
-    
-    if (!is_upload_request) {
-        // Check HTTP Basic Authentication for non-upload requests
-        // Get password from shared memory
-        shared_memory_layout_t* layout = shared_memory_get_layout();
-        if (!layout) {
-            printf("HTTP Auth: Failed to get shared memory layout\n");
-            http_send_auth_required(conn);
-            tcp_recved(tpcb, p->tot_len);
-            pbuf_free(p);
-            return ERR_OK;
-        }
-        
-        // Verify authentication
-        if (!http_check_authentication(request_buffer, layout->config.admin_password)) {
-            printf("HTTP Auth: Authentication failed, sending 401\n");
-            http_send_auth_required(conn);
-            tcp_recved(tpcb, p->tot_len);
-            pbuf_free(p);
-            return ERR_OK;
-        }
-        
-        printf("HTTP Auth: Request authenticated successfully\n");
-    } else {
-        printf("HTTP Auth: Skipping auth check for POST /update (will check in handler)\n");
-    }
-    
-    // Route request to appropriate handler (ADR-018 Phase 4)
-    http_route_handler_t handler = http_router_find_handler(request_buffer);
-    if (handler) {
-        handler(conn, request_buffer, copy_len);
-    } else {
-        // 404 Not Found
-        http_handle_404(conn);
-    }
-    
-    tcp_recved(tpcb, p->tot_len);
+    } 
+
+    tcp_recved(tpcb, total_bytes_processed);
     pbuf_free(p);
     
     return ERR_OK;

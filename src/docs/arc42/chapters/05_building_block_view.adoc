@@ -1818,6 +1818,163 @@ static const channel_config_t channel_configs[4] = {
 - Integration with existing interrupt handling infrastructure
 - CMake build system support for PIO program compilation
 
+==== Whitebox HTTP Server and Management Interface
+
+The HTTP Server has been refactored from a monolithic 2,349-line file into 8 focused modules as described in ADR-018. This modularization provides clear separation of concerns, improved maintainability, and enables independent testing of components.
+
+[plantuml, level2-http-server-modules, svg]
+----
+include::../diagrams/http_server_modules.puml[]
+----
+
+===== Motivation
+
+The HTTP server refactoring addresses the Single Responsibility Principle violations in the original monolithic implementation. Each module now has a clear, focused responsibility, making the codebase more maintainable, testable, and extensible.
+
+===== Contained Building Blocks
+
+[options="header",cols="1,3"]
+|===
+|Name|Responsibility
+
+|*http_server.c (964 lines)*
+|Core HTTP protocol handling, connection management via lwIP callbacks, multipart file upload support, and TCP connection lifecycle. Provides receive callback, send callback, error handling, and connection timeout management.
+
+|*http_router.c (180 lines)*
+|Route registration and request dispatch using a route table (max 20 routes). Maps HTTP method + path to handler functions, provides 404 handling for unmatched routes, and enables modular page handling.
+
+|*http_auth.c (231 lines)*
+|HTTP Basic Authentication implementation with Base64 encoding/decoding, credential verification against shared memory admin password, 401 response generation with WWW-Authenticate header, and session-less authentication on each request.
+
+|*http_forms.c (446 lines)*
+|Form data parsing and validation including URL-encoded POST data parsing, field extraction and validation, configuration update processing, and factory reset handling with conditional compilation.
+
+|*page_device.c (230 lines)*
+|Device status page generation showing system information, network status, UART channel status, ring buffer statistics, and uptime information in HTML format.
+
+|*page_config.c (250 lines)*
+|Configuration page generation and form handling for UART channel settings, network configuration, password changes, and configuration persistence operations.
+
+|*page_update.c (130 lines)*
+|Firmware update page generation with file upload form, multipart form processing, OTA update integration, and update status reporting.
+
+|*page_styles.c (100 lines)*
+|CSS stylesheet generation providing consistent styling across all web pages, responsive design elements, and modern UI appearance.
+
+|*page_factory.c (380 lines)*
+|Factory defaults page (conditional compilation under FACTORY_INTERNAL_VERSION) for internal development and factory configuration operations.
+|===
+
+===== Important Interfaces
+
+====== HTTP Router Interface
+
+The router provides a simple registration and dispatch mechanism:
+
+```c
+// Route handler signature
+typedef void (*http_route_handler_t)(
+    http_connection_t* conn,
+    const char* request_buffer,
+    size_t buffer_len
+);
+
+// Route registration
+void http_router_register_route(
+    const char* method,     // "GET" or "POST"
+    const char* path,       // "/", "/config", "/update", etc.
+    http_route_handler_t handler
+);
+
+// Request dispatch
+http_route_handler_t http_router_find_handler(const char* request_buffer);
+```
+
+====== HTTP Authentication Interface
+
+Authentication is checked on every request:
+
+```c
+// Check authentication against shared memory password
+bool http_check_authentication(
+    const char* request_buffer,
+    const char* admin_password
+);
+
+// Send 401 Unauthorized response
+void http_send_auth_required(http_connection_t* conn);
+```
+
+====== Connection Management
+
+Connection lifecycle is managed through specific close functions:
+
+```c
+// Immediate connection close (use sparingly)
+void http_close_connection(http_connection_t* conn);
+
+// Close after send complete (preferred for responses)
+void http_close_connection_after_send(http_connection_t* conn);
+
+// TCP callbacks from lwIP
+static err_t http_connection_recv_callback(
+    void* arg,
+    struct tcp_pcb* tpcb,
+    struct pbuf* p,
+    err_t err
+);
+
+static err_t http_connection_sent_callback(
+    void* arg,
+    struct tcp_pcb* tpcb,
+    u16_t len
+);
+```
+
+===== HTTP Server Refactoring Benefits
+
+**Code Organization:**
+- Reduced largest file from 2,349 lines to 964 lines (-59%)
+- Created 8 focused modules with average 255 lines each
+- Clear module boundaries enable parallel development
+
+**Maintainability:**
+- Single Responsibility Principle enforced per module
+- Easy to locate and modify specific functionality
+- Reduced cognitive load when working on features
+
+**Testability:**
+- Each module can be tested independently
+- Mock interfaces enable isolated unit testing
+- Integration testing more focused and reliable
+
+**Extensibility:**
+- New pages add new page_*.c files without touching core
+- New routes registered independently
+- Authentication and form parsing reusable across pages
+
+===== Critical Bug Fixes During Refactoring
+
+Three critical bugs were discovered and fixed during Phase 5 hardware testing:
+
+**Bug 1: Connection Reset on Page Load**
+- Issue: `http_close_connection()` called immediately after send
+- Impact: Browser received incomplete data
+- Fix: Changed to `http_close_connection_after_send()`
+- Status: ✅ Fixed in http_server.c lines 482, 498, 514
+
+**Bug 2: 401 Unauthorized on File Upload**
+- Issue: Browser doesn't send Authorization header with multipart forms
+- Impact: Upload always failed authentication
+- Fix: Refactored receive callback for chunked processing
+- Status: ✅ Fixed in http_server.c receive callback
+
+**Bug 3: Orphaned Connections on Upload Errors**
+- Issue: Error handlers didn't close connections
+- Impact: Subsequent packets caused authentication failures
+- Fix: Added connection close to all error paths
+- Status: ✅ Fixed in http_server.c lines 682, 693, 706
+
 ==== Whitebox Flash Persistence System
 
 The Flash Persistence System provides reliable storage and recovery of the complete shared memory structure using a flash ring buffer approach that ensures wear leveling and power-loss safety for embedded systems.

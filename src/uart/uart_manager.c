@@ -12,6 +12,7 @@
 #include "pico/stdlib.h"
 #include <string.h>
 #include <stdio.h>
+#include "debug.h"
 
 // External interfaces
 extern const uart_interface_t pl011_uart_interface;
