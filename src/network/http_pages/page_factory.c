@@ -16,6 +16,8 @@
 #ifdef FACTORY_INTERNAL_VERSION
 
 #include "config/factory_defaults.h"
+#include "config/shared_memory.h"
+#include "config/flash_persistence.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -41,12 +43,49 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
     const char* current_board_type = "Unknown";
     char current_password[32] = "Not Set";
     
+    // Form field defaults (populated from factory defaults when available)
+    int form_prod_year = 26;
+    int form_prod_week = 1;
+    char form_serial[21] = "1";  // max uint48 is 281474976710655 (15 digits)
+    int form_board_type = 0;
+    char form_ip[16] = "192.168.1.201";
+    char form_netmask[16] = "255.255.255.0";
+    const char* form_dhcp_checked = "";
+    char form_password[32] = "admin";
+    char form_mac_decimal[21] = "58102136176640";  // default: 34:D7:F5:30:00:00
+    
     if (factory_valid && current_factory) {
         // Format serial number as YYWW-NNNNNNNNNNNN
         uint64_t serial_decimal = 0;
         for (int i = 0; i < 6; i++) {
             serial_decimal = (serial_decimal << 8) | current_factory->serial_number[i];
         }
+        
+        // Populate form fields from saved factory defaults
+        form_prod_year = current_factory->production_year;
+        form_prod_week = current_factory->production_week;
+        snprintf(form_serial, sizeof(form_serial), "%llu", serial_decimal);
+        form_board_type = current_factory->board_type;
+        
+        uint32_t fip = current_factory->default_ip;
+        snprintf(form_ip, sizeof(form_ip), "%d.%d.%d.%d",
+                 (int)(fip & 0xFF), (int)((fip >> 8) & 0xFF),
+                 (int)((fip >> 16) & 0xFF), (int)((fip >> 24) & 0xFF));
+        
+        uint32_t fnm = current_factory->default_netmask;
+        snprintf(form_netmask, sizeof(form_netmask), "%d.%d.%d.%d",
+                 (int)(fnm & 0xFF), (int)((fnm >> 8) & 0xFF),
+                 (int)((fnm >> 16) & 0xFF), (int)((fnm >> 24) & 0xFF));
+        
+        form_dhcp_checked = current_factory->default_dhcp_enable ? "checked" : "";
+        snprintf(form_password, sizeof(form_password), "%s", current_factory->default_password);
+        
+        // Compute decimal MAC from 6-byte address for the form field
+        uint64_t mac_val = 0;
+        for (int i = 0; i < 6; i++) {
+            mac_val = (mac_val << 8) | current_factory->mac_address[i];
+        }
+        snprintf(form_mac_decimal, sizeof(form_mac_decimal), "%llu", mac_val);
         snprintf(current_serial, sizeof(current_serial), "%02u%02u-%012llu",
                  current_factory->production_year,
                  current_factory->production_week,
@@ -117,49 +156,55 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         "<div class=\"section\"><h3>Serial Number</h3>"
         "<div class=\"form-row\">"
         "<div class=\"form-group\"><label for=\"prod_year\">Production Year (YY):</label>"
-        "<input type=\"number\" id=\"prod_year\" name=\"prod_year\" min=\"0\" max=\"99\" value=\"26\" required>"
+        "<input type=\"number\" id=\"prod_year\" name=\"prod_year\" min=\"0\" max=\"99\" value=\"%d\" required>"
         "<small>YY for 20YY (e.g., 26=2026)</small></div>"
         "<div class=\"form-group\"><label for=\"prod_week\">Production Week:</label>"
-        "<input type=\"number\" id=\"prod_week\" name=\"prod_week\" min=\"1\" max=\"52\" value=\"1\" required>"
+        "<input type=\"number\" id=\"prod_week\" name=\"prod_week\" min=\"1\" max=\"52\" value=\"%d\" required>"
         "<small>Week 1-52</small></div>"
         "</div>"
         "<div class=\"form-group\"><label for=\"serial_number\">Serial Number (Decimal):</label>"
-        "<input type=\"text\" id=\"serial_number\" name=\"serial_number\" value=\"1\" required>"
+        "<input type=\"text\" id=\"serial_number\" name=\"serial_number\" value=\"%s\" required>"
         "<small>Unique serial (0-281474976710655)</small></div>"
         "</div>"
         "<div class=\"section\"><h3>Network Identity</h3>"
-        "<div class=\"form-group\"><label for=\"mac_address\">MAC Address:</label>"
-        "<div style=\"display:flex;align-items:center;gap:4px;\">"
-        "<span style=\"font-family:monospace;font-size:14px;\">34:D7:F5:3</span>"
-        "<input type=\"text\" id=\"mac_address\" name=\"mac_address\" value=\"%s\" "
-        "pattern=\"[0-9A-Fa-f]:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}\" maxlength=\"8\" "
-        "style=\"width:80px;font-family:monospace;\" required>"
+        "<div class=\"form-group\"><label for=\"mac_decimal\">MAC Address (Decimal):</label>"
+        "<input type=\"text\" id=\"mac_decimal\" name=\"mac_decimal\" value=\"%s\" "
+        "style=\"width:200px;font-family:monospace;\" required>"
+        "<small>Valid range: 58102136176640 - 58102137225215 "
+        "(34:D7:F5:30:00:00 - 34:D7:F5:3F:FF:FF)</small>"
+        "<p id=\"mac_hex\" style=\"font-family:monospace;margin:4px 0 0 0;\"></p>"
+        "<script>function updMac(){var v=document.getElementById('mac_decimal').value;"
+        "var n=parseFloat(v);if(n>=58102136176640&&n<=58102137225215){"
+        "var h=[],t=n;for(var i=0;i<6;i++){h.unshift(('0'+(t%%256).toString(16)).slice(-2).toUpperCase());"
+        "t=Math.floor(t/256);}document.getElementById('mac_hex').textContent='= '+h.join(':');"
+        "}else{document.getElementById('mac_hex').textContent='(out of range)';}}"
+        "document.getElementById('mac_decimal').addEventListener('input',updMac);"
+        "updMac();</script>"
         "</div>"
-        "<small>Enter last 5 hex digits as X:XX:XX (prefix 34:D7:F5:3 is fixed)</small></div>"
         "</div>"
         "<div class=\"section\"><h3>Board Type</h3>"
         "<div class=\"form-group\"><label for=\"board_type\">Hardware Variant:</label>"
         "<select id=\"board_type\" name=\"board_type\" required>"
-        "<option value=\"0\" selected>SHARK</option>"
-        "<option value=\"1\">PRIMARY</option>"
-        "<option value=\"2\">SECONDARY</option>"
+        "<option value=\"0\"%s>SHARK</option>"
+        "<option value=\"1\"%s>PRIMARY</option>"
+        "<option value=\"2\"%s>SECONDARY</option>"
         "</select></div>"
         "</div>"
         "<div class=\"section\"><h3>Default Network</h3>"
         "<div class=\"form-row\">"
         "<div class=\"form-group\"><label for=\"default_ip\">Default IP:</label>"
-        "<input type=\"text\" id=\"default_ip\" name=\"default_ip\" value=\"192.168.1.201\" required></div>"
+        "<input type=\"text\" id=\"default_ip\" name=\"default_ip\" value=\"%s\" required></div>"
         "<div class=\"form-group\"><label for=\"default_netmask\">Default Netmask:</label>"
-        "<input type=\"text\" id=\"default_netmask\" name=\"default_netmask\" value=\"255.255.255.0\" required></div>"
+        "<input type=\"text\" id=\"default_netmask\" name=\"default_netmask\" value=\"%s\" required></div>"
         "</div>"
         "<div class=\"form-group\"><div class=\"checkbox-group\">"
-        "<input type=\"checkbox\" id=\"default_dhcp\" name=\"default_dhcp\" value=\"1\">"
+        "<input type=\"checkbox\" id=\"default_dhcp\" name=\"default_dhcp\" value=\"1\" %s>"
         "<label for=\"default_dhcp\">Enable DHCP by default</label>"
         "</div></div>"
         "</div>"
         "<div class=\"section\"><h3>Security</h3>"
         "<div class=\"form-group\"><label for=\"default_password\">Factory Password:</label>"
-        "<input type=\"text\" id=\"default_password\" name=\"default_password\" value=\"admin\" maxlength=\"31\" required>"
+        "<input type=\"text\" id=\"default_password\" name=\"default_password\" value=\"%s\" maxlength=\"31\" required>"
         "<small>Max 31 characters</small></div>"
         "</div>"
         "<div class=\"section\"><h3>Actions</h3>"
@@ -178,7 +223,13 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         factory_valid ? "valid" : "invalid",
         current_serial, current_mac, current_board_type,
         current_ip, current_netmask, current_dhcp, current_password,
-        current_mac_suffix
+        /* Form field values */
+        form_prod_year, form_prod_week, form_serial,
+        form_mac_decimal,
+        (form_board_type == 0) ? " selected" : "",
+        (form_board_type == 1) ? " selected" : "",
+        (form_board_type == 2) ? " selected" : "",
+        form_ip, form_netmask, form_dhcp_checked, form_password
     );
     
     printf("HTTP: Generated factory page (%d bytes, %s)\n", html_len, error_msg ? "with error" : "OK");
@@ -257,21 +308,26 @@ bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* 
                 serial_number = sn;
                 has_serial = true;
             }
-            // Parse MAC address (user enters X:XX:XX, we prepend 34:D7:F5:3)
-            else if (strcmp(key, "mac_address") == 0) {
-                int m3_low, m4, m5;
-                // Parse format "X:XX:XX" or URL-encoded "X%3AXX%3AXX"
-                if (sscanf(value, "%1x%%3A%02x%%3A%02x", &m3_low, &m4, &m5) == 3 ||
-                    sscanf(value, "%1x:%02x:%02x", &m3_low, &m4, &m5) == 3) {
-                    // Fixed prefix: 34:D7:F5:3X
-                    factory_data.mac_address[0] = 0x34;
-                    factory_data.mac_address[1] = 0xD7;
-                    factory_data.mac_address[2] = 0xF5;
-                    factory_data.mac_address[3] = (uint8_t)(0x30 | (m3_low & 0x0F));
-                    factory_data.mac_address[4] = (uint8_t)m4;
-                    factory_data.mac_address[5] = (uint8_t)m5;
-                    has_mac = true;
+            // Parse MAC address as decimal number
+            // Valid range: 58102136176640 (34:D7:F5:30:00:00) to
+            //              58102137225215 (34:D7:F5:3F:FF:FF)
+            else if (strcmp(key, "mac_decimal") == 0) {
+                char* endptr;
+                unsigned long long mac_val = strtoull(value, &endptr, 10);
+                if (*endptr != '\0' ||
+                    mac_val < 58102136176640ULL ||
+                    mac_val > 58102137225215ULL) {
+                    free(form_copy);
+                    snprintf(error_msg, error_msg_size,
+                             "MAC must be 58102136176640 - 58102137225215");
+                    return false;
                 }
+                // Convert decimal to 6-byte MAC (big-endian)
+                for (int i = 5; i >= 0; i--) {
+                    factory_data.mac_address[i] = (uint8_t)(mac_val & 0xFF);
+                    mac_val >>= 8;
+                }
+                has_mac = true;
             }
             // Parse board type
             else if (strcmp(key, "board_type") == 0) {
@@ -399,6 +455,22 @@ bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* 
     }
     
     printf("HTTP: Factory defaults verified successfully!\n");
+    
+    // Apply new factory defaults to the running configuration so that
+    // all pages (status, config, factory) show consistent values and
+    // the ENC28J60 MAC is updated without requiring a reboot.
+    factory_defaults_apply_to_config();
+    
+    // Signal core1 to reconfigure the network with the updated MAC/IP
+    shared_memory_layout_t* layout = shared_memory_get_layout();
+    if (layout) {
+        layout->config_change_pending = true;
+    }
+    
+    // Persist the updated configuration to flash
+    flash_persistence_force_save_configuration();
+    
+    printf("HTTP: Factory defaults applied to running config and persisted\n");
     snprintf(success_msg, success_msg_size, "Factory defaults updated successfully!");
     return true;
 }

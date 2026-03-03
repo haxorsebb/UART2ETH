@@ -325,44 +325,39 @@ void network_manager_get_default_config(network_config_t* config) {
 
     memset(config, 0, sizeof(network_config_t));
     
-    // Re-enable DHCP with fast ACD timeouts to prevent hangs
-    config->use_dhcp = true;   // ENABLE DHCP - use dynamic IP assignment
-    config->dhcp_timeout_ms = 30000;  // 30 seconds DHCP timeout
-    
-    // Generate unique MAC address based on RP2350 flash unique ID
-    pico_unique_board_id_t unique_id;
-    // FIXED MAC ADDRESS - no more dynamic generation to avoid ARP conflicts
-    // pico_get_unique_board_id(&unique_id);  // Commented out
-    
-    //TODO mixed minced meat HACK!
-    if(factory_defaults_is_valid()) {
+    if (factory_defaults_is_valid()) {
+        // Factory defaults present: use unique MAC and factory network settings
         const factory_defaults_t* defaults = factory_defaults_get();
-        config->mac_address[0] = defaults->mac_address[0];  
-        config->mac_address[1] = defaults->mac_address[1];  
-        config->mac_address[2] = defaults->mac_address[2];
-        config->mac_address[3] = defaults->mac_address[3];
-        config->mac_address[4] = defaults->mac_address[4];
-        config->mac_address[5] = defaults->mac_address[5];
-        
-    } else {    
+        memcpy(config->mac_address, defaults->mac_address, 6);
+        config->use_dhcp = defaults->default_dhcp_enable;
+        config->static_ip.addr = defaults->default_ip;
+        config->static_netmask.addr = defaults->default_netmask;
+        config->dhcp_timeout_ms = config->use_dhcp ? 30000 : 0;
+    } else {
+        // No valid factory defaults: use fixed MAC, disable DHCP.
+        // DHCP is unsafe without a unique MAC — multiple devices would
+        // share the same address and cause ARP conflicts on the network.
         config->mac_address[0] = 0x34;  // Locally administered, unicast
-        config->mac_address[1] = 0xD7;  // Fixed values
-        config->mac_address[2] = 0xF5; 
+        config->mac_address[1] = 0xD7;
+        config->mac_address[2] = 0xF5;
         config->mac_address[3] = 0x30;
         config->mac_address[4] = 0x00;
-        config->mac_address[5] = 0x01;  // Simple fixed MAC: 34:D7:F5:30:00:01
+        config->mac_address[5] = 0x01;  // Fixed MAC: 34:D7:F5:30:00:01
+        config->use_dhcp = false;
+        config->dhcp_timeout_ms = 0;
+        IP4_ADDR(&config->static_ip, 192, 168, 1, 201);
+        IP4_ADDR(&config->static_netmask, 255, 255, 255, 0);
     }
 
-    DEBUG_ONLY({
-        printf("Network Manager: Using FIXED MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
-               config->mac_address[0], config->mac_address[1], config->mac_address[2],
-               config->mac_address[3], config->mac_address[4], config->mac_address[5]);
-    });
+    // Gateway and management port are the same regardless of source
+    IP4_ADDR(&config->static_gateway, 192, 168, 1, 1);
 
-    // Static IP configuration (only used when use_dhcp = false)
-    IP4_ADDR(&config->static_ip, 192, 168, 1, 201);       // Static IP: 10.10.10.41
-    IP4_ADDR(&config->static_gateway, 192, 168, 1, 1);   // Gateway: 10.10.10.1 (DHCP server)
-    IP4_ADDR(&config->static_netmask, 255, 255, 255, 0); // Netmask: 255.255.255.0
+    DEBUG_ONLY({
+        printf("Network Manager: MAC: %02X:%02X:%02X:%02X:%02X:%02X, DHCP: %s\n",
+               config->mac_address[0], config->mac_address[1], config->mac_address[2],
+               config->mac_address[3], config->mac_address[4], config->mac_address[5],
+               config->use_dhcp ? "ON" : "OFF");
+    });
 
     config->management_port = 80;
 }
@@ -542,10 +537,21 @@ bool network_manager_reconfigure(const network_config_t* config) {
            (int)((config->static_ip.addr >> 8) & 0xFF),
            (int)((config->static_ip.addr >> 16) & 0xFF),
            (int)((config->static_ip.addr >> 24) & 0xFF),
-           config->use_dhcp ? "ENABLED" : "Dnetwork_manager_reconfigureISABLED");
+           config->use_dhcp ? "ENABLED" : "DISABLED");
 
     // Update global configuration with new settings
     memcpy(&g_network_config, config, sizeof(network_config_t));
+
+    // Update MAC address on ENC28J60 and lwIP netif if it changed
+    if (g_netif) {
+        if (memcmp(g_netif->hwaddr, config->mac_address, 6) != 0) {
+            enc28j60_set_mac_address(config->mac_address);
+            memcpy(g_netif->hwaddr, config->mac_address, 6);
+            printf("Network Manager: MAC updated to %02X:%02X:%02X:%02X:%02X:%02X\n",
+                   config->mac_address[0], config->mac_address[1], config->mac_address[2],
+                   config->mac_address[3], config->mac_address[4], config->mac_address[5]);
+        }
+    }
 
     core1_timer_cancel(CORE1_TIMER_NETWORK_TIMEOUT);
     core1_timer_cancel(CORE1_TIMER_DHCP_DISCOVER);
