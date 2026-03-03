@@ -3,172 +3,172 @@
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-003-programming-language-selection.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-011-ringbuffer-implementation.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-015-factory-defaults-web-interface.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-006-flash-persistence-strategy.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-007-state-machine-architecture.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-004-development-ecosystem.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-002-ethernet-controller-selection.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-010-external-protocol-validation-tool.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-016-http-basic-authentication.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-018-http-server-modularization.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-014-factory-defaults-implementation.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-009-per-core-timer-subsystem.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-012-core0-ringbuffer-separation.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-001-microcontroller-selection.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-005-buffer-allocation-strategy.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-013-pio-uart-implementation.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-017-update-module.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/adrs/ADR-008-hardware-pin-configuration.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/00_architecture_communication_canvas.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/01_introduction_and_goals.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/05_building_block_view.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/02_architecture_constraints.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/08_concepts.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/03_context_and_scope.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/12_glossary.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/09_architecture_decisions.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/06_runtime_view.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/10_quality_requirements.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/07_deployment_view.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/04_solution_strategy.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/chapters/11_technical_risks.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/arc42/arc42.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/search.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
     <url>
     	<loc>http://jbake.org/lunrjsindex.html</loc>
-    	<lastmod>2026-03-01</lastmod>
+    	<lastmod>2026-03-03</lastmod>
     </url>
 
 </urlset>
