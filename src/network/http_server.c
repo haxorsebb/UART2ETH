@@ -493,7 +493,8 @@ static void http_handle_config_get(http_connection_t* conn,
     (void)buffer_len;      // Unused
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
-    http_generate_config_page(response_buffer, sizeof(response_buffer));
+    http_generate_config_page(response_buffer, sizeof(response_buffer),
+                              NULL, 0, NULL, 0);
     http_send_response(conn, response_buffer, strlen(response_buffer));
     http_close_connection_after_send(conn);
 }
@@ -581,23 +582,18 @@ static void http_handle_config_post(http_connection_t* conn,
                                      size_t buffer_len) {
     printf("HTTP Server: Processing configuration update\n");
     
-    if (http_parse_post_data(request_buffer, buffer_len)) {
-        // Configuration updated successfully - redirect to main page
-        http_send_redirect(conn, "/");
-    } else {
-        // Error updating configuration - show error page
-        static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
-        snprintf(response_buffer, sizeof(response_buffer),
-            "HTTP/1.0 400 Bad Request\r\n"
-            "Content-Type: text/html\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            "<html><body><h1>Configuration Error</h1>"
-            "<p>Failed to update configuration. Please check your input values.</p>"
-            "<p><a href=\"/\">Return to main page</a></p>"
-            "</body></html>\r\n");
-        http_send_response(conn, response_buffer, strlen(response_buffer));
-    }
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    char error_msg[128] = {0};
+    char success_msg[128] = {0};
+    
+    http_parse_post_data(request_buffer, buffer_len,
+                         error_msg, sizeof(error_msg),
+                         success_msg, sizeof(success_msg));
+    
+    http_generate_config_page(response_buffer, sizeof(response_buffer),
+                              error_msg, strlen(error_msg),
+                              success_msg, strlen(success_msg));
+    http_send_response(conn, response_buffer, strlen(response_buffer));
 }
 
 /**
@@ -609,23 +605,18 @@ static void http_handle_password_post(http_connection_t* conn,
                                        size_t buffer_len) {
     printf("HTTP Server: Processing password change\n");
     
-    if (http_handle_password_change(request_buffer, buffer_len)) {
-        // Password changed successfully - redirect to config page
-        http_send_redirect(conn, "/config");
-    } else {
-        // Error changing password - show error page
-        static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
-        snprintf(response_buffer, sizeof(response_buffer),
-            "HTTP/1.0 400 Bad Request\r\n"
-            "Content-Type: text/html\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            "<html><body><h1>Password Change Error</h1>"
-            "<p>Failed to change password. Please check your current password and try again.</p>"
-            "<p><a href=\"/config\">Return to configuration</a></p>"
-            "</body></html>\r\n");
-        http_send_response(conn, response_buffer, strlen(response_buffer));
-    }
+    static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
+    char error_msg[128] = {0};
+    char success_msg[128] = {0};
+    
+    http_handle_password_change(request_buffer, buffer_len,
+                                error_msg, sizeof(error_msg),
+                                success_msg, sizeof(success_msg));
+    
+    http_generate_config_page(response_buffer, sizeof(response_buffer),
+                              error_msg, strlen(error_msg),
+                              success_msg, strlen(success_msg));
+    http_send_response(conn, response_buffer, strlen(response_buffer));
 }
 
 /**

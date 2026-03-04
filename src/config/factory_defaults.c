@@ -86,6 +86,7 @@ void factory_defaults_apply_to_config(void) {
     // Apply network defaults
     layout->config.network.static_ip.addr = g_factory_defaults.default_ip;
     layout->config.network.static_netmask.addr = g_factory_defaults.default_netmask;
+    layout->config.network.static_gateway.addr = g_factory_defaults.default_gateway;
     layout->config.network.use_dhcp = g_factory_defaults.default_dhcp_enable;
     
     // Apply MAC address

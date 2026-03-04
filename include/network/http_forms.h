@@ -85,9 +85,15 @@ void http_url_decode(char* str);
  * 
  * @param post_data Raw POST request data
  * @param data_len Length of POST data
+ * @param error_msg Buffer for error message (filled on failure)
+ * @param error_msg_size Size of error message buffer
+ * @param success_msg Buffer for success message (filled on success)
+ * @param success_msg_size Size of success message buffer
  * @return true if configuration updated successfully, false on error
  */
-bool http_parse_post_data(const char* post_data, size_t data_len);
+bool http_parse_post_data(const char* post_data, size_t data_len,
+                          char* error_msg, size_t error_msg_size,
+                          char* success_msg, size_t success_msg_size);
 
 /**
  * @brief Handle password change request
@@ -97,8 +103,14 @@ bool http_parse_post_data(const char* post_data, size_t data_len);
  * 
  * @param post_data Raw POST request data
  * @param data_len Length of POST data
+ * @param error_msg Buffer for error message (filled on failure)
+ * @param error_msg_size Size of error message buffer
+ * @param success_msg Buffer for success message (filled on success)
+ * @param success_msg_size Size of success message buffer
  * @return true if password changed successfully, false on error
  */
-bool http_handle_password_change(const char* post_data, size_t data_len);
+bool http_handle_password_change(const char* post_data, size_t data_len,
+                                 char* error_msg, size_t error_msg_size,
+                                 char* success_msg, size_t success_msg_size);
 
 #endif // HTTP_FORMS_H

@@ -51,7 +51,7 @@ typedef struct {
     uint8_t sha256_checksum[32];       // SHA256 integrity verification (FIRST for easy hash exclusion)
     
     // Serial number (8 bytes total) - Format: YYWW-NNNNNN
-    uint8_t production_week;           // Week number 1-52
+    uint8_t production_week;           // Week number 1-53 (ISO 8601)
     uint8_t production_year;           // Years since 2000 (e.g., 26 for 2026)
     uint8_t serial_number[6];          // 6-byte running number (unique per device)
     
@@ -61,10 +61,11 @@ typedef struct {
     // Board type (1 byte)
     uint8_t board_type;                // board_type_t enum value
     
-    // Default network configuration (9 bytes)
+    // Default network configuration (13 bytes)
     uint32_t default_ip;               // Default IP address (network byte order)
     uint32_t default_netmask;          // Default netmask (network byte order)
-    uint8_t default_dhcp_enable;          // Default DHCP enable flag
+    uint32_t default_gateway;          // Default gateway address (network byte order)
+    uint8_t default_dhcp_enable;       // Default DHCP enable flag
     
     // Security (32 bytes)
     char default_password[32];         // Factory default password (including null-terminator)
@@ -79,6 +80,7 @@ typedef struct {
         - sizeof(uint8_t)       /*board_type*/
         - sizeof(uint32_t)      /*default_ip*/
         - sizeof(uint32_t)      /*default_netmask*/
+        - sizeof(uint32_t)      /*default_gateway*/
         - sizeof(uint8_t)       /*default_dhcp_enable*/
         - 32*sizeof(char)       /*default_password*/
         ];
@@ -114,6 +116,7 @@ void factory_defaults_print_serial_number(void);
  * to corresponding fields in g_shared_memory:
  * - default_ip → network.static_ip
  * - default_netmask → network.static_netmask
+ * - default_gateway → network.static_gateway
  * - default_dhcp_enable → network.use_dhcp
  * - default_password → (user authentication system)
  * - mac_address → network.mac_address

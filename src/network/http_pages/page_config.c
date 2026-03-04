@@ -28,7 +28,9 @@
  * 
  * Documentation Reference: ADR-018
  */
-void http_generate_config_page(char* buffer, size_t buffer_size) {
+void http_generate_config_page(char* buffer, size_t buffer_size,
+                               const char* error_msg, size_t error_msg_size,
+                               const char* success_msg, size_t success_msg_size) {
     if (!buffer || buffer_size == 0) {
         return;
     }
@@ -52,6 +54,24 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
              (int)((static_ip >> 8) & 0xFF),
              (int)((static_ip >> 16) & 0xFF),
              (int)((static_ip >> 24) & 0xFF));
+    
+    // Format static netmask for form
+    uint32_t static_nm = layout->config.network.static_netmask.addr;
+    char static_nm_str[16];
+    snprintf(static_nm_str, sizeof(static_nm_str), "%d.%d.%d.%d",
+             (int)((static_nm >> 0) & 0xFF),
+             (int)((static_nm >> 8) & 0xFF),
+             (int)((static_nm >> 16) & 0xFF),
+             (int)((static_nm >> 24) & 0xFF));
+    
+    // Format static gateway for form
+    uint32_t static_gw = layout->config.network.static_gateway.addr;
+    char static_gw_str[16];
+    snprintf(static_gw_str, sizeof(static_gw_str), "%d.%d.%d.%d",
+             (int)((static_gw >> 0) & 0xFF),
+             (int)((static_gw >> 8) & 0xFF),
+             (int)((static_gw >> 16) & 0xFF),
+             (int)((static_gw >> 24) & 0xFF));
     
     // Format MAC address for form
     char mac_str[18];
@@ -92,6 +112,8 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
 #endif
         "        </div>\n"
         "        \n"
+        "%s%s%s"
+        "%s%s%s"
         "        <div class=\"current-status\">\n"
         "            <strong>Current Status:</strong> IP Address: %s | MAC: %s | DHCP: %s\n"
         "        </div>\n"
@@ -109,13 +131,18 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
         "                </div>\n"
         "                \n"
         "                <div class=\"form-group\">\n"
-        "                    <label for=\"static_ip\">Static IP Address (used when DHCP disabled):</label>\n"
-        "                    <input type=\"text\" id=\"static_ip\" name=\"static_ip\" value=\"%s\" placeholder=\"10.10.10.41\">\n"
+        "                    <label for=\"static_ip\">Static IP Address:</label>\n"
+        "                    <input type=\"text\" id=\"static_ip\" name=\"static_ip\" value=\"%s\" placeholder=\"192.168.1.201\">\n"
         "                </div>\n"
         "                \n"
         "                <div class=\"form-group\">\n"
-        "                    <label for=\"mac_addr\">MAC Address:</label>\n"
-        "                    <input type=\"text\" id=\"mac_addr\" name=\"mac_addr\" value=\"%s\" placeholder=\"02:00:00:00:00:01\" readonly>\n"
+        "                    <label for=\"static_netmask\">Subnet Mask:</label>\n"
+        "                    <input type=\"text\" id=\"static_netmask\" name=\"static_netmask\" value=\"%s\" placeholder=\"255.255.255.0\">\n"
+        "                </div>\n"
+        "                \n"
+        "                <div class=\"form-group\">\n"
+        "                    <label for=\"static_gateway\">Gateway:</label>\n"
+        "                    <input type=\"text\" id=\"static_gateway\" name=\"static_gateway\" value=\"%s\" placeholder=\"192.168.1.1\">\n"
         "                </div>\n"
         "            </div>\n"
         "            \n"
@@ -153,9 +180,8 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
 #if DEVICE_CHANNEL_4_ENABLED
         "                \n"
         "                <div class=\"uart-row\">\n"
-        "                    <div class=\"checkbox-group\">\n"
-        "                        <input type=\"checkbox\" id=\"ch4_enabled\" name=\"ch4_enabled\" value=\"1\" %s>\n"
-        "                        <label for=\"ch4_enabled\">UART4 Enabled</label>\n"
+        "                    <div style=\"flex:1;font-size:14px;color:#2c3e50;\">"
+        "                        <strong>UART4</strong> (always enabled)"
         "                    </div>\n"
         "                    <div class=\"form-group\" style=\"margin-bottom: 0;\">\n"
         "                        <label for=\"ch4_port\">TCP Port:</label>\n"
@@ -204,13 +230,19 @@ void http_generate_config_page(char* buffer, size_t buffer_size) {
         "    </div>\n"
         "</body>\n"
         "</html>\r\n",
+        error_msg_size > 0 ? "<div class=\"section\" style=\"background-color:#fadbd8;border-left:4px solid #e74c3c\">" : "",
+        error_msg_size > 0 ? error_msg : "",
+        error_msg_size > 0 ? "</div>" : "",
+        success_msg_size > 0 ? "<div class=\"section\" style=\"background-color:#d5f5e3;border-left:4px solid #27ae60\">" : "",
+        success_msg_size > 0 ? success_msg : "",
+        success_msg_size > 0 ? "</div>" : "",
         current_ip_str, mac_str, layout->config.network.use_dhcp ? "Enabled" : "Disabled",
         layout->config.network.use_dhcp ? "checked" : "",
         static_ip_str,
-        mac_str
+        static_nm_str,
+        static_gw_str
 #if DEVICE_CHANNEL_4_ENABLED
-        ,layout->config.channels[CHANNEL_4].enabled ? "checked" : "",
-        layout->config.channels[CHANNEL_4].tcp_port
+        ,layout->config.channels[CHANNEL_4].tcp_port
 #endif
     );
     

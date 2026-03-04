@@ -224,11 +224,15 @@ password_change_result_t http_validate_password_change(
  * 
  * Reference: ADR-016 HTTP Basic Authentication - Password Management
  */
-bool http_handle_password_change(const char* post_data, size_t data_len) {
+bool http_handle_password_change(const char* post_data, size_t data_len,
+                                 char* error_msg, size_t error_msg_size,
+                                 char* success_msg, size_t success_msg_size) {
+    (void)data_len;
     // Find start of form data (after double CRLF)
     const char* form_start = strstr(post_data, "\r\n\r\n");
     if (!form_start) {
         printf("HTTP Password Change: No form data found\n");
+        snprintf(error_msg, error_msg_size, "Invalid form data");
         return false;
     }
     form_start += 4; // Skip past \r\n\r\n
@@ -244,6 +248,7 @@ bool http_handle_password_change(const char* post_data, size_t data_len) {
     char* form_copy = malloc(strlen(form_start) + 1);
     if (!form_copy) {
         printf("HTTP Password Change: Memory allocation failed\n");
+        snprintf(error_msg, error_msg_size, "Memory allocation failed");
         return false;
     }
     strcpy(form_copy, form_start);
@@ -284,6 +289,26 @@ bool http_handle_password_change(const char* post_data, size_t data_len) {
     
     if (result != PWD_CHANGE_OK) {
         printf("HTTP Password Change: Validation failed with code %d\n", result);
+        switch (result) {
+            case PWD_CHANGE_CURRENT_WRONG:
+                snprintf(error_msg, error_msg_size, "Current password is incorrect");
+                break;
+            case PWD_CHANGE_TOO_SHORT:
+                snprintf(error_msg, error_msg_size, "New password must be at least 8 characters");
+                break;
+            case PWD_CHANGE_TOO_LONG:
+                snprintf(error_msg, error_msg_size, "New password must be at most 31 characters");
+                break;
+            case PWD_CHANGE_NO_MATCH:
+                snprintf(error_msg, error_msg_size, "New password and confirmation do not match");
+                break;
+            case PWD_CHANGE_EMPTY_FIELD:
+                snprintf(error_msg, error_msg_size, "All password fields are required");
+                break;
+            default:
+                snprintf(error_msg, error_msg_size, "Password validation failed");
+                break;
+        }
         return false;
     }
     
@@ -298,6 +323,12 @@ bool http_handle_password_change(const char* post_data, size_t data_len) {
     printf("HTTP Password Change: Password updated successfully, flash save: %s\n", 
            save_result ? "success" : "failed");
     
+    if (save_result) {
+        snprintf(success_msg, success_msg_size, "Password changed successfully");
+    } else {
+        snprintf(error_msg, error_msg_size, "Password changed but flash save failed");
+    }
+    
     return save_result;
 }
 
@@ -311,10 +342,14 @@ bool http_handle_password_change(const char* post_data, size_t data_len) {
  * @param data_len Length of POST data
  * @return true if configuration updated successfully, false on error
  */
-bool http_parse_post_data(const char* post_data, size_t data_len) {
+bool http_parse_post_data(const char* post_data, size_t data_len,
+                          char* error_msg, size_t error_msg_size,
+                          char* success_msg, size_t success_msg_size) {
+    (void)data_len;
     // Find start of form data (after double CRLF)
     const char* form_start = strstr(post_data, "\r\n\r\n");
     if (!form_start) {
+        snprintf(error_msg, error_msg_size, "Invalid form data");
         return false;
     }
     form_start += 4; // Skip past \r\n\r\n
@@ -343,6 +378,10 @@ bool http_parse_post_data(const char* post_data, size_t data_len) {
     // Reset all checkboxes to false first, then enable only checked ones
     layout->config.network.use_dhcp = false;  // CRITICAL FIX: Reset DHCP checkbox
     for (int ch = 1; ch <= 4; ch++) {
+#if DEVICE_CHANNEL_4_ENABLED
+        // UART4 is always enabled in SHARK mode (no checkbox on config page)
+        if (ch == CHANNEL_4) continue;
+#endif
         layout->config.channels[ch].enabled = false;  // Reset UART channel checkboxes
     }
     
@@ -361,12 +400,37 @@ bool http_parse_post_data(const char* post_data, size_t data_len) {
             
             // Parse network settings
             if (strcmp(key, "static_ip") == 0) {
-                // Parse IP address (format: 10.10.10.41)
                 int a, b, c, d;
-                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4) {
+                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4 &&
+                    a >= 0 && a <= 255 && b >= 0 && b <= 255 &&
+                    c >= 0 && c <= 255 && d >= 0 && d <= 255) {
                     IP4_ADDR(&layout->config.network.static_ip, a, b, c, d);
                     config_changed = true;
                     printf("HTTP: Updated static IP to %d.%d.%d.%d\n", a, b, c, d);
+                } else {
+                    printf("HTTP: Invalid static IP: %s\n", value);
+                }
+            } else if (strcmp(key, "static_netmask") == 0) {
+                int a, b, c, d;
+                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4 &&
+                    a >= 0 && a <= 255 && b >= 0 && b <= 255 &&
+                    c >= 0 && c <= 255 && d >= 0 && d <= 255) {
+                    IP4_ADDR(&layout->config.network.static_netmask, a, b, c, d);
+                    config_changed = true;
+                    printf("HTTP: Updated netmask to %d.%d.%d.%d\n", a, b, c, d);
+                } else {
+                    printf("HTTP: Invalid netmask: %s\n", value);
+                }
+            } else if (strcmp(key, "static_gateway") == 0) {
+                int a, b, c, d;
+                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4 &&
+                    a >= 0 && a <= 255 && b >= 0 && b <= 255 &&
+                    c >= 0 && c <= 255 && d >= 0 && d <= 255) {
+                    IP4_ADDR(&layout->config.network.static_gateway, a, b, c, d);
+                    config_changed = true;
+                    printf("HTTP: Updated gateway to %d.%d.%d.%d\n", a, b, c, d);
+                } else {
+                    printf("HTTP: Invalid gateway: %s\n", value);
                 }
             } else if (strcmp(key, "use_dhcp") == 0 && strcmp(value, "1") == 0) {
                 // Enable DHCP only if checkbox was checked (appears in POST data with value "1")
@@ -438,8 +502,16 @@ bool http_parse_post_data(const char* post_data, size_t data_len) {
         
         bool save_result = flash_persistence_force_save_configuration();
         printf("HTTP: Configuration save result: %s\n", save_result ? "success" : "failed");
-        printf("HTTP: ⚙️ Configuration change signaled to Core1 for runtime update\n");
-        printf("HTTP: 🌐 Note: Network changes (IP/DHCP/MAC) will be applied immediately\n");
+        printf("HTTP: Configuration change signaled to Core1 for runtime update\n");
+        printf("HTTP: Note: Network changes (IP/DHCP/MAC) will be applied immediately\n");
+        
+        if (save_result) {
+            snprintf(success_msg, success_msg_size, "Configuration saved successfully");
+        } else {
+            snprintf(error_msg, error_msg_size, "Configuration changed but flash save failed");
+        }
+    } else {
+        snprintf(success_msg, success_msg_size, "No changes detected");
     }
     
     return config_changed;

@@ -55,6 +55,20 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
     // Get device configuration
     shared_memory_layout_t* layout = shared_memory_get_layout();
     
+    // Format subnet mask
+    uint32_t nm = layout->config.network.static_netmask.addr;
+    char netmask_str[16];
+    snprintf(netmask_str, sizeof(netmask_str), "%d.%d.%d.%d",
+             (int)((nm >> 0) & 0xFF), (int)((nm >> 8) & 0xFF),
+             (int)((nm >> 16) & 0xFF), (int)((nm >> 24) & 0xFF));
+    
+    // Format gateway
+    uint32_t gw = layout->config.network.static_gateway.addr;
+    char gateway_str[16];
+    snprintf(gateway_str, sizeof(gateway_str), "%d.%d.%d.%d",
+             (int)((gw >> 0) & 0xFF), (int)((gw >> 8) & 0xFF),
+             (int)((gw >> 16) & 0xFF), (int)((gw >> 24) & 0xFF));
+    
 #if DEVICE_CHANNEL_2_ENABLED
     char uart2_pins[16];
     if (layout->config.channels[CHANNEL_2].enabled) {
@@ -117,7 +131,7 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         " <span class=\"factory-badge\">FACTORY INTERNAL</span>"
 #endif
         "</h1>\n"
-        "            <p>Serial to Network Bridge - Device Status | 2Firmware " FIRMWARE_VERSION_STRING " - " _TIMEZ_"</p>\n"
+        "            <p>Serial to Network Bridge - Device Status | Firmware " FIRMWARE_VERSION_STRING " - " _TIMEZ_"</p>\n"
         "        </div>\n"
         "        \n"
         "        <div class=\"nav-links\">\n"
@@ -132,6 +146,8 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         "        <div class=\"section\">\n"
         "            <h2>Network Configuration</h2>\n"
         "            <p><span class=\"label\">IP Address:</span> <span class=\"value\">%s</span></p>\n"
+        "            <p><span class=\"label\">Subnet Mask:</span> <span class=\"value\">%s</span></p>\n"
+        "            <p><span class=\"label\">Gateway:</span> <span class=\"value\">%s</span></p>\n"
         "            <p><span class=\"label\">MAC Address:</span> <span class=\"value\">%02X:%02X:%02X:%02X:%02X:%02X</span></p>\n"
         "            <p><span class=\"label\">DHCP:</span> <span class=\"status-ok\">%s</span></p>\n"
         "        </div>\n"
@@ -173,6 +189,8 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         "</html>\r\n",
         DEVICE_MODE_NAME,
         ip_str,
+        netmask_str,
+        gateway_str,
         mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5],
         layout->config.network.use_dhcp ? "Enabled" : "Static",
 #if DEVICE_CHANNEL_4_ENABLED

@@ -332,6 +332,7 @@ void network_manager_get_default_config(network_config_t* config) {
         config->use_dhcp = defaults->default_dhcp_enable;
         config->static_ip.addr = defaults->default_ip;
         config->static_netmask.addr = defaults->default_netmask;
+        config->static_gateway.addr = defaults->default_gateway;
         config->dhcp_timeout_ms = config->use_dhcp ? 30000 : 0;
     } else {
         // No valid factory defaults: use fixed MAC, disable DHCP.
@@ -347,10 +348,8 @@ void network_manager_get_default_config(network_config_t* config) {
         config->dhcp_timeout_ms = 0;
         IP4_ADDR(&config->static_ip, 192, 168, 1, 201);
         IP4_ADDR(&config->static_netmask, 255, 255, 255, 0);
+        IP4_ADDR(&config->static_gateway, 192, 168, 1, 1);
     }
-
-    // Gateway and management port are the same regardless of source
-    IP4_ADDR(&config->static_gateway, 192, 168, 1, 1);
 
     DEBUG_ONLY({
         printf("Network Manager: MAC: %02X:%02X:%02X:%02X:%02X:%02X, DHCP: %s\n",

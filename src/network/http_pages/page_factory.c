@@ -39,6 +39,7 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
     char current_mac_suffix[9] = "0:00:00";
     char current_ip[16] = "0.0.0.0";
     char current_netmask[16] = "0.0.0.0";
+    char current_gateway[16] = "0.0.0.0";
     const char* current_dhcp = "No";
     const char* current_board_type = "Unknown";
     char current_password[32] = "Not Set";
@@ -50,6 +51,7 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
     int form_board_type = 0;
     char form_ip[16] = "192.168.1.201";
     char form_netmask[16] = "255.255.255.0";
+    char form_gateway[16] = "192.168.1.1";
     const char* form_dhcp_checked = "";
     char form_password[32] = "admin";
     char form_mac_decimal[21] = "58102136176640";  // default: 34:D7:F5:30:00:00
@@ -76,6 +78,11 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         snprintf(form_netmask, sizeof(form_netmask), "%d.%d.%d.%d",
                  (int)(fnm & 0xFF), (int)((fnm >> 8) & 0xFF),
                  (int)((fnm >> 16) & 0xFF), (int)((fnm >> 24) & 0xFF));
+        
+        uint32_t fgw = current_factory->default_gateway;
+        snprintf(form_gateway, sizeof(form_gateway), "%d.%d.%d.%d",
+                 (int)(fgw & 0xFF), (int)((fgw >> 8) & 0xFF),
+                 (int)((fgw >> 16) & 0xFF), (int)((fgw >> 24) & 0xFF));
         
         form_dhcp_checked = current_factory->default_dhcp_enable ? "checked" : "";
         snprintf(form_password, sizeof(form_password), "%s", current_factory->default_password);
@@ -114,6 +121,11 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
                  (int)((netmask >> 0) & 0xFF), (int)((netmask >> 8) & 0xFF),
                  (int)((netmask >> 16) & 0xFF), (int)((netmask >> 24) & 0xFF));
         
+        uint32_t gw = current_factory->default_gateway;
+        snprintf(current_gateway, sizeof(current_gateway), "%d.%d.%d.%d",
+                 (int)((gw >> 0) & 0xFF), (int)((gw >> 8) & 0xFF),
+                 (int)((gw >> 16) & 0xFF), (int)((gw >> 24) & 0xFF));
+        
         current_dhcp = current_factory->default_dhcp_enable ? "Yes" : "No";
         
         // Get board type name
@@ -149,7 +161,7 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         "<p><strong>Serial:</strong> %s</p>"
         "<p><strong>MAC:</strong> %s</p>"
         "<p><strong>Board:</strong> %s</p>"
-        "<p><strong>IP:</strong> %s | <strong>Mask:</strong> %s | <strong>DHCP:</strong> %s</p>"
+        "<p><strong>IP:</strong> %s | <strong>Mask:</strong> %s | <strong>GW:</strong> %s | <strong>DHCP:</strong> %s</p>"
         "<p><strong>Access:</strong> User: admin | Password %s</p>"
         "</div>"
         "<form method=\"POST\" action=\"/factory\">"
@@ -159,8 +171,8 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         "<input type=\"number\" id=\"prod_year\" name=\"prod_year\" min=\"0\" max=\"99\" value=\"%d\" required>"
         "<small>YY for 20YY (e.g., 26=2026)</small></div>"
         "<div class=\"form-group\"><label for=\"prod_week\">Production Week:</label>"
-        "<input type=\"number\" id=\"prod_week\" name=\"prod_week\" min=\"1\" max=\"52\" value=\"%d\" required>"
-        "<small>Week 1-52</small></div>"
+        "<input type=\"number\" id=\"prod_week\" name=\"prod_week\" min=\"1\" max=\"53\" value=\"%d\" required>"
+        "<small>Week 1-53 (ISO 8601)</small></div>"
         "</div>"
         "<div class=\"form-group\"><label for=\"serial_number\">Serial Number (Decimal):</label>"
         "<input type=\"text\" id=\"serial_number\" name=\"serial_number\" value=\"%s\" required>"
@@ -197,6 +209,8 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         "<div class=\"form-group\"><label for=\"default_netmask\">Default Netmask:</label>"
         "<input type=\"text\" id=\"default_netmask\" name=\"default_netmask\" value=\"%s\" required></div>"
         "</div>"
+        "<div class=\"form-group\"><label for=\"default_gateway\">Default Gateway:</label>"
+        "<input type=\"text\" id=\"default_gateway\" name=\"default_gateway\" value=\"%s\" required></div>"
         "<div class=\"form-group\"><div class=\"checkbox-group\">"
         "<input type=\"checkbox\" id=\"default_dhcp\" name=\"default_dhcp\" value=\"1\" %s>"
         "<label for=\"default_dhcp\">Enable DHCP by default</label>"
@@ -222,14 +236,14 @@ void http_generate_factory_page(char* buffer, size_t buffer_size, const char* er
         success_msg_size > 0 ? "</div>" : "",
         factory_valid ? "valid" : "invalid",
         current_serial, current_mac, current_board_type,
-        current_ip, current_netmask, current_dhcp, current_password,
+        current_ip, current_netmask, current_gateway, current_dhcp, current_password,
         /* Form field values */
         form_prod_year, form_prod_week, form_serial,
         form_mac_decimal,
         (form_board_type == 0) ? " selected" : "",
         (form_board_type == 1) ? " selected" : "",
         (form_board_type == 2) ? " selected" : "",
-        form_ip, form_netmask, form_dhcp_checked, form_password
+        form_ip, form_netmask, form_gateway, form_dhcp_checked, form_password
     );
     
     printf("HTTP: Generated factory page (%d bytes, %s)\n", html_len, error_msg ? "with error" : "OK");
@@ -266,7 +280,7 @@ bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* 
     uint64_t serial_number = 0;
     bool has_year = false, has_week = false, has_serial = false;
     bool has_mac = false, has_board_type = false;
-    bool has_ip = false, has_netmask = false;
+    bool has_ip = false, has_netmask = false, has_gateway = false;
     bool has_password = false;
     
     char* token = strtok(form_copy, "&");
@@ -289,9 +303,9 @@ bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* 
                 has_year = true;
             } else if (strcmp(key, "prod_week") == 0) {
                 int week = atoi(value);
-                if (week < 1 || week > 52) {
+                if (week < 1 || week > 53) {
                     free(form_copy);
-                    snprintf(error_msg, error_msg_size, "Production week must be 1-52");
+                    snprintf(error_msg, error_msg_size, "Production week must be 1-53");
                     return false;
                 }
                 prod_week = (uint8_t)week;
@@ -340,19 +354,46 @@ bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* 
             // Parse default IP
             else if (strcmp(key, "default_ip") == 0) {
                 int a, b, c, d;
-                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4) {
+                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4 &&
+                    a >= 0 && a <= 255 && b >= 0 && b <= 255 &&
+                    c >= 0 && c <= 255 && d >= 0 && d <= 255) {
                     factory_data.default_ip = (uint32_t)a | ((uint32_t)b << 8) | 
                                              ((uint32_t)c << 16) | ((uint32_t)d << 24);
                     has_ip = true;
+                } else {
+                    free(form_copy);
+                    snprintf(error_msg, error_msg_size, "Invalid IP address (each octet must be 0-255)");
+                    return false;
                 }
             }
             // Parse default netmask
             else if (strcmp(key, "default_netmask") == 0) {
                 int a, b, c, d;
-                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4) {
+                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4 &&
+                    a >= 0 && a <= 255 && b >= 0 && b <= 255 &&
+                    c >= 0 && c <= 255 && d >= 0 && d <= 255) {
                     factory_data.default_netmask = (uint32_t)a | ((uint32_t)b << 8) | 
                                                   ((uint32_t)c << 16) | ((uint32_t)d << 24);
                     has_netmask = true;
+                } else {
+                    free(form_copy);
+                    snprintf(error_msg, error_msg_size, "Invalid netmask (each octet must be 0-255)");
+                    return false;
+                }
+            }
+            // Parse default gateway
+            else if (strcmp(key, "default_gateway") == 0) {
+                int a, b, c, d;
+                if (sscanf(value, "%d.%d.%d.%d", &a, &b, &c, &d) == 4 &&
+                    a >= 0 && a <= 255 && b >= 0 && b <= 255 &&
+                    c >= 0 && c <= 255 && d >= 0 && d <= 255) {
+                    factory_data.default_gateway = (uint32_t)a | ((uint32_t)b << 8) | 
+                                                  ((uint32_t)c << 16) | ((uint32_t)d << 24);
+                    has_gateway = true;
+                } else {
+                    free(form_copy);
+                    snprintf(error_msg, error_msg_size, "Invalid gateway (each octet must be 0-255)");
+                    return false;
                 }
             }
             // Parse default DHCP
@@ -404,8 +445,8 @@ bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* 
         snprintf(error_msg, error_msg_size, "Missing board type");
         return false;
     }
-    if (!has_ip || !has_netmask) {
-        snprintf(error_msg, error_msg_size, "Missing IP configuration");
+    if (!has_ip || !has_netmask || !has_gateway) {
+        snprintf(error_msg, error_msg_size, "Missing IP/netmask/gateway configuration");
         return false;
     }
     if (!has_password) {
@@ -438,6 +479,16 @@ bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* 
            (unsigned int)((factory_data.default_ip >> 8) & 0xFF),
            (unsigned int)((factory_data.default_ip >> 16) & 0xFF),
            (unsigned int)((factory_data.default_ip >> 24) & 0xFF));
+    printf("  Default GW: %u.%u.%u.%u\n",
+           (unsigned int)(factory_data.default_gateway & 0xFF),
+           (unsigned int)((factory_data.default_gateway >> 8) & 0xFF),
+           (unsigned int)((factory_data.default_gateway >> 16) & 0xFF),
+           (unsigned int)((factory_data.default_gateway >> 24) & 0xFF));
+    printf("  Default GW: %u.%u.%u.%u\n",
+           (unsigned int)(factory_data.default_gateway & 0xFF),
+           (unsigned int)((factory_data.default_gateway >> 8) & 0xFF),
+           (unsigned int)((factory_data.default_gateway >> 16) & 0xFF),
+           (unsigned int)((factory_data.default_gateway >> 24) & 0xFF));
     printf("  Default DHCP: %s\n", factory_data.default_dhcp_enable ? "Yes" : "No");
     
     // Write factory defaults to flash
