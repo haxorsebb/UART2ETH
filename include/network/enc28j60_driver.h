@@ -79,6 +79,8 @@ extern "C" {
 #define ENC28J60_MAMXFLH        0x0B
 #define ENC28J60_MICMD          0x12
 #define ENC28J60_MIREGADR       0x14
+#define ENC28J60_MIWRL          0x16
+#define ENC28J60_MIWRH          0x17
 #define ENC28J60_MIRDL          0x18
 #define ENC28J60_MIRDH          0x19
 
@@ -156,6 +158,9 @@ extern "C" {
 #define ENC28J60_PHSTAT1        0x01
 #define ENC28J60_PHCON2         0x10
 #define ENC28J60_PHSTAT2        0x11
+
+// PHCON1 (PHY Control 1) register bits
+#define ENC28J60_PHCON1_PDPXMD  0x0100  // PHY Duplex Mode (bit 8): 1 = Full Duplex
 
 // MICMD (MII Command) register bits
 #define ENC28J60_MICMD_MIISCAN  0x02  // MII Scan enable

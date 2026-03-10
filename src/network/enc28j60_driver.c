@@ -87,6 +87,7 @@ static uint8_t enc28j60_read_register_internal(uint8_t reg);
 static void enc28j60_write_register_internal(uint8_t reg, uint8_t value);
 static void enc28j60_set_register_bank_internal(uint8_t new_bank);
 static uint16_t enc28j60_read_phy_register(uint8_t phy_reg);
+static void enc28j60_write_phy_register(uint8_t phy_reg, uint16_t value);
 /**
  * @brief reset tx after timeout
  */
@@ -370,10 +371,21 @@ static void enc28j60_configure_mac(void) {
  * @brief Configure PHY layer (minimal for basic operation)
  */
 static void enc28j60_configure_phy(void) {
-    DEBUG_ONLY({ printf("ENC28J60: PHY configuration (using defaults)\n"); });
-    // Use default PHY settings for basic operation
-    // No PHY register writes needed for minimal functionality
-    
+    DEBUG_ONLY({ printf("ENC28J60: Configuring PHY for full duplex\n"); });
+
+    // PHCON1.PDPXMD must match MACON3.FULDPX (datasheet Section 3.3.1).
+    // The PHY may default to half duplex, and errata item 16 warns that
+    // the LED auto-polarity detection can reset PDPXMD to the wrong state.
+    // Explicitly set full duplex to match the MAC configuration.
+    enc28j60_write_phy_register(ENC28J60_PHCON1, ENC28J60_PHCON1_PDPXMD);
+
+    // Verify the write
+    uint16_t phcon1 = enc28j60_read_phy_register(ENC28J60_PHCON1);
+    if (phcon1 & ENC28J60_PHCON1_PDPXMD) {
+        DEBUG_ONLY({ printf("ENC28J60: PHY full duplex confirmed (PHCON1=0x%04X)\n", phcon1); });
+    } else {
+        printf("ENC28J60: WARNING! PHY duplex mismatch - PHCON1=0x%04X, expected PDPXMD set\n", phcon1);
+    }
 }
 
 /**
@@ -1515,6 +1527,55 @@ static uint16_t enc28j60_read_phy_register(uint8_t phy_reg) {
     
 
     return (high_byte << 8) | low_byte;
+}
+
+/**
+ * @brief Write PHY register via MII interface
+ *
+ * Per ENC28J60 datasheet Section 3.3.2:
+ * 1. Write PHY register address to MIREGADR
+ * 2. Write low byte to MIWRL
+ * 3. Write high byte to MIWRH (triggers the write)
+ * 4. Wait for MISTAT.BUSY to clear
+ *
+ * @param phy_reg PHY register address (e.g. ENC28J60_PHCON1)
+ * @param value   16-bit value to write
+ */
+static void enc28j60_write_phy_register(uint8_t phy_reg, uint16_t value) {
+    if (!g_driver_initialized) {
+        return;
+    }
+    enc28j60_block_interrupt();
+
+    // Set bank 2 for MII access
+    enc28j60_set_register_bank_internal(MACONX_BANK);
+
+    // Set the PHY register address
+    enc28j60_write_register_internal(ENC28J60_MIREGADR, phy_reg);
+
+    // Write low byte first, then high byte (high byte triggers the write)
+    enc28j60_write_register_internal(ENC28J60_MIWRL, (uint8_t)(value & 0xFF));
+    enc28j60_write_register_internal(ENC28J60_MIWRH, (uint8_t)(value >> 8));
+
+    // Wait for the PHY write to complete
+    // MISTAT is in Bank 3
+    enc28j60_set_register_bank_internal(MAADRX_BANK);
+
+    uint32_t timeout = 1000;  // 1ms timeout
+    while (timeout > 0) {
+        uint8_t mistat = enc28j60_read_register_internal(ENC28J60_MISTAT);
+        if ((mistat & ENC28J60_MISTAT_BUSY) == 0) {
+            break;
+        }
+        sleep_us(1);
+        timeout--;
+    }
+
+    if (timeout == 0) {
+        printf("ENC28J60: TIMEOUT writing PHY register 0x%02X\n", phy_reg);
+    }
+
+    enc28j60_unblock_interrupt();
 }
 
 /**
