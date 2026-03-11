@@ -13,6 +13,7 @@
 #include "network/http_server.h"
 #include "network/network_manager.h"
 #include "shared_memory.h"
+#include "factory_defaults.h"
 #include "device_mode.h"
 #include "config/version.h"
 #include "debug.h"
@@ -54,6 +55,20 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
     
     // Get device configuration
     shared_memory_layout_t* layout = shared_memory_get_layout();
+
+    // Format serial number from factory defaults
+    char serial_str[24] = "N/A";
+    const factory_defaults_t* factory = factory_defaults_get();
+    if (factory && factory_defaults_is_valid()) {
+        uint64_t serial_decimal = 0;
+        for (int i = 0; i < 6; i++) {
+            serial_decimal = (serial_decimal << 8) | factory->serial_number[i];
+        }
+        snprintf(serial_str, sizeof(serial_str), "%02u%02u-%012llu",
+                 factory->production_year,
+                 factory->production_week,
+                 serial_decimal);
+    }
     
     // Format subnet mask
     uint32_t nm = layout->config.network.static_netmask.addr;
@@ -174,6 +189,7 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         "        \n"
         "        <div class=\"section\">\n"
         "            <h2>Device Information</h2>\n"
+        "            <p><span class=\"label\">Serial Number:</span> <span class=\"value\">%s</span></p>\n"
         "            <p><span class=\"label\">Firmware:</span> <span class=\"value\">UART2ETH v" FIRMWARE_VERSION_STRING " (%s)</span></p>\n"
         "            <p><span class=\"label\">Build Type:</span> <span class=\"value\">" FIRMWARE_BUILD_TYPE "</span></p>\n"
         "            <p><span class=\"label\">Hardware:</span> <span class=\"value\">RP2350 + ENC28J60</span></p>\n"
@@ -198,6 +214,7 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
         layout->config.channels[CHANNEL_4].enabled ? "Active" : "Disabled",
         uart4_pins,
 #endif
+        serial_str,
         DEVICE_MODE_NAME,
         (int)g_server_stats.uptime_seconds,
         ip_str,

@@ -15,7 +15,7 @@
 #define FIRMWARE_VERSION_PATCH 0
 
 // Version string for display
-#define FIRMWARE_VERSION_STRING "0.9.6"
+#define FIRMWARE_VERSION_STRING "0.9.7"
 
 // Build type indicator
 #ifdef FACTORY_INTERNAL_VERSION

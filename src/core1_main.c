@@ -118,10 +118,12 @@ void core1_main(void) {
         g_core1_state_reads++;
         
         // Minimal debug output - only every 10000 loops to avoid printf floods
+        DEBUG_ONLY({
         if (g_core1_loop_counter % 200000 == 0) {
             printf("DEBUG: Core1 loop=%u, states=%u, main=%d, sub=%d\n", g_core1_loop_counter, g_core1_state_reads, main_state, sub_state);
             enc28j60_dump_signal_quality_registers();
         }
+        });
         
         // Big switch statement for main states
         switch (main_state) {

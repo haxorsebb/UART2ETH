@@ -1598,7 +1598,7 @@ bool enc28j60_get_link_status(void) {
     // Only print on state change or every 5 seconds to reduce spam
     uint32_t now = to_ms_since_boot(get_absolute_time());
     if (link_up != last_link_state || (now - last_print_time) > 5000) {
-        printf("ENC28J60: link state: %d (PHSTAT2=0x%04X)\n", link_up, phstat2);
+        //printf("ENC28J60: link state: %d (PHSTAT2=0x%04X)\n", link_up, phstat2);
         last_print_time = now;
         last_link_state = link_up;
     }
