@@ -74,7 +74,7 @@ int main() {
   // BOARDTEST software can see it
 
   //The next line must be commented out if the factory internal version runs on a board without boardtest software
-  //selftest();
+  selftest();
   #endif
 
   // Configure GPIO21 to output 25 MHz clock for ENC28J60
