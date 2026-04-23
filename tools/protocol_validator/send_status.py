@@ -150,7 +150,7 @@ def main():
     """Main function - modify these parameters as needed"""
     
     # Configuration
-    SHARK_IP = "10.10.10.19"
+    SHARK_IP = "192.168.1.201"
     SHARK_PORT = 4002
     UNIT_NUMBER = 0  # Change this for different units
     

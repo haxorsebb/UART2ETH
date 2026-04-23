@@ -423,6 +423,13 @@ bool tcp_socket_server_send_to_channel(channel_id_t channel, const uint8_t* data
                 server->stats.bytes_sent += length;
                 return true;
             } else {
+                printf("TCP Server: tcp_write error %d on channel %u - closing connection\n",
+                    err, channel);
+                // ERR_CLSD (-14) or other fatal errors mean the connection is gone.
+                // Clean up so new connections can be accepted on this channel.
+                if (err == ERR_CLSD || err == ERR_RST || err == ERR_ABRT) {
+                    close_connection(conn);
+                }                
                 return false;
             }
         }

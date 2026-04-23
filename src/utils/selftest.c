@@ -102,7 +102,7 @@ void selftest(void)
     }
     
     // Send selftest message
-    selftest_puts("RP2354 SELFTEST: V0.90 START\r\n");
+    selftest_puts("RP2354 SELFTEST: V0.99 START\r\n");
     
     // Note: The PIO UART will be reconfigured later by uart_manager_init() if UART4 is used.
     // After uart_manager_init(), GPIO5 will be reassigned to PIO2, and selftest_puts()

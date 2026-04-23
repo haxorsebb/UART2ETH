@@ -946,7 +946,8 @@ static bool check_main_state_operational(void) {
  */
 static void wake_other_core_after_main_state_change(main_state_t new_state) {
     //wake the other core - doorbell functionality disabled, using FIFO instead
-    multicore_fifo_push_blocking(0xDEADBEEF);  // Simple wake signal via FIFO
+    if (multicore_fifo_wready())
+        multicore_fifo_push_blocking(0xDEADBEEF);  // Simple wake signal via FIFO
 }
 
 /**

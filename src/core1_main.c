@@ -366,6 +366,10 @@ static void core1_work_or_idle_wait(void) {
  * The ENC28J60 needs time between register accesses for reliable operation.
  */
 static void core1_idle_wait(void) {
+    // Drain any pending FIFO wake signals
+    while (multicore_fifo_rvalid()) {
+        multicore_fifo_pop_blocking();
+    }
     // 1ms sleep provides good balance between responsiveness and reliability
     // Faster polling can cause SPI timing issues with the ENC28J60
     sleep_ms(1);

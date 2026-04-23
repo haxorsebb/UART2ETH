@@ -28,6 +28,7 @@
 #include "uart/uart_manager.h"
 #include <pico/time.h>
 #include <pico/flash.h>
+#include <pico/multicore.h>
 #include <stdio.h>
 #include "debug.h"
 
@@ -253,6 +254,10 @@ static void core0_init_complete(void) {
  * This function only handles the actual waiting/sleeping part.
  */
 static void core0_idle_wait(void) {
+    // Drain any pending FIFO wake signals
+    while (multicore_fifo_rvalid()) {
+        multicore_fifo_pop_blocking();
+}
     // Wait for interrupt - power efficient
     // Work detection is handled elsewhere in the new architecture
     __wfi();
