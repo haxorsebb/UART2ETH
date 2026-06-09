@@ -386,6 +386,15 @@ static void enc28j60_configure_phy(void) {
     } else {
         printf("ENC28J60: WARNING! PHY duplex mismatch - PHCON1=0x%04X, expected PDPXMD set\n", phcon1);
     }
+
+    // Enable PHY link change interrupt (datasheet Section 12.1.3):
+    // PHIE.PLNKIE = 1 → PHY generates interrupt on link status change
+    // PHIE.PGEIE  = 1 → PHY global interrupt enable
+    // Without this, EIR.LINKIF is never set and cable insertion is not detected.
+    enc28j60_write_phy_register(ENC28J60_PHIE, ENC28J60_PHIE_PLNKIE | ENC28J60_PHIE_PGEIE);
+
+    uint16_t phie_verify = enc28j60_read_phy_register(ENC28J60_PHIE);
+    printf("ENC28J60: PHY interrupt enable configured (PHIE=0x%04X)\n", phie_verify);
 }
 
 /**

@@ -263,6 +263,30 @@ static bool core1_check_for_pending_work(void) {
 
     enc28j60_process_interrupts(false);
 
+    // ===== Link status polling =====
+    // The ENC28J60 LINKIF interrupt path is unreliable (PHIE/PHIR 
+    // interaction issues). Instead, poll the PHY link status register
+    // directly every 500ms. This is cheap (one SPI register read) and
+    // guarantees cable insertion/removal is always detected.
+    {
+        static uint32_t last_link_poll_time = 0;
+        static bool last_polled_link = false;
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+        if (now - last_link_poll_time > 500) {
+            last_link_poll_time = now;
+            bool phy_link = enc28j60_get_link_status();
+            if (phy_link != last_polled_link) {
+                printf("Core1: PHY link changed: %s -> %s\n",
+                       last_polled_link ? "UP" : "DOWN",
+                       phy_link ? "UP" : "DOWN");
+                last_polled_link = phy_link;
+                // Update lwIP netif link state to match PHY reality
+                network_manager_is_link_up();
+            }
+        }
+    }
+    // ===== End link status polling =====
+
     // Check for configuration changes (high priority)
     shared_memory_layout_t* layout = shared_memory_get_layout();
     if (layout && layout->config_change_pending) {
@@ -276,9 +300,7 @@ static bool core1_check_for_pending_work(void) {
     }
 
     if(network_manager_link_change_pending()) {
-        DEBUG_ONLY({ 
-            printf("network has link change pending\n"); 
-        });
+        printf("Core1: LINKIF interrupt detected — processing link change\n");
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE);
         return true; 
     }
@@ -824,7 +846,9 @@ static void core1_reboot_execute(void) {
 static void core1_process_network_link_change(void) {
 
     network_manager_link_change();
-    if(network_manager_is_link_up()) {
+    bool link_up = network_manager_is_link_up();
+    printf("Core1: LINK CHANGE detected — link is now %s\n", link_up ? "UP" : "DOWN");
+    if(link_up) {
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_UP);
     }
     else {

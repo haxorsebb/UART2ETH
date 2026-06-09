@@ -481,16 +481,16 @@ static uint32_t ringbuffer_get_used_count(void) {
  */
 static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(ringbuffer_direction_t direction, channel_id_t channel, entry_status_t status) {
     ring_entry_t* oldest = NULL;
-    uint32_t oldest_timestamp = UINT32_MAX;
+    uint32_t oldest_sequence = UINT32_MAX;
     
     for (uint32_t i = 0; i < RINGBUFFER_CAPACITY; i++) {
         ring_entry_t* entry = &g_ringbuffer.entries[i];
         if (entry->status == status && 
             entry->direction == direction && 
             ((entry->channel == channel || channel == CHANNEL_ANY)) && 
-            entry->timestamp < oldest_timestamp) {
+            entry->sequence_id < oldest_sequence) {
             oldest = entry;
-            oldest_timestamp = entry->timestamp;
+            oldest_sequence = entry->sequence_id;
         }
     }
     
@@ -503,13 +503,13 @@ static ring_entry_t* ringbuffer_find_oldest_entry_by_direction(ringbuffer_direct
  */
 static ring_entry_t* ringbuffer_find_oldest_ready_entry(void) {
     ring_entry_t* oldest = NULL;
-    uint32_t oldest_timestamp = UINT32_MAX;
+    uint32_t oldest_sequence = UINT32_MAX;
     
     for (uint32_t i = 0; i < RINGBUFFER_CAPACITY; i++) {
         ring_entry_t* entry = &g_ringbuffer.entries[i];
-        if (entry->status == ENTRY_STATUS_READY && entry->timestamp < oldest_timestamp) {
+        if (entry->status == ENTRY_STATUS_READY && entry->sequence_id < oldest_sequence) {
             oldest = entry;
-            oldest_timestamp = entry->timestamp;
+            oldest_sequence = entry->sequence_id;
         }
     }
     

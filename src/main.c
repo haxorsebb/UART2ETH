@@ -14,6 +14,39 @@
  * - ADR-007: Event-Driven State Machine Architecture
  * - arc42 Chapter 5 - Building Block View
  *
+ * 
+Changes from 0.9.7 (production version until 2026-06-09) to 0.9.10
+Several problems were noticed:
+
+- Link detection problem
+  When the network cable is plugged in AFTER the Shark mainboard is powered, it is very unlikely (<20 % chance)
+  that the PC/laptop can connect to the mainboard.
+
+  Reason: The ENC28J60 does not signal the link status correctly, or the firmware does not react properly. 
+  The link detection by interrupt does not work.
+
+  Fix: RP2354 now polls link status every 500 ms, this works.
+
+- Parameter restore and firmware update problem
+  When Sharknet sends many packets quickly, it is observed that 
+  a) some packets are truncated at the beginning (first ~80 chars missing)
+  b) some packets are completely lost
+  c) sometimes the order of the packets is mixed up (typically ABCDE => CDEAB or ABC => BCA)
+  As a result, parameter restore and firmware update both do not work with board revision 07 (RP2354 Ethernet interface).
+  
+  Analysis and fix:
+  It is possible that a TCP packet contains more than one Sharknet message. The firmware currently assumes that
+  each Sharknet message is a separate TCP packet and looks for the termination character only at the end of the TCP packet.
+  This is wrong. The firmware must look for termination characters everywhere in the TCP packet and enqueues each
+  Sharknet message separately => fixed.
+    
+  It is possible that more than one Sharknet message arrives at the same millisecond. So looking for the "oldest" message
+  by a millisecond timestamp can fail. Timestamp replaced by sequence index => fixed.
+  
+  Note that also an update of the Sharknet software is required.
+  In the sharknet software we can set socket.nodelay = true and socket.blocking = true. This forces each Sharknet packet
+  to be sent immediately and fixes the problem. However, the problem is also fixed in the RP2354 firmware now.
+
  */
 
 #include "debug.h"

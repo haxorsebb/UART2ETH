@@ -716,11 +716,14 @@ bool network_manager_check_dhcp_status(void) {
                 netif_set_netmask(g_netif, &netmask);
                 netif_set_gw(g_netif, &gateway);
                 
-                // Bring the interface up for TCP to work
-                netif_set_link_up(g_netif);
+                // Set interface administratively UP so TCP listeners can be created.
+                // Do NOT fake netif_set_link_up() here — the link is physically down.
+                // netif_set_link_up() must only be called when the PHY reports real link.
+                // Faking it prevents lwIP from detecting the real link-up transition
+                // later, which breaks TCP (SYN-ACK never sent or ARP table stale).
                 netif_set_up(g_netif);
                 
-                printf("DHCP: Static IP fallback applied: %d.%d.%d.%d\n",
+                printf("DHCP: Static IP fallback applied: %d.%d.%d.%d (link still down)\n",
                        (int)((static_ip.addr >> 0) & 0xFF),
                        (int)((static_ip.addr >> 8) & 0xFF),
                        (int)((static_ip.addr >> 16) & 0xFF),
@@ -784,8 +787,8 @@ bool network_manager_check_dhcp_status(void) {
             netif_set_netmask(g_netif, &netmask);
             netif_set_gw(g_netif, &gateway);
             
-            // Bring the interface up for TCP to work
-            netif_set_link_up(g_netif);
+            // Set interface administratively UP — do NOT fake link-up.
+            // Link state must reflect actual PHY status.
             netif_set_up(g_netif);
 
             printf("DHCP: DHCP timeout - falling back to CONFIGURED static IP: %d.%d.%d.%d\n",
@@ -830,11 +833,11 @@ bool network_manager_check_dhcp_status(void) {
             netif_set_netmask(g_netif, &netmask);
             netif_set_gw(g_netif, &gateway);
             
-            // Bring the interface up for TCP to work
-            netif_set_link_up(g_netif);
+            // Set interface administratively UP — do NOT fake link-up.
+            // Link state must reflect actual PHY status.
             netif_set_up(g_netif);
             
-            printf("DHCP: Static IP fallback applied: %d.%d.%d.%d\n",
+            printf("DHCP: Static IP fallback applied (link still down): %d.%d.%d.%d\n",
                    (int)((static_ip.addr >> 0) & 0xFF),
                    (int)((static_ip.addr >> 8) & 0xFF),
                    (int)((static_ip.addr >> 16) & 0xFF),

@@ -158,6 +158,12 @@ extern "C" {
 #define ENC28J60_PHSTAT1        0x01
 #define ENC28J60_PHCON2         0x10
 #define ENC28J60_PHSTAT2        0x11
+#define ENC28J60_PHIE           0x12    // PHY Interrupt Enable Register
+#define ENC28J60_PHIR           0x13    // PHY Interrupt Request (Flag) Register
+
+// PHIE (PHY Interrupt Enable) register bits
+#define ENC28J60_PHIE_PLNKIE    0x0010  // PHY Link Change Interrupt Enable (bit 4)
+#define ENC28J60_PHIE_PGEIE     0x0002  // PHY Global Interrupt Enable (bit 1)
 
 // PHCON1 (PHY Control 1) register bits
 #define ENC28J60_PHCON1_PDPXMD  0x0100  // PHY Duplex Mode (bit 8): 1 = Full Duplex

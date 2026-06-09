@@ -620,6 +620,10 @@ bool state_machine_process_core1_event(core1_event_t event) {
         
         case CORE1_NET_LINK_CHANGE:
             switch (event) {
+                case CORE1_EVENT_NETWORK_LINK_UP:          // ADD
+                    // Link came up — transition to connected, then idle
+                    new_state = CORE1_NET_CONNECTED;        // ADD
+                    break;   
                 case CORE1_EVENT_NETWORK_LINK_DOWN:
                     // Return to idle, will check for more work or sleep
                     new_state = CORE1_NET_DISCONNECTED;

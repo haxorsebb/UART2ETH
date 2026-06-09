@@ -524,14 +524,9 @@ static err_t tcp_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, struc
     // Process received data
     struct pbuf *q = p;
     uint16_t total_len = p->tot_len;
-    int processed = 0;
 
     while (q != NULL) {
-        processed += process_received_data(conn, (const char*)q->payload, q->len);
-        if (processed > 0) {
-            conn->bytes_received += processed;
-            conn->server_instance->stats.bytes_received += processed;
-        }
+        process_received_data(conn, (const char*)q->payload, q->len);
         q = q->next;
     }
 
@@ -604,7 +599,34 @@ static void close_connection(tcp_connection_t* conn) {
 }
 
 /**
+ * @brief Enqueue one complete message from the line buffer to the ringbuffer
+ */
+static void enqueue_complete_message(tcp_connection_t* conn) {
+    ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, conn->channel);
+    
+    if (entry) {
+        entry->fill_index = conn->line_pos;
+        
+        if (entry->fill_index > RINGBUFFER_PAYLOAD_MAX_SIZE) {
+            entry->fill_index = RINGBUFFER_PAYLOAD_MAX_SIZE;
+        }
+        memcpy(entry->payload, conn->line_buffer, entry->fill_index);
+        
+        if (ringbuffer_enqueue_entry(entry)) {
+            if (conn->server_instance) {
+                conn->server_instance->stats.lines_processed++;
+            }
+        }
+    }
+    conn->line_pos = 0;
+}
+
+/**
  * @brief Process received data for line-based protocol
+ * 
+ * Scans incoming data for '\n' message delimiters. A single TCP chunk
+ * may contain multiple complete messages or partial messages. Each
+ * complete message is enqueued individually to the ringbuffer.
  */
 static int process_received_data(tcp_connection_t* conn, const char* data, size_t len) {
     
@@ -612,51 +634,47 @@ static int process_received_data(tcp_connection_t* conn, const char* data, size_
         return 0;
     }
     
-    // Update activity timestamp
     conn->last_activity_ms = to_ms_since_boot(get_absolute_time());
     
+    size_t offset = 0;
     
-    int processed = 0;
-    
-    //copy to buffer
-    //prevent overflow
-    if( (conn->line_pos + len) > TCP_SERVER_LINE_BUFFER_SIZE ) {    
-        len = TCP_SERVER_LINE_BUFFER_SIZE - conn->line_pos;
-    }
-    memcpy( &(conn->line_buffer[conn->line_pos]), data, len);
-    conn->line_pos+=len;
-    processed = len;
-
-    bool message_complete = check_message_end(conn->line_buffer, conn->line_pos);
-    
-    if (message_complete) {
-        processed = len;
+    while (offset < len) {
+        // Search for '\n' in the remaining unprocessed data
+        const char* nl = memchr(&data[offset], '\n', len - offset);
         
-        // Ring Buffer Integration: Enqueue TCP messages for Core0 processing
-        ring_entry_t* entry = ringbuffer_get_free_entry(RX_TCP_TO_UART, conn->channel);
-        
-        if (entry) {
-            entry->fill_index = conn->line_pos;
+        if (nl) {
+            // Found a message boundary — copy up to and including '\n'
+            size_t chunk_len = (nl - &data[offset]) + 1;
             
-            // Copy message data to ring buffer
-            if (entry->fill_index > RINGBUFFER_PAYLOAD_MAX_SIZE) {
-                entry->fill_index = RINGBUFFER_PAYLOAD_MAX_SIZE;
-            }
-            memcpy(entry->payload, conn->line_buffer, entry->fill_index);
+            // Append to line buffer (with overflow protection)
+            size_t space = TCP_SERVER_LINE_BUFFER_SIZE - conn->line_pos;
+            size_t copy_len = (chunk_len < space) ? chunk_len : space;
+            memcpy(&conn->line_buffer[conn->line_pos], &data[offset], copy_len);
+            conn->line_pos += copy_len;
             
-            // Enqueue for Core0 processing
-            if (ringbuffer_enqueue_entry(entry)) {
-                if (conn->server_instance) {
-                    conn->server_instance->stats.lines_processed++;
-                }
+            // Enqueue the complete message
+            enqueue_complete_message(conn);
+            
+            offset += chunk_len;
+        } else {
+            // No more '\n' in remaining data — buffer the rest
+            size_t remaining = len - offset;
+            size_t space = TCP_SERVER_LINE_BUFFER_SIZE - conn->line_pos;
+            size_t copy_len = (remaining < space) ? remaining : space;
+            memcpy(&conn->line_buffer[conn->line_pos], &data[offset], copy_len);
+            conn->line_pos += copy_len;
+            
+            // If line buffer is full without finding a delimiter, discard it
+            if (conn->line_pos >= TCP_SERVER_LINE_BUFFER_SIZE) {
+                conn->line_pos = 0;
             }
+            
+            offset += remaining;
         }
     }
     
-    if(message_complete || (conn->line_pos >= TCP_SERVER_LINE_BUFFER_SIZE)) {
-        // Reset line buffer for next message
-        conn->line_pos = 0;
-    }
-
-    return processed;
+    conn->bytes_received += len;
+    conn->server_instance->stats.bytes_received += len;
+    
+    return (int)len;
 }
