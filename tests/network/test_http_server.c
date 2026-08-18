@@ -110,6 +110,9 @@ void test_accept_returns_err_abrt_when_pool_is_full(void) {
 
 int main(void) {
     stdio_init_all();
+    // Route UART0 to GP16/GP17, same as production main.c, so the output
+    // reaches the debug UART logger. SDK default is GP0/GP1.
+    stdio_uart_init_full(uart0, 115200, 16, 17);
     sleep_ms(2000);  // Wait for USB serial to stabilize
 
     lwip_init();
