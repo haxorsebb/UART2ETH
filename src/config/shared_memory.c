@@ -168,7 +168,7 @@ bool shared_memory_init(void) {
         printf("WARNING: Using fallback admin password (factory defaults not available)\n");
     }
     
-    printf("V: ");
+    /* printf("V: "); */
     factory_defaults_print_serial_number();
    
     return true;
@@ -248,8 +248,9 @@ bool factory_reset_needed() {
 */
 void update_shared_memory_revision() {
     flash_persistence_state_t* flash_state = get_persistence_state();
-    while(g_shared_memory->revision_counter <= flash_state->last_written_revision)
+    // Increases revision counter once after a flash block was written
+    if (g_shared_memory->revision_counter <= flash_state->last_written_revision)
     {
-        g_shared_memory->revision_counter++;
+        g_shared_memory->revision_counter = flash_state->last_written_revision+1;
     }
 }

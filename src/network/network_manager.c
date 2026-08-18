@@ -317,11 +317,11 @@ bool network_manager_restart_interface(void) {
  */
 void network_manager_get_default_config(network_config_t* config) {
     if (!config) {
-        printf("UNABLE TO GET DEFAULT NETWORK CONFIG!");
+        /* printf("UNABLE TO GET DEFAULT NETWORK CONFIG!"); */
         return;
     }
     
-    printf("GETTING DEFAULT NETWORK CONFIG!");
+    /* printf("GETTING DEFAULT NETWORK CONFIG!"); */
 
     memset(config, 0, sizeof(network_config_t));
     
@@ -524,19 +524,19 @@ bool network_manager_reconfigure(const network_config_t* config) {
     bool dhcp_in_progress = (dhcp != NULL && dhcp->state != DHCP_STATE_OFF && dhcp->state != DHCP_STATE_BOUND);
     
     if (dhcp_in_progress && config->use_dhcp) {
-        printf("Network Manager: DHCP already in progress (state=%d), not restarting\n", dhcp->state);
+        /* printf("Network Manager: DHCP already in progress (state=%d), not restarting\n", dhcp->state); */
         // Just update the config but don't restart DHCP
         memcpy(&g_network_config, config, sizeof(network_config_t));
         return true;
     }
 
-    printf("Network Manager: 🔧 Reconfiguring interface with new settings\n");
+    /* printf("Network Manager: 🔧 Reconfiguring interface with new settings\n");
     printf("Network Manager: 📍 Target IP: %d.%d.%d.%d | DHCP: %s\n",
            (int)((config->static_ip.addr >> 0) & 0xFF),
            (int)((config->static_ip.addr >> 8) & 0xFF),
            (int)((config->static_ip.addr >> 16) & 0xFF),
            (int)((config->static_ip.addr >> 24) & 0xFF),
-           config->use_dhcp ? "ENABLED" : "DISABLED");
+           config->use_dhcp ? "ENABLED" : "DISABLED"); */
 
     // Update global configuration with new settings
     memcpy(&g_network_config, config, sizeof(network_config_t));
@@ -546,9 +546,9 @@ bool network_manager_reconfigure(const network_config_t* config) {
         if (memcmp(g_netif->hwaddr, config->mac_address, 6) != 0) {
             enc28j60_set_mac_address(config->mac_address);
             memcpy(g_netif->hwaddr, config->mac_address, 6);
-            printf("Network Manager: MAC updated to %02X:%02X:%02X:%02X:%02X:%02X\n",
+            /* printf("Network Manager: MAC updated to %02X:%02X:%02X:%02X:%02X:%02X\n",
                    config->mac_address[0], config->mac_address[1], config->mac_address[2],
-                   config->mac_address[3], config->mac_address[4], config->mac_address[5]);
+                   config->mac_address[3], config->mac_address[4], config->mac_address[5]); */
         }
     }
 
@@ -569,17 +569,17 @@ bool network_manager_reconfigure(const network_config_t* config) {
         IP4_ADDR(&ip_addr, 0, 0, 0, 0);
         IP4_ADDR(&netmask, 0, 0, 0, 0);
         IP4_ADDR(&gateway, 0, 0, 0, 0);
-        printf("Network Manager: ✅ Configured for DHCP\n");
+        /* printf("Network Manager: ✅ Configured for DHCP\n"); */
     } else {
         // Use NEW static IP configuration from parameter
         ip_addr.addr = config->static_ip.addr;        // FIXED: Use config parameter
         netmask.addr = config->static_netmask.addr;   // FIXED: Use config parameter  
         gateway.addr = config->static_gateway.addr;   // FIXED: Use config parameter
-        printf("Network Manager: ✅ Configured for static IP: %d.%d.%d.%d\n",
+        /* printf("Network Manager: ✅ Configured for static IP: %d.%d.%d.%d\n",
                (int)((config->static_ip.addr >> 0) & 0xFF),
                (int)((config->static_ip.addr >> 8) & 0xFF),
                (int)((config->static_ip.addr >> 16) & 0xFF),
-               (int)((config->static_ip.addr >> 24) & 0xFF));
+               (int)((config->static_ip.addr >> 24) & 0xFF)); */
     }
 
     netif_set_ipaddr(g_netif, &ip_addr);
@@ -591,12 +591,12 @@ bool network_manager_reconfigure(const network_config_t* config) {
 
     // FIXED: Use NEW config parameter for DHCP decision
     if(config->use_dhcp) {
-        printf("Network Manager: 🔄 Starting DHCP client\n");
+        /* printf("Network Manager: 🔄 Starting DHCP client\n"); */
         //start dhcp by sending a request
         return(network_manager_process_dhcp());
     }
     
-    printf("Network Manager: ✅ Static IP configuration applied successfully\n");
+    /* printf("Network Manager: ✅ Static IP configuration applied successfully\n"); */
     core1_timer_set(CORE1_TIMER_NETWORK_TIMEOUT, sys_timeouts_sleeptime());
         
     return true;

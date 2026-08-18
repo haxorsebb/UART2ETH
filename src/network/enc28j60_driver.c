@@ -384,7 +384,7 @@ static void enc28j60_configure_phy(void) {
     if (phcon1 & ENC28J60_PHCON1_PDPXMD) {
         DEBUG_ONLY({ printf("ENC28J60: PHY full duplex confirmed (PHCON1=0x%04X)\n", phcon1); });
     } else {
-        printf("ENC28J60: WARNING! PHY duplex mismatch - PHCON1=0x%04X, expected PDPXMD set\n", phcon1);
+        DEBUG_ONLY({ printf("ENC28J60: WARNING! PHY duplex mismatch - PHCON1=0x%04X, expected PDPXMD set\n", phcon1);});
     }
 
     // Enable PHY link change interrupt (datasheet Section 12.1.3):
@@ -394,7 +394,7 @@ static void enc28j60_configure_phy(void) {
     enc28j60_write_phy_register(ENC28J60_PHIE, ENC28J60_PHIE_PLNKIE | ENC28J60_PHIE_PGEIE);
 
     uint16_t phie_verify = enc28j60_read_phy_register(ENC28J60_PHIE);
-    printf("ENC28J60: PHY interrupt enable configured (PHIE=0x%04X)\n", phie_verify);
+    DEBUG_ONLY({ printf("ENC28J60: PHY interrupt enable configured (PHIE=0x%04X)\n", phie_verify);});
 }
 
 /**
@@ -1645,7 +1645,7 @@ static uint16_t enc28j60_read_phy_register_dump(uint8_t phy_reg) {
     }
     
     if (timeout == 0) {
-        printf("  WARNING: PHY register 0x%02X read timeout!\n", phy_reg);
+        DEBUG_ONLY(printf("  WARNING: PHY register 0x%02X read timeout!\n", phy_reg));
         return 0xFFFF;
     }
     

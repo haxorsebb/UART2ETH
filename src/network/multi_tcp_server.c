@@ -47,7 +47,7 @@ static bool multi_tcp_server_init_system(void) {
     }
     
     multi_tcp_server_initialized = true;
-    printf("Multi-TCP Server: TRUE MULTI-INSTANCE system initialized\n");
+    /* printf("Multi-TCP Server: TRUE MULTI-INSTANCE system initialized\n"); */
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, 0);
     
     return true;
@@ -64,19 +64,19 @@ bool multi_tcp_server_init_channel(channel_id_t channel, uint16_t port) {
     
     if (!multi_tcp_server_initialized) {
         if (!multi_tcp_server_init_system()) {
-            printf("Multi-TCP Server: Failed to initialize system\n");
+            /* printf("Multi-TCP Server: Failed to initialize system\n"); */
             return false;
         }
     }
     
     // Check if channel already initialized
     if (tcp_servers[channel].initialized) {
-        printf("Multi-TCP Server: Channel %u already initialized on port %u\n", 
-               channel, tcp_servers[channel].port);
+        /* printf("Multi-TCP Server: Channel %u already initialized on port %u\n", 
+               channel, tcp_servers[channel].port); */
         return true;
     }
     
-    printf("Multi-TCP Server: Initializing channel %u on port %u\n", channel, port);
+    /* printf("Multi-TCP Server: Initializing channel %u on port %u\n", channel, port); */
     
     // Initialize the TCP server for this channel (no deinitialization needed!)
     bool result = tcp_socket_server_init(port, channel);
@@ -87,12 +87,12 @@ bool multi_tcp_server_init_channel(channel_id_t channel, uint16_t port) {
         tcp_servers[channel].channel = channel;
         tcp_servers[channel].active = true;
         
-        printf("Multi-TCP Server: Channel %u initialized successfully on port %u\n", channel, port);
+        /* printf("Multi-TCP Server: Channel %u initialized successfully on port %u\n", channel, port); */
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port);
         
         return true;
     } else {
-        printf("Multi-TCP Server: Failed to initialize channel %u on port %u\n", channel, port);
+        /* printf("Multi-TCP Server: Failed to initialize channel %u on port %u\n", channel, port); */
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port);
         
         return false;
@@ -111,8 +111,8 @@ void multi_tcp_server_deinit_channel(channel_id_t channel) {
         return;  // Channel not initialized
     }
     
-    printf("Multi-TCP Server: Deinitializing channel %u (port %u)\n", 
-           channel, tcp_servers[channel].port);
+    /* printf("Multi-TCP Server: Deinitializing channel %u (port %u)\n", 
+           channel, tcp_servers[channel].port); */
     
     // Deinitialize the specific server instance
     tcp_socket_server_deinit_port(tcp_servers[channel].port);
@@ -134,7 +134,7 @@ bool multi_tcp_server_send_to_channel(channel_id_t channel, const uint8_t* data,
     }
     
     if (!tcp_servers[channel].initialized || !tcp_servers[channel].active) {
-        printf("Multi-TCP Server: Channel %u not initialized or active\n", channel);
+        /* printf("Multi-TCP Server: Channel %u not initialized or active\n", channel); */
         return false;
     }
     
@@ -147,32 +147,32 @@ bool multi_tcp_server_send_to_channel(channel_id_t channel, const uint8_t* data,
  */
 void multi_tcp_server_get_all_stats(void) {
     if (!multi_tcp_server_initialized) {
-        printf("Multi-TCP Server: System not initialized\n");
+        /* printf("Multi-TCP Server: System not initialized\n"); */
         return;
     }
     
-    printf("=== Multi-TCP Server Status (TRUE MULTI-INSTANCE) ===\n");
+    /* printf("=== Multi-TCP Server Status (TRUE MULTI-INSTANCE) ===\n"); */
     
     int active_count = 0;
     for (int i = 0; i < MAX_TCP_SERVERS; i++) {
         if (tcp_servers[i].initialized) {
-            printf("Channel %d: Port %u, %s\n", 
+            /* printf("Channel %d: Port %u, %s\n", 
                    i, tcp_servers[i].port, 
-                   tcp_servers[i].active ? "ACTIVE" : "INACTIVE");
+                   tcp_servers[i].active ? "ACTIVE" : "INACTIVE"); */
             
             if (tcp_servers[i].active) {
                 active_count++;
                 // Note: Getting individual server stats would require 
                 // extending the tcp_socket_server API to get stats by channel
-                printf("  - Status: LISTENING\n");
+                /* printf("  - Status: LISTENING\n"); */
             }
         } else {
-            printf("Channel %d: Not initialized\n", i);
+            /* printf("Channel %d: Not initialized\n", i); */
         }
     }
     
-    printf("Total active servers: %d/%d\n", active_count, MAX_TCP_SERVERS);
-    printf("=====================================================\n");
+    /* printf("Total active servers: %d/%d\n", active_count, MAX_TCP_SERVERS);
+    printf("=====================================================\n"); */
 }
 
 /**
@@ -256,7 +256,7 @@ void multi_tcp_server_deinit_all(void) {
         return;
     }
     
-    printf("Multi-TCP Server: Deinitializing all servers\n");
+    /* printf("Multi-TCP Server: Deinitializing all servers\n"); */
     
     // Deinitialize all servers
     tcp_socket_server_deinit();
@@ -271,7 +271,7 @@ void multi_tcp_server_deinit_all(void) {
     
     multi_tcp_server_initialized = false;
     
-    printf("Multi-TCP Server: All servers deinitialized\n");
+    /* printf("Multi-TCP Server: All servers deinitialized\n"); */
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, 0);
 }
 
@@ -291,10 +291,10 @@ bool multi_tcp_server_switch_active_channel(channel_id_t new_channel) {
     }
     
     if (tcp_servers[new_channel].initialized && tcp_servers[new_channel].active) {
-        printf("Multi-TCP Server: Channel %u is already active (no switching needed)\n", new_channel);
+        /* printf("Multi-TCP Server: Channel %u is already active (no switching needed)\n", new_channel); */
         return true;
     } else {
-        printf("Multi-TCP Server: Channel %u is not active\n", new_channel);
+        /* printf("Multi-TCP Server: Channel %u is not active\n", new_channel); */
         return false;
     }
 }

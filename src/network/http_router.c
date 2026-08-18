@@ -41,7 +41,7 @@ void http_router_init(void) {
     memset(g_route_table, 0, sizeof(g_route_table));
     g_route_count = 0;
     
-    printf("HTTP Router: Initialized (max %d routes)\n", HTTP_ROUTER_MAX_ROUTES);
+    /* printf("HTTP Router: Initialized (max %d routes)\n", HTTP_ROUTER_MAX_ROUTES); */
 }
 
 /**
@@ -51,12 +51,12 @@ bool http_router_register_route(const char* path,
                                  http_method_t method, 
                                  http_route_handler_t handler) {
     if (!path || !handler) {
-        printf("HTTP Router: Invalid parameters for route registration\n");
+        /* printf("HTTP Router: Invalid parameters for route registration\n"); */
         return false;
     }
     
     if (g_route_count >= HTTP_ROUTER_MAX_ROUTES) {
-        printf("HTTP Router: Route table full (max %d routes)\n", HTTP_ROUTER_MAX_ROUTES);
+        /* printf("HTTP Router: Route table full (max %d routes)\n", HTTP_ROUTER_MAX_ROUTES); */
         return false;
     }
     
@@ -66,10 +66,10 @@ bool http_router_register_route(const char* path,
     g_route_table[g_route_count].handler = handler;
     g_route_count++;
     
-    printf("HTTP Router: Registered %s %s (total routes: %zu)\n", 
+    /* printf("HTTP Router: Registered %s %s (total routes: %zu)\n", 
            method == HTTP_METHOD_GET ? "GET" : "POST", 
            path, 
-           g_route_count);
+           g_route_count); */
     
     return true;
 }
@@ -147,34 +147,34 @@ http_route_handler_t http_router_find_handler(const char* request_buffer) {
     // Parse method
     http_method_t method = http_router_parse_method(request_buffer);
     if (method == HTTP_METHOD_UNKNOWN) {
-        printf("HTTP Router: Unknown HTTP method\n");
+        /* printf("HTTP Router: Unknown HTTP method\n"); */
         return NULL;
     }
     
     // Extract path
     char path[128];
     if (!http_router_extract_path(request_buffer, path, sizeof(path))) {
-        printf("HTTP Router: Failed to extract path from request\n");
+        /* printf("HTTP Router: Failed to extract path from request\n"); */
         return NULL;
     }
     
-    printf("HTTP Router: Looking up %s %s\n", 
+    /* printf("HTTP Router: Looking up %s %s\n", 
            method == HTTP_METHOD_GET ? "GET" : "POST", 
-           path);
+           path); */
     
     // Search route table for matching path and method
     for (size_t i = 0; i < g_route_count; i++) {
         if (g_route_table[i].method == method && 
             strcmp(g_route_table[i].path, path) == 0) {
-            printf("HTTP Router: Found handler for %s %s\n",
+            /* printf("HTTP Router: Found handler for %s %s\n",
                    method == HTTP_METHOD_GET ? "GET" : "POST",
-                   path);
+                   path); */
             return g_route_table[i].handler;
         }
     }
     
-    printf("HTTP Router: No handler found for %s %s\n",
+    /* printf("HTTP Router: No handler found for %s %s\n",
            method == HTTP_METHOD_GET ? "GET" : "POST",
-           path);
+           path); */
     return NULL;
 }

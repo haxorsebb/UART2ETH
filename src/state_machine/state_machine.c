@@ -265,7 +265,8 @@ bool state_machine_process_core0_event(core0_event_t event) {
     
     core0_substate_t current_state = atomic_load(&g_core0_substate);
     core0_substate_t new_state = current_state;  // Default: no change
-    
+
+
     // State + Event + Condition → New State
     switch (current_state) {
         case CORE0_INIT_UART:
@@ -339,7 +340,9 @@ bool state_machine_process_core0_event(core0_event_t event) {
                     new_state = CORE0_UART_ERROR;
                     break;
                 default:
-                    // Invalid event for this state - ignore
+                // Invalid event for this state - write log entry
+                    log_event(EVENT_SOURCE_CORE0_SUBSTATE, LOG_LEVEL_WARN, 
+                            LOG_CORE0_IDLE_INVALID_EVENT, (uint32_t)event);
                     break;
             }
             break;
@@ -403,10 +406,17 @@ bool state_machine_process_core0_event(core0_event_t event) {
         atomic_store(&g_core0_substate, new_state);
         
         // Log Core0 substate change (skip high-frequency UART_ACTIVE state)
-        if (true || (old_state != CORE0_UART_ACTIVE && new_state != CORE0_UART_ACTIVE)) {
+        if ((old_state != CORE0_UART_ACTIVE && new_state != CORE0_UART_ACTIVE) ) {
             log_event(EVENT_SOURCE_CORE0_SUBSTATE, LOG_LEVEL_DEBUG, 
                       LOG_CORE0_INIT_UART + new_state, (uint32_t)old_state);
         }
+    }
+    else {
+        log_event(EVENT_SOURCE_CORE0_SUBSTATE, LOG_LEVEL_DEBUG, 
+                    LOG_CORE0_EVENT_WITHOUT_STATE_CHANGE , (uint32_t)current_state);
+        log_event(EVENT_SOURCE_CORE0_SUBSTATE, LOG_LEVEL_DEBUG, 
+                    LOG_CORE0_EVENT_WITHOUT_STATE_CHANGE , (uint32_t)event);
+                    
     }
     
     return true;  // Event processed successfully
@@ -781,7 +791,8 @@ bool state_machine_process_core1_event(core1_event_t event) {
         if (old_state != CORE1_CONFIG_NET_CHECK_DHCP && new_state != CORE1_CONFIG_NET_CHECK_DHCP &&
             old_state != CORE1_LOG_ACTIVE && new_state != CORE1_LOG_ACTIVE &&
             old_state != CORE1_CONFIG_LOG_ACTIVE && new_state != CORE1_CONFIG_LOG_ACTIVE &&
-            old_state != CORE1_NET_ACTIVE_RECEIVE && new_state != CORE1_NET_ACTIVE_RECEIVE 
+            old_state != CORE1_NET_ACTIVE_RECEIVE && new_state != CORE1_NET_ACTIVE_RECEIVE &&
+            old_state != CORE1_RINGBUFFER_ACTIVE && new_state != CORE1_RINGBUFFER_ACTIVE 
         ) {
             log_event(EVENT_SOURCE_CORE1_SUBSTATE, LOG_LEVEL_DEBUG, 
                       LOG_CORE1_INIT_PERISTENCE + new_state, (uint32_t)old_state);

@@ -107,7 +107,7 @@ int main() {
   // BOARDTEST software can see it
 
   //The next line must be commented out if the factory internal version runs on a board without boardtest software
-  selftest();
+  //selftest();
   #endif
 
   // Configure GPIO21 to output 25 MHz clock for ENC28J60
@@ -131,6 +131,8 @@ int main() {
 #endif
   printf("\n--------SOFTWARE START--------\n");
 
+  printf("\n--------LOG LEVEL %d--------\n", LOG_MINIMUM_LEVEL);
+
   // Initialize and display factory defaults (early boot)
   factory_defaults_init();
   factory_defaults_print_serial_number();
@@ -140,7 +142,7 @@ int main() {
     // reset was requested by user
     do_factory_reset(); // reset will happen druing flash persistence init
   }
-  printf("AFTER FACTORY RESET\n");
+  /* printf("AFTER FACTORY RESET\n"); */
   factory_defaults_print_serial_number();
 
   // Initialize shared memory system
@@ -150,7 +152,7 @@ int main() {
       sleep_ms(1000); // Halt system on critical error
     }
   }
-  printf("AFTER SHARED\n");
+  /* printf("AFTER SHARED\n"); */
 
   factory_defaults_print_serial_number();
 

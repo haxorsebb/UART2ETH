@@ -100,12 +100,12 @@ void core0_main(void) {
         
         // Big switch statement for main states
         if (debug_counter <= 3) {  // Only for first few loops
-            printf("DEBUG: About to enter main state switch with main_state=%d\n", main_state);
+            //printf("DEBUG: About to enter main state switch with main_state=%d\n", main_state);
         }
         switch (main_state) {
             case MAIN_STATE_INIT:
                 if (debug_counter <= 3) {  // Only for first few loops
-                    printf("DEBUG: In MAIN_STATE_INIT, sub_state=%d\n", sub_state);
+                    //printf("DEBUG: In MAIN_STATE_INIT, sub_state=%d\n", sub_state);
                 }
                 // Initialization phase - set up UART hardware
                 switch (sub_state) {
@@ -129,7 +129,7 @@ void core0_main(void) {
                         state_machine_process_main_event(MAIN_EVENT_SYSTEM_ERROR);
                         break;
                     default:
-                        printf("DEBUG: Unknown sub_state=%d in MAIN_STATE_INIT\n", sub_state);
+                        /* printf("DEBUG: Unknown sub_state=%d in MAIN_STATE_INIT\n", sub_state); */
                         break;
                 }
                 break;
@@ -196,7 +196,6 @@ void core0_main(void) {
 static void core0_initialize(void) {
 
     bool flash_safe = flash_safe_execute_core_init();
-    printf("DEBUG: Core0 initialize() starting. flash_safe: %d\n",flash_safe);
     
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE0_STARTING, 0);
     
@@ -256,8 +255,8 @@ static void core0_init_complete(void) {
 static void core0_idle_wait(void) {
     // Drain any pending FIFO wake signals
     while (multicore_fifo_rvalid()) {
-        multicore_fifo_pop_blocking();
-}
+        multicore_fifo_pop_blocking();  
+    }
     // Wait for interrupt - power efficient
     // Work detection is handled elsewhere in the new architecture
     __wfi();

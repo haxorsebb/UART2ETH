@@ -178,7 +178,7 @@ bool http_check_authentication(const char* request, const char* expected_passwor
     // Find Authorization header
     const char* auth_header = strstr(request, "Authorization: Basic ");
     if (!auth_header) {
-        printf("HTTP Auth: No Authorization header found\n");
+        /* printf("HTTP Auth: No Authorization header found\n"); */
         return false;
     }
     
@@ -199,14 +199,14 @@ bool http_check_authentication(const char* request, const char* expected_passwor
     char decoded[128] = {0};
     int decoded_len = http_base64_decode(base64_creds, decoded, sizeof(decoded));
     if (decoded_len <= 0) {
-        printf("HTTP Auth: Base64 decode failed\n");
+        /* printf("HTTP Auth: Base64 decode failed\n"); */
         return false;
     }
     
     // Split on ':' to extract username and password
     char* colon = strchr(decoded, ':');
     if (!colon) {
-        printf("HTTP Auth: No colon separator in credentials\n");
+        /* printf("HTTP Auth: No colon separator in credentials\n"); */
         return false;
     }
     
@@ -216,16 +216,16 @@ bool http_check_authentication(const char* request, const char* expected_passwor
     
     // Validate username (must be "admin")
     if (strcmp(username, "admin") != 0) {
-        printf("HTTP Auth: Invalid username '%s'\n", username);
+        /* printf("HTTP Auth: Invalid username '%s'\n", username); */
         return false;
     }
     
     // Validate password
     if (strcmp(password, expected_password) != 0) {
-        printf("HTTP Auth: Invalid password\n");
+        /* printf("HTTP Auth: Invalid password\n"); */
         return false;
     }
     
-    printf("HTTP Auth: Authentication successful for user 'admin'\n");
+    /* printf("HTTP Auth: Authentication successful for user 'admin'\n"); */
     return true;
 }

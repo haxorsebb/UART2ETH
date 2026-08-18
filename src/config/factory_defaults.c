@@ -50,7 +50,7 @@ bool factory_defaults_init(void) {
  */
 void factory_defaults_print_serial_number(void) {
     if (!g_factory_defaults_valid) {
-        printf("Serial Number: NOT AVAILABLE (factory defaults invalid)\n");
+        /* printf("Serial Number: NOT AVAILABLE (factory defaults invalid)\n"); */
         return;
     }
     
@@ -61,10 +61,10 @@ void factory_defaults_print_serial_number(void) {
     }
     
     // Format: YYWW-NNNNNNNNNNNN (decimal, 12 digits with leading zeros)
-    printf("Serial Number: %02u%02u-%012llu\n",
+    /* printf("Serial Number: %02u%02u-%012llu\n",
            g_factory_defaults.production_year,
            g_factory_defaults.production_week,
-           serial_decimal);
+           serial_decimal); */
 }
 
 /**

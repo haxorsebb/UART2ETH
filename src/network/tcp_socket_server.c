@@ -107,7 +107,7 @@ static void init_multi_server_system(void) {
     }
     
     g_multi_server_initialized = true;
-    printf("Multi-TCP Server: System initialized for %d concurrent servers\n", MAX_TCP_SERVER_INSTANCES);
+    /* printf("Multi-TCP Server: System initialized for %d concurrent servers\n", MAX_TCP_SERVER_INSTANCES); */
 }
 
 /**
@@ -158,31 +158,31 @@ bool tcp_socket_server_init(uint16_t port, channel_id_t channel) {
     // Check if server already exists for this port
     tcp_server_instance_t* existing = find_server_by_port(port);
     if (existing) {
-        printf("TCP Server: Already initialized on port %u for channel %u\n", port, existing->server_channel);
+        /* printf("TCP Server: Already initialized on port %u for channel %u\n", port, existing->server_channel); */
         return true;
     }
     
     // Check network is initialized
     network_status_t status = network_manager_get_status();
     if (status == NETWORK_STATUS_UNINITIALIZED || status == NETWORK_STATUS_ERROR) {
-        printf("TCP Server: Network not initialized (status=%d)\n", status);
+        /* printf("TCP Server: Network not initialized (status=%d)\n", status); */
         return false;
     }
     
     // Find free server instance
     tcp_server_instance_t* server = find_free_server_instance();
     if (!server) {
-        printf("TCP Server: No free server instances available (max %d)\n", MAX_TCP_SERVER_INSTANCES);
+        /* printf("TCP Server: No free server instances available (max %d)\n", MAX_TCP_SERVER_INSTANCES); */
         return false;
     }
     
-    printf("TCP Server: Initializing on port %u for channel %u\n", port, channel);
+    /* printf("TCP Server: Initializing on port %u for channel %u\n", port, channel); */
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_INIT, port);
     
     // Create new TCP PCB
     server->server_pcb = tcp_new();
     if (!server->server_pcb) {
-        printf("TCP Server: Failed to create PCB for port %u\n", port);
+        /* printf("TCP Server: Failed to create PCB for port %u\n", port); */
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, TCP_ERROR_PCB_CREATION_FAILED);
         return false;
     }
@@ -190,7 +190,7 @@ bool tcp_socket_server_init(uint16_t port, channel_id_t channel) {
     // Bind to port
     err_t err = tcp_bind(server->server_pcb, IP_ADDR_ANY, port);
     if (err != ERR_OK) {
-        printf("TCP Server: Failed to bind to port %u (error %d)\n", port, err);
+        /* printf("TCP Server: Failed to bind to port %u (error %d)\n", port, err); */
         tcp_close(server->server_pcb);
         server->server_pcb = NULL;
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, TCP_ERROR_BIND_FAILED);
@@ -200,7 +200,7 @@ bool tcp_socket_server_init(uint16_t port, channel_id_t channel) {
     // Start listening
     server->server_pcb = tcp_listen(server->server_pcb);
     if (!server->server_pcb) {
-        printf("TCP Server: Failed to listen on port %u\n", port);
+        /* printf("TCP Server: Failed to listen on port %u\n", port); */
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, TCP_ERROR_LISTEN_FAILED);
         return false;
     }
@@ -225,7 +225,7 @@ bool tcp_socket_server_init(uint16_t port, channel_id_t channel) {
     server->initialized = true;
     server->active = true;
     
-    printf("TCP Server: Listening on port %u for channel %u\n", port, channel);
+    /* printf("TCP Server: Listening on port %u for channel %u\n", port, channel); */
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port);
     
     return true;
@@ -239,7 +239,7 @@ void tcp_socket_server_deinit(void) {
         return;
     }
     
-    printf("TCP Server: Deinitializing all servers\n");
+    /* printf("TCP Server: Deinitializing all servers\n"); */
     
     for (int i = 0; i < MAX_TCP_SERVER_INSTANCES; i++) {
         tcp_server_instance_t* server = &g_server_instances[i];
@@ -249,7 +249,7 @@ void tcp_socket_server_deinit(void) {
     }
     
     g_multi_server_initialized = false;
-    printf("TCP Server: All servers deinitialized\n");
+    /* printf("TCP Server: All servers deinitialized\n"); */
 }
 
 /**
@@ -261,7 +261,7 @@ void tcp_socket_server_deinit_port(uint16_t port) {
         return;
     }
     
-    printf("TCP Server: Deinitializing server on port %u\n", port);
+    /* printf("TCP Server: Deinitializing server on port %u\n", port); */
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DEINIT, port);
     
     // Close all active connections
@@ -285,7 +285,7 @@ void tcp_socket_server_deinit_port(uint16_t port) {
     server->listen_port = 0;
     server->server_channel = CHANNEL_MAX;
     
-    printf("TCP Server: Server on port %u deinitialized\n", port);
+    /* printf("TCP Server: Server on port %u deinitialized\n", port); */
 }
 
 /**
@@ -423,8 +423,8 @@ bool tcp_socket_server_send_to_channel(channel_id_t channel, const uint8_t* data
                 server->stats.bytes_sent += length;
                 return true;
             } else {
-                printf("TCP Server: tcp_write error %d on channel %u - closing connection\n",
-                    err, channel);
+                /* printf("TCP Server: tcp_write error %d on channel %u - closing connection\n",
+                    err, channel); */
                 // ERR_CLSD (-14) or other fatal errors mean the connection is gone.
                 // Clean up so new connections can be accepted on this channel.
                 if (err == ERR_CLSD || err == ERR_RST || err == ERR_ABRT) {
@@ -449,9 +449,9 @@ static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t
         return ERR_VAL;
     }
     
-    printf("TCP Server: New connection on port %u (channel %u)\n", 
+    /* printf("TCP Server: New connection on port %u (channel %u)\n", 
            server->listen_port, server->server_channel);
-    
+     */
     // Single Connection Policy per server: Close all existing connections
     for (int i = 0; i < TCP_SERVER_MAX_CONNECTIONS; i++) {
         if (server->connections[i].active) {
@@ -469,7 +469,7 @@ static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t
     }
     
     if (!conn) {
-        printf("TCP Server: No free connection slots on port %u\n", server->listen_port);
+        /* printf("TCP Server: No free connection slots on port %u\n", server->listen_port); */
         server->stats.connection_errors++;
         tcp_close(newpcb);
         return ERR_MEM;
@@ -495,8 +495,8 @@ static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t
     // Update statistics
     server->stats.total_connections++;
     
-    printf("TCP Server: Connection accepted on port %u -> channel %u\n", 
-           server->listen_port, server->server_channel);
+    /* printf("TCP Server: Connection accepted on port %u -> channel %u, slot %d\n", 
+           server->listen_port, server->server_channel, slot); */
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 1);
     
     return ERR_OK;
@@ -544,8 +544,8 @@ static void tcp_connection_error_callback(void* arg, err_t err) {
     
     LWIP_UNUSED_ARG(err);
     
-    printf("TCP Server: Connection error %d on channel %u\n", 
-           err, conn ? conn->channel : 999);
+    /* printf("TCP Server: Connection error %d on channel %u\n", 
+           err, conn ? conn->channel : 999); */
     
     if (conn) {
         conn->pcb = NULL; // PCB already deallocated by lwIP

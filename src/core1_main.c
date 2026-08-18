@@ -276,9 +276,11 @@ static bool core1_check_for_pending_work(void) {
             last_link_poll_time = now;
             bool phy_link = enc28j60_get_link_status();
             if (phy_link != last_polled_link) {
+                /*
                 printf("Core1: PHY link changed: %s -> %s\n",
                        last_polled_link ? "UP" : "DOWN",
                        phy_link ? "UP" : "DOWN");
+                */
                 last_polled_link = phy_link;
                 // Update lwIP netif link state to match PHY reality
                 network_manager_is_link_up();
@@ -290,8 +292,10 @@ static bool core1_check_for_pending_work(void) {
     // Check for configuration changes (high priority)
     shared_memory_layout_t* layout = shared_memory_get_layout();
     if (layout && layout->config_change_pending) {
+        /*
         printf("Core1: ⚙️ Configuration change detected - updating TCP servers ONLY\n");
         printf("Core1: 🌐 HTTP server (Port 80) will remain active and untouched\n");
+        */
         layout->config_change_pending = false;  // Clear the flag
         
         // Apply configuration changes (TCP servers only - HTTP protected)
@@ -300,7 +304,9 @@ static bool core1_check_for_pending_work(void) {
     }
 
     if(network_manager_link_change_pending()) {
+        /*
         printf("Core1: LINKIF interrupt detected — processing link change\n");
+        */
         state_machine_process_core1_event(CORE1_EVENT_NETWORK_LINK_CHANGE_ACTIVE);
         return true; 
     }
@@ -408,7 +414,7 @@ static void core1_idle_wait(void) {
 static void core1_initialize(void) {
     // Minimal printf to avoid dual-core conflicts
     bool flash_safe = flash_safe_execute_core_init();
-    printf("DEBUG: Core1 initialize() starting. flash_safe: %d\n",flash_safe);
+    /* printf("DEBUG: Core1 initialize() starting. flash_safe: %d\n",flash_safe); */
     
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_CORE1_STARTING, 0);
     
@@ -423,7 +429,7 @@ static void core1_initialize(void) {
     core1_timer_init();
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
     
-    printf("DEBUG: Core1 initialize() completed\n");
+    /* printf("DEBUG: Core1 initialize() completed\n"); */
 }
 
 
@@ -525,7 +531,7 @@ static void core1_wait_for_link_up(void) {
     bool result = network_manager_is_link_up();
     
     if (result) {
-        printf("CORE1: Ethernet link UP - proceeding with network init\n");
+        /* printf("CORE1: Ethernet link UP - proceeding with network init\n"); */
         link_wait_attempts = 0;  // Reset for future use
         log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_UP, 1);
         state_machine_process_core1_event(CORE1_EVENT_INIT_NET_LINK_UP);
@@ -534,14 +540,14 @@ static void core1_wait_for_link_up(void) {
         
         if (link_wait_attempts >= MAX_LINK_WAIT_ATTEMPTS) {
             // Timeout - proceed without link to allow UART to work
-            printf("CORE1: Ethernet link DOWN after %d attempts - proceeding anyway (UART will work)\n", 
-                   link_wait_attempts);
+            /* printf("CORE1: Ethernet link DOWN after %d attempts - proceeding anyway (UART will work)\n", 
+                   link_wait_attempts); */
             link_wait_attempts = 0;  // Reset for future use
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_DOWN, 1);
             // Proceed to next phase even without link - network will be set up later
             state_machine_process_core1_event(CORE1_EVENT_INIT_NET_LINK_UP);
         } else {
-            printf("CORE1: Waiting for Ethernet link (%d/%d)...\n", link_wait_attempts, MAX_LINK_WAIT_ATTEMPTS);
+            /* printf("CORE1: Waiting for Ethernet link (%d/%d)...\n", link_wait_attempts, MAX_LINK_WAIT_ATTEMPTS); */
             sleep_ms(200);
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_DOWN, 1);
             state_machine_process_core1_event(CORE1_EVENT_INIT_NET_LINK_DOWN);
@@ -638,7 +644,7 @@ static void core1_check_dhcp_status(void) {
         static uint32_t last_no_link_msg = 0;
         uint32_t now = to_ms_since_boot(get_absolute_time());
         if (now - last_no_link_msg > 5000) {  // Print every 5 seconds
-            printf("CORE1: DHCP waiting but link is DOWN - connect Ethernet cable\n");
+            /* printf("CORE1: DHCP waiting but link is DOWN - connect Ethernet cable\n"); */
             last_no_link_msg = now;
         }
         // Don't count this against DHCP retries - just wait for link
@@ -647,12 +653,11 @@ static void core1_check_dhcp_status(void) {
     
     if(core1_timer_is_expired(CORE1_TIMER_DHCP_DISCOVER)) {
         dhcp_retry_count++;
-        printf("CORE1: DHCP timer expired, retry %d/%d\n", dhcp_retry_count, MAX_DHCP_RETRIES);
+        /* printf("CORE1: DHCP timer expired, retry %d/%d\n", dhcp_retry_count, MAX_DHCP_RETRIES); */
         
         if (dhcp_retry_count >= MAX_DHCP_RETRIES) {
             // Too many retries - proceed without network to allow UART to work
-            printf("CORE1: DHCP failed after %d retries - proceeding without network (UART will work)\n",
-                   dhcp_retry_count);
+            /* printf("CORE1: DHCP failed after %d retries - proceeding without network (UART will work)\n",dhcp_retry_count); */
             dhcp_retry_count = 0;  // Reset for future use
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_WARN, LOG_EVENT_NETWORK_ERROR, 1);
             // Proceed to OPERATIONAL state even without DHCP
@@ -710,7 +715,7 @@ static void core1_configuration_complete(void) {
         network_config_t net_config;
         network_manager_get_default_config(&net_config);
         
-        printf("Core1: Initializing TRUE MULTI-INSTANCE TCP servers for enabled channels\n");
+        /* printf("Core1: Initializing TRUE MULTI-INSTANCE TCP servers for enabled channels\n"); */
         
         int successful_channels = 0;
         int failed_channels = 0;
@@ -721,7 +726,7 @@ static void core1_configuration_complete(void) {
         {
             // Skip channels not available in current device mode
             if (!DEVICE_CHANNEL_AVAILABLE(channel_idx)) {
-                printf("Core1: Channel %d not available in %s mode, skipping\n", channel_idx, DEVICE_MODE_NAME);
+                /* printf("Core1: Channel %d not available in %s mode, skipping\n", channel_idx, DEVICE_MODE_NAME); */
                 continue;
             }
             
@@ -729,32 +734,32 @@ static void core1_configuration_complete(void) {
             if(channel_config.enabled)
             {
                 uint16_t port = channel_config.tcp_port;
-                printf("Core1: Initializing TCP server for Channel %d (UART1) on port %u\n", channel_idx, port);
+                /* printf("Core1: Initializing TCP server for Channel %d (UART1) on port %u\n", channel_idx, port); */
 
                 if (multi_tcp_server_init_channel(channel_idx, port)) {
-                    printf("Core1: ✅ Channel %d (UART1) initialized successfully on port %u\n", channel_idx, port);
+                    /* printf("Core1: ✅ Channel %d (UART1) initialized successfully on port %u\n", channel_idx, port); */
                     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, port);
                     successful_channels++;
                 } else {
-                    printf("Core1: ❌ Channel %d (UART1) initialization FAILED on port %u\n", channel_idx, port);
+                    /* printf("Core1: ❌ Channel %d (UART1) initialization FAILED on port %u\n", channel_idx, port); */
                     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, port);
                     failed_channels++;
                 }
             }
         }            
         // All channels are now active simultaneously - no switching needed!
-//        DEBUG_ONLY({
+        DEBUG_ONLY({
             printf("Core1: Multi-instance initialization complete: %d successful, %d failed\n", successful_channels, failed_channels);
-//        });
+        });
 
         // Initialize HTTP server for device information web interface
-        printf("Core1: Initializing HTTP server for web interface on port 80\n");
+        /* printf("Core1: Initializing HTTP server for web interface on port 80\n"); */
         if (http_server_init()) {
-            printf("Core1: ✅ HTTP server initialized successfully on port 80\n");
-            printf("Core1: 📄 Device information available at http://%s\n", ip_str);
+            /* printf("Core1: ✅ HTTP server initialized successfully on port 80\n");
+            printf("Core1: 📄 Device information available at http://%s\n", ip_str); */
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, 80);
         } else {
-            printf("Core1: ❌ HTTP server initialization FAILED on port 80\n");
+            /* printf("Core1: ❌ HTTP server initialization FAILED on port 80\n"); */
             log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_ERROR, LOG_EVENT_NETWORK_ERROR, 80);
         }
 
@@ -780,15 +785,15 @@ static void core1_configuration_complete(void) {
  * If this is a flash update boot, performs explicit_buy to mark image as permanent.
  */
 static void core1_buy_update(void) {
-    printf("Core1: Attempting to buy current firmware image\n");
+    /* printf("Core1: Attempting to buy current firmware image\n"); */
     
     bool buy_result = update_buy_current_image();
     
     if (buy_result) {
-        printf("Core1: ✅ Firmware buy succeeded (or not needed)\n");
+        /* printf("Core1: ✅ Firmware buy succeeded (or not needed)\n"); */
         state_machine_process_core1_event(CORE1_EVENT_BUY_SUCCESS);
     } else {
-        printf("Core1: ❌ Firmware buy FAILED - triggering reboot to old image\n");
+        /* printf("Core1: ❌ Firmware buy FAILED - triggering reboot to old image\n"); */
         update_set_reboot_reason(REBOOT_REASON_UPDATE_BUY_FAILED);
         state_machine_process_main_event(MAIN_EVENT_REBOOT_REQUESTED);
     }
@@ -798,23 +803,23 @@ static void core1_buy_update(void) {
  * @brief Flush logs and configuration before reboot (ADR-017)
  */
 static void core1_reboot_flush(void) {
-    printf("Core1: Preparing for reboot - flushing data\n");
+    /* printf("Core1: Preparing for reboot - flushing data\n"); */
     
     // Log the reboot reason
     reboot_reason_t reason = update_get_reboot_reason();
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_SYSTEM_REBOOT, (uint32_t)reason);
     
     // Force save configuration to flash
-    printf("Core1: Flushing configuration to flash\n");
+    /* printf("Core1: Flushing configuration to flash\n"); */
     flash_persistence_force_save_configuration();
     
     // Format and output any pending logs
-    printf("Core1: Flushing pending log entries\n");
+    /* printf("Core1: Flushing pending log entries\n"); */
     while (log_manager_get_pending_count() > 0) {
         log_manager_format_pending();
     }
     
-    printf("Core1: Flush complete - ready for reboot\n");
+    /* printf("Core1: Flush complete - ready for reboot\n"); */
     state_machine_process_core1_event(CORE1_EVENT_REBOOT_FLUSH_COMPLETE);
 }
 
@@ -1039,14 +1044,14 @@ static void core1_handle_error(void) {
 static void core1_apply_configuration_changes(void) {
     shared_memory_layout_t* layout = shared_memory_get_layout();
     if (!layout) {
-        printf("Core1: ERROR - Cannot access shared memory for config update\n");
+        /* printf("Core1: ERROR - Cannot access shared memory for config update\n"); */
         return;
     }
     
-    printf("Core1: 🔧 Applying configuration changes...\n");
+    /* printf("Core1: 🔧 Applying configuration changes...\n"); */
     
     // Step 1: Apply network interface configuration 
-    printf("Core1: 🌐 Applying network interface configuration\n");
+    /* printf("Core1: 🌐 Applying network interface configuration\n");
     printf("Core1: 📍 Target IP: %d.%d.%d.%d | DHCP: %s\n",
            (int)((layout->config.network.static_ip.addr >> 0) & 0xFF),
            (int)((layout->config.network.static_ip.addr >> 8) & 0xFF),
@@ -1055,10 +1060,10 @@ static void core1_apply_configuration_changes(void) {
            layout->config.network.use_dhcp ? "ENABLED" : "DISABLED");
     
     printf("Core1: ⚠️ Network interface may be briefly unavailable during reconfiguration\n");
-    
+     */
     bool reconfig_success = network_manager_reconfigure(&layout->config.network);
     if (reconfig_success) {
-        printf("Core1: ✅ Network interface reconfigured successfully\n");
+        /* printf("Core1: ✅ Network interface reconfigured successfully\n"); */
         
         // Brief delay to allow network to stabilize (PERFORMANCE: Reduced from 500ms to 100ms)
         sleep_ms(100);
@@ -1066,22 +1071,22 @@ static void core1_apply_configuration_changes(void) {
         // Log new network state
         simple_ip_addr_t new_ip;
         if (network_manager_get_ip_address(&new_ip)) {
-            printf("Core1: 📍 Active IP address: %d.%d.%d.%d\n",
+            /* printf("Core1: 📍 Active IP address: %d.%d.%d.%d\n",
                    (new_ip.addr >> 0) & 0xFF,
                    (new_ip.addr >> 8) & 0xFF,
                    (new_ip.addr >> 16) & 0xFF,
-                   (new_ip.addr >> 24) & 0xFF);
+                   (new_ip.addr >> 24) & 0xFF); */
         }
     } else {
-        printf("Core1: ❌ Network reconfiguration FAILED - keeping old network settings\n");
+        /* printf("Core1: ❌ Network reconfiguration FAILED - keeping old network settings\n"); */
     }
     
     // Step 3: Update TCP servers (HTTP server remains untouched)
-    printf("Core1: 🔧 Updating TCP servers for UART channels\n");
-    printf("Core1: 🚨 HTTP Server (Port 80) remains completely untouched\n");
+    /* printf("Core1: 🔧 Updating TCP servers for UART channels\n");
+    printf("Core1: 🚨 HTTP Server (Port 80) remains completely untouched\n"); */
     
     // Stop all TCP servers 
-    printf("Core1: Stopping all TCP servers (Ports 4001-4004 range)\n");
+    /* printf("Core1: Stopping all TCP servers (Ports 4001-4004 range)\n"); */
     multi_tcp_server_deinit_all();
     
     // Small delay to allow TCP sockets to properly close (PERFORMANCE: Reduced from 200ms to 50ms)
@@ -1091,45 +1096,45 @@ static void core1_apply_configuration_changes(void) {
     int successful_channels = 0;
     int failed_channels = 0;
     
-    printf("Core1: Starting TCP servers for enabled channels\n");
+    /* printf("Core1: Starting TCP servers for enabled channels\n"); */
     
     for (int ch = 1; ch < CHANNEL_MAX; ch++) {
         // Skip channels not available in current device mode
         if (!DEVICE_CHANNEL_AVAILABLE(ch)) {
-            printf("Core1: Channel %d not available in %s mode, skipping\n", ch, DEVICE_MODE_NAME);
+            /* printf("Core1: Channel %d not available in %s mode, skipping\n", ch, DEVICE_MODE_NAME); */
             continue;
         }
         
         if (layout->config.channels[ch].enabled) {
             uint16_t tcp_port = layout->config.channels[ch].tcp_port;
             
-            printf("Core1: Initializing TCP server for Channel %d on port %d\n", ch, tcp_port);
+            /* printf("Core1: Initializing TCP server for Channel %d on port %d\n", ch, tcp_port); */
             
             bool success = multi_tcp_server_init_channel(ch, tcp_port);
             if (success) {
-                printf("Core1: ✅ Channel %d TCP server active on port %d\n", ch, tcp_port);
+                /* printf("Core1: ✅ Channel %d TCP server active on port %d\n", ch, tcp_port); */
                 successful_channels++;
             } else {
-                printf("Core1: ❌ Failed to start Channel %d TCP server on port %d\n", ch, tcp_port);
+                /* printf("Core1: ❌ Failed to start Channel %d TCP server on port %d\n", ch, tcp_port); */
                 failed_channels++;
             }
         } else {
-            printf("Core1: Channel %d disabled - no TCP server\n", ch);
+            /* printf("Core1: Channel %d disabled - no TCP server\n", ch); */
         }
     }
     
     // Step 5: Summary
-    printf("Core1: ✅ Configuration update complete\n");
+    /* printf("Core1: ✅ Configuration update complete\n");
     printf("Core1: 📊 Network: %s | TCP servers: %d active, %d failed | HTTP: PROTECTED\n",
            reconfig_success ? "RECONFIGURED" : "failed",
-           successful_channels, failed_channels);
+           successful_channels, failed_channels); */
     
     if (failed_channels > 0) {
-        printf("Core1: ⚠️ Some TCP servers failed to start - check port conflicts\n");
+        /* printf("Core1: ⚠️ Some TCP servers failed to start - check port conflicts\n"); */
     }
     
     if (reconfig_success) {
-        printf("Core1: 🌐 Network configuration applied immediately - web interface available on updated IP\n");
+        /* printf("Core1: 🌐 Network configuration applied immediately - web interface available on updated IP\n"); */
     }
 }
 

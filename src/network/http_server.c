@@ -132,7 +132,7 @@ bool http_server_init(void) {
         return true; // Already initialized
     }
     
-    printf("HTTP Server: Initializing on port %d\n", HTTP_SERVER_PORT);
+    /* printf("HTTP Server: Initializing on port %d\n", HTTP_SERVER_PORT); */
     g_server_status = HTTP_SERVER_STATUS_INITIALIZING;
     
     // Initialize statistics
@@ -143,7 +143,7 @@ bool http_server_init(void) {
     // Create new TCP PCB
     g_http_server_pcb = tcp_new();
     if (!g_http_server_pcb) {
-        printf("HTTP Server: Failed to create PCB\n");
+        /* printf("HTTP Server: Failed to create PCB\n"); */
         g_server_status = HTTP_SERVER_STATUS_ERROR;
         return false;
     }
@@ -151,7 +151,7 @@ bool http_server_init(void) {
     // Bind to port 80
     err_t err = tcp_bind(g_http_server_pcb, IP_ADDR_ANY, HTTP_SERVER_PORT);
     if (err != ERR_OK) {
-        printf("HTTP Server: Failed to bind to port %d (error %d)\n", HTTP_SERVER_PORT, err);
+        /* printf("HTTP Server: Failed to bind to port %d (error %d)\n", HTTP_SERVER_PORT, err); */
         tcp_close(g_http_server_pcb);
         g_http_server_pcb = NULL;
         g_server_status = HTTP_SERVER_STATUS_ERROR;
@@ -161,7 +161,7 @@ bool http_server_init(void) {
     // Start listening
     g_http_server_pcb = tcp_listen(g_http_server_pcb);
     if (!g_http_server_pcb) {
-        printf("HTTP Server: Failed to listen on port %d\n", HTTP_SERVER_PORT);
+        /* printf("HTTP Server: Failed to listen on port %d\n", HTTP_SERVER_PORT); */
         g_server_status = HTTP_SERVER_STATUS_ERROR;
         return false;
     }
@@ -190,7 +190,7 @@ bool http_server_init(void) {
     http_router_register_route("/update", HTTP_METHOD_POST, http_handle_update_post);
     
     g_server_status = HTTP_SERVER_STATUS_READY;
-    printf("HTTP Server: Ready and listening on port %d\n", HTTP_SERVER_PORT);
+    /* printf("HTTP Server: Ready and listening on port %d\n", HTTP_SERVER_PORT); */
     log_event(EVENT_SOURCE_NETWORK, LOG_LEVEL_INFO, LOG_EVENT_NETWORK_AVAILABLE, HTTP_SERVER_PORT);
     
     return true;
@@ -204,7 +204,7 @@ void http_server_deinit(void) {
         return;
     }
     
-    printf("HTTP Server: Deinitializing\n");
+    /* printf("HTTP Server: Deinitializing\n"); */
     
     // Close all active connections
     for (int i = 0; i < HTTP_SERVER_MAX_CONNECTIONS; i++) {
@@ -220,7 +220,7 @@ void http_server_deinit(void) {
     }
     
     g_server_status = HTTP_SERVER_STATUS_UNINITIALIZED;
-    printf("HTTP Server: Deinitialized\n");
+    /* printf("HTTP Server: Deinitialized\n"); */
 }
 
 /**
@@ -291,7 +291,7 @@ void http_server_reset_stats(void) {
  */
 bool http_upload_session_start(uint32_t expected_size) {
     if (g_upload_session.state == UPLOAD_STATE_RECEIVING) {
-        printf("HTTP Upload: Session already in progress\n");
+        /* printf("HTTP Upload: Session already in progress\n"); */
         return false;
     }
     
@@ -299,7 +299,7 @@ bool http_upload_session_start(uint32_t expected_size) {
     
     // Initialize update manager for this upload
     if (!update_start_upload(expected_size)) {
-        printf("HTTP Upload: Failed to start update manager session\n");
+        /* printf("HTTP Upload: Failed to start update manager session\n"); */
         g_upload_session.state = UPLOAD_STATE_ERROR;
         return false;
     }
@@ -328,10 +328,10 @@ void http_upload_receive_chunk(uint32_t bytes_received) {
     // Progress reporting every 4KB
     if ((g_upload_session.bytes_received - g_upload_session.last_progress_report) >= (4 * 1024)) {
         
-        printf("HTTP Upload: %u / %u B (%u%%)\n",
+        /* printf("HTTP Upload: %u / %u B (%u%%)\n",
                g_upload_session.bytes_received ,
                g_upload_session.total_expected_size ,
-               (g_upload_session.bytes_received * 100) / g_upload_session.total_expected_size);
+               (g_upload_session.bytes_received * 100) / g_upload_session.total_expected_size); */
         g_upload_session.last_progress_report = g_upload_session.bytes_received;
         
     }
@@ -342,7 +342,7 @@ void http_upload_receive_chunk(uint32_t bytes_received) {
  */
 void http_upload_session_reset(void) {
     if (g_upload_session.state == UPLOAD_STATE_RECEIVING) {
-        printf("HTTP Upload: Aborting session\n");
+        /* printf("HTTP Upload: Aborting session\n"); */
         update_abort_upload();
     }
     
@@ -394,7 +394,7 @@ static bool http_firmware_upload_callback(const uint8_t* data, uint32_t size, bo
     
     // Feed chunk to update manager (cast away const - update_manager modifies workarea, not data)
     if (!update_write_block((uint8_t*)data, size, finished)) {
-        printf("HTTP Upload: Failed to write %u bytes to update manager\n", size);
+        /* printf("HTTP Upload: Failed to write %u bytes to update manager\n", size); */
         g_upload_session.state = UPLOAD_STATE_ERROR;
         return false;
     }
@@ -404,7 +404,7 @@ static bool http_firmware_upload_callback(const uint8_t* data, uint32_t size, bo
     
     // Handle completion
     if (finished) {
-        printf("HTTP Upload: Firmware upload complete (%u bytes)\n", g_upload_session.bytes_received);
+        /* printf("HTTP Upload: Firmware upload complete (%u bytes)\n", g_upload_session.bytes_received); */
         g_upload_session.state = UPLOAD_STATE_COMPLETE;
     }
     
@@ -425,7 +425,7 @@ static err_t http_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_
         return ERR_VAL;
     }
     
-    printf("HTTP Server: New connection accepted\n");
+    /* printf("HTTP Server: New connection accepted\n"); */
     
     // Find free connection slot
     http_connection_t* conn = NULL;
@@ -437,7 +437,7 @@ static err_t http_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_
     }
     
     if (!conn) {
-        printf("HTTP Server: No free connection slots\n");
+        /* printf("HTTP Server: No free connection slots\n"); */
         tcp_close(newpcb);
         return ERR_MEM;
     }
@@ -580,7 +580,7 @@ static void http_handle_factory_post(http_connection_t* conn,
 static void http_handle_config_post(http_connection_t* conn, 
                                      const char* request_buffer, 
                                      size_t buffer_len) {
-    printf("HTTP Server: Processing configuration update\n");
+    /* printf("HTTP Server: Processing configuration update\n"); */
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     char error_msg[128] = {0};
@@ -603,7 +603,7 @@ static void http_handle_config_post(http_connection_t* conn,
 static void http_handle_password_post(http_connection_t* conn, 
                                        const char* request_buffer, 
                                        size_t buffer_len) {
-    printf("HTTP Server: Processing password change\n");
+    /* printf("HTTP Server: Processing password change\n"); */
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     char error_msg[128] = {0};
@@ -626,7 +626,7 @@ static void http_handle_password_post(http_connection_t* conn,
 static void http_handle_reboot_post(http_connection_t* conn, 
                                      const char* request_buffer, 
                                      size_t buffer_len) {
-    printf("HTTP Server: Processing reboot request\n");
+    /* printf("HTTP Server: Processing reboot request\n"); */
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     if (http_handle_reboot_request(request_buffer, buffer_len)) {
@@ -649,7 +649,7 @@ static void http_handle_reboot_post(http_connection_t* conn,
 static void http_handle_update_post(http_connection_t* conn, 
                                      const char* request_buffer, 
                                      size_t buffer_len) {
-    printf("HTTP Server: Processing firmware upload\n");
+    /* printf("HTTP Server: Processing firmware upload\n"); */
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     /*
@@ -662,11 +662,11 @@ static void http_handle_update_post(http_connection_t* conn,
         return;
     }
     */
-    printf("HTTP Upload: Authentication successful, processing upload\n");
+    /* printf("HTTP Upload: Authentication successful, processing upload\n"); */
     
     // Initialize multipart context from request
     if (!multipart_init_context(&conn->multipart_ctx, request_buffer, buffer_len)) {
-        printf("HTTP Upload: Failed to initialize multipart context\n");
+        /* printf("HTTP Upload: Failed to initialize multipart context\n"); */
         http_generate_update_page(response_buffer, sizeof(response_buffer),
             "Error: Failed to process upload. Invalid multipart data.");
         http_send_response(conn, response_buffer, strlen(response_buffer));
@@ -676,7 +676,7 @@ static void http_handle_update_post(http_connection_t* conn,
     
     // Start upload session in update_manager
     if (!http_upload_session_start(conn->multipart_ctx.file_size)) {
-        printf("HTTP Upload: Failed to start upload session\n");
+        /* printf("HTTP Upload: Failed to start upload session\n"); */
         multipart_reset_context(&conn->multipart_ctx);
         http_generate_update_page(response_buffer, sizeof(response_buffer),
             "Error: Failed to start firmware upload. Update manager not ready.");
@@ -688,7 +688,7 @@ static void http_handle_update_post(http_connection_t* conn,
     // Process the initial chunk (HTTP headers + some data might be in this pbuf)
     if (!multipart_process_chunk(&conn->multipart_ctx, (const uint8_t*)request_buffer, buffer_len,
                                 http_firmware_upload_callback, NULL)) {
-        printf("HTTP Upload: Failed to process initial chunk\n");
+        /* printf("HTTP Upload: Failed to process initial chunk\n"); */
         http_upload_session_reset();
         multipart_reset_context(&conn->multipart_ctx);
         http_generate_update_page(response_buffer, sizeof(response_buffer),
@@ -700,7 +700,7 @@ static void http_handle_update_post(http_connection_t* conn,
     
     // Check if upload is already complete (small file in single packet)
     if (multipart_is_complete(&conn->multipart_ctx)) {
-        printf("HTTP Upload: Upload complete in single packet\n");
+        /* printf("HTTP Upload: Upload complete in single packet\n"); */
         multipart_reset_context(&conn->multipart_ctx);
         http_generate_update_page(response_buffer, sizeof(response_buffer),
             "Firmware uploaded successfully! Device will reboot to apply the update.");
@@ -710,7 +710,7 @@ static void http_handle_update_post(http_connection_t* conn,
         // TODO: Schedule reboot via state machine
     } else {
         // Multi-packet upload - connection will stay open for more data
-        printf("HTTP Upload: Multi-packet upload in progress, waiting for more data...\n");
+        /* printf("HTTP Upload: Multi-packet upload in progress, waiting for more data...\n"); */
         // Don't close connection or send response yet - more data coming
     }
 }
@@ -787,10 +787,10 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
         int copied = pbuf_copy_partial(p, request_buffer, copy_len, total_bytes_processed);
         if(copied == 0)
         {
-            printf("!!!COPY ERROR!!!\n");
+            /* printf("!!!COPY ERROR!!!\n"); */
         }
         total_bytes_processed += copied;
-        printf("total_bytes_processed %u/ total_bytes_in_pbuf %u\n", total_bytes_processed, total_bytes_in_pbuf);
+        /* printf("total_bytes_processed %u/ total_bytes_in_pbuf %u\n", total_bytes_processed, total_bytes_in_pbuf); */
         
         // Check if this connection is in the middle of a firmware upload
         if (conn->multipart_ctx.active && !multipart_is_complete(&conn->multipart_ctx)) {
@@ -799,7 +799,7 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             // Process this chunk through multipart handler
             if (!multipart_process_chunk(&conn->multipart_ctx, request_buffer, copy_len,
                                         http_firmware_upload_callback, NULL)) {
-                printf("HTTP Upload: Failed to process data chunk\n");
+                /* printf("HTTP Upload: Failed to process data chunk\n"); */
                 http_upload_session_reset();
                 multipart_reset_context(&conn->multipart_ctx);
                 
@@ -816,7 +816,7 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             
             // Check if upload is now complete
             if (multipart_is_complete(&conn->multipart_ctx)) {
-                printf("HTTP Upload: Upload completed successfully\n");
+                /* printf("HTTP Upload: Upload completed successfully\n"); */
                 multipart_reset_context(&conn->multipart_ctx);
                 
                 static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
@@ -834,7 +834,7 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             // Get password from shared memory
             shared_memory_layout_t* layout = shared_memory_get_layout();
             if (!layout) {
-                printf("HTTP Auth: Failed to get shared memory layout\n");
+                /* printf("HTTP Auth: Failed to get shared memory layout\n"); */
                 http_send_auth_required(conn);
                 tcp_recved(tpcb, total_bytes_processed);
                 pbuf_free(p);
@@ -843,14 +843,14 @@ static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, stru
             
             // Verify authentication
             if (!http_check_authentication((const char*)request_buffer, layout->config.admin_password)) {
-                printf("HTTP Auth: Authentication failed, sending 401\n");
+                /* printf("HTTP Auth: Authentication failed, sending 401\n"); */
                 http_send_auth_required(conn);
                 tcp_recved(tpcb, total_bytes_processed);
                 pbuf_free(p);
                 return ERR_OK;
             }
             
-            printf("HTTP Auth: Request authenticated successfully\n");
+            /* printf("HTTP Auth: Request authenticated successfully\n"); */
             
             // Route request to appropriate handler (ADR-018 Phase 4)
             http_route_handler_t handler = http_router_find_handler((const char*)request_buffer);
@@ -877,7 +877,7 @@ static void http_connection_error_callback(void* arg, err_t err) {
     
     LWIP_UNUSED_ARG(err);
     
-    printf("HTTP Server: Connection error %d\n", err);
+    /* printf("HTTP Server: Connection error %d\n", err); */
     
     if (conn) {
         conn->pcb = NULL; // PCB already deallocated by lwIP
@@ -895,13 +895,13 @@ static err_t http_connection_sent_callback(void* arg, struct tcp_pcb* tpcb, u16_
     
     if (conn) {
         g_server_stats.bytes_sent += len;
-        printf("HTTP Server: Sent %d bytes\n", len);
+        /* printf("HTTP Server: Sent %d bytes\n", len); */
         
         // Close connection if requested and all data has been sent
         if (conn->close_after_send && conn->pcb) {
             // Check if send buffer is empty (all data sent)
             if (tcp_sndbuf(conn->pcb) == TCP_SND_BUF) {
-                printf("HTTP Server: All data sent, closing connection\n");
+                /* printf("HTTP Server: All data sent, closing connection\n"); */
                 http_close_connection(conn);
             }
         }
@@ -929,7 +929,7 @@ static void http_close_connection(http_connection_t* conn) {
 
     conn->active = false;
     conn->close_after_send = false;
-    printf("HTTP Server: Connection closed\n");
+    /* printf("HTTP Server: Connection closed\n"); */
 }
 
 /**
@@ -945,7 +945,7 @@ static void http_close_connection_after_send(http_connection_t* conn) {
     }
     
     conn->close_after_send = true;
-    printf("HTTP Server: Connection will close after data is sent\n");
+    /* printf("HTTP Server: Connection will close after data is sent\n"); */
 }
 
 /**
@@ -961,9 +961,9 @@ void http_send_response(http_connection_t* conn, const char* response, size_t re
     err_t err = tcp_write(conn->pcb, response, response_len, TCP_WRITE_FLAG_COPY);
     if (err == ERR_OK) {
         tcp_output(conn->pcb);
-        printf("HTTP Server: Response sent (%d bytes)\n", response_len);
+        /* printf("HTTP Server: Response sent (%d bytes)\n", response_len); */
     } else {
-        printf("HTTP Server: Failed to send response (error %d)\n", err);
+        /* printf("HTTP Server: Failed to send response (error %d)\n", err); */
     }
 }
 
@@ -1001,7 +1001,7 @@ static bool http_handle_reboot_request(const char* post_data, size_t data_len) {
     (void)post_data;  // Unused
     (void)data_len;   // Unused
     
-    printf("HTTP Server: Initiating reboot via watchdog\n");
+    /* printf("HTTP Server: Initiating reboot via watchdog\n"); */
     
     // Trigger watchdog reset with 1ms timeout
     watchdog_reboot(0, 0, 1);

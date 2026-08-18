@@ -83,5 +83,5 @@ void http_generate_stylesheet(char* buffer, size_t buffer_size) {
         ".success{color:#27ae60}\r\n"
     );
     
-    printf("HTTP: Generated CSS stylesheet (%zu bytes)\n", strlen(buffer));
+    /* printf("HTTP: Generated CSS stylesheet (%zu bytes)\n", strlen(buffer)); */
 }
