@@ -395,6 +395,7 @@
 <li><a href="#_implementation_timeline">Implementation Timeline</a></li>
 <li><a href="#_actual_module_sizes">Actual Module Sizes</a></li>
 <li><a href="#_critical_bug_fixes_during_phase_5">Critical Bug Fixes During Phase 5</a></li>
+<li><a href="#_bug_fixes_after_phase_5">Bug Fixes After Phase 5</a></li>
 <li><a href="#_hardware_test_results">Hardware Test Results</a></li>
 <li><a href="#_component_diagram">Component Diagram</a></li>
 <li><a href="#_performance_characteristics">Performance Characteristics</a></li>
@@ -1213,6 +1214,48 @@ target_include_directories(http_pages INTERFACE
 </div>
 <div class="paragraph">
 <p><strong>Files Changed</strong>: <code>http_server.c</code> (lines 682, 693, 706)</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_bug_fixes_after_phase_5">Bug Fixes After Phase 5</h3>
+<div class="paragraph">
+<p>The following bugs were found in field use after the modularization was complete.</p>
+</div>
+<div class="sect3">
+<h4 id="_bug_4_stylesheet_missing_after_page_reload">Bug 4: Stylesheet Missing After Page Reload</h4>
+<div class="paragraph">
+<p><strong>Symptom</strong>: Reloading a page in Firefox occasionally rendered the HTML without styles. Edge did not show the problem.</p>
+</div>
+<div class="paragraph">
+<p><strong>Root Cause</strong>: The stylesheet is served as a separate resource (<code>GET /styles.css</code>) on its own TCP connection, so every page load needs two concurrent connections. The connection pool held only two slots (<code>HTTP_SERVER_MAX_CONNECTIONS = 2</code>). A slot is released only from the TCP sent-callback once the send buffer has drained, i.e. after the last ACK from the client. On reload, Firefox opens the new connections before the previous page&#8217;s slot has been released; some browsers additionally open a speculative extra connection. With both slots occupied, the accept callback refused the <code>/styles.css</code> connection. The browser rendered without the stylesheet and did not retry.</p>
+</div>
+<div class="paragraph">
+<p><strong>Solution</strong>: Raised <code>HTTP_SERVER_MAX_CONNECTIONS</code> from 2 to 4. Cost is one <code>http_connection_t</code> (~100 bytes, dominated by <code>multipart_context_t</code>) per additional slot, allocated statically. Per-handler response buffers are shared, not per-connection, so they do not scale with the pool. lwIP <code>MEMP_NUM_TCP_PCB</code> (12) is not affected because PCBs are allocated only for live connections.</p>
+</div>
+<div class="paragraph">
+<p>The value 4 covers one page load (2 connections) plus one reload in flight plus one speculative connection. Inlining the CSS into each page, which would remove the second connection entirely, was considered and rejected for this fix: it changes every page renderer and increases the size of each response.</p>
+</div>
+<div class="paragraph">
+<p><code>HTTP_SERVER_MAX_CONNECTIONS</code> moved from <code>http_server.c</code> to <code>http_server.h</code> and is exposed via <code>http_server_get_max_connections()</code> so the pool size can be verified by unit tests.</p>
+</div>
+<div class="paragraph">
+<p><strong>Files Changed</strong>: <code>http_server.h</code>, <code>http_server.c</code>, <code>tests/network/test_http_server.c</code> (new)</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_bug_5_double_pcb_release_when_connection_pool_is_full">Bug 5: Double PCB Release When Connection Pool Is Full</h4>
+<div class="paragraph">
+<p><strong>Symptom</strong>: None observed. Found during analysis of Bug 4.</p>
+</div>
+<div class="paragraph">
+<p><strong>Root Cause</strong>: When no free slot was available, <code>http_server_accept_callback()</code> called <code>tcp_close(newpcb)</code> and returned <code>ERR_MEM</code>. lwIP&#8217;s <code>tcp_listen_input()</code> calls <code>tcp_abort(npcb)</code> itself whenever the accept callback returns anything other than <code>ERR_ABRT</code>. The PCB was therefore released twice: once by <code>tcp_close()</code>, once by lwIP&#8217;s <code>tcp_abort()</code>.</p>
+</div>
+<div class="paragraph">
+<p><strong>Solution</strong>: Replaced with <code>tcp_abort(newpcb); return ERR_ABRT;</code>, which is the lwIP-documented way to refuse a connection from inside the accept callback. <code>ERR_ABRT</code> tells lwIP that the callback has already disposed of the PCB.</p>
+</div>
+<div class="paragraph">
+<p><strong>Files Changed</strong>: <code>http_server.c</code> (accept callback)</p>
 </div>
 </div>
 </div>

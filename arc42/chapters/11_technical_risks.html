@@ -1084,6 +1084,16 @@
 <strong>Resolution Plan:</strong> Monitor spinlock contention in performance testing; consider lock-free alternatives if contention becomes problematic</p>
 </div>
 </div>
+<div class="sect3">
+<h4 id="_td_005_http_connection_pool_has_no_idle_timeout">TD-005: HTTP Connection Pool Has No Idle Timeout</h4>
+<div class="paragraph">
+<p><strong>Description:</strong> <code>http_connection_t</code> records <code>start_time_ms</code> at accept but nothing evaluates it. A slot is released only when the TCP sent-callback sees the send buffer drained or when the error-callback fires. A client that opens a connection and never sends a request, or that never ACKs the last segment, holds the slot indefinitely. See ADR-018, Bug 4<br>
+<strong>Impact:</strong> With the pool at 4 slots (ADR-018 Bug 4) an idle or stalled client can still exhaust the pool and block the web interface until the client closes or the device reboots<br>
+<strong>Priority:</strong> Medium<br>
+<strong>Effort:</strong> Low (1-2 days)<br>
+<strong>Resolution Plan:</strong> Add a periodic scan from <code>core1_process_network()</code> that aborts connections older than a configurable timeout (proposal: 10 s) that have not completed a request</p>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_risk_mitigation_plan">Risk Mitigation Plan</h3>
