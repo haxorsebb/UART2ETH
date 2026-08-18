@@ -95,6 +95,22 @@ void http_server_get_stats(http_server_stats_t* stats);
 void http_server_reset_stats(void);
 
 /**
+ * Size of the HTTP connection pool.
+ *
+ * Every page load uses two connections (HTML + /styles.css). Four slots
+ * leave room for one reload whose previous connections have not yet been
+ * released, plus one speculative browser connection.
+ * See ADR-018, Bug 4.
+ */
+#define HTTP_SERVER_MAX_CONNECTIONS 4
+
+/**
+ * Get the connection pool size.
+ * @return HTTP_SERVER_MAX_CONNECTIONS. Exposed so tests can verify the pool.
+ */
+int http_server_get_max_connections(void);
+
+/**
  * @brief HTTP Response Sending (exposed for auth module)
  * 
  * Send HTTP response to client connection. Used by authentication

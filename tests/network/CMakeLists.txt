@@ -173,3 +173,34 @@ pico_set_uf2_family(test_http_authentication "rp2350-arm-s")
 
 # Create UF2 output
 pico_add_extra_outputs(test_http_authentication)
+
+# Create test executable for HTTP server connection pool (ADR-018 Bug 4 / Bug 5)
+add_executable(test_http_server
+    test_http_server.c
+)
+
+# Same link set as test_http_authentication: http_server pulls in
+# config_manager and network_manager, which reference each other.
+target_link_libraries(test_http_server
+    unity
+    http_server
+    config_manager
+    state_machine
+    log_manager
+    network_manager
+    timer_subsystems
+    pico_stdlib
+    hardware_spi
+    hardware_gpio
+    utils
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_http_server 1)
+pico_enable_stdio_uart(test_http_server 1)
+
+# Set UF2 family for RP2350
+pico_set_uf2_family(test_http_server "rp2350-arm-s")
+
+# Create UF2 output
+pico_add_extra_outputs(test_http_server)
