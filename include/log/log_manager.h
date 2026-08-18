@@ -252,6 +252,12 @@ typedef enum {
     LOG_CORE0_UART_ACTIVE,
     LOG_CORE0_RINGBUFFER_ACTIVE,
     LOG_CORE0_UART_ERROR,
+    
+    //CORE0 STATE_END
+    LOG_CORE0_IDLE_INVALID_EVENT,
+    LOG_CORE0_EVENT_WITHOUT_STATE_CHANGE = 740,   
+
+
 
     // Core1 substate change events (750-773)
     // IMPORTANT: These MUST match core1_substate_t enum order exactly and be complete

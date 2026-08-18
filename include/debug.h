@@ -38,7 +38,7 @@
  * Debug-only code compilation macro
  * Use this to wrap code that should only be compiled in debug builds
  */
-#if DEBUG
+#if 0 
 #define DEBUG_ONLY(code) do { code } while(0)
 #define IF_DEBUG(debug_code, release_code) debug_code
 #else
