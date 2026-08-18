@@ -430,6 +430,34 @@ During hardware testing, three critical bugs were discovered and fixed:
 
 **Files Changed**: `http_server.c` (lines 682, 693, 706)
 
+=== Bug Fixes After Phase 5
+
+The following bugs were found in field use after the modularization was complete.
+
+==== Bug 4: Stylesheet Missing After Page Reload
+
+**Symptom**: Reloading a page in Firefox occasionally rendered the HTML without styles. Edge did not show the problem.
+
+**Root Cause**: The stylesheet is served as a separate resource (`GET /styles.css`) on its own TCP connection, so every page load needs two concurrent connections. The connection pool held only two slots (`HTTP_SERVER_MAX_CONNECTIONS = 2`). A slot is released only from the TCP sent-callback once the send buffer has drained, i.e. after the last ACK from the client. On reload, Firefox opens the new connections before the previous page's slot has been released; some browsers additionally open a speculative extra connection. With both slots occupied, the accept callback refused the `/styles.css` connection. The browser rendered without the stylesheet and did not retry.
+
+**Solution**: Raised `HTTP_SERVER_MAX_CONNECTIONS` from 2 to 4. Cost is one `http_connection_t` (~100 bytes, dominated by `multipart_context_t`) per additional slot, allocated statically. Per-handler response buffers are shared, not per-connection, so they do not scale with the pool. lwIP `MEMP_NUM_TCP_PCB` (12) is not affected because PCBs are allocated only for live connections.
+
+The value 4 covers one page load (2 connections) plus one reload in flight plus one speculative connection. Inlining the CSS into each page, which would remove the second connection entirely, was considered and rejected for this fix: it changes every page renderer and increases the size of each response.
+
+`HTTP_SERVER_MAX_CONNECTIONS` moved from `http_server.c` to `http_server.h` and is exposed via `http_server_get_max_connections()` so the pool size can be verified by unit tests.
+
+**Files Changed**: `http_server.h`, `http_server.c`, `tests/network/test_http_server.c` (new)
+
+==== Bug 5: Double PCB Release When Connection Pool Is Full
+
+**Symptom**: None observed. Found during analysis of Bug 4.
+
+**Root Cause**: When no free slot was available, `http_server_accept_callback()` called `tcp_close(newpcb)` and returned `ERR_MEM`. lwIP's `tcp_listen_input()` calls `tcp_abort(npcb)` itself whenever the accept callback returns anything other than `ERR_ABRT`. The PCB was therefore released twice: once by `tcp_close()`, once by lwIP's `tcp_abort()`.
+
+**Solution**: Replaced with `tcp_abort(newpcb); return ERR_ABRT;`, which is the lwIP-documented way to refuse a connection from inside the accept callback. `ERR_ABRT` tells lwIP that the callback has already disposed of the PCB.
+
+**Files Changed**: `http_server.c` (accept callback)
+
 === Hardware Test Results
 
 **Test Date**: 2026-02-03 +

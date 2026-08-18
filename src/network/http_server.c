@@ -49,7 +49,7 @@
 
 // HTTP server configuration
 #define HTTP_SERVER_PORT 80
-#define HTTP_SERVER_MAX_CONNECTIONS 2
+// HTTP_SERVER_MAX_CONNECTIONS is defined in http_server.h (ADR-018 Bug 4)
 #define HTTP_RESPONSE_BUFFER_SIZE 8192  // Increased to 8KB for configuration page
 
 // HTTP server state
@@ -95,7 +95,8 @@ typedef struct http_connection {
 static http_connection_t g_http_connections[HTTP_SERVER_MAX_CONNECTIONS];
 
 // Forward declarations
-static err_t http_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t err);
+// Accept callback is non-static so tests can drive it directly (ADR-018 Bug 5).
+err_t http_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t err);
 static err_t http_connection_recv_callback(void* arg, struct tcp_pcb* tpcb, struct pbuf* p, err_t err);
 static void http_connection_error_callback(void* arg, err_t err);
 static err_t http_connection_sent_callback(void* arg, struct tcp_pcb* tpcb, u16_t len);
@@ -258,6 +259,13 @@ http_server_status_t http_server_get_status(void) {
 }
 
 /**
+ * @brief Get the connection pool size (ADR-018 Bug 4)
+ */
+int http_server_get_max_connections(void) {
+    return HTTP_SERVER_MAX_CONNECTIONS;
+}
+
+/**
  * @brief Get HTTP server statistics
  */
 void http_server_get_stats(http_server_stats_t* stats) {
@@ -417,8 +425,10 @@ static bool http_firmware_upload_callback(const uint8_t* data, uint32_t size, bo
 
 /**
  * @brief HTTP accept callback
+ *
+ * Non-static: driven directly by tests/network/test_http_server.c.
  */
-static err_t http_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t err) {
+err_t http_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_t err) {
     LWIP_UNUSED_ARG(arg);
     
     if (err != ERR_OK || !newpcb) {
@@ -438,8 +448,10 @@ static err_t http_server_accept_callback(void* arg, struct tcp_pcb* newpcb, err_
     
     if (!conn) {
         /* printf("HTTP Server: No free connection slots\n"); */
-        tcp_close(newpcb);
-        return ERR_MEM;
+        // Refuse the connection. tcp_abort() releases the PCB; returning
+        // ERR_ABRT tells lwIP not to abort it a second time (ADR-018 Bug 5).
+        tcp_abort(newpcb);
+        return ERR_ABRT;
     }
     
     // Initialize connection
