@@ -164,11 +164,13 @@ static const char* const event_format_strings[] = {
     [LOG_CORE0_CONFIG_COMPLETE] = "Core0 substate changed to CORE0_CONFIG_COMPLETE",
     [LOG_CORE0_CONFIG_IDLE] = "Core0 substate changed to CORE0_CONFIG_IDLE",
     [LOG_CORE0_CONFIG_ERROR] = "Core0 substate changed to CORE0_CONFIG_ERROR",
-    [LOG_CORE0_IDLE] = "Core0 substate changed to CORE0_IDLE",
+    [LOG_CORE0_IDLE] = "Core0 substate changed to CORE0_IDLE (old state %u)",
     [LOG_CORE0_UART_ACTIVE] = "Core0 substate changed to CORE0_UART_ACTIVE",
     [LOG_CORE0_RINGBUFFER_ACTIVE] = "Core0 substate changed to CORE0_RINGBUFFER_ACTIVE",
     [LOG_CORE0_UART_ERROR] = "Core0 substate changed to CORE0_UART_ERROR",
-
+    [LOG_CORE0_IDLE_INVALID_EVENT] = "Core0 substate stayed in CORE0_IDLE (invalid event %u)",
+    [LOG_CORE0_EVENT_WITHOUT_STATE_CHANGE] = "Core0 substate stayed in %u",
+    
     // Core1 substate change events (750-773)
     // IMPORTANT: These MUST match core1_substate_t enum order exactly and be complete
     [LOG_CORE1_INIT_PERISTENCE] = "Core1 substate changed to CORE1_INIT_PERISTENCE",
@@ -346,7 +348,7 @@ static bool write_log_entry(const log_entry_t* entry) {
     }
 
     // Critical section: protect shared buffer state
-    uint32_t save = spin_lock_blocking(g_shared_layout->log_mgmt.entry_lock);
+    spin_lock_unsafe_blocking(g_shared_layout->log_mgmt.entry_lock);
     
     // Calculate next write index without expensive modulo
     uint32_t next_write_index = g_shared_layout->log_mgmt.write_index + 1;
@@ -371,7 +373,7 @@ static bool write_log_entry(const log_entry_t* entry) {
     //update revision if needed
     update_shared_memory_revision();
 
-    spin_unlock(g_shared_layout->log_mgmt.entry_lock, save);
+    spin_unlock_unsafe(g_shared_layout->log_mgmt.entry_lock);
     
     /* this is a test to use atomic instead of spinlocks TBD: use or remove
 
@@ -463,9 +465,12 @@ bool log_event(event_source_t event_source, log_level_t log_level,
         g_last_error = LOG_ERROR_NOT_INITIALIZED;
         return false;
     }
+    else {
+        //return true;
+    }
     
     // Check if this log level meets the minimum threshold
-    if (log_level < LOG_LEVEL_ERROR /*LOG_MINIMUM_LEVEL*/) {
+    if (log_level < LOG_MINIMUM_LEVEL) {
         // Silently drop logs below minimum level (not an error)
         return true;
     }
@@ -487,8 +492,8 @@ bool log_event(event_source_t event_source, log_level_t log_level,
     // Validate log level (0-4) - enhanced safety debugging
     if (log_level > LOG_LEVEL_ERROR) {
         // Safety debugging output: show invalid log level
-        printf("[DEBUG] Log level %u out of valid range (max:%u)\n", log_level, LOG_LEVEL_ERROR);
-        fflush(stdout);
+        /* printf("[DEBUG] Log level %u out of valid range (max:%u)\n", log_level, LOG_LEVEL_ERROR);
+        fflush(stdout); */
         g_last_error = LOG_ERROR_INVALID_EVENT_TYPE;  // Reuse for simplicity
         return false;
     }
