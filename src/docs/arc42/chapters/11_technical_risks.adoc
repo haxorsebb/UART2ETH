@@ -287,6 +287,14 @@ The following technical debts have been identified and require future resolution
 **Effort:** Low (1-2 days) +
 **Resolution Plan:** Add a periodic scan from `core1_process_network()` that aborts connections older than a configurable timeout (proposal: 10 s) that have not completed a request
 
+==== TD-006: Persisted Configuration Has No Schema Version
+
+**Description:** The flash persistence block (ADR-006) stores a raw `memcpy` of `shared_memory_layout_t` protected only by a SHA256 over the bytes. There is no schema version field, so a firmware update that changes field semantics or adds fields cannot distinguish "value written by old firmware" from "value written by current firmware". The only defence is the per-field range check in `flash_persistence_load_configuration()` (ADR-006, "Sanitization of Loaded Configuration"), which must be extended by hand for every new field. The DHCP timeout bug (persisted `dhcp_timeout_ms = 0` made DHCP give up after 1 ms) is one instance of this class +
+**Impact:** Silent misbehaviour after firmware updates when a persisted field is out of range or reinterpreted; a factory reset is the only recovery for fields without a sanitization rule +
+**Priority:** Medium +
+**Effort:** Medium (1 week: version field, per-version migration hook, tests) +
+**Resolution Plan:** Add a `config_schema_version` to the persisted block; on load, run migrations from the stored version to the current one, then sanitize. Until then, every PR that adds or re-scopes a persisted field must add a sanitization rule and a test
+
 === Risk Mitigation Plan
 
 ==== Immediate Actions (Next 30 Days)
