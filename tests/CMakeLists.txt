@@ -154,7 +154,12 @@ add_executable(test_core0_timer
     ../src/core0_timer.c
 )
 
-target_include_directories(test_core0_timer PRIVATE ../include)
+target_include_directories(test_core0_timer PRIVATE
+    ../include
+    ../include/state_machine
+    ../include/config
+    ../include/log
+)
 
 target_link_libraries(test_core0_timer
     unity

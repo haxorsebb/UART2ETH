@@ -14,11 +14,11 @@
 #include "core0_timer.h"
 #include "hardware/timer.h"
 #include "hardware/irq.h"
+#include "hardware/sync.h"
 #include "pico/stdlib.h"
 #include "state_machine.h"
 #include <stdio.h>
 #include <string.h>
-#include "state_machine.h"
 
 
 // Timer state structure
@@ -41,8 +41,11 @@ typedef struct {
 // Global timer subsystem state
 static core0_timer_subsystem_t g_core0_timers = {0};
 
-// Hardware timer alarm number for Core0
+// Hardware timer alarm number for Core0 on the SDK default timer instance
+// (timer_hw, TIMER0 on RP2350). The IRQ line is derived from instance and
+// alarm number; see ADR-009, "Timer instance and IRQ line".
 #define CORE0_TIMER_ALARM_NUM 0
+#define CORE0_TIMER_IRQ_NUM  timer_hardware_alarm_get_irq_num(timer_hw, CORE0_TIMER_ALARM_NUM)
 
 // Forward declarations for internal functions
 static void core0_timer_update_next_alarm(void);
@@ -55,11 +58,17 @@ static bool core0_timer_id_valid(core0_timer_id_t timer_id);
 bool core0_timer_init(void) {
     // Clear timer subsystem state
     memset(&g_core0_timers, 0, sizeof(g_core0_timers));
-    
+
+    // Reserve the alarm so a collision with the SDK alarm pool is detected.
+    // Re-initialization (tests) must not claim twice.
+    if (!hardware_alarm_is_claimed(CORE0_TIMER_ALARM_NUM)) {
+        hardware_alarm_claim(CORE0_TIMER_ALARM_NUM);
+    }
+
     // Set up hardware timer alarm interrupt
     hw_set_bits(&timer_hw->inte, 1u << CORE0_TIMER_ALARM_NUM);
-    irq_set_exclusive_handler(TIMER1_IRQ_0, core0_timer_alarm_isr);
-    irq_set_enabled(TIMER1_IRQ_0, true);
+    irq_set_exclusive_handler(CORE0_TIMER_IRQ_NUM, core0_timer_alarm_isr);
+    irq_set_enabled(CORE0_TIMER_IRQ_NUM, true);
     
     g_core0_timers.initialized = true;
     
@@ -75,8 +84,11 @@ void core0_timer_cleanup(void) {
     }
     
     // Disable timer alarm interrupt
-    irq_set_enabled(TIMER1_IRQ_0, false);
+    irq_set_enabled(CORE0_TIMER_IRQ_NUM, false);
     hw_clear_bits(&timer_hw->inte, 1u << CORE0_TIMER_ALARM_NUM);
+    if (hardware_alarm_is_claimed(CORE0_TIMER_ALARM_NUM)) {
+        hardware_alarm_unclaim(CORE0_TIMER_ALARM_NUM);
+    }
     
     // Clear all timers
     memset(&g_core0_timers, 0, sizeof(g_core0_timers));
@@ -84,12 +96,18 @@ void core0_timer_cleanup(void) {
 
 /**
  * @brief Set a timer with specified interval
+ *
+ * Runs with interrupts disabled on this core because the alarm ISR scans and
+ * rewrites the same timer array (ADR-009, "Concurrency between thread context
+ * and ISR").
  */
 void core0_timer_set(core0_timer_id_t timer_id, uint32_t interval_ms) {
     if (!core0_timer_id_valid(timer_id) || !g_core0_timers.initialized) {
         return;
     }
     
+    uint32_t saved_irq = save_and_disable_interrupts();
+
     timer_entry_t* timer = &g_core0_timers.timers[timer_id];
     
     // Cancel timer if it was previously active
@@ -108,6 +126,8 @@ void core0_timer_set(core0_timer_id_t timer_id, uint32_t interval_ms) {
     
     // Update hardware alarm for next expiration
     core0_timer_update_next_alarm();
+
+    restore_interrupts_from_disabled(saved_irq);
 }
 
 /**
@@ -140,6 +160,8 @@ void core0_timer_cancel(core0_timer_id_t timer_id) {
         return;
     }
     
+    uint32_t saved_irq = save_and_disable_interrupts();
+
     timer_entry_t* timer = &g_core0_timers.timers[timer_id];
     
     if (timer->active) {
@@ -150,6 +172,8 @@ void core0_timer_cancel(core0_timer_id_t timer_id) {
         // Update hardware alarm
         core0_timer_update_next_alarm();
     }
+
+    restore_interrupts_from_disabled(saved_irq);
 }
 
 /**
@@ -168,8 +192,10 @@ uint32_t core0_timer_get_active_count(void) {
  */
 void core0_timer_alarm_isr(void) {
 
-    // Clear the alarm interrupt
+    // Clear the alarm interrupt, both the hardware-raised flag (INTR) and a
+    // forced one (INTF, set by core0_timer_update_next_alarm() on a missed target).
     hw_clear_bits(&timer_hw->intr, 1u << CORE0_TIMER_ALARM_NUM);
+    hw_clear_bits(&timer_hw->intf, 1u << CORE0_TIMER_ALARM_NUM);
     
     // Scan for expired timers
     core0_timer_scan_for_expired();
@@ -229,6 +255,12 @@ static void core0_timer_update_next_alarm(void) {
     // Set hardware alarm if we have active timers
     if (found_active_timer) {
         g_core0_timers.next_alarm_time_us = next_expiration;
-        timer_hw->alarm[CORE0_TIMER_ALARM_NUM] = (uint32_t)next_expiration;
+        bool missed = timer_hardware_alarm_set_target(timer_hw, CORE0_TIMER_ALARM_NUM,
+                                                      (absolute_time_t)next_expiration);
+        if (missed) {
+            // Target already in the past: the hardware would not fire until the
+            // 32-bit counter wraps. Force the IRQ so the ISR expires the timer now.
+            timer_hardware_alarm_force_irq(timer_hw, CORE0_TIMER_ALARM_NUM);
+        }
     }
 }
