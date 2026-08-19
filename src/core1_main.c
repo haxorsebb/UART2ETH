@@ -394,10 +394,10 @@ static void core1_work_or_idle_wait(void) {
  * The ENC28J60 needs time between register accesses for reliable operation.
  */
 static void core1_idle_wait(void) {
-    // Drain any pending FIFO wake signals
-    while (multicore_fifo_rvalid()) {
-        multicore_fifo_pop_blocking();
-    }
+    // Do NOT read the inter-core FIFO here. The SDK lockout handler owns the
+    // SIO FIFO IRQ on this core (flash_safe_execute_core_init()) and drains the
+    // FIFO in the ISR. Popping from thread context races against the ISR and
+    // can block forever in multicore_fifo_pop_blocking(). See core0_idle_wait().
     // 1ms sleep provides good balance between responsiveness and reliability
     // Faster polling can cause SPI timing issues with the ENC28J60
     sleep_ms(1);

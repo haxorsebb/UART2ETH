@@ -333,7 +333,7 @@ void network_manager_get_default_config(network_config_t* config) {
         config->static_ip.addr = defaults->default_ip;
         config->static_netmask.addr = defaults->default_netmask;
         config->static_gateway.addr = defaults->default_gateway;
-        config->dhcp_timeout_ms = config->use_dhcp ? 30000 : 0;
+        config->dhcp_timeout_ms = 30000;/* config->use_dhcp ? 30000 : 0; */
     } else {
         // No valid factory defaults: use fixed MAC, disable DHCP.
         // DHCP is unsafe without a unique MAC — multiple devices would
@@ -345,7 +345,7 @@ void network_manager_get_default_config(network_config_t* config) {
         config->mac_address[4] = 0x00;
         config->mac_address[5] = 0x01;  // Fixed MAC: 34:D7:F5:30:00:01
         config->use_dhcp = false;
-        config->dhcp_timeout_ms = 0;
+        config->dhcp_timeout_ms = 30000;
         IP4_ADDR(&config->static_ip, 192, 168, 1, 201);
         IP4_ADDR(&config->static_netmask, 255, 255, 255, 0);
         IP4_ADDR(&config->static_gateway, 192, 168, 1, 1);
@@ -622,6 +622,8 @@ bool network_manager_process_dhcp(void) {
     // Start DHCP if not already started
     struct dhcp *dhcp = netif_dhcp_data(g_netif);
     if (dhcp == NULL || dhcp->state == DHCP_STATE_OFF) {
+        // Record DHCP start time for general timeout detection
+        g_dhcp_start_time = to_ms_since_boot(get_absolute_time());
         printf("DHCP: Starting DHCP client...\n");
         printf("DHCP: netif status: up=%d, link_up=%d\n", 
             netif_is_up(g_netif), netif_is_link_up(g_netif));
@@ -638,8 +640,7 @@ bool network_manager_process_dhcp(void) {
         }
         printf("DHCP: dhcp_start() returned OK\n");
         
-        // Record DHCP start time for general timeout detection
-        g_dhcp_start_time = to_ms_since_boot(get_absolute_time());
+
         core1_timer_set(CORE1_TIMER_DHCP_DISCOVER, g_network_config.dhcp_timeout_ms);
         // CRITICAL: Also set network timeout timer so sys_check_timeouts() gets called
         // This is needed for DHCP and ACD timers to advance properly

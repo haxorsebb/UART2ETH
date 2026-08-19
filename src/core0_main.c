@@ -253,10 +253,12 @@ static void core0_init_complete(void) {
  * This function only handles the actual waiting/sleeping part.
  */
 static void core0_idle_wait(void) {
-    // Drain any pending FIFO wake signals
-    while (multicore_fifo_rvalid()) {
-        multicore_fifo_pop_blocking();  
-    }
+    // Do NOT read the inter-core FIFO here. Since flash_safe_execute_core_init()
+    // the SDK lockout handler owns the SIO FIFO IRQ on this core and drains the
+    // FIFO in the ISR. A cross-core wake word only serves to raise that IRQ and
+    // exit __wfi(). Popping the FIFO from thread context races against the ISR:
+    // rvalid can be true here, the ISR consumes the word, and
+    // multicore_fifo_pop_blocking() then blocks forever (observed Core0 hang).
     // Wait for interrupt - power efficient
     // Work detection is handled elsewhere in the new architecture
     __wfi();
