@@ -333,7 +333,11 @@ void network_manager_get_default_config(network_config_t* config) {
         config->static_ip.addr = defaults->default_ip;
         config->static_netmask.addr = defaults->default_netmask;
         config->static_gateway.addr = defaults->default_gateway;
-        config->dhcp_timeout_ms = 30000;/* config->use_dhcp ? 30000 : 0; */
+        // Always a usable timeout, independent of use_dhcp: the value is
+        // persisted and the web interface can enable DHCP later without
+        // touching it. See ADR-006 "Sanitization of Loaded Configuration".
+        config->dhcp_timeout_ms = 30000;
+
     } else {
         // No valid factory defaults: use fixed MAC, disable DHCP.
         // DHCP is unsafe without a unique MAC — multiple devices would

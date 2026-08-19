@@ -211,6 +211,7 @@ bool flash_persistence_load_configuration(void) {
         }
 
         // Validate DHCP timeout (may be 0 or garbage from old flash data).
+        // See ADR-006 "Sanitization of Loaded Configuration" and TD-006.
         // A firmware revision persisted dhcp_timeout_ms = 0 when DHCP was
         // disabled; with 0 the network manager gives up on DHCP after the
         // first poll and falls back to the static IP even though a DHCP
