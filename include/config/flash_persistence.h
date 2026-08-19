@@ -24,11 +24,14 @@
 
 
 // Flash persistence constants - RP2350 Partition Table Approach
-#define FLASH_PERSISTENCE_RING_SIZE 8                    // 4 pages in ring buffer
+// Ring buffer geometry: 64 blocks x 8 KB = 512 KB = full configuration partition (ID=3).
+// Using the whole partition with small blocks maximises the erase budget: each
+// block is erased only once per 64 saves (see ADR-006).
+#define FLASH_PERSISTENCE_RING_SIZE 64                   // 64 blocks in ring buffer
 #define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
-#define FLASH_PERSISTENCE_BLOCK_SIZE 16*4096             // SRAM4 BANK SIZE
+#define FLASH_PERSISTENCE_BLOCK_SIZE (2*4096)            // 8 KB per block (2 x 4096-byte sectors)
 #define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
-#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
+#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 120000   // 120 seconds min interval between flash writes
 #define FLASH_PARTITION_FIRMWARE_A 0
 #define FLASH_PARTITION_FIRMWARE_B 1
 #define FLASH_PARTITION_FACTORY_DEFAULTS 2

@@ -273,7 +273,7 @@ static void enc28j60_netif_status_callback(struct netif *netif) {
                 printf("lwIP netif: IP address assigned: %s\n", ip_str);
             }
         } else {
-            printf("lwIP netif: Interface DOWN\n");
+            DEBUG_ONLY(printf("lwIP netif: Interface DOWN\n"));
         }
     });
 }
@@ -283,17 +283,17 @@ static void enc28j60_netif_status_callback(struct netif *netif) {
  */
 static void enc28j60_netif_link_callback(struct netif *netif) {
     if (netif_is_link_up(netif)) {
-        printf("lwIP netif: Link UP\n");
+        DEBUG_ONLY(printf("lwIP netif: Link UP\n"));
         // Send gratuitous ARP to announce our MAC-to-IP mapping.
         // This is critical after late cable insertion — without it,
         // the switch and peer devices don't know our MAC address,
         // so they can't deliver TCP SYN-ACK frames back to us.
         if (netif_is_up(netif) && !ip4_addr_isany(netif_ip4_addr(netif))) {
             etharp_gratuitous(netif);
-            printf("lwIP netif: Sent gratuitous ARP for %s\n",
-                   ip4addr_ntoa(netif_ip4_addr(netif)));
+            DEBUG_ONLY(printf("lwIP netif: Sent gratuitous ARP for %s\n",
+                   ip4addr_ntoa(netif_ip4_addr(netif))));
         }
     } else {
-        printf("lwIP netif: Link DOWN\n");
+        DEBUG_ONLY(printf("lwIP netif: Link DOWN\n"));
     }
 }

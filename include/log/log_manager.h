@@ -94,7 +94,7 @@ typedef uint16_t event_source_t;
 
 
 // Event type definitions with enum for automatic numbering and type safety
-typedef enum {
+enum {
     // System events (0-99)
     LOG_EVENT_SYSTEM_BOOT = 0,
     LOG_EVENT_SYSTEM_CLOCK,
@@ -219,15 +219,15 @@ typedef enum {
     LOG_EVENT_FIRMWARE_BUY_FAILED,
     LOG_EVENT_SYSTEM_REBOOT,
     
-    // Ringbuffer events (410-419) per ADR-012
-    LOG_EVENT_RINGBUFFER_WORK_START = 410,      // Ringbuffer processing started
-    LOG_EVENT_RINGBUFFER_WORK_COMPLETE = 411,   // Ringbuffer processing completed
+    // Ringbuffer events (420-429) per ADR-012
+    LOG_EVENT_RINGBUFFER_WORK_START = 420,      // Ringbuffer processing started
+    LOG_EVENT_RINGBUFFER_WORK_COMPLETE = 421,   // Ringbuffer processing completed
     
-    // Core0 work events (420-429) per ADR-012
-    LOG_EVENT_CORE0_WORK_CHECK = 420,           // Core0 checking for pending work
-    LOG_EVENT_CORE0_IDLE_WAIT = 421,            // Core0 entering idle wait
-    LOG_EVENT_CORE0_UART_WORK_START = 422,      // UART hardware work started
-    LOG_EVENT_CORE0_UART_WORK_COMPLETE = 423,   // UART hardware work completed
+    // Core0 work events (430-439) per ADR-012
+    LOG_EVENT_CORE0_WORK_CHECK = 430,           // Core0 checking for pending work
+    LOG_EVENT_CORE0_IDLE_WAIT = 431,            // Core0 entering idle wait
+    LOG_EVENT_CORE0_UART_WORK_START = 432,      // UART hardware work started
+    LOG_EVENT_CORE0_UART_WORK_COMPLETE = 433,   // UART hardware work completed
 
     // PERSISTENCE events (500-599)
     LOG_EVENT_PERSISTENCE_INIT_SUCCESS = 500,
@@ -303,7 +303,7 @@ typedef enum {
     
     // New Main state for reboot (ADR-017)
     LOG_MAIN_STATE_REBOOT
-} event_type_t;
+};
 
 // Base constants for state change logging
 #define MAIN_STATE_CHANGE_STRING_BASE   LOG_MAIN_STATE_INIT
@@ -311,15 +311,20 @@ typedef enum {
 #define CORE1_STATE_CHANGE_STRING_BASE  LOG_CORE1_INIT_PERISTENCE
 
 
+typedef uint16_t event_type_t;       // this is what goes in the struct
 // Fixed-size log entry structure (16 bytes total, 32-bit aligned)
 typedef struct {
     uint32_t timestamp;             // System timestamp in milliseconds
     event_source_t event_source;    // Event source (UART0-3, NETWORK, etc.) - uint16_t
     uint16_t event_number;          // Per-core sequence counter
     log_level_t log_level;          // DEBUG, INFO, WARN, ERROR - uint16_t
-    event_type_t event_type;        // Explicitly numbered event enum - uint16_t
+    event_type_t event_type;            // Explicitly numbered event enum - uint16_t
     uint32_t event_extra_value;     // Context-specific parameter
 } __attribute__((packed, aligned(4))) log_entry_t;
+
+_Static_assert(sizeof(event_type_t) == 2, "event_type_t must be 16-bit");   // C
+// static_assert(sizeof(event_type_t) == 2, "...");                         // C++
+_Static_assert(sizeof(log_entry_t) == 16, "log_entry_t must be 16 bytes");
 
 // Function declarations
 

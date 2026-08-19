@@ -106,7 +106,7 @@ bool flash_persistence_init(void) {
     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_FLASH_PARTITION_OFFSET, 
               g_flash_state.partition_start_offset);
     
-    // Verify partition size is sufficient for 8-block ring buffer
+    // Verify partition size is sufficient for the ring buffer (RING_SIZE x BLOCK_SIZE)
     uint32_t required_size = FLASH_PERSISTENCE_RING_SIZE * FLASH_PERSISTENCE_BLOCK_SIZE;
     if (g_flash_state.partition_size < required_size) {
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_INIT, required_size);
@@ -275,7 +275,7 @@ bool flash_persistence_save_configuration_if_needed(void) {
         return true;  // No changes to save
     }
     
-    // Check write frequency limiting (30 seconds minimum interval)
+    // Check write frequency limiting (FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS minimum interval)
     uint32_t current_time_ms = to_ms_since_boot(get_absolute_time());
     uint32_t elapsed_ms = current_time_ms - g_flash_state.last_write_timestamp_ms;
     
@@ -307,7 +307,7 @@ bool flash_persistence_save_needed(void) {
         return false;  // No changes to save
     }
     
-    // Check write frequency limiting (30 seconds minimum interval)
+    // Check write frequency limiting (FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS minimum interval)
     uint32_t current_time_ms = to_ms_since_boot(get_absolute_time());
     uint32_t elapsed_ms = current_time_ms - g_flash_state.last_write_timestamp_ms;
     

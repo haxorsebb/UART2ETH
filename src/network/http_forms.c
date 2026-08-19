@@ -11,6 +11,7 @@
  */
 
 #include "network/http_forms.h"
+#include "debug.h"
 #include "network/http_server.h"
 #include "shared_memory.h"
 #include "flash_persistence.h"
@@ -360,7 +361,7 @@ bool http_parse_post_data(const char* post_data, size_t data_len,
     shared_memory_layout_t* layout = shared_memory_get_layout();
     bool config_changed = false;
     
-    printf("HTTP: Parsing configuration form data\n");
+    DEBUG_ONLY( printf("HTTP: Parsing configuration form data\n") );
     
     // CRITICAL FIX: Reset ALL checkbox flags first 
     // (unchecked checkboxes don't appear in POST data)
