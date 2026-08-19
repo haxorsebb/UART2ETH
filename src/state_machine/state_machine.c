@@ -995,17 +995,13 @@ void wake_other_core(wake_direction_t direction) {
  */
 int clear_doorbbell(wake_direction_t direction) {
     //clear the right doorbell - doorbell functionality disabled
+    // Do NOT read the inter-core FIFO here: the SDK lockout handler owns the
+    // SIO FIFO IRQ and drains the FIFO in the ISR. Reading it from thread
+    // context races against the ISR and can block forever.
     if(direction == CORE0_WAKES_CORE1) {
-        // Clear any pending FIFO data instead
-        while (multicore_fifo_rvalid()) {
-            multicore_fifo_pop_blocking();
-        }
         return doorbell_core0_wakes_core1;
-    } 
+    }
     else {
-        while (multicore_fifo_rvalid()) {
-            multicore_fifo_pop_blocking();
-        }
         return doorbell_core1_wakes_core0;
     }
 }
@@ -1039,13 +1035,7 @@ void enable_doorbell_irq(wake_direction_t direction) {
  */
 extern void shared_doorbell_irq() {
     // The main purpose is to wake from wfi - doorbell functionality disabled
-    // Using FIFO IRQ instead
-    
-    // Clear any pending FIFO data to acknowledge the wake signal
-    while (multicore_fifo_rvalid()) {
-        multicore_fifo_pop_blocking();
-    }
-
-    // FIFO IRQ doesn't need manual clearing - it's level triggered
-    // and will clear automatically when FIFO is empty
+    // Using FIFO IRQ instead. Nothing to do here: the SDK lockout handler is
+    // the FIFO IRQ handler and drains the FIFO. This function must not read
+    // the FIFO (see clear_doorbbell()).
 }

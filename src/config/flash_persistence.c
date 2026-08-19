@@ -332,47 +332,36 @@ bool flash_persistence_force_save_configuration(void) {
         return false;
     }
 
-
-
-    
-    // Disable interrupts during flash operation
-    // (this is core_local)
-    uint32_t ints = save_and_disable_interrupts();
     if(g_flash_state.write_in_progress) {
-        restore_interrupts(ints);
         return false;
     }
 
     g_flash_state.write_in_progress = true;    
     //blocked now
     
+
     // Copy shared memory data
     memcpy(&shadow_block_copy.shared_memory_data, layout, TOTAL_SHARED_MEM_USABLE_SIZE);
     // Prepare flash block data structure
     shadow_block_copy.shared_memory_data.magic_number = FLASH_PERSISTENCE_MAGIC;
 
-    //keep doing stuff while we finish this write
-    restore_interrupts(ints);
-        
     // Calculate SHA256 checksum of the complete block (excluding the checksum field itself)
     // Since sha256_checksum is at the start of the struct, hash from magic_number onwards
     flash_calculate_sha256(&shadow_block_copy.shared_memory_data.magic_number,
                            sizeof(flash_persistence_block_t) - sizeof(shadow_block_copy.shared_memory_data.sha256_checksum),
                            shadow_block_copy.shared_memory_data.sha256_checksum);
-    
+        
     // Write to next block in ring buffer
     if (!write_flash_block(g_flash_state.current_write_block, &shadow_block_copy)) {
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_WRITE, 
                   g_flash_state.current_write_block);
         g_flash_state.corruption_events++;
         
-        ints = save_and_disable_interrupts();
         g_flash_state.write_in_progress = false;  
-        restore_interrupts(ints);
         //unblocked now
         return false;
     }
-    
+
     // Update persistence state
     g_flash_state.last_written_revision = shadow_block_copy.shared_memory_data.revision_counter;
     g_flash_state.last_write_timestamp_ms = to_ms_since_boot(get_absolute_time());
@@ -381,11 +370,8 @@ bool flash_persistence_force_save_configuration(void) {
     // Advance to next block in ring buffer
     advance_ring_buffer_position();
     
-    ints = save_and_disable_interrupts();
     g_flash_state.write_in_progress = false;  
-    restore_interrupts(ints);
     //unblocked now
-
     log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_INFO, LOG_EVENT_CONFIG_SAVED, 
               layout->revision_counter);
     
@@ -619,25 +605,24 @@ static bool write_flash_block(uint32_t block_index, const flash_persistence_bloc
         {
             //check if the sector is different to the data
             if(!needs_update && old_data[data_idx] != new_data[data_idx] ) {
-                needs_update = true;
-                DEBUG_ONLY({
-                    printf("-5 needs update at 0x%x (0x%x!=0x%x)!\n", data_idx, old_data[data_idx], new_data[data_idx]);
-                });
+                needs_update=true;
                 break;
             }
         }
        
         if(needs_update) {
-            // Erase the entire block (sets all bytes to 0xFF)
+            log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_WRITE_SECTOR_UPDATE, sector_idx);
+                
+            // Erase the entire sector (sets all bytes to 0xFF)
             // Flash is "execute in place" and so will be in use when any code that is stored in flash runs, e.g. an interrupt handler
             // or code running on a different core.
             // Calling flash_range_erase or flash_range_program at the same time as flash is running code would cause a crash.
             // flash_safe_execute disables interrupts and tries to cooperate with the other core to ensure flash is not in use
             // See the documentation for flash_safe_execute and its assumptions and limitations
+            log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_ERASE, sector_idx);
             int rc = flash_safe_execute(call_flash_range_erase, (void*)flash_offset + (sector_idx*FLASH_SECTOR_SIZE), UINT32_MAX);
             if(rc != PICO_OK) {
                 printf("FLASH ERASE FAILED! Start: 0x%X\n", flash_offset + (sector_idx*FLASH_SECTOR_SIZE));
-                log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_ERASE, block_index);
                 log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_ERASE_FAILED, rc);
                 g_flash_state.corruption_events++;
                 write_ok=false;
@@ -649,12 +634,11 @@ static bool write_flash_block(uint32_t block_index, const flash_persistence_bloc
             // flash_safe_execute disables interrupts and tries to cooperate with the other core to ensure flash is not in use
             // See the documentation for flash_safe_execute and its assumptions and limitations
             // TODO: this could be done in FLASH_BLOCK_SIZE instead of FLASH SECTOR_SIZE
+            log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_PROGRAM, sector_idx);
             uintptr_t params[] = { (uintptr_t)(flash_offset + (sector_idx*FLASH_SECTOR_SIZE)), (uintptr_t)new_data};
             rc = flash_safe_execute(call_flash_range_program, params, UINT32_MAX);
             if(rc != PICO_OK) {
-                printf("FLASH PROGRAM FAILED! Start: 0x%X\n",flash_offset + (sector_idx*FLASH_SECTOR_SIZE));
-                log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_ERASE, block_index);
-                log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_ERASE_FAILED, rc);
+                log_event(EVENT_SOURCE_PERSISTENCE, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_PROGRAM_FAILED, rc);
                 g_flash_state.corruption_events++;
                 write_ok=false;
             }
@@ -663,15 +647,13 @@ static bool write_flash_block(uint32_t block_index, const flash_persistence_bloc
     }
     if(!write_ok)
     {
-        printf("WRITE FAILED!\n");
-        printf("WRITE FAILED!\n");
-        printf("WRITE FAILED!\n");
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FLASH_WRITE_FAILED, block_index);
     }
-    // Restore interrupts (this is core_local)
-    //restore_interrupts(ints);
-    
-    log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_WRITE, block_index);
-    
+    else 
+    {
+        log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_DEBUG, LOG_EVENT_FLASH_WRITE_SUCCESS, block_index);
+    }
+
     return true;
 }
 
