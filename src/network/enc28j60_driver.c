@@ -999,9 +999,11 @@ bool enc28j60_send_packet(const enc28j60_packet_t* packet) {
             goto transfer_finished;
         }
 
-        // TX timeout: 10ms is sufficient for 10Mbps Ethernet
-        // A 1518-byte frame at 10Mbps takes ~1.2ms, plus overhead
-        core1_timer_set(CORE1_TIMER_NETWORK_TX_TIMEOUT, 10);
+        // TX timeout. Until the core 1 timer ISR was fixed (ADR-009, TD-008)
+        // this timer never expired and the effective timeout was the poll
+        // fallback below (~100 ms). A real 10 ms timeout caused TX resets and
+        // an RX stall; 100 ms keeps the historical behaviour. See TD-009.
+        core1_timer_set(CORE1_TIMER_NETWORK_TX_TIMEOUT, 100);
         enc28j60_unblock_interrupt();
 
         //wait for interrupt, either ENC28J60_EIR_TXIF (good case) or CORE1_TIMER_NETWORK_TX_TIMEOUT (bad case)

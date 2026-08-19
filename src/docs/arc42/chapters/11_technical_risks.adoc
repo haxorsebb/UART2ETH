@@ -334,6 +334,14 @@ The following technical debts have been identified and require future resolution
 **Effort:** Low (1 day) +
 **Resolution Plan:** Resolved 2026-08: IRQ line derived with `timer_hardware_alarm_get_irq_num()`, alarms claimed with `hardware_alarm_claim()`, set/cancel made ISR-safe (ADR-009, "Timer instance and IRQ line"). Acceptance: the previously failing `test_core1_timer` cases and the new `test_core0_timer` expiry cases pass. Follow-up: review whether any caller relied on timers never expiring (DHCP discover timeout behaviour after the fix)
 
+==== TD-009: ENC28J60 TX Timeout Value Not Validated
+
+**Description:** `enc28j60_send_packet()` arms `CORE1_TIMER_NETWORK_TX_TIMEOUT` and aborts the transmission with `enc28j60_reset_tx_logic()` when it expires. The code specified 10 ms, but because the core 1 timer ISR never ran (TD-008) the effective timeout was the 1000-iteration poll fallback, roughly 100 ms. With the ISR fixed, a real 10 ms timeout produced ~950 TX errors in 3 minutes and the driver ended in an RX stall (packet pending flag set, receive counter frozen, core 1 spinning). The value was set to 100 ms to restore the previous effective behaviour; a 10 minute soak was then stable +
+**Impact:** The correct TX timeout for this hardware and link partner is unknown; 100 ms is the historical value, not a derived one. The RX stall after repeated TX resets is a separate driver robustness issue (errata 12/13 handling) +
+**Priority:** Medium +
+**Effort:** Low to measure (TX duration histogram), Medium to fix the stall +
+**Resolution Plan:** Measure actual TX completion times under load, derive a timeout with margin, and make the RX path recover from a TX reset. Until then keep 100 ms
+
 === Risk Mitigation Plan
 
 ==== Immediate Actions (Next 30 Days)

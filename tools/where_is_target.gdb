@@ -5,7 +5,10 @@ set pagination off
 target extended-remote :3333
 monitor halt
 info threads
-bt 12
+thread 1
+bt 8
+thread 2
+bt 8
 monitor resume
 detach
 quit
