@@ -246,6 +246,28 @@ void test_core1_timer_edge_cases(void) {
     TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_NETWORK_TIMEOUT));
 }
 
+/**
+ * @brief Test the PHY link poll timer used by core1_check_for_pending_work()
+ *
+ * ADR-007 ("Core 1 idle wait"): the 500 ms link poll is timer-driven so the
+ * alarm IRQ terminates __wfi() on core 1. The timer must expire, and it must
+ * be re-armable so the poll repeats.
+ */
+void test_core1_timer_link_poll(void) {
+    core1_timer_set(CORE1_TIMER_LINK_POLL, 30);
+    TEST_ASSERT_TRUE(core1_timer_is_active(CORE1_TIMER_LINK_POLL));
+    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_LINK_POLL));
+
+    sleep_ms(40);
+    TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_LINK_POLL));
+
+    // Re-arm as the poll loop does after each expiry
+    core1_timer_set(CORE1_TIMER_LINK_POLL, 30);
+    TEST_ASSERT_FALSE(core1_timer_is_expired(CORE1_TIMER_LINK_POLL));
+    sleep_ms(40);
+    TEST_ASSERT_TRUE(core1_timer_is_expired(CORE1_TIMER_LINK_POLL));
+}
+
 // Unity test runner
 int main(void) {
     stdio_init_all();
@@ -262,6 +284,7 @@ int main(void) {
     RUN_TEST(test_core1_timer_accuracy);
     RUN_TEST(test_core1_timer_concurrent_expiration);
     RUN_TEST(test_core1_timer_edge_cases);
+    RUN_TEST(test_core1_timer_link_poll);
     
     while (true) {
         printf("Tests completed\n");

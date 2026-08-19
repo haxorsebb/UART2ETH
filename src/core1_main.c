@@ -42,6 +42,9 @@
 #include "flash_persistence.h"
 #include "update/update_manager.h"
 
+// PHY link status poll period (ADR-007, "Core 1 idle wait")
+#define CORE1_LINK_POLL_INTERVAL_MS 500
+
 
 
 // Forward declarations for Core1 state functions
@@ -146,7 +149,7 @@ void core1_main(void) {
                         core1_init_complete();
                         break;
                     case CORE1_INIT_IDLE:
-                        core1_idle_wait();  // WFI - wait for interrupts, until main state changes
+                        core1_idle_wait();  // sleep until IRQ or doorbell (main state change)
                         break;
                     case CORE1_INIT_ERROR:
                         state_machine_process_main_event(MAIN_EVENT_SYSTEM_ERROR);
@@ -172,7 +175,7 @@ void core1_main(void) {
                         core1_configuration_complete();
                         break;
                     case CORE1_CONFIG_IDLE:
-                        core1_idle_wait();  // WFI - wait for interrupts, until main state changes
+                        core1_idle_wait();  // sleep until IRQ or doorbell (main state change)
                         break;   
                     case CORE1_CONFIG_ERROR:
                         core1_idle_wait();  // wait for config changes
@@ -268,12 +271,13 @@ static bool core1_check_for_pending_work(void) {
     // interaction issues). Instead, poll the PHY link status register
     // directly every 500ms. This is cheap (one SPI register read) and
     // guarantees cable insertion/removal is always detected.
+    // The poll is driven by CORE1_TIMER_LINK_POLL so that its alarm IRQ
+    // terminates __wfi() in core1_idle_wait() (ADR-007, "Core 1 idle wait").
     {
-        static uint32_t last_link_poll_time = 0;
         static bool last_polled_link = false;
-        uint32_t now = to_ms_since_boot(get_absolute_time());
-        if (now - last_link_poll_time > 500) {
-            last_link_poll_time = now;
+        if (!core1_timer_is_active(CORE1_TIMER_LINK_POLL) ||
+            core1_timer_is_expired(CORE1_TIMER_LINK_POLL)) {
+            core1_timer_set(CORE1_TIMER_LINK_POLL, CORE1_LINK_POLL_INTERVAL_MS);
             bool phy_link = enc28j60_get_link_status();
             if (phy_link != last_polled_link) {
                 /*
@@ -383,24 +387,26 @@ static void core1_work_or_idle_wait(void) {
 }
 
 /**
- * @brief Idle state - short sleep for polling
- * 
- * CRITICAL FIX: Do NOT use __wfi() - it causes deadlocks with edge-triggered interrupts.
- * The ENC28J60 uses edge-triggered GPIO interrupts. If the INT pin is already LOW
- * when we enter WFI, no new edge will occur and we hang forever.
- * 
- * Use 1ms sleep - this provides responsive networking (~1ms latency) while
- * avoiding the SPI bus contention issues that occur with faster polling.
- * The ENC28J60 needs time between register accesses for reliable operation.
+ * @brief Idle state - sleep until an interrupt
+ *
+ * Wake sources, all of which raise an IRQ on core 1 (ADR-007, "Core 1 idle wait"):
+ * - the wake doorbell rung by core 0 (ringbuffer data, main state change),
+ * - the core 1 timer alarm (network timeouts, CORE1_TIMER_LINK_POLL),
+ * - the ENC28J60 INT falling edge.
+ *
+ * The ENC28J60 INT pin is edge-triggered but the chip holds INT low until its
+ * flags are serviced, so no new edge arrives while INT is already low. Do not
+ * sleep in that case (risk R-010). An edge between the guard and __wfi() sets
+ * the NVIC pending bit and __wfi() returns at once, so that race is benign.
+ *
+ * The inter-core FIFO is never read here; it belongs to the SDK lockout
+ * mechanism behind flash_safe_execute().
  */
 static void core1_idle_wait(void) {
-    // Do NOT read the inter-core FIFO here. The SDK lockout handler owns the
-    // SIO FIFO IRQ on this core (flash_safe_execute_core_init()) and drains the
-    // FIFO in the ISR. Popping from thread context races against the ISR and
-    // can block forever in multicore_fifo_pop_blocking(). See core0_idle_wait().
-    // 1ms sleep provides good balance between responsiveness and reliability
-    // Faster polling can cause SPI timing issues with the ENC28J60
-    sleep_ms(1);
+    if (enc28j60_wake_pending()) {
+        return;
+    }
+    __wfi();
 }
 
 
@@ -425,7 +431,8 @@ static void core1_initialize(void) {
     g_configuration_loaded = false;
     g_config_loading_cycles = 0;
     
-    enable_doorbell_irq(CORE1_WAKES_CORE0);
+    // Let core 0 terminate our __wfi() via doorbell (ADR-007, "Cross-Core Wake-Up")
+    state_machine_enable_wake_irq();
     core1_timer_init();
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
     

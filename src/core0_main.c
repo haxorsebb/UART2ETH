@@ -205,7 +205,8 @@ static void core0_initialize(void) {
     g_uart_recovery_attempts = 0;
     g_system_recovery_attempts = 0;
     
-    enable_doorbell_irq(CORE0_WAKES_CORE1);
+    // Let core 1 terminate our __wfi() via doorbell (ADR-007, "Cross-Core Wake-Up")
+    state_machine_enable_wake_irq();
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0);
 }
 
@@ -253,14 +254,10 @@ static void core0_init_complete(void) {
  * This function only handles the actual waiting/sleeping part.
  */
 static void core0_idle_wait(void) {
-    // Do NOT read the inter-core FIFO here. Since flash_safe_execute_core_init()
-    // the SDK lockout handler owns the SIO FIFO IRQ on this core and drains the
-    // FIFO in the ISR. A cross-core wake word only serves to raise that IRQ and
-    // exit __wfi(). Popping the FIFO from thread context races against the ISR:
-    // rvalid can be true here, the ISR consumes the word, and
-    // multicore_fifo_pop_blocking() then blocks forever (observed Core0 hang).
-    // Wait for interrupt - power efficient
-    // Work detection is handled elsewhere in the new architecture
+    // Sleep until any interrupt: UART/DMA IRQs, the core 0 timer alarm, or the
+    // wake doorbell rung by core 1 (ADR-007, "Cross-Core Wake-Up").
+    // The inter-core FIFO is never touched here; it belongs to the SDK lockout
+    // mechanism behind flash_safe_execute().
     __wfi();
 }
 

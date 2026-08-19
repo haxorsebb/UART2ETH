@@ -1360,6 +1360,22 @@ bool enc28j60_has_pending_interrupt(void) {
 }
 
 /**
+ * @brief Guard for core 1's __wfi(): is there ENC28J60 work that would not
+ *        raise a new edge IRQ? (ADR-007 "Core 1 idle wait", R-010)
+ */
+bool enc28j60_wake_pending(void) {
+    if (!g_driver_initialized) {
+        // Pin not configured yet; be conservative and let the caller poll.
+        return true;
+    }
+    if (g_interrupt_pending) {
+        return true;
+    }
+    // INT is active low and stays low until EIR flags are serviced.
+    return gpio_get(ENC28J60_INTERRUPT_PIN) == 0;
+}
+
+/**
  * @brief Process pending interrupts
  */
 bool enc28j60_process_interrupts(bool forced) {
