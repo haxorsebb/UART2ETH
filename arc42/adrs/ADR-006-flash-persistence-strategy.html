@@ -411,6 +411,7 @@
 <li><a href="#_ring_buffer_state_management">Ring Buffer State Management</a></li>
 <li><a href="#_memory_layout_and_data_structures">Memory Layout and Data Structures</a></li>
 <li><a href="#_implementation_phases_completed">Implementation Phases (Completed)</a></li>
+<li><a href="#_sanitization_of_loaded_configuration">Sanitization of Loaded Configuration</a></li>
 <li><a href="#_function_interface_design">Function Interface Design</a></li>
 <li><a href="#_test_strategy">Test Strategy</a></li>
 <li><a href="#_implementation_constants">Implementation Constants</a></li>
@@ -937,7 +938,46 @@ static shared_memory_layout_t* g_shared_memory =
 1. Startup recovery validates all 8 blocks, selects highest valid revision
 2. Factory reset erases all blocks and calls <code>shared_memory_force_reinit()</code>
 3. Comprehensive error logging via <code>log_event()</code> API
-4. Device mode enforcement after flash load (GPIO pins, channel enables)</p>
+4. Device mode enforcement after flash load (GPIO pins, channel enables)
+5. Sanitization of persisted value ranges after flash load (see below)</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_sanitization_of_loaded_configuration">Sanitization of Loaded Configuration</h3>
+<div class="paragraph">
+<p>A block that passes the SHA256 check is structurally intact but its field values
+may still be wrong for the running firmware: an older firmware may have written
+a value that was legal then but is not now, or a field that was added later may
+contain whatever the previous layout had at that offset. <code>flash_persistence_load_configuration()</code>
+therefore range-checks such fields on the loaded layout before it is used and
+resets out-of-range values to their defaults, printing a <code>Flash: Fixed &#8230;&#8203;</code> line.
+The checks live inline in the load function next to the device-mode enforcement.</p>
+</div>
+<div class="paragraph">
+<p>Current rules:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>config.channels[ch].tcp_port</code> outside 1024..65535 &#8594; <code>4001 + ch</code></p>
+</li>
+<li>
+<p><code>config.network.dhcp_timeout_ms</code> outside 1000..300000 ms &#8594; 30000 ms</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Background for the DHCP rule: since commit <code>258439c</code> <code>network_manager_get_default_config()</code>
+initialised <code>dhcp_timeout_ms</code> to 0 when DHCP was disabled. Devices that persisted a
+configuration in that state and later enabled DHCP via the web interface (which does
+not touch <code>dhcp_timeout_ms</code>) kept the 0. The network manager then timed out the DHCP
+exchange after the first poll (~1 ms) and fell back to the static IP although a DHCP
+server was present. The default is now 30000 ms regardless of <code>use_dhcp</code>, and the
+load-time check heals already affected devices on the next boot without a factory
+reset.</p>
+</div>
+<div class="paragraph">
+<p>Any new persisted field with a restricted value range must get a rule here.</p>
 </div>
 </div>
 <div class="sect2">
