@@ -326,6 +326,14 @@ The following technical debts have been identified and require future resolution
 **Effort:** Low (1-2 days) +
 **Resolution Plan:** Resolved by the doorbell-based wake-up described in ADR-007 ("Cross-Core Wake-Up"). The FIFO is now SDK-only. Kept here as a record for anyone who finds references to the FIFO wake words in old commits or logs
 
+==== TD-008: Per-Core Timer ISRs Were Wired to the Wrong IRQ Lines (resolved)
+
+**Description:** `core0_timer.c` and `core1_timer.c` armed alarms 0 and 1 of `timer_hw` (TIMER0 on RP2350) but installed and enabled their ISRs on `TIMER1_IRQ_0` / `TIMER1_IRQ_1`. The alarm interrupts pended on TIMER0's NVIC lines where no handler was enabled, so neither ISR ever ran. Timers only became "expired" through the zero-interval shortcut in `*_timer_set()`. Network code masked this by arming `CORE1_TIMER_NETWORK_TIMEOUT` with `sys_timeouts_sleeptime()`, which is often 0, and by the former 1 ms polling on core 1. `test_core1_timer` had been failing (and hanging in `test_core1_timer_accuracy`) for this reason +
+**Impact:** Timers with real intervals (`CORE1_TIMER_DHCP_DISCOVER`, `CORE1_TIMER_NETWORK_TX_TIMEOUT`, all core 0 timers) did not fire; with core 1 now sleeping in `__wfi()` (ADR-007) the alarm IRQ is a required wake source +
+**Priority:** High (resolved) +
+**Effort:** Low (1 day) +
+**Resolution Plan:** Resolved 2026-08: IRQ line derived with `timer_hardware_alarm_get_irq_num()`, alarms claimed with `hardware_alarm_claim()`, set/cancel made ISR-safe (ADR-009, "Timer instance and IRQ line"). Acceptance: the previously failing `test_core1_timer` cases and the new `test_core0_timer` expiry cases pass. Follow-up: review whether any caller relied on timers never expiring (DHCP discover timeout behaviour after the fix)
+
 === Risk Mitigation Plan
 
 ==== Immediate Actions (Next 30 Days)

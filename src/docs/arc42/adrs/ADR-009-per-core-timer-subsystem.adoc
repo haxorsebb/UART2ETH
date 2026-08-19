@@ -138,10 +138,35 @@ typedef struct {
 
 === Hardware Timer Integration
 * **Timer Alarm 0**: Dedicated to Core0 timer subsystem
-* **Timer Alarm 1**: Dedicated to Core1 timer subsystem  
+* **Timer Alarm 1**: Dedicated to Core1 timer subsystem
 * **Interrupt handling**: Each core registers its own timer alarm ISR
 * **Next alarm calculation**: ISR finds minimum expiration time among active timers
 * **Automatic rescheduling**: Hardware alarm set to next expiration time
+
+==== Timer instance and IRQ line (clarified 2026-08-19)
+
+RP2350 has two timer peripherals (TIMER0, TIMER1), each with four alarms and
+four NVIC lines. Both per-core subsystems use alarms of the SDK default
+instance `timer_hw` (TIMER0 unless `PICO_DEFAULT_TIMER` is changed). The NVIC
+line for an alarm must therefore be derived from the instance and alarm number
+with `timer_hardware_alarm_get_irq_num(timer_hw, alarm)`; it must not be
+hard-coded. The alarm is claimed with `hardware_alarm_claim()` so that a
+collision with the SDK alarm pool (alarm 3 by default) is detected at start-up.
+
+Until 2026-08 both modules hard-coded `TIMER1_IRQ_0` / `TIMER1_IRQ_1` while
+arming alarms on TIMER0. The alarm ISRs never ran; timers only reached the
+expired state through the "zero interval = immediately expired" shortcut in
+`*_timer_set()`. See chapter 11, TD-008.
+
+==== Concurrency between thread context and ISR
+
+`*_timer_set()` and `*_timer_cancel()` are called from thread context (and, for
+core 1, from the ENC28J60 TX path) while the alarm ISR scans and rewrites the
+same timer array. The set/cancel bodies therefore run with interrupts disabled
+on the calling core (`save_and_disable_interrupts()` / `restore_interrupts()`).
+The sections are short (one array entry plus a scan of at most 16 entries) and
+do not block the other core, which keeps the "zero cross-core contention"
+property of this ADR intact.
 
 === Timer Update Algorithm
 1. **Timer expiration check**: ISR scans all active timers, marks expired timers
