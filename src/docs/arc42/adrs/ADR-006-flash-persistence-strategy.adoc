@@ -232,6 +232,33 @@ static shared_memory_layout_t* g_shared_memory =
 2. Factory reset erases all blocks and calls `shared_memory_force_reinit()`
 3. Comprehensive error logging via `log_event()` API
 4. Device mode enforcement after flash load (GPIO pins, channel enables)
+5. Sanitization of persisted value ranges after flash load (see below)
+
+### Sanitization of Loaded Configuration
+
+A block that passes the SHA256 check is structurally intact but its field values
+may still be wrong for the running firmware: an older firmware may have written
+a value that was legal then but is not now, or a field that was added later may
+contain whatever the previous layout had at that offset. `flash_persistence_load_configuration()`
+therefore range-checks such fields on the loaded layout before it is used and
+resets out-of-range values to their defaults, printing a `Flash: Fixed ...` line.
+The checks live inline in the load function next to the device-mode enforcement.
+
+Current rules:
+
+* `config.channels[ch].tcp_port` outside 1024..65535 -> `4001 + ch`
+* `config.network.dhcp_timeout_ms` outside 1000..300000 ms -> 30000 ms
+
+Background for the DHCP rule: since commit `258439c` `network_manager_get_default_config()`
+initialised `dhcp_timeout_ms` to 0 when DHCP was disabled. Devices that persisted a
+configuration in that state and later enabled DHCP via the web interface (which does
+not touch `dhcp_timeout_ms`) kept the 0. The network manager then timed out the DHCP
+exchange after the first poll (~1 ms) and fell back to the static IP although a DHCP
+server was present. The default is now 30000 ms regardless of `use_dhcp`, and the
+load-time check heals already affected devices on the next boot without a factory
+reset.
+
+Any new persisted field with a restricted value range must get a rule here.
 
 ### Function Interface Design
 

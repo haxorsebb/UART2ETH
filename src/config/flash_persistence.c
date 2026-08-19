@@ -205,11 +205,30 @@ bool flash_persistence_load_configuration(void) {
             if (layout->config.channels[ch].tcp_port < 1024 || 
                 layout->config.channels[ch].tcp_port > 65535) {
                 layout->config.channels[ch].tcp_port = 4001 + ch;
-                printf("Flash: Fixed invalid port for channel %d -> %d\n", 
+                printf("Flash: Fixed invalid port for channel %d -> %d\n",
                        ch, layout->config.channels[ch].tcp_port);
             }
         }
-        
+
+        // Validate DHCP timeout (may be 0 or garbage from old flash data).
+        // See ADR-006 "Sanitization of Loaded Configuration" and TD-006.
+        // A firmware revision persisted dhcp_timeout_ms = 0 when DHCP was
+        // disabled; with 0 the network manager gives up on DHCP after the
+        // first poll and falls back to the static IP even though a DHCP
+        // server is present. Repair it here so existing devices recover
+        // without a factory reset.
+        {
+            const uint32_t DHCP_TIMEOUT_MIN_MS = 1000;
+            const uint32_t DHCP_TIMEOUT_MAX_MS = 300000;
+            const uint32_t DHCP_TIMEOUT_DEFAULT_MS = 30000;
+            uint32_t timeout = layout->config.network.dhcp_timeout_ms;
+            if (timeout < DHCP_TIMEOUT_MIN_MS || timeout > DHCP_TIMEOUT_MAX_MS) {
+                layout->config.network.dhcp_timeout_ms = DHCP_TIMEOUT_DEFAULT_MS;
+                printf("Flash: Fixed invalid dhcp_timeout_ms %u -> %u\n",
+                       timeout, DHCP_TIMEOUT_DEFAULT_MS);
+            }
+        }
+
         // ALWAYS enforce GPIO pins from device_mode.h (hardware-specific, not configurable)
         layout->config.channels[CHANNEL_0].tx_gpio = DEVICE_UART0_TX_GPIO;
         layout->config.channels[CHANNEL_0].rx_gpio = DEVICE_UART0_RX_GPIO;
