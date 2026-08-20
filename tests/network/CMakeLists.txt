@@ -204,3 +204,34 @@ pico_set_uf2_family(test_http_server "rp2350-arm-s")
 
 # Create UF2 output
 pico_add_extra_outputs(test_http_server)
+
+# Test executable for runtime network state display on the device page
+# (arc42 Chapter 8, "Configured vs. Runtime Network State")
+add_executable(test_device_page_network_status
+    test_device_page_network_status.c
+)
+
+target_link_libraries(test_device_page_network_status
+    unity
+    http_server
+    http_pages
+    config_manager
+    state_machine
+    log_manager
+    network_manager
+    timer_subsystems
+    pico_stdlib
+    hardware_spi
+    hardware_gpio
+    utils
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_device_page_network_status 1)
+pico_enable_stdio_uart(test_device_page_network_status 1)
+
+# Set UF2 family for RP2350
+pico_set_uf2_family(test_device_page_network_status "rp2350-arm-s")
+
+# Create UF2 output
+pico_add_extra_outputs(test_device_page_network_status)
