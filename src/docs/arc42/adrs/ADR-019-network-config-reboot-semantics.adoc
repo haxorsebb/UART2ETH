@@ -66,7 +66,9 @@ no runtime configuration apply.
   configuration to flash — unchanged from before.
 * The form handler no longer sets `config_change_pending` and no longer
   triggers any runtime apply. The success message states that the change
-  takes effect after a reboot.
+  takes effect after a reboot, and the response page offers a
+  "Reboot now" control next to it, so the required user action is
+  available where the requirement is stated.
 * `core1_apply_configuration_changes()` and its trigger check in the Core1
   work loop are removed. `network_manager_reconfigure()` is called only
   during the boot sequence.
