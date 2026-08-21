@@ -23,6 +23,7 @@
 #include "unity.h"
 #include "network/http_forms.h"
 #include "network/http_pages/page_config.h"
+#include "network/http_pages/page_update.h"
 #include "shared_memory.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
@@ -187,6 +188,30 @@ void test_config_page_has_no_reboot_control_without_change(void) {
 }
 
 /**
+ * Test: The reboot confirmation page returns to the status page by itself.
+ *
+ * After POST /reboot the device resets while the confirmation is on
+ * screen. Without an automatic refresh the user has to know to reload
+ * manually once the device is back; with the meta refresh the browser
+ * lands on the status page after the boot completes.
+ */
+void test_reboot_page_auto_refreshes_to_status_page(void) {
+    static char page[8192];
+
+    http_generate_reboot_page(page, sizeof(page));
+
+    TEST_ASSERT_NOT_NULL_MESSAGE(
+        strstr(page, "http-equiv=\"refresh\""),
+        "Reboot confirmation must auto-refresh");
+    TEST_ASSERT_NOT_NULL_MESSAGE(
+        strstr(page, "url=/"),
+        "Auto-refresh must return to the status page");
+    TEST_ASSERT_NOT_NULL_MESSAGE(
+        strstr(page, "Reboot"),
+        "Reboot confirmation must state that the device reboots");
+}
+
+/**
  * Test: A stored channel 4 port change survives the persistence round
  * trip (save to flash, wipe RAM, load from flash).
  *
@@ -199,12 +224,11 @@ void test_config_page_has_no_reboot_control_without_change(void) {
  * flash_persistence_load_configuration().
  */
 void test_ch4_port_change_survives_persistence_round_trip(void) {
-    // Every test in this suite re-inits shared memory to revision 1 and
-    // saves as revision 2, so the flash ring holds several revision-2
-    // blocks from earlier tests. Raise the revision so the block written
-    // here is unambiguously the newest one for the loader's best-block
-    // search.
-    g_layout->revision_counter = 1000000 + g_layout->revision_counter;
+    // The flash ring persists across tests and across test runs, so blocks
+    // from earlier saves would compete with the block written here in the
+    // loader's best-block search. Start from a factory-reset ring for a
+    // deterministic arrangement.
+    flash_persistence_factory_reset();
 
     TEST_ASSERT_TRUE_MESSAGE(parse(POST_PREFIX "ch4_port=5001"),
                              "Handler must report a configuration change");
@@ -269,6 +293,7 @@ int main(void) {
     RUN_TEST(test_config_change_does_not_signal_live_apply);
     RUN_TEST(test_config_page_offers_reboot_after_change);
     RUN_TEST(test_config_page_has_no_reboot_control_without_change);
+    RUN_TEST(test_reboot_page_auto_refreshes_to_status_page);
     RUN_TEST(test_ch4_port_change_survives_persistence_round_trip);
     RUN_TEST(test_privileged_port_is_rejected);
     RUN_TEST(test_non_numeric_port_is_rejected);

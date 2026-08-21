@@ -647,9 +647,8 @@ static void http_handle_reboot_post(http_connection_t* conn,
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     if (http_handle_reboot_request(request_buffer, buffer_len)) {
-        // Reboot initiated - show confirmation page
-        http_generate_update_page(response_buffer, sizeof(response_buffer), 
-            "Reboot initiated. Device will restart in a few seconds. Please wait and then refresh this page.");
+        // Reboot initiated - confirmation auto-refreshes to the status page
+        http_generate_reboot_page(response_buffer, sizeof(response_buffer));
         http_send_response(conn, response_buffer, strlen(response_buffer));
     } else {
         // Reboot failed
@@ -657,6 +656,11 @@ static void http_handle_reboot_post(http_connection_t* conn,
             "Error: Failed to initiate reboot.");
         http_send_response(conn, response_buffer, strlen(response_buffer));
     }
+    // Responses are HTTP/1.0 without Content-Length: the browser only
+    // detects the end of the body when the connection closes. Close it
+    // before the deferred reboot resets the link, otherwise the page
+    // never finishes loading.
+    http_close_connection_after_send(conn);
 }
 
 /**

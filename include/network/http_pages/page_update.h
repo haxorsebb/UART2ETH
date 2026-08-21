@@ -35,4 +35,16 @@
  */
 void http_generate_update_page(char* buffer, size_t buffer_size, const char* message);
 
+/**
+ * @brief Generate the reboot confirmation page
+ *
+ * Returned by POST /reboot. States that the device reboots and
+ * auto-refreshes to the status page once the boot has completed
+ * (deferred reboot, ADR-019).
+ *
+ * @param buffer Output buffer for HTTP response
+ * @param buffer_size Size of output buffer in bytes
+ */
+void http_generate_reboot_page(char* buffer, size_t buffer_size);
+
 #endif // PAGE_UPDATE_H

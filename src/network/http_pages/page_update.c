@@ -167,3 +167,39 @@ void http_generate_update_page(char* buffer, size_t buffer_size, const char* mes
     
     printf("HTTP: Generated update page (%d bytes)\n", html_len);
 }
+
+void http_generate_reboot_page(char* buffer, size_t buffer_size) {
+    if (!buffer || buffer_size == 0) {
+        return;
+    }
+
+    // The refresh delay covers the deferred reboot grace period plus the
+    // boot to a working web server with a static IP. Under DHCP the boot
+    // can take longer; the user then refreshes manually once more.
+    int html_len = snprintf(buffer, buffer_size,
+        "HTTP/1.0 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head>\n"
+        "    <title>UART2ETH Reboot</title>\n"
+        "    <meta http-equiv=\"refresh\" content=\"10;url=/\">\n"
+        "    <link rel=\"stylesheet\" href=\"/styles.css\">\n"
+        "</head>\n"
+        "<body>\n"
+        "    <div class=\"container\">\n"
+        "        <div class=\"header\">\n"
+        "            <h1>Rebooting</h1>\n"
+        "        </div>\n"
+        "        <div class=\"message message-info\">\n"
+        "            Reboot initiated. The device restarts now and this page\n"
+        "            returns to the status page in a few seconds.\n"
+        "        </div>\n"
+        "    </div>\n"
+        "</body>\n"
+        "</html>\r\n");
+
+    printf("HTTP: Generated reboot page (%d bytes)\n", html_len);
+}
