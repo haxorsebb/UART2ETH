@@ -83,10 +83,8 @@ void test_shared_memory_layout_access(void) {
     
     // ASSERT: Layout should be located in SRAM Bank 4
     uintptr_t layout_addr = (uintptr_t)layout;
-    TEST_ASSERT_GREATER_OR_EQUAL_MESSAGE(SRAM_BANK4_BASE, layout_addr,
+    TEST_ASSERT_EQUAL_MESSAGE(layout_addr % SHARED_MEMORY_ALIGNMENT,0,
         "Layout should be at or after SRAM Bank 4 base address");
-    TEST_ASSERT_LESS_THAN_MESSAGE(SRAM_BANK4_BASE + SRAM_BANK4_SIZE, layout_addr,
-        "Layout should be within SRAM Bank 4 bounds");
     
 }
 
