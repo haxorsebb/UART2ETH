@@ -235,3 +235,79 @@ pico_set_uf2_family(test_device_page_network_status "rp2350-arm-s")
 
 # Create UF2 output
 pico_add_extra_outputs(test_device_page_network_status)
+
+# Test executable for reboot-based network configuration change semantics
+# (ADR-019 proposed: network configuration changes take effect at boot)
+add_executable(test_config_change_reboot_semantics
+    test_config_change_reboot_semantics.c
+)
+
+target_link_libraries(test_config_change_reboot_semantics
+    unity
+    http_server         # http_parse_post_data under test
+    config_manager
+    state_machine
+    log_manager
+    network_manager
+    timer_subsystems
+    pico_stdlib
+    hardware_spi
+    hardware_gpio
+    hardware_flash      # Flash persistence of the changed configuration
+    hardware_sha256     # Checksum for flash persistence blocks
+    pico_bootrom        # Partition table lookup for flash persistence
+    utils
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_config_change_reboot_semantics 1)
+pico_enable_stdio_uart(test_config_change_reboot_semantics 1)
+
+# Embed partition table: flash persistence needs the configuration partition
+pico_embed_pt_in_binary(test_config_change_reboot_semantics "${CMAKE_CURRENT_SOURCE_DIR}/../../partition_table.json")
+
+# Set UF2 family for RP2350
+pico_set_uf2_family(test_config_change_reboot_semantics "rp2350-arm-s")
+
+# Create UF2 output
+pico_add_extra_outputs(test_config_change_reboot_semantics)
+
+# Regression test: a configuration POST must not disturb the running network
+# (listeners and interface address); changed values take effect at boot
+# (ADR-019 proposed). Drives http_parse_post_data against the live stack.
+add_executable(test_config_change_runtime_stability
+    test_config_change_runtime_stability.c
+)
+
+target_link_libraries(test_config_change_runtime_stability
+    unity
+    http_server         # http_parse_post_data under test
+    tcp_socket_server   # multi_tcp_server listener observables
+    ringbuffer          # tcp_socket_server dependency
+    config_manager
+    state_machine
+    log_manager
+    network_manager
+    timer_subsystems
+    pico_stdlib
+    pico_multicore
+    hardware_spi
+    hardware_gpio
+    hardware_flash      # Flash persistence of the changed configuration
+    hardware_sha256     # Checksum for flash persistence blocks
+    pico_bootrom        # Partition table lookup for flash persistence
+    utils
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_config_change_runtime_stability 1)
+pico_enable_stdio_uart(test_config_change_runtime_stability 1)
+
+# Embed partition table: flash persistence needs the configuration partition
+pico_embed_pt_in_binary(test_config_change_runtime_stability "${CMAKE_CURRENT_SOURCE_DIR}/../../partition_table.json")
+
+# Set UF2 family for RP2350
+pico_set_uf2_family(test_config_change_runtime_stability "rp2350-arm-s")
+
+# Create UF2 output
+pico_add_extra_outputs(test_config_change_runtime_stability)

@@ -564,6 +564,48 @@ pico_enable_stdio_uart(test_gpio_loopback 1)
 
 pico_add_extra_outputs(test_gpio_loopback)
 
+# Test for deferred reboot mechanism (ADR-019 proposed, ADR-017 reboot path)
+# Verifies that a network-triggered reboot request keeps the system in
+# MAIN_STATE_OPERATIONAL for a grace period so the HTTP acknowledgement can
+# leave the device, and only then enters the ADR-017 reboot path.
+add_executable(test_deferred_reboot
+    test_deferred_reboot.c
+)
+
+target_include_directories(test_deferred_reboot PRIVATE
+    ../include
+    ../include/state_machine
+    ../include/config
+    ../include/log
+)
+
+target_link_libraries(test_deferred_reboot
+    unity
+    update_manager      # deferred_reboot + reboot reason handling
+    state_machine
+    config_manager
+    log_manager
+    network_manager     # Needed by config_manager (shared_memory.c)
+    timer_subsystems    # CORE1_TIMER_REBOOT_GRACE
+    pico_stdlib
+    pico_multicore      # State machine doorbell functions
+    hardware_sync
+    hardware_timer
+    hardware_irq
+    hardware_spi        # Needed by network_manager
+    hardware_gpio       # Needed by network_manager
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_deferred_reboot 1)
+pico_enable_stdio_uart(test_deferred_reboot 1)
+
+# Set UF2 family for RP2350
+pico_set_uf2_family(test_deferred_reboot "rp2350-arm-s")
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_deferred_reboot)
+
 # Add network tests subdirectory
 add_subdirectory(network)
 

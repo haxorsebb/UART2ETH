@@ -20,6 +20,7 @@
 #include "device_mode.h"
 #include "log_manager.h"
 #include "update/update_manager.h"
+#include "update/deferred_reboot.h"
 #include "state_machine/state_machine.h"
 #include "debug.h"
 #include "pico/stdlib.h"
@@ -715,11 +716,13 @@ static void http_handle_update_post(http_connection_t* conn,
         /* printf("HTTP Upload: Upload complete in single packet\n"); */
         multipart_reset_context(&conn->multipart_ctx);
         http_generate_update_page(response_buffer, sizeof(response_buffer),
-            "Firmware uploaded successfully! Device will reboot to apply the update.");
+            "Firmware uploaded successfully! Device needs reboot to apply the update.");
         http_send_response(conn, response_buffer, strlen(response_buffer));
-        
-        // Trigger reboot after short delay (allow response to be sent)
-        // TODO: Schedule reboot via state machine
+
+        // The user triggers the reboot via POST /reboot, which uses
+        // deferred_reboot_request() (ADR-019). If an automatic reboot after
+        // upload is wanted later, call
+        // deferred_reboot_request(REBOOT_REASON_UPDATE_COMPLETE) here.
     } else {
         // Multi-packet upload - connection will stay open for more data
         /* printf("HTTP Upload: Multi-packet upload in progress, waiting for more data...\n"); */
@@ -1002,9 +1005,11 @@ static void http_send_redirect(http_connection_t* conn, const char* location) {
 
 /**
  * @brief Handle reboot request
- * 
- * Triggers a system reboot via watchdog reset.
- * 
+ *
+ * Requests a deferred reboot (ADR-019). The reset happens after
+ * DEFERRED_REBOOT_GRACE_MS via the ADR-017 reboot path, so the HTTP
+ * response to this request is transmitted before the device resets.
+ *
  * @param post_data POST request data
  * @param data_len Length of POST data
  * @return true if reboot initiated successfully
@@ -1012,11 +1017,8 @@ static void http_send_redirect(http_connection_t* conn, const char* location) {
 static bool http_handle_reboot_request(const char* post_data, size_t data_len) {
     (void)post_data;  // Unused
     (void)data_len;   // Unused
-    
-    /* printf("HTTP Server: Initiating reboot via watchdog\n"); */
-    
-    // Trigger watchdog reset with 1ms timeout
-    watchdog_reboot(0, 0, 1);
-    
+
+    deferred_reboot_request(REBOOT_REASON_USER_REQUESTED);
+
     return true;
 }
