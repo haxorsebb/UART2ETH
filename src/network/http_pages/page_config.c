@@ -31,7 +31,14 @@
  */
 void http_generate_config_page(char* buffer, size_t buffer_size,
                                const char* error_msg, size_t error_msg_size,
-                               const char* success_msg, size_t success_msg_size) {
+                               const char* success_msg, size_t success_msg_size,
+                               bool offer_reboot) {
+    // "Reboot now" control rendered next to the success message after a
+    // stored configuration change; changes take effect at boot (ADR-019).
+    static const char reboot_form_html[] =
+        "<form method=\"POST\" action=\"/reboot\" style=\"margin-top:8px\">"
+        "<button type=\"submit\" class=\"button button-danger\">Reboot now</button>"
+        "</form>";
     if (!buffer || buffer_size == 0) {
         return;
     }
@@ -114,7 +121,7 @@ void http_generate_config_page(char* buffer, size_t buffer_size,
         "        </div>\n"
         "        \n"
         "%s%s%s"
-        "%s%s%s"
+        "%s%s%s%s"
         "        <div class=\"current-status\">\n"
         "            <strong>Current Status:</strong> IP Address: %s | MAC: %s | DHCP: %s\n"
         "        </div>\n"
@@ -236,6 +243,7 @@ void http_generate_config_page(char* buffer, size_t buffer_size,
         error_msg_size > 0 ? "</div>" : "",
         success_msg_size > 0 ? "<div class=\"section\" style=\"background-color:#d5f5e3;border-left:4px solid #27ae60\">" : "",
         success_msg_size > 0 ? success_msg : "",
+        (success_msg_size > 0 && offer_reboot) ? reboot_form_html : "",
         success_msg_size > 0 ? "</div>" : "",
         current_ip_str, mac_str, layout->config.network.use_dhcp ? "Enabled" : "Disabled",
         layout->config.network.use_dhcp ? "checked" : "",

@@ -245,6 +245,7 @@ add_executable(test_config_change_reboot_semantics
 target_link_libraries(test_config_change_reboot_semantics
     unity
     http_server         # http_parse_post_data under test
+    http_pages          # http_generate_config_page under test
     config_manager
     state_machine
     log_manager

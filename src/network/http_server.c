@@ -507,7 +507,7 @@ static void http_handle_config_get(http_connection_t* conn,
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     http_generate_config_page(response_buffer, sizeof(response_buffer),
-                              NULL, 0, NULL, 0);
+                              NULL, 0, NULL, 0, false);
     http_send_response(conn, response_buffer, strlen(response_buffer));
     http_close_connection_after_send(conn);
 }
@@ -599,13 +599,16 @@ static void http_handle_config_post(http_connection_t* conn,
     char error_msg[128] = {0};
     char success_msg[128] = {0};
     
-    http_parse_post_data(request_buffer, buffer_len,
-                         error_msg, sizeof(error_msg),
-                         success_msg, sizeof(success_msg));
-    
+    // A stored change takes effect at boot (ADR-019); offer the reboot as
+    // the required next user action directly on the response page.
+    bool config_changed = http_parse_post_data(request_buffer, buffer_len,
+                                               error_msg, sizeof(error_msg),
+                                               success_msg, sizeof(success_msg));
+
     http_generate_config_page(response_buffer, sizeof(response_buffer),
                               error_msg, strlen(error_msg),
-                              success_msg, strlen(success_msg));
+                              success_msg, strlen(success_msg),
+                              config_changed);
     http_send_response(conn, response_buffer, strlen(response_buffer));
 }
 
@@ -625,10 +628,11 @@ static void http_handle_password_post(http_connection_t* conn,
     http_handle_password_change(request_buffer, buffer_len,
                                 error_msg, sizeof(error_msg),
                                 success_msg, sizeof(success_msg));
-    
+
     http_generate_config_page(response_buffer, sizeof(response_buffer),
                               error_msg, strlen(error_msg),
-                              success_msg, strlen(success_msg));
+                              success_msg, strlen(success_msg),
+                              false /* password change needs no reboot */);
     http_send_response(conn, response_buffer, strlen(response_buffer));
 }
 

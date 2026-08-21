@@ -22,6 +22,7 @@
 
 #include "unity.h"
 #include "network/http_forms.h"
+#include "network/http_pages/page_config.h"
 #include "shared_memory.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
@@ -146,6 +147,46 @@ void test_config_change_does_not_signal_live_apply(void) {
 }
 
 /**
+ * Test: After a stored configuration change, the config page offers a
+ * "Reboot now" control next to the success message.
+ *
+ * The reboot is the required next user action (changes take effect at
+ * boot); without a control on the same page the user has to know that the
+ * reboot button lives on the update page.
+ */
+void test_config_page_offers_reboot_after_change(void) {
+    static char page[16384];
+    const char* msg = "Configuration saved. Changes take effect after reboot.";
+
+    http_generate_config_page(page, sizeof(page),
+                              NULL, 0, msg, strlen(msg),
+                              true /* offer_reboot */);
+
+    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(page, "action=\"/reboot\""),
+        "Config page must contain a POST /reboot form after a stored change");
+    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(page, "Reboot now"),
+        "Config page must offer a 'Reboot now' control after a stored change");
+}
+
+/**
+ * Test: Without a stored change the config page has no reboot control.
+ *
+ * An always-present reboot button next to a "No changes detected" message
+ * would invite pointless reboots.
+ */
+void test_config_page_has_no_reboot_control_without_change(void) {
+    static char page[16384];
+    const char* msg = "No changes detected";
+
+    http_generate_config_page(page, sizeof(page),
+                              NULL, 0, msg, strlen(msg),
+                              false /* offer_reboot */);
+
+    TEST_ASSERT_NULL_MESSAGE(strstr(page, "action=\"/reboot\""),
+        "Config page must not contain a reboot form without a stored change");
+}
+
+/**
  * Test: Port values below 1024 are rejected and the configuration is
  * left unchanged (privileged port range, matches boot-time validation
  * in flash_persistence.c).
@@ -186,6 +227,8 @@ int main(void) {
     RUN_TEST(test_port_change_message_states_reboot_required);
     RUN_TEST(test_static_ip_change_is_stored_and_states_reboot_required);
     RUN_TEST(test_config_change_does_not_signal_live_apply);
+    RUN_TEST(test_config_page_offers_reboot_after_change);
+    RUN_TEST(test_config_page_has_no_reboot_control_without_change);
     RUN_TEST(test_privileged_port_is_rejected);
     RUN_TEST(test_non_numeric_port_is_rejected);
     return UNITY_END();
