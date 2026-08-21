@@ -982,8 +982,50 @@ bool network_manager_get_ip_address(simple_ip_addr_t* ip_addr) {
         ip_addr->addr = netif_ip4_addr(g_netif)->addr;
         return true;
     }
-    
+
     return false;
+}
+
+/**
+ * @brief Report whether the interface currently has a usable address
+ *
+ * Shared validity check for the runtime state accessors below. "Usable"
+ * means the netif is up and holds a non-zero IP address (static or via
+ * DHCP lease).
+ */
+static bool network_manager_runtime_state_valid(void) {
+    return g_network_initialized && g_netif && netif_is_up(g_netif) &&
+           !ip4_addr_isany(netif_ip4_addr(g_netif));
+}
+
+/**
+ * @brief Get current netmask active on the interface (runtime state)
+ *
+ * Documentation Reference: arc42 Chapter 8,
+ * "Configured vs. Runtime Network State"
+ */
+bool network_manager_get_netmask(simple_ip_addr_t* netmask) {
+    if (!netmask || !network_manager_runtime_state_valid()) {
+        return false;
+    }
+
+    netmask->addr = netif_ip4_netmask(g_netif)->addr;
+    return true;
+}
+
+/**
+ * @brief Get current gateway active on the interface (runtime state)
+ *
+ * Documentation Reference: arc42 Chapter 8,
+ * "Configured vs. Runtime Network State"
+ */
+bool network_manager_get_gateway(simple_ip_addr_t* gateway) {
+    if (!gateway || !network_manager_runtime_state_valid()) {
+        return false;
+    }
+
+    gateway->addr = netif_ip4_gw(g_netif)->addr;
+    return true;
 }
 
 /**

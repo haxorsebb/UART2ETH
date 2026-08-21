@@ -167,6 +167,24 @@ void network_manager_reset_stats(void);
 bool network_manager_get_ip_address(simple_ip_addr_t* ip_addr);
 
 /**
+ * Get current netmask active on the interface (runtime state).
+ * Under DHCP this is the DHCP-assigned netmask, not the configured static one.
+ * Documentation Reference: arc42 Chapter 8, "Configured vs. Runtime Network State"
+ * @param netmask Output for current netmask
+ * @return true if the interface is up and has a valid address, false otherwise
+ */
+bool network_manager_get_netmask(simple_ip_addr_t* netmask);
+
+/**
+ * Get current gateway active on the interface (runtime state).
+ * Under DHCP this is the DHCP-assigned gateway, not the configured static one.
+ * Documentation Reference: arc42 Chapter 8, "Configured vs. Runtime Network State"
+ * @param gateway Output for current gateway
+ * @return true if the interface is up and has a valid address, false otherwise
+ */
+bool network_manager_get_gateway(simple_ip_addr_t* gateway);
+
+/**
  * Get current MAC address
  * @param mac_addr Output buffer for 6-byte MAC address
  */

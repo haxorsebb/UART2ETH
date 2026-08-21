@@ -365,6 +365,38 @@ Persistent configuration includes:
 * Fallback to previous valid block if available
 * Complete factory reset if no valid blocks found
 
+==== Configured vs. Runtime Network State
+
+The system holds two distinct sets of network parameters that must not be conflated:
+
+* *Configured state*: `static_ip`, `static_netmask`, `static_gateway` in
+  `shared_memory_layout_t.config.network`. Persisted in flash. Only applied to
+  the interface when DHCP is disabled. This is what the configuration form on
+  the web interface edits and pre-fills.
+* *Runtime state*: the addresses currently active on the lwIP `netif`
+  (assigned by DHCP, or copied from the configured state in static mode).
+  This is what status displays must show.
+
+Rules:
+
+* Any display of the current network situation (device status page,
+  diagnostics, logs) reads the runtime state via the `network_manager`
+  accessors `network_manager_get_ip_address()`,
+  `network_manager_get_netmask()` and `network_manager_get_gateway()`.
+  These return `false` while the interface is down or unconfigured;
+  callers then display "Not Available" instead of a stale value.
+* Any configuration form reads and writes the configured state in shared
+  memory. It never reads the `netif`.
+* Code outside `network_manager` does not access the `netif` directly for
+  address information.
+
+Rationale: a defect existed where the device status page rendered the
+configured `static_gateway` and `static_netmask` while DHCP was active,
+permanently displaying the static values instead of the DHCP-assigned ones.
+The IP address on the same page already used the runtime accessor and was
+correct. Keeping one accessor per runtime address value makes the correct
+data source the obvious one.
+
 === Testing and Validation Strategy
 
 The UART2ETH system requires comprehensive validation to ensure protocol compliance, performance characteristics, and reliability under various operating conditions. This is achieved through a multi-layered testing approach combining unit tests, integration tests, and external black-box validation.

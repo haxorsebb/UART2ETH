@@ -70,19 +70,21 @@ void http_generate_device_page(char* buffer, size_t buffer_size) {
                  serial_decimal);
     }
     
-    // Format subnet mask
-    uint32_t nm = layout->config.network.static_netmask.addr;
-    char netmask_str[16];
-    snprintf(netmask_str, sizeof(netmask_str), "%d.%d.%d.%d",
-             (int)((nm >> 0) & 0xFF), (int)((nm >> 8) & 0xFF),
-             (int)((nm >> 16) & 0xFF), (int)((nm >> 24) & 0xFF));
-    
-    // Format gateway
-    uint32_t gw = layout->config.network.static_gateway.addr;
-    char gateway_str[16];
-    snprintf(gateway_str, sizeof(gateway_str), "%d.%d.%d.%d",
-             (int)((gw >> 0) & 0xFF), (int)((gw >> 8) & 0xFF),
-             (int)((gw >> 16) & 0xFF), (int)((gw >> 24) & 0xFF));
+    // Format subnet mask and gateway from the runtime state of the interface,
+    // not from the stored static configuration: under DHCP they differ.
+    // Documentation Reference: arc42 Chapter 8,
+    // "Configured vs. Runtime Network State"
+    simple_ip_addr_t runtime_addr;
+
+    char netmask_str[16] = "Not Available";
+    if (network_manager_get_netmask(&runtime_addr)) {
+        network_manager_ip_to_string(&runtime_addr, netmask_str);
+    }
+
+    char gateway_str[16] = "Not Available";
+    if (network_manager_get_gateway(&runtime_addr)) {
+        network_manager_ip_to_string(&runtime_addr, gateway_str);
+    }
     
 #if DEVICE_CHANNEL_2_ENABLED
     char uart2_pins[16];
