@@ -6202,6 +6202,58 @@ Output packets:
 * Complete factory reset if no valid blocks found</p>
 </div>
 </div>
+<div class="sect3">
+<h4 id="_configured_vs_runtime_network_state">8.5.4. Configured vs. Runtime Network State</h4>
+<div class="paragraph">
+<p>The system holds two distinct sets of network parameters that must not be conflated:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Configured state</strong>: <code>static_ip</code>, <code>static_netmask</code>, <code>static_gateway</code> in
+<code>shared_memory_layout_t.config.network</code>. Persisted in flash. Only applied to
+the interface when DHCP is disabled. This is what the configuration form on
+the web interface edits and pre-fills.</p>
+</li>
+<li>
+<p><strong>Runtime state</strong>: the addresses currently active on the lwIP <code>netif</code>
+(assigned by DHCP, or copied from the configured state in static mode).
+This is what status displays must show.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Rules:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Any display of the current network situation (device status page,
+diagnostics, logs) reads the runtime state via the <code>network_manager</code>
+accessors <code>network_manager_get_ip_address()</code>,
+<code>network_manager_get_netmask()</code> and <code>network_manager_get_gateway()</code>.
+These return <code>false</code> while the interface is down or unconfigured;
+callers then display "Not Available" instead of a stale value.</p>
+</li>
+<li>
+<p>Any configuration form reads and writes the configured state in shared
+memory. It never reads the <code>netif</code>.</p>
+</li>
+<li>
+<p>Code outside <code>network_manager</code> does not access the <code>netif</code> directly for
+address information.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Rationale: a defect existed where the device status page rendered the
+configured <code>static_gateway</code> and <code>static_netmask</code> while DHCP was active,
+permanently displaying the static values instead of the DHCP-assigned ones.
+The IP address on the same page already used the runtime accessor and was
+correct. Keeping one accessor per runtime address value makes the correct
+data source the obvious one.</p>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_testing_and_validation_strategy">8.6. Testing and Validation Strategy</h3>
