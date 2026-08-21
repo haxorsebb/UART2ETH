@@ -689,6 +689,36 @@ typedef struct {
 </li>
 </ul>
 </div>
+<div class="sect3">
+<h4 id="_timer_instance_and_irq_line_clarified_2026_08_19">Timer instance and IRQ line (clarified 2026-08-19)</h4>
+<div class="paragraph">
+<p>RP2350 has two timer peripherals (TIMER0, TIMER1), each with four alarms and
+four NVIC lines. Both per-core subsystems use alarms of the SDK default
+instance <code>timer_hw</code> (TIMER0 unless <code>PICO_DEFAULT_TIMER</code> is changed). The NVIC
+line for an alarm must therefore be derived from the instance and alarm number
+with <code>timer_hardware_alarm_get_irq_num(timer_hw, alarm)</code>; it must not be
+hard-coded. The alarm is claimed with <code>hardware_alarm_claim()</code> so that a
+collision with the SDK alarm pool (alarm 3 by default) is detected at start-up.</p>
+</div>
+<div class="paragraph">
+<p>Until 2026-08 both modules hard-coded <code>TIMER1_IRQ_0</code> / <code>TIMER1_IRQ_1</code> while
+arming alarms on TIMER0. The alarm ISRs never ran; timers only reached the
+expired state through the "zero interval = immediately expired" shortcut in
+<code>*_timer_set()</code>. See chapter 11, TD-008.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_concurrency_between_thread_context_and_isr">Concurrency between thread context and ISR</h4>
+<div class="paragraph">
+<p><code>*_timer_set()</code> and <code>*_timer_cancel()</code> are called from thread context (and, for
+core 1, from the ENC28J60 TX path) while the alarm ISR scans and rewrites the
+same timer array. The set/cancel bodies therefore run with interrupts disabled
+on the calling core (<code>save_and_disable_interrupts()</code> / <code>restore_interrupts()</code>).
+The sections are short (one array entry plus a scan of at most 16 entries) and
+do not block the other core, which keeps the "zero cross-core contention"
+property of this ADR intact.</p>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_timer_update_algorithm">Timer Update Algorithm</h3>

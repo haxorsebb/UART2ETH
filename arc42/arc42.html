@@ -7953,6 +7953,22 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 <td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-009</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Protocol Implementation Compliance</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HIGH</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">R-010</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Core 1 WFI Misses ENC28J60 Edge Interrupt</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>MEDIUM</strong></p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -8507,6 +8523,65 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 </tbody>
 </table>
 </div>
+<div class="sect3">
+<h4 id="_r_010_core_1_wfi_misses_enc28j60_edge_interrupt">11.2.10. R-010: Core 1 WFI Misses ENC28J60 Edge Interrupt</h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 75%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Category</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Technical</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Description</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Core 1 idles in <code><em>wfi()</code> (ADR-007, "Core 1 idle wait"). The ENC28J60 INT pin is a falling-edge GPIO IRQ, but the chip holds INT low until its interrupt flags are serviced, so no new edge occurs while INT is already low. If core 1 enters <code></em>wfi()</code> with INT low and no pending work, no IRQ arrives from the Ethernet controller until a timer or doorbell wakes the core</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low - <code>core1_idle_wait()</code> refuses to sleep when the driver reports a pending interrupt or the INT pin reads low; an edge between the guard and <code><em>wfi()</code> sets the NVIC pending bit and <code></em>wfi()</code> returns immediately</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High - Lost receive latency of up to one timer period (500 ms link poll timer) if the guard is ever bypassed or the driver clears INT without re-checking for new packets</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Risk Level</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>MEDIUM</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Current Controls</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Guard in <code>core1_idle_wait()</code> (pending flag and raw pin level)
+- <code>CORE1_TIMER_LINK_POLL</code> guarantees a wake-up at least every 500 ms
+- Core 1 timers (network timeouts) wake the core independently</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Additional Mitigation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Switch the GPIO IRQ to <code>GPIO_IRQ_LEVEL_LOW</code> with ISR self-masking and unmask in <code>enc28j60_process_interrupts()</code> if latency outliers are observed
+- Throughput test with continuous inbound traffic and compare latency histograms against the previous 1 ms polling build</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Owner</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Senior Developer</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Timeline</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Validate during doorbell feature test</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Early Warning Signs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">- Receive latency spikes near 500 ms
+- <code>enc28j60</code> pending-flag set while core 1 reports idle</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Review Date</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">After feature PR merge</p></td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_technical_debt_register">11.3. Technical Debt Register</h3>
@@ -8571,6 +8646,36 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 <strong>Priority:</strong> Medium<br>
 <strong>Effort:</strong> Medium (1 week: version field, per-version migration hook, tests)<br>
 <strong>Resolution Plan:</strong> Add a <code>config_schema_version</code> to the persisted block; on load, run migrations from the stored version to the current one, then sanitize. Until then, every PR that adds or re-scopes a persisted field must add a sanitization rule and a test</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_td_007_inter_core_fifo_shared_with_sdk_lockout_resolved">11.3.7. TD-007: Inter-Core FIFO Shared with SDK Lockout (resolved)</h4>
+<div class="paragraph">
+<p><strong>Description:</strong> Until 2026-08 cross-core wake-up pushed words into the SIO inter-core FIFO although <code>flash_safe_execute_core_init()</code> had handed the FIFO IRQ to the SDK lockout handler on both cores. The wake words were discarded by the lockout ISR; the doorbell functions named in ADR-007 were stubs; core 1 polled with <code>sleep_ms(1)</code> instead of <code>__wfi()</code><br>
+<strong>Impact:</strong> Dependence on an undocumented SDK behaviour, possible stall of <code>multicore_lockout_start_blocking()</code> when the 4-entry FIFO filled while the victim core had interrupts disabled, documentation and code disagreeing<br>
+<strong>Priority:</strong> High (resolved)<br>
+<strong>Effort:</strong> Low (1-2 days)<br>
+<strong>Resolution Plan:</strong> Resolved by the doorbell-based wake-up described in ADR-007 ("Cross-Core Wake-Up"). The FIFO is now SDK-only. Kept here as a record for anyone who finds references to the FIFO wake words in old commits or logs</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_td_008_per_core_timer_isrs_were_wired_to_the_wrong_irq_lines_resolved">11.3.8. TD-008: Per-Core Timer ISRs Were Wired to the Wrong IRQ Lines (resolved)</h4>
+<div class="paragraph">
+<p><strong>Description:</strong> <code>core0_timer.c</code> and <code>core1_timer.c</code> armed alarms 0 and 1 of <code>timer_hw</code> (TIMER0 on RP2350) but installed and enabled their ISRs on <code>TIMER1_IRQ_0</code> / <code>TIMER1_IRQ_1</code>. The alarm interrupts pended on TIMER0&#8217;s NVIC lines where no handler was enabled, so neither ISR ever ran. Timers only became "expired" through the zero-interval shortcut in <code>*_timer_set()</code>. Network code masked this by arming <code>CORE1_TIMER_NETWORK_TIMEOUT</code> with <code>sys_timeouts_sleeptime()</code>, which is often 0, and by the former 1 ms polling on core 1. <code>test_core1_timer</code> had been failing (and hanging in <code>test_core1_timer_accuracy</code>) for this reason<br>
+<strong>Impact:</strong> Timers with real intervals (<code>CORE1_TIMER_DHCP_DISCOVER</code>, <code>CORE1_TIMER_NETWORK_TX_TIMEOUT</code>, all core 0 timers) did not fire; with core 1 now sleeping in <code>__wfi()</code> (ADR-007) the alarm IRQ is a required wake source<br>
+<strong>Priority:</strong> High (resolved)<br>
+<strong>Effort:</strong> Low (1 day)<br>
+<strong>Resolution Plan:</strong> Resolved 2026-08: IRQ line derived with <code>timer_hardware_alarm_get_irq_num()</code>, alarms claimed with <code>hardware_alarm_claim()</code>, set/cancel made ISR-safe (ADR-009, "Timer instance and IRQ line"). Acceptance: the previously failing <code>test_core1_timer</code> cases and the new <code>test_core0_timer</code> expiry cases pass. Follow-up: review whether any caller relied on timers never expiring (DHCP discover timeout behaviour after the fix)</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_td_009_enc28j60_tx_timeout_value_not_validated">11.3.9. TD-009: ENC28J60 TX Timeout Value Not Validated</h4>
+<div class="paragraph">
+<p><strong>Description:</strong> <code>enc28j60_send_packet()</code> arms <code>CORE1_TIMER_NETWORK_TX_TIMEOUT</code> and aborts the transmission with <code>enc28j60_reset_tx_logic()</code> when it expires. The code specified 10 ms, but because the core 1 timer ISR never ran (TD-008) the effective timeout was the 1000-iteration poll fallback, roughly 100 ms. With the ISR fixed, a real 10 ms timeout produced ~950 TX errors in 3 minutes and the driver ended in an RX stall (packet pending flag set, receive counter frozen, core 1 spinning). The value was set to 100 ms to restore the previous effective behaviour; a 10 minute soak was then stable<br>
+<strong>Impact:</strong> The correct TX timeout for this hardware and link partner is unknown; 100 ms is the historical value, not a derived one. The RX stall after repeated TX resets is a separate driver robustness issue (errata 12/13 handling)<br>
+<strong>Priority:</strong> Medium<br>
+<strong>Effort:</strong> Low to measure (TX duration histogram), Medium to fix the stall<br>
+<strong>Resolution Plan:</strong> Measure actual TX completion times under load, derive a timeout with margin, and make the RX path recover from a TX reset. Until then keep 100 ms</p>
 </div>
 </div>
 </div>

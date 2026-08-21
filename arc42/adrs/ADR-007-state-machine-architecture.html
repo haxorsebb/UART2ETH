@@ -383,6 +383,7 @@
 <li><a href="#_state_definitions">State Definitions</a></li>
 <li><a href="#_event_driven_interface_design">Event-Driven Interface Design</a></li>
 <li><a href="#_concurrency_and_safety_model">Concurrency and Safety Model</a></li>
+<li><a href="#_cross_core_wake_up_decision_2026_08_19">Cross-Core Wake-Up (Decision 2026-08-19)</a></li>
 <li><a href="#_core_main_loop_architecture">Core Main Loop Architecture</a></li>
 <li><a href="#_complex_state_transition_examples">Complex State Transition Examples</a></li>
 <li><a href="#_condition_checking_functions">Condition Checking Functions</a></li>
@@ -439,7 +440,7 @@
 <h2 id="_date">Date</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>2024-01-16 (Updated: 2025-08-16)</p>
+<p>2024-01-16 (Updated: 2026-08-19)</p>
 </div>
 </div>
 </div>
@@ -680,18 +681,132 @@ core1_substate_t state_machine_get_core1_substate(void);</code></pre>
 * <strong>No Cross-Core Locking</strong>: No mutexes required for sub-states
 * <strong>Atomic Variables</strong>: Use <code>_Atomic</code> variables for ISR safety</p>
 </div>
+</div>
+<div class="sect2">
+<h3 id="_cross_core_wake_up_decision_2026_08_19">Cross-Core Wake-Up (Decision 2026-08-19)</h3>
 <div class="paragraph">
-<p><strong>Doorbell Implementation:</strong></p>
+<p><strong>Problem.</strong> Both cores call <code>flash_safe_execute_core_init()</code> so that
+<code>flash_safe_execute()</code> (used by flash persistence, factory defaults and the
+update module) can park the other core while flash is erased or programmed.
+In the Pico SDK (2.2.0) this installs the multicore lockout handler as the
+exclusive SIO FIFO IRQ handler on each core. The SDK documentation states
+that once lockout is in use, the inter-core FIFO must not be used for any
+other purpose. An interim implementation nevertheless pushed wake words
+(<code>0xDEADBEEF</code> / <code>0xCAFEBABE</code>) into the FIFO to exit <code>__wfi()</code> on the other
+core; the words were never popped by application code and were discarded by
+the lockout ISR. This relied on an undocumented SDK implementation detail and,
+because the RP2350 FIFO is only four entries deep, could stall
+<code>multicore_lockout_start_blocking()</code> when the receiving core had interrupts
+disabled. The doorbell functions referenced by earlier versions of this ADR
+existed only as stubs.</p>
+</div>
+<div class="paragraph">
+<p><strong>Decision.</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The inter-core FIFO is reserved for the SDK (core launch, lockout).
+Application code never reads or writes it.</p>
+</li>
+<li>
+<p>Cross-core wake-up uses the RP2350 SIO doorbells. One doorbell per direction
+is claimed during state machine initialization
+(<code>multicore_doorbell_claim_unused()</code>), the doorbell IRQ is enabled on the
+receiving core, and the ISR only clears the doorbell
+(<code>multicore_doorbell_clear_current_core()</code>). The ISR carries no payload and
+performs no work; its sole purpose is to terminate <code>__wfi()</code>. All state lives
+in the atomic main state, the ringbuffers and shared memory, which the woken
+core re-inspects.</p>
+</li>
+<li>
+<p><code>wake_other_core(direction)</code> and <code>wake_other_core_after_main_state_change()</code>
+call <code>multicore_doorbell_set_other_core()</code>. Setting a doorbell is
+non-blocking and idempotent, so it is safe to call while holding a mutex.</p>
+</li>
+<li>
+<p>The wake-up is a hint, not a message. Both cores must check their real
+work conditions after returning from <code>__wfi()</code> (see
+<code>core0_work_or_idle_wait()</code>, <code>core1_check_for_pending_work()</code>).
+A missed or spurious doorbell must never change behaviour, only latency.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Core 1 idle wait.</strong> Core 1 previously replaced <code><em>wfi()</code> with <code>sleep_ms(1)</code>
+because the ENC28J60 INT line is configured as a falling-edge GPIO IRQ while
+the chip keeps INT low until its interrupt flags are serviced; entering
+<code></em>wfi()</code> with INT already low therefore hung the core. With doorbells in
+place core 1 returns to <code>__wfi()</code> under the following conditions, all of which
+raise an IRQ on core 1:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>core 0 produces work (ringbuffer data, main state change) → doorbell;</p>
+</li>
+<li>
+<p>a core 1 timer expires (network timeouts, lwIP) → hardware alarm IRQ;</p>
+</li>
+<li>
+<p>the 500 ms PHY link poll in <code>core1_check_for_pending_work()</code> is driven by a
+dedicated core 1 timer (<code>CORE1_TIMER_LINK_POLL</code>) instead of wall-clock
+comparison, so the core is guaranteed to wake for it;</p>
+</li>
+<li>
+<p>the ENC28J60 INT pin: the GPIO IRQ stays edge-triggered (no change to the
+driver&#8217;s block/unblock sequence in the TX path). <code>core1_idle_wait()</code> guards
+the sleep: if the driver reports a pending interrupt or the INT pin reads
+low, the core does not sleep. An edge that arrives between the guard and
+<code><em>wfi()</code> sets the NVIC pending bit, so <code></em>wfi()</code> returns immediately; this
+race is benign. Switching the GPIO IRQ to level-triggered was considered and
+rejected for now because it requires the ISR to mask itself and the driver&#8217;s
+service routine to unmask, touching a delicate part of the driver.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Log entries written by core 0 do not ring the doorbell. They are drained the
+next time core 1 wakes for another reason. This delay was accepted
+deliberately to keep <code>log_event()</code> free of cross-core side effects.</p>
+</div>
+<div class="paragraph">
+<p><strong>Rejected alternatives.</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code><em>sev()</code>/<code></em>wfe()</code> instead of doorbells: no SIO resource needed, but the
+SDK lockout victim loop also uses <code>__wfe()</code>, so application events would
+spin the parked core and SDK events would wake application loops; works, but
+semantically muddier than a dedicated IRQ.</p>
+</li>
+<li>
+<p>A custom <code>get_flash_safety_helper()</code> that parks the other core via a
+doorbell, leaving the FIFO to the application: moves safety-critical code
+from the SDK into this project for no benefit.</p>
+</li>
+<li>
+<p>Stopping core 1 during flash operations: flash writes originate on core 1,
+and runtime configuration saves must not tear down the network core.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Implementation sketch:</strong></p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">extern int doorbell_core0_wakes_core1;
-extern int doorbell_core1_wakes_core0;
+<pre class="prettyprint highlight"><code data-lang="c">static int doorbell_core0_wakes_core1;   // claimed at init
+static int doorbell_core1_wakes_core0;   // claimed at init
 
-static void wake_other_core_after_main_state_change(main_state_t new_state) {
-    // Wake the other core
-    multicore_doorbell_set_other_core(doorbell_core0_wakes_core1);
-    multicore_doorbell_set_other_core(doorbell_core1_wakes_core0);
+void wake_other_core(wake_direction_t direction) {
+    multicore_doorbell_set_other_core(doorbell_for(direction));
+}
+
+static void doorbell_irq_handler(void) {
+    // clear every doorbell routed to this core; nothing else to do
+    multicore_doorbell_clear_current_core(doorbell_for_this_core());
 }</code></pre>
 </div>
 </div>
