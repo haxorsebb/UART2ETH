@@ -1209,6 +1209,16 @@
 <strong>Resolution Plan:</strong> Measure actual TX completion times under load, derive a timeout with margin, and make the RX path recover from a TX reset. Until then keep 100 ms</p>
 </div>
 </div>
+<div class="sect3">
+<h4 id="_td_010_deprecated_config_change_pending_field_in_persisted_layout">TD-010: Deprecated config_change_pending Field in Persisted Layout</h4>
+<div class="paragraph">
+<p><strong>Description:</strong> ADR-019 removed the runtime configuration apply; the <code>config_change_pending</code> field in <code>shared_memory_layout_t</code> that triggered it is no longer written or read. It cannot be removed because the flash persistence block (ADR-006) is a raw copy of the layout and removing a field would shift all following fields, invalidating every persisted configuration (see also TD-006, no schema version)<br>
+<strong>Impact:</strong> Four dead bytes in RAM and in every persisted block; a future reader must learn from ADR-019 why the field exists but does nothing<br>
+<strong>Priority:</strong> Low<br>
+<strong>Effort:</strong> Trivial once TD-006 (schema versioning with migration) is resolved; blocked until then<br>
+<strong>Resolution Plan:</strong> Remove the field together with the first schema migration introduced under TD-006. Until then the field stays, documented as deprecated in <code>shared_memory.h</code></p>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_risk_mitigation_plan">Risk Mitigation Plan</h3>

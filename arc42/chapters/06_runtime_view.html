@@ -1122,11 +1122,16 @@ ip addr add 10.10.10.11/24 dev eth0
 <div class="sect2">
 <h3 id="_management_interface_configuration_scenario">Management Interface Configuration Scenario</h3>
 <div class="paragraph">
-<p>This scenario shows how system configuration changes are applied through the web-based management interface with proper validation and persistence.</p>
+<p>This scenario shows how system configuration changes are handled through the
+web-based management interface. Changes are validated and persisted at once,
+but take effect only at the next boot (ADR-019). The reboot is requested
+explicitly by the user and executed with a grace period so the HTTP
+acknowledgement is transmitted before the reset (deferred reboot, ADR-019;
+reboot state flow, ADR-017).</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="../../images/management-configuration.svg" alt="management configuration" width="1887" height="1931">
+<img src="../../images/management-configuration.svg" alt="management configuration" width="1880" height="1583">
 </div>
 </div>
 </div>

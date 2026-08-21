@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
     
-    <!-- sourceuri: arc42/adrs/ADR-005-buffer-allocation-strategy.html -->
+    <!-- sourceuri: arc42/adrs/ADR-019-network-config-reboot-semantics.html -->
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
 
     <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
     <meta content="jbake" name="generator">
     <meta content="INDEX, FOLLOW" name="ROBOTS">
 
-    <title>ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</title>
+    <title>ADR-019: Network Configuration Changes Take Effect at Boot</title>
     <meta content="docToolchain" property="og:title">
     <meta content="build your dev docs the easy way..." property="og:description">
     <meta content="website" property="og:type">
@@ -282,7 +282,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
                                    href="../../arc42/adrs/ADR-005-buffer-allocation-strategy.html" title="ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</a>
                                 
                             </li>
@@ -347,7 +347,7 @@
                                 
                             </li>
                             <li class="td-sidebar-nav__section-title td-sidebar-nav__section without-child">
-                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section "
+                                <a class="align-left pl-0 pr-2 pt-2 td-sidebar-link td-sidebar-link__section active"
                                    href="../../arc42/adrs/ADR-019-network-config-reboot-semantics.html" title="ADR-019: Network Configuration Changes Take Effect at Boot">ADR-019: Network Configuration Changes Take Effect at Boot</a>
                                 
                             </li>
@@ -363,11 +363,11 @@
 				<div class="td-page-meta ml-2 pb-1 pt-2 mb-0">
 					
 
-        <a href="##git-repo-url##/arc42/adrs/ADR-005-buffer-allocation-strategy.adoc"
+        <a href="##git-repo-url##/arc42/adrs/ADR-019-network-config-reboot-semantics.adoc"
            target="_blank"><i class="fa fa-edit fa-fw"></i> Improve this doc</a>
 
 
-        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-005%3A+Ring+Buffer+Memory+Allocation+Strategy+for+UART2ETH%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-005-buffer-allocation-strategy.adoc%0A%23branch:%20main" target="_blank"><i
+        <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-019%3A+Network+Configuration+Changes+Take+Effect+at+Boot%27&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:%20##git-repo-url##/arc42/adrs/ADR-019-network-config-reboot-semantics.adoc%0A%23branch:%20main" target="_blank"><i
                 class="fab fa-github fa-fw"></i> Create an issue</a>
 
         
@@ -377,62 +377,31 @@
         <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel0">
-<li><a href="#_adr_005_ring_buffer_memory_allocation_strategy_for_uart2eth">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</a>
+<li><a href="#_adr_019_network_configuration_changes_take_effect_at_boot">ADR-019: Network Configuration Changes Take Effect at Boot</a>
 <ul class="sectlevel1">
+<li><a href="#_status">Status</a></li>
+<li><a href="#_date">Date</a></li>
 <li><a href="#_context">Context</a></li>
-<li><a href="#_decision_drivers">Decision Drivers</a>
+<li><a href="#_decision">Decision</a>
 <ul class="sectlevel2">
-<li><a href="#_primary_requirements">Primary Requirements</a></li>
-<li><a href="#_constraints">Constraints</a></li>
+<li><a href="#_configuration_change_semantics">Configuration change semantics</a></li>
+<li><a href="#_deferred_reboot">Deferred reboot</a></li>
+<li><a href="#_sequence">Sequence</a></li>
 </ul>
 </li>
-<li><a href="#_options_considered">Options Considered</a>
-<ul class="sectlevel2">
-<li><a href="#_option_a_static_worst_case_allocation_baseline">Option A: Static Worst-Case Allocation (Baseline)</a></li>
-<li><a href="#_option_b_protocol_aware_multi_pool">Option B: Protocol-Aware Multi-Pool</a></li>
-<li><a href="#_option_c_variable_length_with_fragmentation">Option C: Variable-Length with Fragmentation</a></li>
-</ul>
-</li>
-<li><a href="#_pugh_matrix_analysis">PUGH Matrix Analysis</a>
-<ul class="sectlevel2">
-<li><a href="#_weighted_scores">Weighted Scores</a></li>
-</ul>
-</li>
-<li><a href="#_decision">Decision</a></li>
 <li><a href="#_rationale">Rationale</a>
 <ul class="sectlevel2">
-<li><a href="#_why_static_allocation_over_multi_pool_10_score">Why Static Allocation Over Multi-Pool (-10 score)</a></li>
-<li><a href="#_why_static_allocation_over_variable_length_23_score">Why Static Allocation Over Variable-Length (-23 score)</a></li>
-<li><a href="#_memory_efficiency_analysis">Memory Efficiency Analysis</a></li>
+<li><a href="#_rejected_alternatives">Rejected Alternatives</a></li>
 </ul>
 </li>
 <li><a href="#_consequences">Consequences</a>
 <ul class="sectlevel2">
 <li><a href="#_positive">Positive</a></li>
 <li><a href="#_negative">Negative</a></li>
-<li><a href="#_risks_and_mitigation">Risks and Mitigation</a></li>
+<li><a href="#_implementation_requirements">Implementation Requirements</a></li>
 </ul>
 </li>
-<li><a href="#_implementation_notes">Implementation Notes</a>
-<ul class="sectlevel2">
-<li><a href="#_ring_buffer_entry_structure">Ring Buffer Entry Structure</a></li>
-<li><a href="#_memory_allocation_strategy">Memory Allocation Strategy</a></li>
-</ul>
-</li>
-<li><a href="#_future_optimization_path">Future Optimization Path</a>
-<ul class="sectlevel2">
-<li><a href="#_multi_pool_implementation_strategy">Multi-Pool Implementation Strategy</a></li>
-<li><a href="#_protocol_size_prediction">Protocol Size Prediction</a></li>
-<li><a href="#_migration_path">Migration Path</a></li>
-</ul>
-</li>
-<li><a href="#_alternative_approaches_considered">Alternative Approaches Considered</a>
-<ul class="sectlevel2">
-<li><a href="#_per_uart_configurable_sizing">Per-UART Configurable Sizing</a></li>
-<li><a href="#_hybrid_static_overflow">Hybrid Static + Overflow</a></li>
-</ul>
-</li>
-<li><a href="#_follow_up_actions">Follow-up Actions</a></li>
+<li><a href="#_references">References</a></li>
 </ul>
 </li>
 </ul>
@@ -457,355 +426,76 @@
     <div class="td-content">
         <p>
             
-<h1 id="_adr_005_ring_buffer_memory_allocation_strategy_for_uart2eth" class="sect0">ADR-005: Ring Buffer Memory Allocation Strategy for UART2ETH</h1>
+<h1 id="_adr_019_network_configuration_changes_take_effect_at_boot" class="sect0">ADR-019: Network Configuration Changes Take Effect at Boot</h1>
+<div class="sect1">
+<h2 id="_status">Status</h2>
+<div class="sectionbody">
 <div class="paragraph">
-<p><strong>Status:</strong> ACCEPTED<br>
-<strong>Date:</strong> 2025-07-27<br>
-<strong>Deciders:</strong> Architecture Team<br>
-<strong>Consulted:</strong> Senior Developer<br>
-<strong>Informed:</strong> Development Team</p>
+<p>Accepted</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_date">Date</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>2026-08-21</p>
+</div>
+</div>
 </div>
 <div class="sect1">
 <h2 id="_context">Context</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>The UART2ETH system requires a ring buffer allocation strategy for inter-core communication between Core 0 (UART processing) and Core 1 (network processing). Based on our solution strategy (Chapter 4), we use cache-aligned ring buffers with fixed-size entries to enable deterministic, high-performance data transfer.</p>
+<p>The four UART channels are exposed as TCP servers whose listeners are bound
+once during Core1 startup (<code>core1_main.c</code>, boot path). Network configuration
+(channel TCP ports, channel enable flags, static IP/netmask/gateway, DHCP
+mode) is edited through the web form handled by <code>http_parse_post_data()</code>
+(<code>http_forms.c</code>).</p>
 </div>
 <div class="paragraph">
-<p>This ADR documents the critical decision between different buffer allocation approaches given our realistic packet size analysis:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Maximum payload size</strong>: 1024 bytes (worst-case industrial protocol)</p>
-</li>
-<li>
-<p><strong>Minimum payload size</strong>: 10 bytes (small sensor readings)</p>
-</li>
-<li>
-<p><strong>Average payload size</strong>: 40 bytes (typical industrial data)</p>
-</li>
-</ul>
+<p>Until now, a configuration change was applied at runtime: the form handler
+set the <code>config_change_pending</code> flag in shared memory, and the Core1 work
+loop reacted by executing <code>core1_apply_configuration_changes()</code>. That
+function called <code>network_manager_reconfigure()</code> on the interface, then
+<code>multi_tcp_server_deinit_all()</code>, waited 50 ms and re-initialized all enabled
+channels with <code>multi_tcp_server_init_channel()</code>.</p>
 </div>
 <div class="paragraph">
-<p>The buffer allocation strategy directly impacts:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Memory efficiency and utilization</p>
-</li>
-<li>
-<p>System determinism and real-time behavior</p>
-</li>
-<li>
-<p>Implementation complexity and maintainability</p>
-</li>
-<li>
-<p>Development timeline and risk</p>
-</li>
-</ul>
+<p>This runtime apply is defective. After changing a channel&#8217;s TCP port, the
+re-bind following the teardown fails and the device is left without a
+working listener on either the old or the new port. Only a reboot restores
+connectivity. The failure mode is a listen-PCB lifecycle problem in the
+teardown/re-bind cycle (re-bind returns <code>ERR_USE</code> when the previous listen
+PCB was not fully released); the failure count only grows with repeated
+apply cycles.</p>
 </div>
 <div class="paragraph">
-<p>This decision is architecturally significant because it affects the fundamental memory model of our dual-core architecture and determines whether we can achieve our non-negotiable requirements within the 520KB SRAM constraints of the RP2350.</p>
+<p>A related defect exists in the reboot request path: <code>POST /reboot</code>
+(<code>http_server.c</code>) called <code>watchdog_reboot(0, 0, 1)</code> synchronously from the
+request handler. With a 1 ms delay the HTTP response races the reset and is
+usually lost, so the user receives no acknowledgement.</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_decision_drivers">Decision Drivers</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_primary_requirements">Primary Requirements</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Industrial Reliability</strong>: Must enable deterministic, predictable behavior for industrial applications</p>
-</li>
-<li>
-<p><strong>Static Memory Allocation</strong>: All memory must be allocated at compile time (no dynamic allocation)</p>
-</li>
-<li>
-<p><strong>Sub-5ms Latency</strong>: Latency requirement limits buffering depth, reducing total memory impact</p>
-</li>
-<li>
-<p><strong>Cache-Aligned Performance</strong>: Inter-core communication must be optimized for dual-core RP2350</p>
-</li>
-<li>
-<p><strong>TDD Implementation</strong>: Must be testable and maintainable using test-driven development</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_constraints">Constraints</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Limited to 520KB SRAM total on RP2350 platform</p>
-</li>
-<li>
-<p>Static allocation only (no malloc/free)</p>
-</li>
-<li>
-<p>Cache-line alignment required (64-byte boundaries)</p>
-</li>
-<li>
-<p>Maximum 2-3 packets buffered per UART due to latency constraints</p>
-</li>
-<li>
-<p>Must support worst-case 1024-byte payload scenarios</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_options_considered">Options Considered</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_option_a_static_worst_case_allocation_baseline">Option A: Static Worst-Case Allocation (Baseline)</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Approach</strong>: Fixed ring buffer entries sized for maximum payload (1024 bytes + 16 bytes management = 1040 bytes per entry)</p>
-</li>
-<li>
-<p><strong>Memory Usage</strong>: Each entry wastes 984 bytes when storing 40-byte average payloads (96% waste)</p>
-</li>
-<li>
-<p><strong>Determinism</strong>: Completely predictable, compile-time allocation</p>
-</li>
-<li>
-<p><strong>Implementation Complexity</strong>: Minimal - simple fixed-size array</p>
-</li>
-<li>
-<p><strong>Cache Alignment</strong>: Straightforward alignment to cache boundaries</p>
-</li>
-<li>
-<p><strong>Testing</strong>: Simple to test, no dynamic allocation edge cases</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_b_protocol_aware_multi_pool">Option B: Protocol-Aware Multi-Pool</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Approach</strong>: Three separate buffer pools sized for different payload ranges</p>
-<div class="ulist">
-<ul>
-<li>
-<p>Small Pool: 64-byte entries (for ≤40 byte packets)</p>
-</li>
-<li>
-<p>Medium Pool: 256-byte entries (for 41-200 byte packets)</p>
-</li>
-<li>
-<p>Large Pool: 1024-byte entries (for 201-1024 byte packets)</p>
-</li>
-</ul>
-</div>
-</li>
-<li>
-<p><strong>Memory Usage</strong>: Significantly more efficient (~20-30% waste vs 96%)</p>
-</li>
-<li>
-<p><strong>Determinism</strong>: Still predictable, but requires pool management logic</p>
-</li>
-<li>
-<p><strong>Implementation Complexity</strong>: Requires pool allocation logic, protocol size prediction</p>
-</li>
-<li>
-<p><strong>Cache Alignment</strong>: More complex alignment across multiple pools</p>
-</li>
-<li>
-<p><strong>Testing</strong>: Complex testing scenarios for pool exhaustion, allocation failures</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_option_c_variable_length_with_fragmentation">Option C: Variable-Length with Fragmentation</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Approach</strong>: Variable-length entries with fragmentation and reassembly</p>
-</li>
-<li>
-<p><strong>Memory Usage</strong>: Most efficient possible memory utilization</p>
-</li>
-<li>
-<p><strong>Determinism</strong>: Unpredictable due to fragmentation and reassembly timing</p>
-</li>
-<li>
-<p><strong>Implementation Complexity</strong>: High - fragmentation logic, reassembly buffers</p>
-</li>
-<li>
-<p><strong>Cache Alignment</strong>: Complex alignment with variable sizes</p>
-</li>
-<li>
-<p><strong>Testing</strong>: Very complex testing for fragmentation edge cases</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_pugh_matrix_analysis">PUGH Matrix Analysis</h2>
-<div class="sectionbody">
 <div class="paragraph">
-<p><em>Scoring: Better than baseline (+1, +2), Same as baseline (0), Worse than baseline (-1, -2)</em><br>
-<em>Baseline: Static Worst-Case Allocation (all scores = 0)</em></p>
-</div>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 31.25%;">
-<col style="width: 12.5%;">
-<col style="width: 18.75%;">
-<col style="width: 18.75%;">
-<col style="width: 18.75%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top"><strong>Criteria</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Weight</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Static Worst-Case</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Multi-Pool</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Variable-Length</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Industrial Reliability</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (pool management risk)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (fragmentation unpredictability)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Memory Efficiency</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (20-30% waste vs 96%)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+2 (optimal utilization)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Implementation Simplicity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (pool allocation logic)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (fragmentation complexity)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Deterministic Behavior</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (pool allocation timing)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (fragmentation timing)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Testing Complexity</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (pool edge cases)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (fragmentation edge cases)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Development Timeline</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (additional development)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (significant additional work)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Cache Optimization</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (multi-pool alignment)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-2 (variable alignment complexity)</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Future Maintainability</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0 (baseline)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">+1 (documented optimization path)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">-1 (complex maintenance)</p></td>
-</tr>
-</tbody>
-</table>
-<div class="sect2">
-<h3 id="_weighted_scores">Weighted Scores</h3>
-<div class="paragraph">
-<p><strong>Multi-Pool Total Score:</strong></p>
+<p>Relevant existing mechanisms:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>Reliability: 3×(-1) = -3</p>
+<p>ADR-017 defines a controlled reboot path: <code>MAIN_EVENT_REBOOT_REQUESTED</code>
+transitions to <code>MAIN_STATE_REBOOT</code>, Core1 flushes configuration and logs
+(<code>CORE1_REBOOT_FLUSH</code>) and then executes the reset
+(<code>CORE1_REBOOT_EXECUTE</code>).</p>
 </li>
 <li>
-<p>Memory: 2×(+2) = +4</p>
-</li>
-<li>
-<p>Simplicity: 3×(-1) = -3</p>
-</li>
-<li>
-<p>Determinism: 3×(-1) = -3</p>
-</li>
-<li>
-<p>Testing: 2×(-1) = -2</p>
-</li>
-<li>
-<p>Timeline: 2×(-1) = -2</p>
-</li>
-<li>
-<p>Cache: 2×(-1) = -2</p>
-</li>
-<li>
-<p>Maintainability: 1×(+1) = +1</p>
-</li>
-<li>
-<p><strong>Total: -10</strong></p>
+<p>Chapter 8 ("Configured vs. Runtime Network State") already separates
+persisted configuration from the state active on the interface.</p>
 </li>
 </ul>
 </div>
 <div class="paragraph">
-<p><strong>Variable-Length Total Score:</strong></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Reliability: 3×(-2) = -6</p>
-</li>
-<li>
-<p>Memory: 2×(+2) = +4</p>
-</li>
-<li>
-<p>Simplicity: 3×(-2) = -6</p>
-</li>
-<li>
-<p>Determinism: 3×(-2) = -6</p>
-</li>
-<li>
-<p>Testing: 2×(-2) = -4</p>
-</li>
-<li>
-<p>Timeline: 2×(-2) = -4</p>
-</li>
-<li>
-<p>Cache: 2×(-2) = -4</p>
-</li>
-<li>
-<p>Maintainability: 1×(-1) = -1</p>
-</li>
-<li>
-<p><strong>Total: -23</strong></p>
-</li>
-</ul>
-</div>
+<p>Port and address changes are rare, administrative operations. A brief,
+controlled outage during an explicit reboot is acceptable for them.</p>
 </div>
 </div>
 </div>
@@ -813,115 +503,158 @@
 <h2 id="_decision">Decision</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p><strong>Selected: Static Worst-Case Allocation</strong></p>
+<p>All network configuration changes take effect exclusively at boot. There is
+no runtime configuration apply.</p>
+</div>
+<div class="sect2">
+<h3 id="_configuration_change_semantics">Configuration change semantics</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>The form handler validates a submitted change, stores it in the shared
+memory configuration, increments the revision counter and persists the
+configuration to flash — unchanged from before.</p>
+</li>
+<li>
+<p>The form handler no longer sets <code>config_change_pending</code> and no longer
+triggers any runtime apply. The success message states that the change
+takes effect after a reboot.</p>
+</li>
+<li>
+<p><code>core1_apply_configuration_changes()</code> and its trigger check in the Core1
+work loop are removed. <code>network_manager_reconfigure()</code> is called only
+during the boot sequence.</p>
+</li>
+<li>
+<p>The <code>config_change_pending</code> field remains in <code>shared_memory_layout_t</code> as
+a deprecated field. Removing it would change the persisted flash layout
+(see TD-010 in Chapter 11).</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_deferred_reboot">Deferred reboot</h3>
+<div class="paragraph">
+<p>Reboots requested over the network are decoupled from their execution by a
+new <code>deferred_reboot</code> module, so the HTTP acknowledgement leaves the device
+before the reset:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>src/update/
+├── deferred_reboot.c
+
+include/update/
+├── deferred_reboot.h</pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code data-lang="c">// deferred_reboot.h
+
+// Grace period between the reboot request and entering the ADR-017
+// reboot path. The system stays in MAIN_STATE_OPERATIONAL during the
+// grace period, so Core1 keeps servicing lwIP and the HTTP response
+// is transmitted.
+#define DEFERRED_REBOOT_GRACE_MS 300
+
+void deferred_reboot_init(void);
+
+// Called by the HTTP layer (POST /reboot, firmware update completion).
+// Records the reason and arms CORE1_TIMER_REBOOT_GRACE.
+// Does not change the main state.
+void deferred_reboot_request(reboot_reason_t reason);
+
+bool deferred_reboot_is_pending(void);
+
+// Called from the Core1 work loop. Once the grace timer has expired:
+// stores the reboot reason (update_set_reboot_reason) and posts
+// MAIN_EVENT_REBOOT_REQUESTED, entering the ADR-017 reboot path.
+void deferred_reboot_poll(void);</code></pre>
+</div>
 </div>
 <div class="paragraph">
-<p>Despite the significant memory inefficiency (96% waste in typical scenarios), static worst-case allocation scores highest in our weighted analysis due to our <strong>reliability-first</strong> architecture principles and aggressive <strong>sub-5ms latency requirements</strong>.</p>
+<p><code>CORE1_TIMER_RESERVED_2</code> is renamed to <code>CORE1_TIMER_REBOOT_GRACE</code>
+(<code>core1_timer.h</code>, ADR-009 timer subsystem).</p>
+</div>
+<div class="paragraph">
+<p><code>POST /reboot</code> calls <code>deferred_reboot_request(REBOOT_REASON_USER_REQUESTED)</code>
+instead of <code>watchdog_reboot()</code>. The direct <code>watchdog_reboot()</code> call is
+removed from <code>http_server.c</code>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_sequence">Sequence</h3>
+<div class="imageblock">
+<div class="content">
+<img src="../../images/diag-39099c5cb7f1e2038a407eeaa2161835.png" alt="Diagram" width="1449" height="626">
+</div>
+</div>
 </div>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_rationale">Rationale</h2>
 <div class="sectionbody">
-<div class="sect2">
-<h3 id="_why_static_allocation_over_multi_pool_10_score">Why Static Allocation Over Multi-Pool (-10 score)</h3>
-<div class="paragraph">
-<p><strong>Reliability Trumps Efficiency:</strong></p>
-</div>
 <div class="ulist">
 <ul>
 <li>
-<p>Industrial reliability is our non-negotiable #1 priority</p>
+<p>The defect class disappears instead of being fixed: there is no runtime
+listener teardown/re-bind, so it cannot fail. The only apply path is the
+boot path, which is exercised on every start.</p>
 </li>
 <li>
-<p>Static allocation provides <strong>completely predictable behavior</strong></p>
+<p>Uniform semantics: every network setting behaves the same way. A mix of
+immediately applied settings (addresses) and reboot-based settings
+(ports) would be harder to explain, document and test.</p>
 </li>
 <li>
-<p>No pool exhaustion scenarios or allocation failures</p>
+<p>The ADR-017 reboot path already force-saves the configuration before the
+reset, so a reboot triggered right after a change cannot lose it.</p>
 </li>
 <li>
-<p>Simpler testing with fewer edge cases</p>
+<p>Port and address changes are rare administrative events; optimizing their
+availability does not justify the complexity of a correct live re-bind.</p>
+</li>
+<li>
+<p>Chapter 8 already gives the web UI the vocabulary for this model: the
+device page shows runtime state, the configuration page shows persisted
+(possibly not yet active) values.</p>
 </li>
 </ul>
-</div>
-<div class="paragraph">
-<p><strong>Latency Constraint Mitigation:</strong></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Sub-5ms requirement limits buffer depth to ~2-3 packets maximum</p>
-</li>
-<li>
-<p>Total memory waste: 4 UARTs × 3 packets × 1024 bytes = ~12KB</p>
-</li>
-<li>
-<p>12KB waste is <strong>acceptable within 520KB total SRAM</strong></p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<p><strong>Implementation Risk Reduction:</strong></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>TDD requirement</strong> favors simpler, more testable implementation</p>
-</li>
-<li>
-<p>Aggressive delivery timeline cannot accommodate complex allocation logic</p>
-</li>
-<li>
-<p>Static allocation enables immediate development progress</p>
-</li>
-</ul>
-</div>
 </div>
 <div class="sect2">
-<h3 id="_why_static_allocation_over_variable_length_23_score">Why Static Allocation Over Variable-Length (-23 score)</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Variable-length fails completely on <strong>reliability and determinism</strong></p>
-</li>
-<li>
-<p>Fragmentation creates <strong>unpredictable latency</strong> - incompatible with sub-5ms requirement</p>
-</li>
-<li>
-<p>Testing complexity would significantly impact <strong>TDD implementation</strong></p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_memory_efficiency_analysis">Memory Efficiency Analysis</h3>
+<h3 id="_rejected_alternatives">Rejected Alternatives</h3>
 <div class="paragraph">
-<p><strong>Realistic Memory Impact:</strong></p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code>Worst-case buffer usage:
-4 UARTs × 3 packets/UART × 1024 bytes/packet = 12KB total
-Percentage of available SRAM: 12KB / 520KB = 2.3%
-
-Total system memory budget impact: Acceptable</code></pre>
-</div>
+<p><strong>On-the-fly re-bind (fix the live apply)</strong></p>
 </div>
 <div class="paragraph">
-<p><strong>Latency-Limited Buffering:</strong></p>
+<p>Close all connection PCBs and the listen PCB of the affected channel, then
+create, bind and listen a new PCB, all inside the lwIP context. Rejected:
+correct listen-PCB lifecycle handling and error paths (<code>ERR_USE</code>,
+half-closed connections, interactions between channels) carry exactly the
+risk that produced the current defect, require substantial testing on
+target, and buy availability for an operation that is performed rarely and
+by an administrator who can tolerate a reboot.</p>
 </div>
-<div class="ulist">
-<ul>
-<li>
-<p>Sub-5ms latency inherently limits packet accumulation</p>
-</li>
-<li>
-<p>Small buffer depths make absolute memory waste manageable</p>
-</li>
-<li>
-<p><strong>Quality goal (latency) constraints enable architectural simplification</strong></p>
-</li>
-</ul>
+<div class="paragraph">
+<p><strong>Reboot-based ports, live-applied addresses (partial scope)</strong></p>
+</div>
+<div class="paragraph">
+<p>Keep <code>network_manager_reconfigure()</code> at runtime for IP/DHCP changes and
+make only ports reboot-based. Rejected: mixed semantics confuse users and
+documentation, and the risky runtime reconfigure path survives.</p>
+</div>
+<div class="paragraph">
+<p><strong>Immediate automatic reboot on save</strong></p>
+</div>
+<div class="paragraph">
+<p>Reboot directly after a configuration POST. Rejected: a user changing
+several settings would suffer one reboot per submit, and the response would
+race the reset just like the old <code>POST /reboot</code> handler. The explicit
+reboot request with grace period keeps the user in control and the
+acknowledgement reliable.</p>
 </div>
 </div>
 </div>
@@ -934,19 +667,20 @@ Total system memory budget impact: Acceptable</code></pre>
 <div class="ulist">
 <ul>
 <li>
-<p>✅ <strong>Industrial Reliability</strong>: Completely predictable memory behavior</p>
+<p>Eliminates the reported defect (device unreachable after port change).</p>
 </li>
 <li>
-<p>✅ <strong>Development Velocity</strong>: Immediate implementation, no complex allocation logic</p>
+<p>Less production code: the entire runtime apply path is deleted.</p>
 </li>
 <li>
-<p>✅ <strong>Testing Simplicity</strong>: Straightforward test scenarios, high confidence</p>
+<p>One apply path (boot), exercised on every start, instead of two.</p>
 </li>
 <li>
-<p>✅ <strong>Cache Optimization</strong>: Simple 64-byte alignment for optimal inter-core performance</p>
+<p><code>POST /reboot</code> acknowledges reliably before the reset.</p>
 </li>
 <li>
-<p>✅ <strong>Future Flexibility</strong>: Clear optimization path documented for later enhancement</p>
+<p>The deferred reboot mechanism is reusable for the firmware update flow
+(ADR-017 upload completion currently has a TODO for exactly this).</p>
 </li>
 </ul>
 </div>
@@ -956,149 +690,53 @@ Total system memory budget impact: Acceptable</code></pre>
 <div class="ulist">
 <ul>
 <li>
-<p>❌ <strong>Memory Inefficiency</strong>: 96% waste in typical scenarios (1024B allocated, 40B used)</p>
+<p>A configuration change requires a reboot; all channels drop for the boot
+duration. Documented, user-visible behavior.</p>
 </li>
 <li>
-<p>❌ <strong>Resource Utilization</strong>: Suboptimal use of precious SRAM resource</p>
+<p>The web UI shows persisted values that are not yet active until the next
+reboot. Mitigated by the Chapter 8 configured-vs-runtime separation.</p>
 </li>
 <li>
-<p>❌ <strong>Scalability Limitation</strong>: Inefficiency grows with larger maximum packet sizes</p>
+<p><code>config_change_pending</code> remains as a dead field in the persisted layout
+(technical debt, TD-010).</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_risks_and_mitigation">Risks and Mitigation</h3>
-<div class="paragraph">
-<p><strong>Primary Risk: Memory Inefficiency</strong></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Probability</strong>: High (96% waste is certain)</p>
-</li>
-<li>
-<p><strong>Impact</strong>: Medium (limited by latency constraints to ~12KB total)</p>
-</li>
-<li>
-<p><strong>Mitigation</strong>: Document multi-pool optimization path, monitor actual memory usage</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<p><strong>Secondary Risk: Future Scalability</strong></p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Probability</strong>: Low (latency requirements unlikely to change)</p>
-</li>
-<li>
-<p><strong>Impact</strong>: Medium (could require architectural changes)</p>
-</li>
-<li>
-<p><strong>Mitigation</strong>: Protocol-aware multi-pool approach documented as known optimization</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_implementation_notes">Implementation Notes</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_ring_buffer_entry_structure">Ring Buffer Entry Structure</h3>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Each entry = 1024 bytes payload + 16 bytes management + padding to cache line
-typedef struct {
-    // Management Data (16 bytes)
-    uint8_t  channel;     // 0-3
-    uint8_t  direction;        // TX/RX
-    uint8_t  status;           // FILLING/DRAINING/FULL/EMPTY
-    uint8_t  payload_length;   // Actual data length (≤1024)
-    uint32_t timestamp;        // Fill timestamp
-    uint32_t sequence_id;      // For ordering/debugging
-    uint32_t reserved;         // Future use/alignment
-
-    // Payload Data (1024 bytes fixed)
-    uint8_t  payload[1024];    // Fixed maximum size
-} __attribute__((aligned(64))) ring_entry_t;  // Cache-aligned</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_memory_allocation_strategy">Memory Allocation Strategy</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Total Buffer Size</strong>: <code>(available_memory - static_variables) / sizeof(ring_entry_t) - 1</code> entries</p>
-</li>
-<li>
-<p><strong>Per-UART Allocation</strong>: Dynamic allocation from shared pool based on actual usage</p>
-</li>
-<li>
-<p><strong>Overflow Policy</strong>: Drop oldest packets (deterministic behavior)</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_future_optimization_path">Future Optimization Path</h2>
-<div class="sectionbody">
-<div class="paragraph">
-<p>When memory efficiency becomes critical (e.g., adding features that require more SRAM), implement <strong>Protocol-Aware Multi-Pool</strong> allocation:</p>
-</div>
-<div class="sect2">
-<h3 id="_multi_pool_implementation_strategy">Multi-Pool Implementation Strategy</h3>
-<div class="listingblock">
-<div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Future optimization - three separate pools
-typedef struct {
-    ring_entry_t small_pool[SMALL_POOL_SIZE];   // 64-byte entries
-    ring_entry_t medium_pool[MEDIUM_POOL_SIZE]; // 256-byte entries
-    ring_entry_t large_pool[LARGE_POOL_SIZE];   // 1024-byte entries
-
-    // Pool allocation logic
-    pool_allocator_t allocator;
-} multi_pool_ring_buffer_t;</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_protocol_size_prediction">Protocol Size Prediction</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Runtime Analysis</strong>: Monitor actual packet sizes during operation</p>
-</li>
-<li>
-<p><strong>Protocol Configuration</strong>: Per-UART protocol profiles specifying expected size ranges</p>
-</li>
-<li>
-<p><strong>Adaptive Allocation</strong>: Adjust pool usage based on observed patterns</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_migration_path">Migration Path</h3>
+<h3 id="_implementation_requirements">Implementation Requirements</h3>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><strong>Phase 1</strong>: Implement size monitoring in current static allocation</p>
+<p><code>http_forms.c</code>: stop setting <code>config_change_pending</code>; success message
+states the reboot requirement.</p>
 </li>
 <li>
-<p><strong>Phase 2</strong>: Develop pool allocation logic with same interfaces</p>
+<p><code>core1_main.c</code>: remove the <code>config_change_pending</code> check and
+<code>core1_apply_configuration_changes()</code>.</p>
 </li>
 <li>
-<p><strong>Phase 3</strong>: A/B test multi-pool vs static allocation</p>
+<p>Create <code>src/update/deferred_reboot.c</code> and
+<code>include/update/deferred_reboot.h</code>; call <code>deferred_reboot_poll()</code> from
+the Core1 work loop.</p>
 </li>
 <li>
-<p><strong>Phase 4</strong>: Switch to multi-pool if memory pressure requires it</p>
+<p><code>core1_timer.h</code>: rename <code>CORE1_TIMER_RESERVED_2</code> to
+<code>CORE1_TIMER_REBOOT_GRACE</code>.</p>
+</li>
+<li>
+<p><code>http_server.c</code>: route <code>POST /reboot</code> through
+<code>deferred_reboot_request()</code>; remove the direct <code>watchdog_reboot()</code> call.</p>
+</li>
+<li>
+<p>Tests: <code>tests/test_deferred_reboot.c</code>,
+<code>tests/network/test_config_change_reboot_semantics.c</code>,
+<code>tests/network/test_config_change_runtime_stability.c</code>.</p>
+</li>
+<li>
+<p>Update the "Management Interface Configuration Scenario" in Chapter 6
+and add TD-010 to Chapter 11.</p>
 </li>
 </ol>
 </div>
@@ -1106,84 +744,27 @@ typedef struct {
 </div>
 </div>
 <div class="sect1">
-<h2 id="_alternative_approaches_considered">Alternative Approaches Considered</h2>
+<h2 id="_references">References</h2>
 <div class="sectionbody">
-<div class="sect2">
-<h3 id="_per_uart_configurable_sizing">Per-UART Configurable Sizing</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Concept</strong>: Compile-time configuration of maximum packet size per UART</p>
+<p>ADR-017: Update Module Architecture — reboot state flow reused here</p>
 </li>
 <li>
-<p><strong>Rejection Reason</strong>: Adds complexity without addressing core efficiency problem</p>
+<p>ADR-009: Per-Core Timer Subsystem — grace timer</p>
 </li>
 <li>
-<p><strong>Example</strong>: UART0=64B, UART1=128B, UART2=1024B, UART3=256B</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_hybrid_static_overflow">Hybrid Static + Overflow</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>Concept</strong>: Small static buffers + large overflow buffer for rare large packets</p>
+<p>ADR-007: State Machine Architecture — event-driven transition</p>
 </li>
 <li>
-<p><strong>Rejection Reason</strong>: Violates deterministic behavior requirement</p>
+<p>ADR-006: Flash Persistence Strategy — configuration persistence</p>
 </li>
 <li>
-<p><strong>Risk</strong>: Overflow scenarios create unpredictable timing</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_follow_up_actions">Follow-up Actions</h2>
-<div class="sectionbody">
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><strong>Memory Monitoring</strong>: Implement runtime memory usage tracking in debug builds</p>
+<p>arc42 Chapter 8 — "Configured vs. Runtime Network State"</p>
 </li>
 <li>
-<p><strong>Size Analysis</strong>: Log actual packet sizes during development and testing</p>
-</li>
-<li>
-<p><strong>Pool Design</strong>: Document detailed multi-pool implementation specifications</p>
-</li>
-<li>
-<p><strong>Performance Validation</strong>: Benchmark static allocation performance characteristics</p>
-</li>
-<li>
-<p><strong>Future Review</strong>: Schedule memory efficiency review after core implementation</p>
-</li>
-</ol>
-</div>
-<hr>
-<div class="paragraph">
-<p><strong>Review Notes:</strong></p>
-</div>
-<div class="ulist checklist">
-<ul class="checklist">
-<li>
-<p>&#10063; Validate 12KB memory impact against other system memory requirements</p>
-</li>
-<li>
-<p>&#10063; Confirm cache-line alignment performance benefits on RP2350</p>
-</li>
-<li>
-<p>&#10063; Review multi-pool optimization trigger conditions</p>
-</li>
-<li>
-<p>&#10063; Document protocol size prediction strategies</p>
-</li>
-<li>
-<p>&#10063; Establish memory usage monitoring in CI/CD pipeline</p>
+<p>arc42 Chapter 6 — "Management Interface Configuration Scenario"</p>
 </li>
 </ul>
 </div>
@@ -1216,11 +797,11 @@ typedef struct {
     <button class="feedback--answer feedback--answer-yes">Yes</button>
     <button class="feedback--answer feedback--answer-no">No</button>
     <p class="feedback--response feedback--response-yes">
-        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-005%3A+Ring+Buffer+Memory+Allocation+Strategy+for+UART2ETH%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-005-buffer-allocation-strategy.adoc">tell us
+        Glad to hear it! Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-019%3A+Network+Configuration+Changes+Take+Effect+at+Boot%27%20%F0%9F%91%8D&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-019-network-config-reboot-semantics.adoc">tell us
     how we can improve</a>.
     </p>
     <p class="feedback--response feedback--response-no">
-        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-005%3A+Ring+Buffer+Memory+Allocation+Strategy+for+UART2ETH%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-005-buffer-allocation-strategy.adoc">tell
+        Sorry to hear that. Please <a href="##https://github.com/haxorsebb/UART2ETH/issues/new##?title=Docs%3A+Feedback+for+%27ADR-019%3A+Network+Configuration+Changes+Take+Effect+at+Boot%27%20%F0%9F%91%8E&body=%0A%0A%5BEnter%20feedback%20here%5D%0A%0A%0A---%0A%23page:arc42/adrs/ADR-019-network-config-reboot-semantics.adoc">tell
     us how we can improve</a>.
     </p>
 </div>

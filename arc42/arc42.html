@@ -5529,11 +5529,16 @@ ip addr add 10.10.10.11/24 dev eth0
 <div class="sect2">
 <h3 id="_management_interface_configuration_scenario">6.12. Management Interface Configuration Scenario</h3>
 <div class="paragraph">
-<p>This scenario shows how system configuration changes are applied through the web-based management interface with proper validation and persistence.</p>
+<p>This scenario shows how system configuration changes are handled through the
+web-based management interface. Changes are validated and persisted at once,
+but take effect only at the next boot (ADR-019). The reboot is requested
+explicitly by the user and executed with a grace period so the HTTP
+acknowledgement is transmitted before the reset (deferred reboot, ADR-019;
+reboot state flow, ADR-017).</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="../images/management-configuration.svg" alt="management configuration" width="1887" height="1931">
+<img src="../images/management-configuration.svg" alt="management configuration" width="1880" height="1583">
 </div>
 </div>
 <div style="page-break-after: always;"></div>
@@ -8726,6 +8731,16 @@ Debug Monitoring:     /dev/ttyUSB0 (target debug output)</code></pre>
 <strong>Priority:</strong> Medium<br>
 <strong>Effort:</strong> Low to measure (TX duration histogram), Medium to fix the stall<br>
 <strong>Resolution Plan:</strong> Measure actual TX completion times under load, derive a timeout with margin, and make the RX path recover from a TX reset. Until then keep 100 ms</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_td_010_deprecated_config_change_pending_field_in_persisted_layout">11.3.10. TD-010: Deprecated config_change_pending Field in Persisted Layout</h4>
+<div class="paragraph">
+<p><strong>Description:</strong> ADR-019 removed the runtime configuration apply; the <code>config_change_pending</code> field in <code>shared_memory_layout_t</code> that triggered it is no longer written or read. It cannot be removed because the flash persistence block (ADR-006) is a raw copy of the layout and removing a field would shift all following fields, invalidating every persisted configuration (see also TD-006, no schema version)<br>
+<strong>Impact:</strong> Four dead bytes in RAM and in every persisted block; a future reader must learn from ADR-019 why the field exists but does nothing<br>
+<strong>Priority:</strong> Low<br>
+<strong>Effort:</strong> Trivial once TD-006 (schema versioning with migration) is resolved; blocked until then<br>
+<strong>Resolution Plan:</strong> Remove the field together with the first schema migration introduced under TD-006. Until then the field stays, documented as deprecated in <code>shared_memory.h</code></p>
 </div>
 </div>
 </div>
