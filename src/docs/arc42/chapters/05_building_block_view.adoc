@@ -702,7 +702,7 @@ Shared SRAM configuration provides fast access for real-time Core0 operations wh
 |Maintains revision counter and SHA256 checksum for configuration validation. Detects corruption during flash load operations and triggers recovery procedures.
 
 |*Flash Ring Buffer Persistence*
-|Manages configuration save/load operations using 8-block flash ring buffer (64KB per block) for wear leveling and power-loss safety. Implements deferred write-back with SHA256 integrity verification and sector-level updates. Uses partition ID=3 discovered via bootrom APIs.
+|Manages configuration save/load operations using 64-block flash ring buffer (8 KB per block, full 512 KB partition) for wear leveling and power-loss safety. Implements deferred write-back with SHA256 integrity verification and sector-level updates. Uses partition ID=3 discovered via bootrom APIs.
 |===
 
 ===== Important Interfaces
@@ -720,11 +720,11 @@ Shared SRAM configuration provides fast access for real-time Core0 operations wh
 * **User Preferences**: Web interface settings, display options, alert preferences
 
 ====== Flash Ring Buffer Management
-* **8-Block Ring Buffer**: Circular buffer of 64KB flash blocks for wear leveling
+* **64-Block Ring Buffer**: Circular buffer of 8 KB flash blocks (2 sectors each) spanning the whole configuration partition for wear leveling
 * **Revision Counter**: Incremented on each write, used for startup block selection
 * **SHA256 Checksum**: Per-block integrity verification during startup recovery (checksum stored first in block for easy hash exclusion)
-* **Startup Recovery**: Load all 8 blocks, select highest revision + valid checksum
-* **Deferred Writes**: Core1 write-back limited to maximum once per 30 seconds
+* **Startup Recovery**: Load all 64 blocks, select highest revision + valid checksum
+* **Deferred Writes**: Core1 write-back limited to maximum once per 120 seconds
 * **Sector-Level Updates**: Changed sectors within a block are updated individually for efficiency
 
 ==== Whitebox Management Interface
@@ -2041,10 +2041,10 @@ Flash persistence ensures configuration survival across power cycles while preve
 |Name|Responsibility
 
 |*Write Controller*
-|Manages deferred write-back strategy with Core1 integration. Limits write frequency to maximum once per 30 seconds and only writes when shared memory revision counter changes.
+|Manages deferred write-back strategy with Core1 integration. Limits write frequency to maximum once per 120 seconds and only writes when shared memory revision counter changes.
 
 |*Flash Ring Buffer Manager*
-|Implements 8-block circular buffer (64KB per block) for wear leveling. Tracks current write position, manages block allocation sequence, and maintains ring buffer state at runtime.
+|Implements 64-block circular buffer (8 KB per block, 512 KB total) for wear leveling. Tracks current write position, manages block allocation sequence, and maintains ring buffer state at runtime.
 
 |*Integrity Manager*
 |Handles SHA256 checksum generation and verification for each flash block. SHA256 checksum stored first in block structure for easy hash exclusion. Maintains revision counters for startup block selection and detects data corruption.
@@ -2053,7 +2053,7 @@ Flash persistence ensures configuration survival across power cycles while preve
 |Provides hardware abstraction layer for RP2350 flash operations. Implements sector-by-sector write/erase operations using `flash_safe_execute()` for interrupt safety. Only changed sectors within a block are reprogrammed.
 
 |*Recovery System*
-|Handles startup configuration loading by validating all 8 ring buffer blocks. Selects block with highest revision and valid checksum, implements factory reset fallback via `shared_memory_force_reinit()` for total corruption.
+|Handles startup configuration loading by validating all 64 ring buffer blocks. Selects block with highest revision and valid checksum, implements factory reset fallback via `shared_memory_force_reinit()` for total corruption.
 
 |*Block Metadata*
 |Manages per-block metadata including revision counters, SHA256 checksums, and block status flags. Provides efficient block validation and selection during recovery.
@@ -2062,22 +2062,22 @@ Flash persistence ensures configuration survival across power cycles while preve
 ===== Important Interfaces
 
 ====== Flash Block Structure
-* **Block Size**: 64KB (16 × 4096-byte flash sectors)
-* **Data Section**: Complete `shared_memory_layout_t` structure (raw binary)
+* **Block Size**: 8 KB (2 × 4096-byte flash sectors); 64 blocks fill the 512 KB partition
+* **Data Section**: Complete `shared_memory_layout_t` structure (raw binary), log ring capacity derived from `TOTAL_SHARED_MEM_USABLE_SIZE`
 * **Metadata Layout**: SHA256 checksum (256-bit, first field) + Magic number (32-bit) + Revision counter (32-bit)
 * **Magic Number**: Block validity marker (`0xC0FFEEAA`) for ring buffer management
 * **Static Allocation**: Shared memory is embedded within a statically allocated `flash_persistence_block_t`
 
 ====== Write-Back Interface
 * **Trigger Condition**: `shared_memory_layout.revision_counter` increment detection
-* **Frequency Limit**: Maximum once per 30 seconds via Core1 timer
+* **Frequency Limit**: Maximum once per 120 seconds via Core1 timer
 * **Block Operation**: Complete shared memory + metadata written per block
 * **Sector-Level Efficiency**: Only changed sectors within a block are erased/programmed
-* **Ring Advancement**: Automatic progression to next block in 8-block ring
+* **Ring Advancement**: Automatic progression to next block in 64-block ring
 * **Safe Flash Access**: Uses `flash_safe_execute()` for interrupt-safe operations
 
 ====== Recovery Interface
-* **Block Scanning**: Read all 8 ring buffer blocks during startup
+* **Block Scanning**: Read all 64 ring buffer blocks during startup
 * **Validation Logic**: SHA256 verification + magic number check per block
 * **Selection Criteria**: Highest revision counter among valid blocks
 * **Fallback Strategy**: Factory defaults via `shared_memory_force_reinit()` if no valid blocks found
@@ -2086,26 +2086,23 @@ Flash persistence ensures configuration survival across power cycles while preve
 ====== Flash Ring Buffer Layout
 [source,c]
 ----
-// Flash persistence block structure (64KB, 16 × 4096-byte sectors)
-// Note: sha256_checksum is placed first to simplify exclusion during hash calculation.
-// The hash covers all fields after sha256_checksum (magic_number through padding).
-typedef struct {
-    uint8_t  sha256_checksum[32];    // Block integrity (FIRST for hash exclusion)
-    uint32_t magic_number;           // 0xC0FFEEAA - block validity
-    uint32_t revision_counter;       // Incremented on each write
-    uint32_t reserved[4];            // Future use
-    
-    // Complete shared memory structure (raw binary)
-    shared_memory_layout_t shared_memory_data;
-    
-    // Padding to 64KB block size
-    uint8_t padding[...];
-} __attribute__((packed, aligned(4096))) flash_persistence_block_t;
+// Flash persistence block (8 KB = FLASH_PERSISTENCE_BLOCK_SIZE, 2 × 4096-byte sectors)
+// Note: sha256_checksum is the first field of shared_memory_layout_t to simplify
+// exclusion during hash calculation. The hash covers all fields after it.
+typedef union {
+    struct {
+        // Complete shared memory structure (raw binary):
+        // checksum, magic, revision, config, counters, log ring
+        shared_memory_layout_t shared_memory_data;
+    };
+    // Pads the block to 8 KB; the log ring grows into this space
+    uint8_t _size[FLASH_PERSISTENCE_BLOCK_SIZE];
+} __attribute__((aligned(FLASH_PERSISTENCE_PAGE_SIZE))) flash_persistence_block_t;
 
 // Ring buffer management state (runtime, not persisted)
 typedef struct {
-    uint8_t  current_write_block;         // 0-7, next block to write
-    uint8_t  last_valid_block;            // 0-7, last successfully read block
+    uint8_t  current_write_block;         // 0-63, next block to write
+    uint8_t  last_valid_block;            // 0-63, last successfully read block
     uint32_t total_writes_lifetime;       // Lifetime write counter
     uint32_t corruption_events;           // Detected corruption events
     uint32_t last_written_revision;       // Change detection state
@@ -2187,14 +2184,14 @@ void core1_main(void) {
 ====== Error Handling and Recovery
 
 **Factory Reset Procedure:**
-1. **Corruption Detection**: If all 8 ring buffer blocks fail SHA256 verification, or user-requested
-2. **Factory Reset Execution**: Erase all 8 blocks, call `shared_memory_force_reinit()` to restore defaults
+1. **Corruption Detection**: If all 64 ring buffer blocks fail SHA256 verification, or user-requested
+2. **Factory Reset Execution**: Erase all 64 blocks, call `shared_memory_force_reinit()` to restore defaults
 3. **Emergency Logging**: Log factory reset event as first entry in clean log system
 4. **Shared Memory Reinit**: Factory defaults applied via `shared_memory_init()` sequence
 
 **Startup Recovery Process:**
 1. **Partition Discovery**: Use bootrom APIs to locate configuration data partition (ID=3)
-2. **Block Validation**: Read all 8 blocks, verify magic numbers and SHA256 checksums
+2. **Block Validation**: Read all 64 blocks, verify magic numbers and SHA256 checksums
 3. **Best Block Selection**: Choose block with highest revision + valid checksum
 4. **Graceful Degradation**: Factory reset if no valid blocks found, log corruption count
 5. **Device Mode Enforcement**: Apply GPIO pins and channel enables from device_mode.h
@@ -2203,14 +2200,14 @@ void core1_main(void) {
 
 **Real Hardware Testing Approach:**
 - All persistence tests run on actual RP2350 flash hardware
-- Test ring buffer wraparound with real 64KB block operations
+- Test ring buffer wraparound with real 8 KB block operations
 - Verify SHA256 integrity checking with hardware crypto acceleration
 - Test power-loss scenarios by controlled resets during write operations
-- Validate 30-second deferred write-back timing with Core1 main loop
+- Validate 120-second deferred write-back timing with Core1 main loop
 
 **Test Coverage Requirements:**
 - Sector-by-sector flash operations (read/write/erase)
-- Ring buffer advancement and wraparound across 8 blocks
+- Ring buffer advancement and wraparound across 64 blocks
 - SHA256 integrity verification and corruption detection
 - Startup recovery with various corruption scenarios
 - Core1 integration and timing verification

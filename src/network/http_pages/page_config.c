@@ -10,6 +10,7 @@
  */
 
 #include "network/http_pages/page_config.h"
+#include "debug.h"
 #include "network/network_manager.h"
 #include "shared_memory.h"
 #include "device_mode.h"
@@ -247,11 +248,13 @@ void http_generate_config_page(char* buffer, size_t buffer_size,
     );
     
     // DEBUG: Check if HTML generation was successful
-    printf("HTTP: Generated config page HTML length: %d bytes (max: %d)\n", html_len, (int)buffer_size);
-    if (html_len >= (int)buffer_size) {
-        printf("HTTP: ERROR - Config HTML truncated! Need at least %d bytes\n", html_len);
-    } else {
-        printf("HTTP: Config HTML generation successful - %d bytes remaining\n", 
-               (int)buffer_size - html_len);
-    }
+    DEBUG_ONLY(
+        printf("HTTP: Generated config page HTML length: %d bytes (max: %d)\n", html_len, (int)buffer_size);
+        if (html_len >= (int)buffer_size) {
+                printf("HTTP: ERROR - Config HTML truncated! Need at least %d bytes\n", html_len);
+        } else {
+                printf("HTTP: Config HTML generation successful - %d bytes remaining\n", 
+                (int)buffer_size - html_len);
+        }
+    );
 }

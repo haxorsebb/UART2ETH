@@ -324,14 +324,15 @@ Configuration data persistence uses raw binary storage with flash ring buffer ma
 * Shared memory statically allocated within a `flash_persistence_block_t` structure
 
 **Flash Ring Buffer Management**
-* 8 flash blocks (64KB each) organized as circular ring buffer
+* 64 flash blocks (8 KB each, 2 × 4096-byte sectors) organized as circular ring buffer covering the full 512 KB configuration partition
 * Each block stores complete `shared_memory_layout_t` snapshot + metadata
+* Each block is erased only once per 64 saves, giving ~6.4 M saves at 100k P/E cycles (see ADR-006)
 * Write operations advance to next block in ring (wear leveling)
 * Sector-by-sector updates: only changed sectors reprogrammed for efficiency
 * Power-loss safety through `flash_safe_execute()` for interrupt-safe operations
 
 **Startup Recovery Process**
-* Read all 8 ring buffer blocks from flash (partition ID=3)
+* Read all 64 ring buffer blocks from flash (partition ID=3)
 * Verify SHA256 checksum for each block
 * Select block with highest revision counter AND valid checksum
 * Load selected block data into `shared_memory_layout_t`
@@ -340,7 +341,7 @@ Configuration data persistence uses raw binary storage with flash ring buffer ma
 
 **Write-Back Strategy**
 * Deferred writes executed by Core1 main loop
-* Write frequency limited to maximum once per 30 seconds
+* Write frequency limited to maximum once per 120 seconds
 * Write triggered only when `shared_memory_layout.revision_counter` changes
 * Complete shared memory structure written per block with sector-level optimization
 * Write-in-progress tracking prevents concurrent write operations

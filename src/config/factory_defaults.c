@@ -36,7 +36,7 @@ static bool validate_factory_defaults_integrity(const factory_defaults_t* defaul
 bool factory_defaults_init(void) {
     
     if (!load_factory_defaults()) {
-        printf("WARNING: Factory defaults invalid or corrupted\n");
+        DEBUG_ONLY(printf("WARNING: Factory defaults invalid or corrupted\n"));
         g_factory_defaults_valid = false;
         return false;
     }
@@ -104,7 +104,7 @@ void factory_defaults_apply_to_config(void) {
  */
 const factory_defaults_t* factory_defaults_get(void) {
 
-    printf("FACTORY DEFAULTS GET: %d, 0x%08X %02d/%02d\n",g_factory_defaults_valid, &g_factory_defaults, g_factory_defaults.production_week, g_factory_defaults.production_year);
+    DEBUG_ONLY(printf("FACTORY DEFAULTS GET: %d, 0x%08X %02d/%02d\n",g_factory_defaults_valid, &g_factory_defaults, g_factory_defaults.production_week, g_factory_defaults.production_year));
     if (!g_factory_defaults_valid) {
         return NULL;
     }
@@ -144,7 +144,7 @@ static bool load_factory_defaults(void) {
     // Validate integrity
     if (!validate_factory_defaults_integrity((const factory_defaults_t *)(XIP_NOCACHE_NOALLOC_NOTRANSLATE_BASE + partition_start))) {
         log_event(EVENT_SOURCE_CONFIG, LOG_LEVEL_ERROR, LOG_EVENT_FACTORY_DEFAULTS_CHECKSUM_FAILED, 0);
-        printf("FACTORY DEFAULTS INTEGRITY FAILED!\n");
+        DEBUG_ONLY(printf("FACTORY DEFAULTS INTEGRITY FAILED!\n"));
         return false;
     }
     
