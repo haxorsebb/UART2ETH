@@ -248,6 +248,26 @@ void test_core0_timer_statistics(void) {
     TEST_ASSERT_EQUAL(1, core0_timer_get_active_count());
 }
 
+/**
+ * @brief Test that a target already in the past still expires
+ *
+ * ADR-009, "Timer instance and IRQ line": if the alarm target is missed
+ * (interval shorter than the time to arm it), the module forces the IRQ so the
+ * ISR expires the timer immediately instead of waiting for a counter wrap.
+ * Also guards against an IRQ storm from a forced IRQ left asserted.
+ */
+void test_core0_timer_missed_target_expires(void) {
+    core0_timer_set(CORE0_TIMER_UART0_TIMEOUT, 1);
+    sleep_ms(5);
+    TEST_ASSERT_TRUE(core0_timer_is_expired(CORE0_TIMER_UART0_TIMEOUT));
+
+    // A second timer afterwards must still work normally (no stuck forced IRQ)
+    core0_timer_set(CORE0_TIMER_UART1_TIMEOUT, 30);
+    TEST_ASSERT_FALSE(core0_timer_is_expired(CORE0_TIMER_UART1_TIMEOUT));
+    sleep_ms(40);
+    TEST_ASSERT_TRUE(core0_timer_is_expired(CORE0_TIMER_UART1_TIMEOUT));
+}
+
 // Unity test runner
 int main(void) {
     stdio_init_all();
@@ -264,6 +284,7 @@ int main(void) {
     RUN_TEST(test_core0_timer_invalid_id);
     RUN_TEST(test_core0_timer_zero_interval);
     RUN_TEST(test_core0_timer_statistics);
+    RUN_TEST(test_core0_timer_missed_target_expires);
     
     while (true) {
         printf("Tests completed\n");

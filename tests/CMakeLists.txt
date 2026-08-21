@@ -10,6 +10,15 @@ pico_sdk_init()
 
 if (TARGET tinyusb_device)
 
+# Test binaries call stdio_init_all(). The firmware routes its debug UART to
+# GP16/GP17 (see src/main.c, stdio_uart_init_full(uart0, 115200, 16, 17)) and
+# the development UART logger listens there. Point the SDK default UART pins
+# at the same pair so test output shows up in ./tools/persistent_uart_logger.sh.
+add_compile_definitions(
+    PICO_DEFAULT_UART_TX_PIN=16
+    PICO_DEFAULT_UART_RX_PIN=17
+)
+
 # Unity test framework - simple embedded testing
 add_library(unity
     unity/src/unity.c
@@ -113,7 +122,12 @@ add_executable(test_state_machine
     ../src/log/log_manager.c
 )
 
-target_include_directories(test_state_machine PRIVATE ../include)
+target_include_directories(test_state_machine PRIVATE
+    ../include
+    ../include/state_machine
+    ../include/config
+    ../include/log
+)
 
 target_link_libraries(test_state_machine
     unity
@@ -140,7 +154,12 @@ add_executable(test_core0_timer
     ../src/core0_timer.c
 )
 
-target_include_directories(test_core0_timer PRIVATE ../include)
+target_include_directories(test_core0_timer PRIVATE
+    ../include
+    ../include/state_machine
+    ../include/config
+    ../include/log
+)
 
 target_link_libraries(test_core0_timer
     unity
@@ -162,7 +181,12 @@ add_executable(test_core1_timer
     ../src/core1_timer.c
 )
 
-target_include_directories(test_core1_timer PRIVATE ../include)
+target_include_directories(test_core1_timer PRIVATE
+    ../include
+    ../include/state_machine
+    ../include/config
+    ../include/log
+)
 
 target_link_libraries(test_core1_timer
     unity

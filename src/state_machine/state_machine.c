@@ -22,9 +22,11 @@
 #include <stdio.h>
 #include "debug.h"
 
-// Doorbell stub definitions for testing
-static int doorbell_core0_wakes_core1 = 0;
-static int doorbell_core1_wakes_core0 = 1;
+// Cross-core wake-up doorbells (ADR-007, "Cross-Core Wake-Up").
+// One SIO doorbell per direction, claimed once in claim_wake_doorbells().
+// -1 means "not claimed". The inter-core FIFO is never used by this module.
+static int doorbell_core0_wakes_core1 = -1;
+static int doorbell_core1_wakes_core0 = -1;
 
 // State variables with proper synchronization
 static _Atomic main_state_t g_main_state = MAIN_STATE_INIT;                   // Atomic for cross-core access
@@ -55,6 +57,10 @@ static bool check_core1_configuration_complete(void);
 
 // Cross-core synchronization
 static void wake_other_core_after_main_state_change(main_state_t new_state);
+static bool claim_wake_doorbells(void);
+static int doorbell_for_direction(wake_direction_t direction);
+static wake_direction_t direction_targeting_this_core(void);
+static void wake_doorbell_irq_handler(void);
 
 /**
  * Initialize the event-driven state machine
@@ -71,18 +77,47 @@ bool state_machine_init(void) {
     atomic_store(&g_core0_substate, CORE0_INIT_UART);
     atomic_store(&g_core1_substate, CORE1_INIT_PERISTENCE);
     
+    if (!claim_wake_doorbells()) {
+        return false;
+    }
+
     // Atomic operations provide necessary memory ordering guarantees
     atomic_store(&g_initialized, true);
 
-    // Doorbell functionality disabled for compatibility with this commit
-    doorbell_core0_wakes_core1 = 0;
-    doorbell_core1_wakes_core0 = 1;
-    
     DEBUG_ONLY({
-        printf("Doorbells disabled - using stub values: core0_wakes_core1=%d, core1_wakes_core0=%d\n", 
+        printf("Wake doorbells: core0_wakes_core1=%d, core1_wakes_core0=%d\n", 
                doorbell_core0_wakes_core1, doorbell_core1_wakes_core0);
     });
 
+    return true;
+}
+
+/**
+ * Claim one doorbell per wake direction.
+ *
+ * Doorbells are hardware resources; claiming is done exactly once for the
+ * lifetime of the program, independent of g_initialized, so that
+ * re-initialization (tests, core restarts) does not exhaust the 8 doorbells.
+ *
+ * @return true if both doorbells are available
+ */
+static bool claim_wake_doorbells(void) {
+    if (doorbell_core0_wakes_core1 >= 0 && doorbell_core1_wakes_core0 >= 0) {
+        return true;  // Already claimed
+    }
+
+    const uint both_cores = 0x3;
+    int first = multicore_doorbell_claim_unused(both_cores, false);
+    int second = multicore_doorbell_claim_unused(both_cores, false);
+    if (first < 0 || second < 0) {
+        if (first >= 0) {
+            multicore_doorbell_unclaim((uint)first, both_cores);
+        }
+        return false;
+    }
+
+    doorbell_core0_wakes_core1 = first;
+    doorbell_core1_wakes_core0 = second;
     return true;
 }
 
@@ -956,86 +991,96 @@ static bool check_main_state_operational(void) {
     return atomic_load(&g_main_state) == MAIN_STATE_OPERATIONAL;
 }
 
-/**
- * wake the other core when a main state change happens
+/*
+ * Cross-core wake-up via SIO doorbells (ADR-007, "Cross-Core Wake-Up").
+ *
+ * The inter-core FIFO is NOT used here. flash_safe_execute_core_init() hands
+ * the FIFO IRQ on both cores to the SDK lockout handler, and the SDK requires
+ * the FIFO to be used for nothing else once lockout is active. Doorbells are a
+ * separate SIO resource with their own IRQ (SIO_IRQ_BELL), so ringing one
+ * cannot interfere with flash_safe_execute().
  */
-static void wake_other_core_after_main_state_change(main_state_t new_state) {
-    //wake the other core - doorbell functionality disabled, using FIFO instead
-    if (multicore_fifo_wready())
-        multicore_fifo_push_blocking(0xDEADBEEF);  // Simple wake signal via FIFO
-}
 
 /**
- * wake the other core from WFI (NON-BLOCKING to prevent deadlocks)
+ * Map a wake direction to its doorbell number.
  */
-void wake_other_core(wake_direction_t direction) {
-    // Use completely non-blocking FIFO operations to prevent deadlock
-    // when called while holding mutex (such as from ringbuffer_enqueue_entry)
-    
-    uint32_t wake_signal;
-    if(direction == CORE0_WAKES_CORE1) {
-        wake_signal = 0xDEADBEEF;
-    } else {
-        wake_signal = 0xCAFEBABE;
-    }
-    
-    // Try non-blocking push - if FIFO full, skip wake signal rather than deadlock
-    if (!multicore_fifo_wready()) {
-        // FIFO full - core will wake up on next processing cycle anyway
-        printf("FIFO-DEADLOCK-PREVENTION: FIFO full, skipping wake signal (direction=%d)\n", direction);
-        return;
-    }
-    
-    // FIFO has space - safe to push without blocking
-    multicore_fifo_push_blocking(wake_signal);
-}
-
-/**
- * clear doorbell for init
- */
-int clear_doorbbell(wake_direction_t direction) {
-    //clear the right doorbell - doorbell functionality disabled
-    // Do NOT read the inter-core FIFO here: the SDK lockout handler owns the
-    // SIO FIFO IRQ and drains the FIFO in the ISR. Reading it from thread
-    // context races against the ISR and can block forever.
-    if(direction == CORE0_WAKES_CORE1) {
+static int doorbell_for_direction(wake_direction_t direction) {
+    if (direction == CORE0_WAKES_CORE1) {
         return doorbell_core0_wakes_core1;
     }
-    else {
-        return doorbell_core1_wakes_core0;
+    return doorbell_core1_wakes_core0;
+}
+
+/**
+ * The wake direction whose doorbell rings on the calling core.
+ */
+static wake_direction_t direction_targeting_this_core(void) {
+    if (get_core_num() == 0) {
+        return CORE1_WAKES_CORE0;
+    }
+    return CORE0_WAKES_CORE1;
+}
+
+/**
+ * Wake the other core when the main state changes.
+ * Both cores may sleep on a main state change, so wake whichever is "other".
+ */
+static void wake_other_core_after_main_state_change(main_state_t new_state) {
+    (void)new_state;
+    if (get_core_num() == 0) {
+        wake_other_core(CORE0_WAKES_CORE1);
+    } else {
+        wake_other_core(CORE1_WAKES_CORE0);
     }
 }
 
 /**
- * enable doorbell for irq for cores
+ * Wake the other core from __wfi().
+ *
+ * Setting a doorbell is a single register write: non-blocking, idempotent,
+ * safe while holding a mutex (ringbuffer_enqueue_entry() calls this) and
+ * safe from ISR context. The woken core re-checks its work conditions; a
+ * doorbell carries no payload.
  */
-void enable_doorbell_irq(wake_direction_t direction) {
-    
-    int doorbell_num = 0;
-
-    if(direction == CORE0_WAKES_CORE1) {
-        doorbell_num = doorbell_core0_wakes_core1;
-    } 
-    else {
-        doorbell_num = doorbell_core1_wakes_core0;
+void wake_other_core(wake_direction_t direction) {
+    int doorbell = doorbell_for_direction(direction);
+    if (doorbell < 0) {
+        return;  // state_machine_init() not run or claim failed; nothing to ring
     }
-
-    // Doorbell functionality disabled - IRQ setup skipped
-    DEBUG_ONLY({
-        printf("Core%d: Doorbell IRQ disabled - no IRQ setup needed\n", get_core_num());
-    });
-
-    // IRQ functionality disabled for compatibility with this commit
-    // Cross-core communication will use polling instead of interrupts
+    multicore_doorbell_set_other_core((uint)doorbell);
 }
 
+/**
+ * Doorbell IRQ handler. Runs on the core that was rung.
+ * Only clears the doorbell so the IRQ does not re-fire; the purpose of the
+ * interrupt is solely to terminate __wfi() in the core's idle wait.
+ */
+static void wake_doorbell_irq_handler(void) {
+    int doorbell = doorbell_for_direction(direction_targeting_this_core());
+    if (doorbell >= 0) {
+        multicore_doorbell_clear_current_core((uint)doorbell);
+    }
+}
 
 /**
- * Handle the doorbell set from core0 or core 1
+ * Enable the doorbell IRQ on the calling core.
  */
-extern void shared_doorbell_irq() {
-    // The main purpose is to wake from wfi - doorbell functionality disabled
-    // Using FIFO IRQ instead. Nothing to do here: the SDK lockout handler is
-    // the FIFO IRQ handler and drains the FIFO. This function must not read
-    // the FIFO (see clear_doorbbell()).
+void state_machine_enable_wake_irq(void) {
+    int doorbell = doorbell_for_direction(direction_targeting_this_core());
+    if (doorbell < 0) {
+        return;
+    }
+    uint irq_num = multicore_doorbell_irq_num((uint)doorbell);
+    // Start clean: a doorbell rung before the IRQ was enabled would otherwise
+    // fire once immediately, which is harmless but noisy.
+    multicore_doorbell_clear_current_core((uint)doorbell);
+    irq_set_exclusive_handler(irq_num, wake_doorbell_irq_handler);
+    irq_set_enabled(irq_num, true);
+}
+
+/**
+ * Doorbell number for a direction (diagnostics, tests).
+ */
+int state_machine_get_wake_doorbell(wake_direction_t direction) {
+    return doorbell_for_direction(direction);
 }

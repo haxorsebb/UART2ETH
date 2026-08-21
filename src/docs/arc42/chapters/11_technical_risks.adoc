@@ -32,6 +32,8 @@ endif::arc42help[]
 | R-006 | RP2350 Platform Learning Curve | Organizational | Medium | Medium | **MEDIUM**
 | R-007 | Component Supply Chain Availability | External | Low | High | **MEDIUM**
 | R-008 | Industrial Performance Requirements | Business | Medium | High | **HIGH**
+| R-009 | Protocol Implementation Compliance | Technical | Medium | High | **HIGH**
+| R-010 | Core 1 WFI Misses ENC28J60 Edge Interrupt | Technical | Low | High | **MEDIUM**
 |===
 
 === Detailed Risk Analysis
@@ -243,6 +245,27 @@ endif::arc42help[]
 | **Review Date** | Weekly during protocol implementation
 |===
 
+==== R-010: Core 1 WFI Misses ENC28J60 Edge Interrupt
+
+[cols="1,3"]
+|===
+| **Category** | Technical
+| **Description** | Core 1 idles in `__wfi()` (ADR-007, "Core 1 idle wait"). The ENC28J60 INT pin is a falling-edge GPIO IRQ, but the chip holds INT low until its interrupt flags are serviced, so no new edge occurs while INT is already low. If core 1 enters `__wfi()` with INT low and no pending work, no IRQ arrives from the Ethernet controller until a timer or doorbell wakes the core
+| **Probability** | Low - `core1_idle_wait()` refuses to sleep when the driver reports a pending interrupt or the INT pin reads low; an edge between the guard and `__wfi()` sets the NVIC pending bit and `__wfi()` returns immediately
+| **Impact** | High - Lost receive latency of up to one timer period (500 ms link poll timer) if the guard is ever bypassed or the driver clears INT without re-checking for new packets
+| **Risk Level** | **MEDIUM**
+| **Current Controls** | - Guard in `core1_idle_wait()` (pending flag and raw pin level)
+- `CORE1_TIMER_LINK_POLL` guarantees a wake-up at least every 500 ms
+- Core 1 timers (network timeouts) wake the core independently
+| **Additional Mitigation** | - Switch the GPIO IRQ to `GPIO_IRQ_LEVEL_LOW` with ISR self-masking and unmask in `enc28j60_process_interrupts()` if latency outliers are observed
+- Throughput test with continuous inbound traffic and compare latency histograms against the previous 1 ms polling build
+| **Owner** | Senior Developer
+| **Timeline** | Validate during doorbell feature test
+| **Early Warning Signs** | - Receive latency spikes near 500 ms
+- `enc28j60` pending-flag set while core 1 reports idle
+| **Review Date** | After feature PR merge
+|===
+
 === Technical Debt Register
 
 The following technical debts have been identified and require future resolution:
@@ -294,6 +317,30 @@ The following technical debts have been identified and require future resolution
 **Priority:** Medium +
 **Effort:** Medium (1 week: version field, per-version migration hook, tests) +
 **Resolution Plan:** Add a `config_schema_version` to the persisted block; on load, run migrations from the stored version to the current one, then sanitize. Until then, every PR that adds or re-scopes a persisted field must add a sanitization rule and a test
+
+==== TD-007: Inter-Core FIFO Shared with SDK Lockout (resolved)
+
+**Description:** Until 2026-08 cross-core wake-up pushed words into the SIO inter-core FIFO although `flash_safe_execute_core_init()` had handed the FIFO IRQ to the SDK lockout handler on both cores. The wake words were discarded by the lockout ISR; the doorbell functions named in ADR-007 were stubs; core 1 polled with `sleep_ms(1)` instead of `__wfi()` +
+**Impact:** Dependence on an undocumented SDK behaviour, possible stall of `multicore_lockout_start_blocking()` when the 4-entry FIFO filled while the victim core had interrupts disabled, documentation and code disagreeing +
+**Priority:** High (resolved) +
+**Effort:** Low (1-2 days) +
+**Resolution Plan:** Resolved by the doorbell-based wake-up described in ADR-007 ("Cross-Core Wake-Up"). The FIFO is now SDK-only. Kept here as a record for anyone who finds references to the FIFO wake words in old commits or logs
+
+==== TD-008: Per-Core Timer ISRs Were Wired to the Wrong IRQ Lines (resolved)
+
+**Description:** `core0_timer.c` and `core1_timer.c` armed alarms 0 and 1 of `timer_hw` (TIMER0 on RP2350) but installed and enabled their ISRs on `TIMER1_IRQ_0` / `TIMER1_IRQ_1`. The alarm interrupts pended on TIMER0's NVIC lines where no handler was enabled, so neither ISR ever ran. Timers only became "expired" through the zero-interval shortcut in `*_timer_set()`. Network code masked this by arming `CORE1_TIMER_NETWORK_TIMEOUT` with `sys_timeouts_sleeptime()`, which is often 0, and by the former 1 ms polling on core 1. `test_core1_timer` had been failing (and hanging in `test_core1_timer_accuracy`) for this reason +
+**Impact:** Timers with real intervals (`CORE1_TIMER_DHCP_DISCOVER`, `CORE1_TIMER_NETWORK_TX_TIMEOUT`, all core 0 timers) did not fire; with core 1 now sleeping in `__wfi()` (ADR-007) the alarm IRQ is a required wake source +
+**Priority:** High (resolved) +
+**Effort:** Low (1 day) +
+**Resolution Plan:** Resolved 2026-08: IRQ line derived with `timer_hardware_alarm_get_irq_num()`, alarms claimed with `hardware_alarm_claim()`, set/cancel made ISR-safe (ADR-009, "Timer instance and IRQ line"). Acceptance: the previously failing `test_core1_timer` cases and the new `test_core0_timer` expiry cases pass. Follow-up: review whether any caller relied on timers never expiring (DHCP discover timeout behaviour after the fix)
+
+==== TD-009: ENC28J60 TX Timeout Value Not Validated
+
+**Description:** `enc28j60_send_packet()` arms `CORE1_TIMER_NETWORK_TX_TIMEOUT` and aborts the transmission with `enc28j60_reset_tx_logic()` when it expires. The code specified 10 ms, but because the core 1 timer ISR never ran (TD-008) the effective timeout was the 1000-iteration poll fallback, roughly 100 ms. With the ISR fixed, a real 10 ms timeout produced ~950 TX errors in 3 minutes and the driver ended in an RX stall (packet pending flag set, receive counter frozen, core 1 spinning). The value was set to 100 ms to restore the previous effective behaviour; a 10 minute soak was then stable +
+**Impact:** The correct TX timeout for this hardware and link partner is unknown; 100 ms is the historical value, not a derived one. The RX stall after repeated TX resets is a separate driver robustness issue (errata 12/13 handling) +
+**Priority:** Medium +
+**Effort:** Low to measure (TX duration histogram), Medium to fix the stall +
+**Resolution Plan:** Measure actual TX completion times under load, derive a timeout with margin, and make the RX path recover from a TX reset. Until then keep 100 ms
 
 === Risk Mitigation Plan
 

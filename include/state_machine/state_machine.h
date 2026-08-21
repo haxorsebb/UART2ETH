@@ -18,23 +18,16 @@
 #include <stdbool.h>
 
 
-extern void shared_doorbell_irq();
-
-
 /**
- * @brief Message direction enumeration
+ * @brief Cross-core wake-up direction
+ *
+ * Each direction is backed by one RP2350 SIO doorbell claimed in
+ * state_machine_init(). See ADR-007, "Cross-Core Wake-Up".
  */
 typedef enum {
     CORE0_WAKES_CORE1 = 0,   
     CORE1_WAKES_CORE0 = 1    
 } wake_direction_t;
-
-
-typedef enum {
-    WAKE_MAIN_STATE_CHANGED = 1,
-    WAKE_CONFIG_UPDATE = 2,
-    WAKE_ERROR_CONDITION = 3
-} wake_reason_t;
 
 // Main system states (shared between cores, atomic access)
 typedef enum {
@@ -198,13 +191,33 @@ typedef enum {
 bool state_machine_init(void);
 
 /**
- * @brief Wakes the 'other' core from WFI
- * 
- * 
+ * @brief Wake the other core from __wfi()
+ *
+ * Rings the doorbell that belongs to @p direction. Non-blocking, idempotent,
+ * safe to call while holding a mutex or from an ISR. The wake-up is a hint:
+ * the woken core must re-check its work conditions. The inter-core FIFO is
+ * never used; it is reserved for the SDK lockout behind flash_safe_execute().
+ * See ADR-007, "Cross-Core Wake-Up".
+ *
+ * @param direction which core is to be woken
  */
-// Cross-core synchronization
 void wake_other_core(wake_direction_t direction);
-void enable_doorbell_irq(wake_direction_t direction);
+
+/**
+ * @brief Enable the doorbell IRQ on the calling core
+ *
+ * Must be called once on each core before that core relies on __wfi() being
+ * terminated by wake_other_core() from the other core. The handler only
+ * clears the doorbell; it does no work.
+ */
+void state_machine_enable_wake_irq(void);
+
+/**
+ * @brief Doorbell number used for a wake direction (diagnostics, tests)
+ *
+ * @return doorbell number 0..7, or -1 if not claimed
+ */
+int state_machine_get_wake_doorbell(wake_direction_t direction);
 
 /**
  * @brief Get current main state (thread-safe, non-blocking)

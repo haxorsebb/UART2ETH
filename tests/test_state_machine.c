@@ -14,6 +14,8 @@
 #include "unity.h"
 #include "state_machine.h"
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
+#include "hardware/sync.h"
 #include <stdio.h>
 #include <stdatomic.h>
 
@@ -286,6 +288,166 @@ void test_state_queries_non_blocking(void) {
     TEST_ASSERT_TRUE(core1_state >= CORE1_INIT_PERISTENCE && core1_state <= CORE1_SHUTDOWN);
 }
 
+// ---------------------------------------------------------------------------
+// Cross-core wake-up via SIO doorbells
+// Documentation Reference: ADR-007, section "Cross-Core Wake-Up"
+// ---------------------------------------------------------------------------
+
+/**
+ * Test: Initialization claims one distinct doorbell per wake direction
+ *
+ * Both doorbells must be valid RP2350 doorbell numbers (0..7) and must differ,
+ * otherwise one core could clear the other core's wake request.
+ */
+void test_wake_doorbells_are_claimed_and_distinct(void) {
+    int core0_to_core1 = state_machine_get_wake_doorbell(CORE0_WAKES_CORE1);
+    int core1_to_core0 = state_machine_get_wake_doorbell(CORE1_WAKES_CORE0);
+
+    TEST_ASSERT_TRUE_MESSAGE(core0_to_core1 >= 0 && core0_to_core1 < NUM_DOORBELLS,
+                             "CORE0_WAKES_CORE1 doorbell must be claimed");
+    TEST_ASSERT_TRUE_MESSAGE(core1_to_core0 >= 0 && core1_to_core0 < NUM_DOORBELLS,
+                             "CORE1_WAKES_CORE0 doorbell must be claimed");
+    TEST_ASSERT_NOT_EQUAL_MESSAGE(core0_to_core1, core1_to_core0,
+                                  "Wake doorbells must be distinct");
+}
+
+/**
+ * Test: Re-initialization does not leak doorbells
+ *
+ * setUp() re-runs state_machine_init() before every test. The doorbell numbers
+ * must stay stable across re-initialization; otherwise the 8 doorbells would
+ * be exhausted after a few tests (or after a core restart in production).
+ */
+void test_wake_doorbells_stable_across_reinit(void) {
+    int first_c0 = state_machine_get_wake_doorbell(CORE0_WAKES_CORE1);
+    int first_c1 = state_machine_get_wake_doorbell(CORE1_WAKES_CORE0);
+
+    atomic_store(&g_initialized, false);
+    state_machine_init();
+
+    TEST_ASSERT_EQUAL_INT(first_c0, state_machine_get_wake_doorbell(CORE0_WAKES_CORE1));
+    TEST_ASSERT_EQUAL_INT(first_c1, state_machine_get_wake_doorbell(CORE1_WAKES_CORE0));
+}
+
+/**
+ * Test: wake_other_core() rings the other core's doorbell
+ *
+ * Observable from this core via multicore_doorbell_is_set_other_core().
+ * Cleared afterwards so that a later core 1 launch starts clean.
+ */
+void test_wake_other_core_sets_doorbell(void) {
+    int doorbell = state_machine_get_wake_doorbell(CORE0_WAKES_CORE1);
+    multicore_doorbell_clear_other_core(doorbell);
+    TEST_ASSERT_FALSE(multicore_doorbell_is_set_other_core(doorbell));
+
+    wake_other_core(CORE0_WAKES_CORE1);
+
+    TEST_ASSERT_TRUE_MESSAGE(multicore_doorbell_is_set_other_core(doorbell),
+                             "wake_other_core must set the doorbell of the other core");
+    multicore_doorbell_clear_other_core(doorbell);
+}
+
+/**
+ * Test: wake_other_core() never uses the inter-core FIFO
+ *
+ * The FIFO is reserved for the SDK lockout mechanism behind
+ * flash_safe_execute() (ADR-007). The RP2350 FIFO holds 4 words; after more
+ * than 4 wake requests the FIFO would be full if it were still in use.
+ */
+void test_wake_other_core_does_not_use_fifo(void) {
+    int doorbell = state_machine_get_wake_doorbell(CORE0_WAKES_CORE1);
+    multicore_fifo_drain();
+    TEST_ASSERT_TRUE(multicore_fifo_wready());
+
+    for (int i = 0; i < 8; i++) {
+        wake_other_core(CORE0_WAKES_CORE1);
+    }
+
+    TEST_ASSERT_TRUE_MESSAGE(multicore_fifo_wready(),
+                             "Inter-core FIFO must stay untouched by wake_other_core");
+    multicore_doorbell_clear_other_core(doorbell);
+}
+
+/**
+ * Helper for the cross-core tests: core 1 enables its wake IRQ, sleeps in
+ * __wfi() and reports every wake-up by incrementing a counter.
+ */
+static volatile uint32_t g_core1_wakeups = 0;
+static volatile bool g_core1_ready = false;
+
+static void core1_wfi_helper(void) {
+    state_machine_enable_wake_irq();
+    g_core1_ready = true;
+    while (true) {
+        __wfi();
+        g_core1_wakeups++;
+    }
+}
+
+static bool wait_for_condition(volatile bool *flag, uint32_t timeout_ms) {
+    absolute_time_t deadline = make_timeout_time_ms(timeout_ms);
+    while (!*flag) {
+        if (time_reached(deadline)) {
+            return false;
+        }
+        tight_loop_contents();
+    }
+    return true;
+}
+
+/**
+ * Test: A doorbell from core 0 terminates __wfi() on core 1
+ *
+ * This is the property core1_idle_wait() relies on (ADR-007, "Core 1 idle wait").
+ */
+void test_doorbell_wakes_core1_from_wfi(void) {
+    g_core1_wakeups = 0;
+    g_core1_ready = false;
+    multicore_reset_core1();
+    multicore_launch_core1(core1_wfi_helper);
+    TEST_ASSERT_TRUE_MESSAGE(wait_for_condition(&g_core1_ready, 1000), "core 1 did not start");
+    sleep_ms(5);
+
+    uint32_t before = g_core1_wakeups;
+    wake_other_core(CORE0_WAKES_CORE1);
+
+    absolute_time_t deadline = make_timeout_time_ms(100);
+    while (g_core1_wakeups == before && !time_reached(deadline)) {
+        tight_loop_contents();
+    }
+    uint32_t after = g_core1_wakeups;
+    multicore_reset_core1();
+
+    TEST_ASSERT_TRUE_MESSAGE(after > before, "core 1 must leave __wfi() on doorbell");
+}
+
+/**
+ * Test: The wake IRQ handler clears the doorbell so the IRQ does not storm
+ *
+ * After the wake-up the doorbell seen from core 0 must be clear again, and
+ * core 1 must not wake more often than it was rung (plus a tolerance for
+ * unrelated interrupts).
+ */
+void test_doorbell_is_cleared_by_irq_handler(void) {
+    int doorbell = state_machine_get_wake_doorbell(CORE0_WAKES_CORE1);
+    g_core1_wakeups = 0;
+    g_core1_ready = false;
+    multicore_reset_core1();
+    multicore_launch_core1(core1_wfi_helper);
+    TEST_ASSERT_TRUE_MESSAGE(wait_for_condition(&g_core1_ready, 1000), "core 1 did not start");
+    sleep_ms(5);
+
+    wake_other_core(CORE0_WAKES_CORE1);
+    sleep_ms(20);
+    bool still_set = multicore_doorbell_is_set_other_core(doorbell);
+    uint32_t wakeups = g_core1_wakeups;
+    multicore_reset_core1();
+
+    TEST_ASSERT_FALSE_MESSAGE(still_set, "IRQ handler must clear the doorbell");
+    TEST_ASSERT_TRUE_MESSAGE(wakeups >= 1 && wakeups < 10,
+                             "doorbell must wake core 1 once, not storm");
+}
+
 // Test runner
 int main() {
     // Initialize Pico SDK
@@ -318,6 +480,14 @@ int main() {
     // Edge case and validation tests
     RUN_TEST(test_invalid_event_ignored);
     RUN_TEST(test_state_queries_non_blocking);
+
+    // Cross-core wake-up via doorbells (ADR-007)
+    RUN_TEST(test_wake_doorbells_are_claimed_and_distinct);
+    RUN_TEST(test_wake_doorbells_stable_across_reinit);
+    RUN_TEST(test_wake_other_core_sets_doorbell);
+    RUN_TEST(test_wake_other_core_does_not_use_fifo);
+    RUN_TEST(test_doorbell_wakes_core1_from_wfi);
+    RUN_TEST(test_doorbell_is_cleared_by_irq_handler);
     
     while (true) {
         printf("Event-Driven State Machine Tests completed\n");

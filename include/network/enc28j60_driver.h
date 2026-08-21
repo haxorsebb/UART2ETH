@@ -397,6 +397,18 @@ bool enc28j60_process_interrupts(bool forced);
 bool enc28j60_has_pending_interrupt(void);
 
 /**
+ * Guard for core 1's __wfi() (ADR-007, "Core 1 idle wait", risk R-010).
+ *
+ * The INT pin is a falling-edge GPIO IRQ but the chip holds INT low until
+ * its interrupt flags are serviced, so no new edge arrives while INT is
+ * already low. Core 1 must not enter __wfi() while the driver has work.
+ *
+ * @return true if the driver is not initialised, has a pending interrupt,
+ *         or the INT pin currently reads low
+ */
+bool enc28j60_wake_pending(void);
+
+/**
  * @brief Utility and diagnostic functions
  */
 
