@@ -104,7 +104,11 @@ typedef struct {
     uint8_t  sha256_checksum[32];                        // Page integrity verification (first for easy hash exclusion)
     uint32_t magic_number;                               // Page validity marker
     uint32_t revision_counter;                           // Write sequence number
-    uint32_t config_change_pending;                // do we need to store data        
+    uint32_t config_change_pending;                // DEPRECATED (ADR-019, TD-010): formerly triggered the
+                                                   // runtime configuration apply; no longer written or read.
+                                                   // Kept because removal would shift the persisted flash
+                                                   // layout (ADR-006). Remove with the first schema
+                                                   // migration (TD-006).
     // Complete shared memory structure (raw binary copy)
     uint32_t reserved[8];                                // Reserved for future integrity features 
     

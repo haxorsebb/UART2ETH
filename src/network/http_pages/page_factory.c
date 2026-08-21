@@ -511,18 +511,14 @@ bool http_parse_factory_post_data(const char* post_data, size_t data_len, char* 
     // all pages (status, config, factory) show consistent values and
     // the ENC28J60 MAC is updated without requiring a reboot.
     factory_defaults_apply_to_config();
-    
-    // Signal core1 to reconfigure the network with the updated MAC/IP
-    shared_memory_layout_t* layout = shared_memory_get_layout();
-    if (layout) {
-        layout->config_change_pending = true;
-    }
-    
-    // Persist the updated configuration to flash
+
+    // Persist the updated configuration to flash. The new MAC/IP take
+    // effect at the next boot; there is no runtime apply (ADR-019).
     flash_persistence_force_save_configuration();
-    
-    printf("HTTP: Factory defaults applied to running config and persisted\n");
-    snprintf(success_msg, success_msg_size, "Factory defaults updated successfully!");
+
+    printf("HTTP: Factory defaults applied to config and persisted\n");
+    snprintf(success_msg, success_msg_size,
+             "Factory defaults updated. Changes take effect after reboot.");
     return true;
 }
 

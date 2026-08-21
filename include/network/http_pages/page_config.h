@@ -13,6 +13,7 @@
 #define PAGE_CONFIG_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 /**
  * @brief Generate configuration page
@@ -32,11 +33,16 @@
  * @param error_msg_size Length of error message string
  * @param success_msg Success message to display (NULL or empty for none)
  * @param success_msg_size Length of success message string
- * 
- * Documentation Reference: ADR-018
+ * @param offer_reboot Render a "Reboot now" control next to the success
+ *        message. Set after a stored configuration change: changes take
+ *        effect at boot (ADR-019), so the reboot is the required next
+ *        user action.
+ *
+ * Documentation Reference: ADR-018, ADR-019
  */
 void http_generate_config_page(char* buffer, size_t buffer_size,
                                const char* error_msg, size_t error_msg_size,
-                               const char* success_msg, size_t success_msg_size);
+                               const char* success_msg, size_t success_msg_size,
+                               bool offer_reboot);
 
 #endif // PAGE_CONFIG_H

@@ -496,18 +496,19 @@ bool http_parse_post_data(const char* post_data, size_t data_len,
     
     free(form_copy);
     
-    // Save configuration to flash if changes were made
+    // Save configuration to flash if changes were made. Changes take effect
+    // at the next boot; there is no runtime apply (ADR-019). The running
+    // network (listeners, interface address) stays untouched so the response
+    // to this request reaches the client.
     if (config_changed) {
         layout->revision_counter++;
-        layout->config_change_pending = true;  // Signal Core1 to apply changes
-        
+
         bool save_result = flash_persistence_force_save_configuration();
         printf("HTTP: Configuration save result: %s\n", save_result ? "success" : "failed");
-        printf("HTTP: Configuration change signaled to Core1 for runtime update\n");
-        printf("HTTP: Note: Network changes (IP/DHCP/MAC) will be applied immediately\n");
-        
+
         if (save_result) {
-            snprintf(success_msg, success_msg_size, "Configuration saved successfully");
+            snprintf(success_msg, success_msg_size,
+                     "Configuration saved. Changes take effect after reboot.");
         } else {
             snprintf(error_msg, error_msg_size, "Configuration changed but flash save failed");
         }
