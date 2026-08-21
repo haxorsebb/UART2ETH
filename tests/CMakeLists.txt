@@ -564,6 +564,34 @@ pico_enable_stdio_uart(test_gpio_loopback 1)
 
 pico_add_extra_outputs(test_gpio_loopback)
 
+# Guard test: flash persistence geometry sustains at least 20 years
+# (ADR-006 erase budget; pure arithmetic over the persistence constants)
+add_executable(test_flash_endurance
+    test_flash_endurance.c
+)
+
+target_include_directories(test_flash_endurance PRIVATE
+    ../include
+    ../include/config
+    ../include/log
+    ../include/network
+    ../include/state_machine
+)
+
+target_link_libraries(test_flash_endurance
+    unity
+    pico_stdlib
+)
+
+# Enable dual stdio for test output
+pico_enable_stdio_usb(test_flash_endurance 1)
+pico_enable_stdio_uart(test_flash_endurance 1)
+
+# Set UF2 family for RP2350
+pico_set_uf2_family(test_flash_endurance "rp2350-arm-s")
+
+# Create UF2 output for flashing to device
+pico_add_extra_outputs(test_flash_endurance)
 # Test for deferred reboot mechanism (ADR-019 proposed, ADR-017 reboot path)
 # Verifies that a network-triggered reboot request keeps the system in
 # MAIN_STATE_OPERATIONAL for a grace period so the HTTP acknowledgement can
