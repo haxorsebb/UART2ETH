@@ -114,7 +114,7 @@ void test_flash_persistence_change_detection(void) {
  * Test: Flash persistence should enforce write frequency limits
  * 
  * Tests that the deferred write-back system limits writes to
- * maximum once per 30 seconds as specified in ADR-006.
+ * maximum once per FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS (120 s) as specified in ADR-006.
  */
 void test_flash_persistence_write_frequency_limiting(void) {
     // ARRANGE: Initialize system

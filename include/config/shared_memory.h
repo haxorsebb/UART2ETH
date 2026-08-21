@@ -23,6 +23,8 @@
 #include <hardware/sync/spin_lock.h>
 #include <stdint.h>
 #include <stdbool.h>
+
+#include "flash_persistence.h"
 #include "log_manager.h"  // For log_entry_t definition
 #include "network/network_manager.h"  // For network_config_t definition
 
@@ -119,22 +121,9 @@ typedef struct {
     log_entry_t log_entries[1];       // Flexible array member placeholder
 } __attribute__((aligned(4))) shared_memory_layout_t;
 
-// Flash persistence constants - RP2350 Partition Table Approach
-#define FLASH_PERSISTENCE_RING_SIZE 8                    // 4 pages in ring buffer
-#define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
-#define FLASH_PERSISTENCE_BLOCK_SIZE 16*4096             // SRAM4 BANK SIZE
-#define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
-#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
-#define FLASH_PARTITION_FIRMWARE_A 0
-#define FLASH_PARTITION_FIRMWARE_B 1
-#define FLASH_PARTITION_FACTORY_DEFAULTS 2
-#define FLASH_PARTITION_CONFIGURATION_DATA 3
-
 // Flash page structure for ring buffer persistence
 // Note: sha256_checksum is placed first to simplify exclusion during hash calculation.
 // The hash covers all fields after sha256_checksum (magic_number through padding).
-
-#define STRUCT_SIZE 65536
 
 typedef union {
     struct {

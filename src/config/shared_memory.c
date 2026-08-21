@@ -40,9 +40,12 @@ static bool factory_reset_requested = false;
  * @return Number of log entries that fit in available space
  */
 static uint32_t calculate_log_buffer_capacity(void) {
-    // Calculate: Total Bank Size - (Fixed Structure Size excluding flexible array)
+    // Calculate: usable bytes of the backing flash_persistence_block_t
+    // (FLASH_PERSISTENCE_BLOCK_SIZE) minus the fixed structure size excluding
+    // the flexible log array. The log ring must never exceed the block that is
+    // persisted to flash, otherwise the static block is overrun.
     size_t fixed_size = offsetof(shared_memory_layout_t, log_entries);
-    uint32_t available_bytes = SHARED_MEMORY_BANK_SIZE - fixed_size;
+    uint32_t available_bytes = TOTAL_SHARED_MEM_USABLE_SIZE - fixed_size;
     
     // Calculate number of entries that fit
     uint32_t max_entries = available_bytes / sizeof(log_entry_t);
