@@ -1116,7 +1116,12 @@ note over UI, ROM: Zero-downtime updates with automatic rollback\nCryptographic 
 
 === Management Interface Configuration Scenario
 
-This scenario shows how system configuration changes are applied through the web-based management interface with proper validation and persistence.
+This scenario shows how system configuration changes are handled through the
+web-based management interface. Changes are validated and persisted at once,
+but take effect only at the next boot (ADR-019). The reboot is requested
+explicitly by the user and executed with a grace period so the HTTP
+acknowledgement is transmitted before the reset (deferred reboot, ADR-019;
+reboot state flow, ADR-017).
 
 [plantuml, management-configuration, svg]
 ----
@@ -1158,64 +1163,47 @@ HTTP --> BROWSER: Main Configuration Page
 deactivate AUTH
 
 TECH -> BROWSER: Modify UART Settings
-note over TECH: Change UART1: 9600→115200 baud\nChange Port mapping: 4002→4012
+note over TECH: Change Port mapping: 4002→4012
 
-BROWSER -> HTTP: POST /api/uart/config
+BROWSER -> HTTP: POST /config
 activate HTTP
-HTTP -> VALIDATOR: validate_uart_config()
+HTTP -> VALIDATOR: validate submitted values
 activate VALIDATOR
-VALIDATOR -> VALIDATOR: Check Baud Rate Range
-VALIDATOR -> VALIDATOR: Validate Port Assignment
-VALIDATOR -> VALIDATOR: Check for Conflicts
+VALIDATOR -> VALIDATOR: Check port range (1024-65535)
 
 alt Configuration Valid
     VALIDATOR --> HTTP: Validation Passed
-    HTTP -> CFG: apply_uart_configuration()
+    HTTP -> CFG: store in shared memory,\nincrement revision counter
     activate CFG
-    CFG -> CFG: Prepare Configuration Change
-    CFG -> C0: configure_channel_1()
-    activate C0
-    C0 -> C0: Stop Current UART1 Operations
-    C0 -> C0: Reconfigure Hardware Registers
-    C0 -> C0: Update Baud Rate to 115200
-    C0 -> C0: Restart UART1 Operations
-    C0 --> CFG: UART1 Reconfigured
-    deactivate C0
-    
-    CFG -> C1: update_port_mapping()
-    activate C1
-    C1 -> C1: Close Socket on Port 4002
-    C1 -> C1: Open Socket on Port 4012
-    C1 -> C1: Update Routing Table
-    C1 --> CFG: Port Mapping Updated
-    deactivate C1
-    
     CFG -> FLASH: persist_configuration()
     activate FLASH
     FLASH -> FLASH: Write to Flash Memory
-    FLASH -> FLASH: Verify Write Success
     FLASH --> CFG: Configuration Persisted
     deactivate FLASH
-    
-    CFG --> HTTP: Configuration Applied
+    CFG --> HTTP: Saved
     deactivate CFG
-    HTTP --> BROWSER: Success Response
+    HTTP --> BROWSER: "Saved. Takes effect after reboot."
+    note over C0, C1: Running UARTs, listeners and\ninterface address stay untouched\n(ADR-019: no runtime apply)
 else Configuration Invalid
     VALIDATOR --> HTTP: Validation Failed
-    HTTP --> BROWSER: Error Response (Conflicts)
-    note over BROWSER: Display validation errors\nNo changes applied
+    HTTP --> BROWSER: Error Response
+    note over BROWSER: Display validation errors\nNo changes stored
 end
 
 deactivate VALIDATOR
 deactivate HTTP
 
-TECH -> BROWSER: Verify Configuration
-BROWSER -> HTTP: GET /api/system/status
-HTTP -> CFG: get_current_configuration()
-CFG --> HTTP: Current Settings
-HTTP --> BROWSER: Status JSON
-BROWSER -> BROWSER: Display Updated Configuration
+TECH -> BROWSER: Trigger Reboot
+BROWSER -> HTTP: POST /reboot
+activate HTTP
+HTTP -> HTTP: deferred_reboot_request(\nUSER_REQUESTED)
+note right of HTTP: Arms grace timer (300 ms).\nMain state stays OPERATIONAL,\nlwIP keeps being serviced.
+HTTP --> BROWSER: "Rebooting." (acknowledgement\ntransmitted during grace period)
+deactivate HTTP
 
-note over TECH, FLASH: Configuration changes applied atomically\nPersisted for power-cycle recovery\nValidation prevents invalid states
+C1 -> C1: deferred_reboot_poll()\n(grace timer expired)
+C1 -> C1: MAIN_EVENT_REBOOT_REQUESTED\n→ flush config and logs,\nexecute reboot (ADR-017)
+
+note over TECH, FLASH: Boot applies the persisted configuration:\nlisteners bound to the new ports.\nValidation prevents invalid states.
 @enduml
 ----
