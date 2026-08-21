@@ -629,21 +629,21 @@ static void core0_process_uart_hardware(void) {
 <div class="sect2">
 <h3 id="_new_log_events">New Log Events</h3>
 <div class="paragraph">
-<p><strong>Core0-Specific Log Events:</strong></p>
+<p><strong>Core0-Specific Log Events</strong> (as implemented in <code>log_manager.h</code>; the range
+410-419 is used by the firmware update events of ADR-017, so the ringbuffer
+events were moved to 420-429 and the Core0 work events to 430-439):</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// New ringbuffer processing events
-LOG_EVENT_RINGBUFFER_ECHO_SUCCESS = 410,    // Ringbuffer message echoed successfully
-LOG_EVENT_RINGBUFFER_ECHO_FAILED = 411,     // Ringbuffer message echo failed
-LOG_EVENT_RINGBUFFER_WORK_START = 412,      // Ringbuffer processing started
-LOG_EVENT_RINGBUFFER_WORK_COMPLETE = 413,   // Ringbuffer processing completed
+<pre class="prettyprint highlight"><code data-lang="c">// Ringbuffer processing events (420-429)
+LOG_EVENT_RINGBUFFER_WORK_START = 420,      // Ringbuffer processing started
+LOG_EVENT_RINGBUFFER_WORK_COMPLETE = 421,   // Ringbuffer processing completed
 
-// New Core0 state events
-LOG_EVENT_CORE0_WORK_CHECK = 420,           // Core0 checking for pending work
-LOG_EVENT_CORE0_IDLE_WAIT = 421,            // Core0 entering idle wait
-LOG_EVENT_CORE0_UART_WORK_START = 422,      // UART hardware work started
-LOG_EVENT_CORE0_UART_WORK_COMPLETE = 423,   // UART hardware work completed</code></pre>
+// Core0 work events (430-439)
+LOG_EVENT_CORE0_WORK_CHECK = 430,           // Core0 checking for pending work
+LOG_EVENT_CORE0_IDLE_WAIT = 431,            // Core0 entering idle wait
+LOG_EVENT_CORE0_UART_WORK_START = 432,      // UART hardware work started
+LOG_EVENT_CORE0_UART_WORK_COMPLETE = 433,   // UART hardware work completed</code></pre>
 </div>
 </div>
 </div>

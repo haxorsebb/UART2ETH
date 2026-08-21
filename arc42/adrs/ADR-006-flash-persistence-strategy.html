@@ -391,6 +391,7 @@
 <li><a href="#_advantages">Advantages</a></li>
 <li><a href="#_rejected_alternatives">Rejected Alternatives</a></li>
 <li><a href="#_trade_offs">Trade-offs</a></li>
+<li><a href="#_flash_endurance_revision_2026_08">Flash Endurance (revision 2026-08)</a></li>
 </ul>
 </li>
 <li><a href="#_consequences">Consequences</a>
@@ -446,7 +447,7 @@
 <h2 id="_status">Status</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Accepted</p>
+<p>Accepted (revised 2026-08: ring buffer geometry changed from 8 × 64 KB to 64 × 8 KB blocks, write interval raised to 120 s)</p>
 </div>
 </div>
 </div>
@@ -454,7 +455,7 @@
 <h2 id="_date">Date</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>2024-01-15</p>
+<p>2024-01-15 (revision 2026-08-19)</p>
 </div>
 </div>
 </div>
@@ -479,7 +480,7 @@
 <h2 id="_decision">Decision</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>We will implement flash persistence using an <strong>8-block ring buffer strategy</strong> with <strong>RP2350 partition table isolation</strong> for industrial reliability:</p>
+<p>We will implement flash persistence using a <strong>64-block ring buffer strategy</strong> with <strong>RP2350 partition table isolation</strong> for industrial reliability:</p>
 </div>
 <div class="sect2">
 <h3 id="_flash_partitioning_strategy">Flash Partitioning Strategy</h3>
@@ -524,10 +525,13 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>8 Configuration Blocks</strong> organized as circular ring buffer within data partition</p>
+<p><strong>64 Configuration Blocks</strong> organized as circular ring buffer within data partition</p>
 </li>
 <li>
-<p><strong>Block size</strong>: 64KB per block (16 × 4096-byte flash sectors)</p>
+<p><strong>Block size</strong>: 8 KB per block (2 × 4096-byte flash sectors)</p>
+</li>
+<li>
+<p><strong>Full partition usage</strong>: 64 × 8 KB = 512 KB, i.e. the complete configuration partition (ID=3) is used for wear leveling</p>
 </li>
 <li>
 <p><strong>Wear leveling</strong>: Sequential writes advance through ring, sector-by-sector updates</p>
@@ -552,7 +556,7 @@
 <p><strong>Deferred write-back</strong>: Integrated into Core1 main loop</p>
 </li>
 <li>
-<p><strong>Frequency limiting</strong>: Maximum once per 30 seconds</p>
+<p><strong>Frequency limiting</strong>: Maximum once per 120 seconds</p>
 </li>
 <li>
 <p><strong>Change detection</strong>: Write only when <code>revision_counter</code> increments</p>
@@ -574,7 +578,7 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Startup validation</strong>: Read all 8 blocks, verify checksums</p>
+<p><strong>Startup validation</strong>: Read all 64 blocks, verify checksums</p>
 </li>
 <li>
 <p><strong>Block selection</strong>: Use block with highest revision + valid checksum</p>
@@ -601,7 +605,7 @@
 <p><strong>Power-loss safety</strong>: Sector-by-sector writes with checksums prevent partial corruption</p>
 </li>
 <li>
-<p><strong>Wear leveling</strong>: Ring buffer distributes writes across 8 blocks</p>
+<p><strong>Wear leveling</strong>: Ring buffer distributes writes across 64 blocks</p>
 </li>
 <li>
 <p><strong>Fast recovery</strong>: Simple page validation, no complex parsing</p>
@@ -650,18 +654,44 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Flash usage</strong>: 8 × 64KB blocks for configuration ring buffer</p>
+<p><strong>Flash usage</strong>: 64 × 8 KB blocks (512 KB, entire configuration partition) for configuration ring buffer</p>
 </li>
 <li>
-<p><strong>Write frequency</strong>: Limited to 30-second intervals (acceptable for config changes)</p>
+<p><strong>Write frequency</strong>: Limited to 120-second intervals (acceptable for config changes)</p>
 </li>
 <li>
-<p><strong>Recovery time</strong>: Startup requires reading/validating 8 blocks (minimal impact)</p>
+<p><strong>Recovery time</strong>: Startup requires reading/validating 64 blocks of 8 KB (minimal impact, same total bytes as before)</p>
+</li>
+<li>
+<p><strong>Shared memory size</strong>: The log ring in shared memory is bounded by the 8 KB block size (see Flash Endurance below)</p>
 </li>
 <li>
 <p><strong>Partition complexity</strong>: Requires RP2350 partition table support in build system</p>
 </li>
 </ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_flash_endurance_revision_2026_08">Flash Endurance (revision 2026-08)</h3>
+<div class="paragraph">
+<p>The original layout (8 blocks × 64 KB) only touched 8 of the 128 sectors of the
+512 KB configuration partition. Every save erases one block, so each block was
+erased once per 8 saves. With the typical 100,000 P/E cycle endurance of the
+RP2350 SPI NOR flash this gave a budget of roughly 8 × 100,000 = 800,000 saves.</p>
+</div>
+<div class="paragraph">
+<p>The revised layout (64 blocks × 8 KB) spreads the same ring buffer over the whole
+partition: each block is now erased only once per 64 saves, raising the budget to
+roughly 64 × 100,000 = 6.4 million saves (8× improvement). In addition the minimum
+write interval was raised from 30 s to 120 s, which bounds the worst-case erase
+rate to 30 erases per hour even if the configuration changes continuously.</p>
+</div>
+<div class="paragraph">
+<p>The price is that the persisted snapshot (and therefore the shared memory
+structure including the log ring buffer) must fit in 8 KB instead of 64 KB. The
+log capacity is derived from <code>TOTAL_SHARED_MEM_USABLE_SIZE</code> at startup, so it
+shrinks automatically; the static <code>flash_persistence_block_t</code> in
+<code>shared_memory.c</code> is sized by <code>FLASH_PERSISTENCE_BLOCK_SIZE</code>.</p>
 </div>
 </div>
 </div>
@@ -686,7 +716,7 @@
 <p><strong>Future Growth</strong>: Partition size determined by partition table, allows expansion</p>
 </li>
 <li>
-<p><strong>Automatic wear leveling</strong>: Ring buffer distributes writes across 8 blocks</p>
+<p><strong>Automatic wear leveling</strong>: Ring buffer distributes writes across 64 blocks covering the whole partition</p>
 </li>
 <li>
 <p><strong>Simple implementation</strong>: Raw binary storage reduces bugs and maintenance</p>
@@ -705,10 +735,13 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Flash usage</strong>: 8 × 64KB blocks reserved for ring buffer</p>
+<p><strong>Flash usage</strong>: 64 × 8 KB blocks (512 KB) reserved for ring buffer</p>
 </li>
 <li>
-<p><strong>Write frequency</strong>: Limited to 30-second intervals (acceptable for config changes)</p>
+<p><strong>Write frequency</strong>: Limited to 120-second intervals (acceptable for config changes)</p>
+</li>
+<li>
+<p><strong>Snapshot size</strong>: Shared memory snapshot incl. log ring limited to 8 KB</p>
 </li>
 <li>
 <p><strong>Build complexity</strong>: Requires partition table embedding in build system</p>
@@ -811,7 +844,7 @@
 <p><strong>Lowest Priority Task</strong>: Flash persistence checking runs after all other Core1 tasks</p>
 </li>
 <li>
-<p><strong>Deferred Write Logic</strong>: Check for changes every 100ms, write only if 30+ seconds elapsed</p>
+<p><strong>Deferred Write Logic</strong>: Check for changes every 100ms, write only if 120+ seconds elapsed</p>
 </li>
 <li>
 <p><strong>Non-blocking Operation</strong>: Persistence never blocks critical network or ring buffer operations</p>
@@ -830,7 +863,7 @@
 <p><strong>Change Detection</strong>: Compare current vs. last written revision to detect config changes</p>
 </li>
 <li>
-<p><strong>Write Frequency Limiting</strong>: Track last write timestamp, enforce 30-second minimum interval</p>
+<p><strong>Write Frequency Limiting</strong>: Track last write timestamp, enforce 120-second minimum interval</p>
 </li>
 <li>
 <p><strong>Atomic Decision</strong>: Only proceed with write if both change detected AND time interval met</p>
@@ -843,7 +876,7 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Factory Reset Strategy</strong>: If all 8 ring buffer blocks corrupt, load factory defaults via <code>shared_memory_force_reinit()</code></p>
+<p><strong>Factory Reset Strategy</strong>: If all 64 ring buffer blocks corrupt, load factory defaults via <code>shared_memory_force_reinit()</code></p>
 </li>
 <li>
 <p><strong>Recovery Event Logging</strong>: Use existing <code>log_event()</code> API to record factory reset as first entry</p>
@@ -862,7 +895,7 @@
 <div class="ulist">
 <ul>
 <li>
-<p><strong>8-Block Circular Buffer</strong>: Blocks 0-7 in sequential write order with wrap-around at block 7→0</p>
+<p><strong>64-Block Circular Buffer</strong>: Blocks 0-63 in sequential write order with wrap-around at block 63→0</p>
 </li>
 <li>
 <p><strong>Block Selection Logic</strong>: Write to next block in sequence, select highest revision during recovery</p>
@@ -871,7 +904,7 @@
 <p><strong>Write State Tracking</strong>: Track current write block position in static state structure</p>
 </li>
 <li>
-<p><strong>Overflow Handling</strong>: After block 7, wrap to block 0 for continuous wear leveling</p>
+<p><strong>Overflow Handling</strong>: After block 63, wrap to block 0 for continuous wear leveling</p>
 </li>
 </ul>
 </div>
@@ -880,24 +913,24 @@
 <h3 id="_memory_layout_and_data_structures">Memory Layout and Data Structures</h3>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Flash persistence block structure (64KB aligned, 16 × 4096-byte sectors)
-// Note: sha256_checksum is placed first to simplify exclusion during hash calculation.
-// The hash covers all fields after sha256_checksum (magic_number through padding).
-typedef struct {
-    uint8_t  sha256_checksum[32];             // Block integrity verification (FIRST for easy hash exclusion)
-    uint32_t magic_number;                    // 0xC0FFEEAA block validity
-    uint32_t revision_counter;                // Write sequence tracking
-    uint32_t reserved[4];                     // Future expansion
+<pre class="prettyprint highlight"><code data-lang="c">// Flash persistence block (8 KB = FLASH_PERSISTENCE_BLOCK_SIZE, 2 × 4096-byte sectors)
+// Note: sha256_checksum is the first field of shared_memory_layout_t to simplify
+// exclusion during hash calculation. The hash covers all fields after it.
+typedef union {
+    struct {
+        shared_memory_layout_t shared_memory_data; // checksum, magic, revision, config, counters, log ring
+    };
+    uint8_t _size[FLASH_PERSISTENCE_BLOCK_SIZE];   // Pads the block to 8 KB; log ring grows into this space
+} __attribute__((aligned(FLASH_PERSISTENCE_PAGE_SIZE))) flash_persistence_block_t;
 
-    shared_memory_layout_t shared_memory_data; // Complete config snapshot
-
-    uint8_t padding[...];                     // Padding to 64KB block size
-} __attribute__((packed, aligned(4096))) flash_persistence_block_t;
+// Usable bytes for the shared memory snapshot inside one block
+#define TOTAL_SHARED_MEM_USABLE_SIZE \
+    (FLASH_PERSISTENCE_BLOCK_SIZE - offsetof(flash_persistence_block_t, shared_memory_data))
 
 // Ring buffer management state (runtime tracking, not persisted)
 typedef struct {
-    uint8_t  current_write_block;             // 0-7, next block to write
-    uint8_t  last_valid_block;                // 0-7, last successfully read
+    uint8_t  current_write_block;             // 0-63, next block to write
+    uint8_t  last_valid_block;                // 0-63, last successfully read
     uint32_t total_writes_lifetime;           // Total write operations
     uint32_t corruption_events;               // Detected corruption count
     uint32_t last_written_revision;           // Change detection state
@@ -924,18 +957,18 @@ static shared_memory_layout_t* g_shared_memory =
 1. Created <code>flash_persistence.c</code> and <code>flash_persistence.h</code> implementation files
 2. Implemented partition table discovery using bootrom APIs (<code>rom_get_partition_table_info()</code>)
 3. Integrated hardware SHA256 via <code>pico/sha256.h</code>
-4. Implemented 8-block ring buffer state management</p>
+4. Implemented ring buffer state management (originally 8 blocks, now 64 blocks)</p>
 </div>
 <div class="paragraph">
 <p><strong>Phase 2: Core1 Integration</strong> ✓
 1. Persistence checking integrated as lowest priority Core1 task
 2. Implemented change detection via revision counter comparison
-3. Added 30-second write frequency limiting
+3. Added write frequency limiting (originally 30 s, now 120 s)
 4. Implemented sector-by-sector flash updates with <code>flash_safe_execute()</code></p>
 </div>
 <div class="paragraph">
 <p><strong>Phase 3: Recovery and Error Handling</strong> ✓
-1. Startup recovery validates all 8 blocks, selects highest valid revision
+1. Startup recovery validates all 64 blocks, selects highest valid revision
 2. Factory reset erases all blocks and calls <code>shared_memory_force_reinit()</code>
 3. Comprehensive error logging via <code>log_event()</code> API
 4. Device mode enforcement after flash load (GPIO pins, channel enables)
@@ -1044,12 +1077,12 @@ static void call_flash_range_program(void *param);</code></pre>
 <h3 id="_implementation_constants">Implementation Constants</h3>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code data-lang="c">// Flash persistence constants (shared_memory.h)
-#define FLASH_PERSISTENCE_RING_SIZE 8                    // 8 blocks in ring buffer
+<pre class="prettyprint highlight"><code data-lang="c">// Flash persistence constants (flash_persistence.h)
+#define FLASH_PERSISTENCE_RING_SIZE 64                   // 64 blocks in ring buffer
 #define FLASH_PERSISTENCE_PAGE_SIZE 4096                 // RP2350 flash sector size
-#define FLASH_PERSISTENCE_BLOCK_SIZE (16*4096)           // 64KB per block
+#define FLASH_PERSISTENCE_BLOCK_SIZE (2*4096)            // 8 KB per block (64 x 8 KB = 512 KB partition)
 #define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Block validity marker
-#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 30000    // 30 seconds max write frequency
+#define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 120000   // 120 seconds min interval between writes
 
 // Partition IDs
 #define FLASH_PARTITION_FIRMWARE_A 0
