@@ -32,6 +32,25 @@
 #define FLASH_PERSISTENCE_BLOCK_SIZE (2*4096)            // 8 KB per block (2 x 4096-byte sectors)
 #define FLASH_PERSISTENCE_MAGIC 0xC0FFEEAA               // Page validity marker
 #define FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS 120000   // 120 seconds min interval between flash writes
+
+// Flash lifetime guarantee (ADR-006 erase budget).
+// Each save erases the sectors of exactly one ring block, so a given 4K
+// sector is erased once per FLASH_PERSISTENCE_RING_SIZE saves; saves are
+// throttled to one per FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS. Datasheet
+// endurance of the external QSPI NOR flash: program/erase cycles per sector.
+// Enforced at compile time below and re-verified on target by
+// tests/test_flash_endurance.c.
+#define FLASH_PERSISTENCE_SECTOR_ENDURANCE_CYCLES 100000ULL
+#define FLASH_PERSISTENCE_MIN_LIFETIME_YEARS 20ULL
+#define FLASH_PERSISTENCE_SECONDS_PER_YEAR 31557600ULL   // Julian year, 365.25 days
+
+_Static_assert(
+    FLASH_PERSISTENCE_SECTOR_ENDURANCE_CYCLES
+        * FLASH_PERSISTENCE_RING_SIZE
+        * (FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS / 1000ULL)
+    >= FLASH_PERSISTENCE_MIN_LIFETIME_YEARS * FLASH_PERSISTENCE_SECONDS_PER_YEAR,
+    "Flash lifetime below FLASH_PERSISTENCE_MIN_LIFETIME_YEARS: increase "
+    "FLASH_PERSISTENCE_RING_SIZE or FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS");
 #define FLASH_PARTITION_FIRMWARE_A 0
 #define FLASH_PARTITION_FIRMWARE_B 1
 #define FLASH_PARTITION_FACTORY_DEFAULTS 2

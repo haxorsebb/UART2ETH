@@ -32,13 +32,10 @@
 #include <stdio.h>
 #include <stdint.h>
 
-// Datasheet endurance assumption for the external QSPI NOR flash:
-// program/erase cycles per 4K sector.
-#define FLASH_SECTOR_ENDURANCE_CYCLES 100000ULL
-
-// Required minimum lifetime. Julian year: 365.25 days.
-#define REQUIRED_LIFETIME_YEARS 20ULL
-#define SECONDS_PER_YEAR 31557600ULL
+// Endurance assumption and lifetime requirement are single-sourced in
+// flash_persistence.h, where a _Static_assert enforces the same property
+// at compile time. This test re-verifies it on target and prints the
+// numbers for the test log.
 
 void setUp(void) {
 }
@@ -59,21 +56,24 @@ void test_flash_lifetime_at_least_20_years(void) {
     uint64_t seconds_between_erases_of_one_sector =
         seconds_between_saves * (uint64_t)FLASH_PERSISTENCE_RING_SIZE;
     uint64_t lifetime_seconds =
-        seconds_between_erases_of_one_sector * FLASH_SECTOR_ENDURANCE_CYCLES;
+        seconds_between_erases_of_one_sector
+        * FLASH_PERSISTENCE_SECTOR_ENDURANCE_CYCLES;
 
-    uint64_t required_seconds = REQUIRED_LIFETIME_YEARS * SECONDS_PER_YEAR;
+    uint64_t required_seconds = FLASH_PERSISTENCE_MIN_LIFETIME_YEARS
+                                * FLASH_PERSISTENCE_SECONDS_PER_YEAR;
 
     printf("Flash endurance: ring=%d blocks, min save interval=%u ms, "
            "endurance=%llu cycles/sector\n",
            FLASH_PERSISTENCE_RING_SIZE,
            (unsigned)FLASH_PERSISTENCE_MAX_WRITE_INTERVAL_MS,
-           (unsigned long long)FLASH_SECTOR_ENDURANCE_CYCLES);
+           (unsigned long long)FLASH_PERSISTENCE_SECTOR_ENDURANCE_CYCLES);
     printf("Flash endurance: worst-case lifetime %llu s (~%llu years), "
            "required %llu s (%llu years)\n",
            (unsigned long long)lifetime_seconds,
-           (unsigned long long)(lifetime_seconds / SECONDS_PER_YEAR),
+           (unsigned long long)(lifetime_seconds
+                                / FLASH_PERSISTENCE_SECONDS_PER_YEAR),
            (unsigned long long)required_seconds,
-           (unsigned long long)REQUIRED_LIFETIME_YEARS);
+           (unsigned long long)FLASH_PERSISTENCE_MIN_LIFETIME_YEARS);
 
     TEST_ASSERT_TRUE_MESSAGE(lifetime_seconds >= required_seconds,
         "Flash lifetime below 20 years: increase FLASH_PERSISTENCE_RING_SIZE "
