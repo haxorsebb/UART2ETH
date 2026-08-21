@@ -194,8 +194,10 @@ bool flash_persistence_load_configuration(void) {
 #endif
 #if DEVICE_CHANNEL_4_ENABLED
         layout->config.channels[CHANNEL_4].enabled = true;
-        // In SHARK mode, Channel 4 is the primary data channel - use port 4002
-        layout->config.channels[CHANNEL_4].tcp_port = 4002;
+        // The port is NOT enforced here: it is user configuration with the
+        // factory default 4002 (shared_memory.c) and must survive the load
+        // unchanged, since boot is the only apply path (ADR-019). Invalid
+        // values are repaired by the range check below.
 #else
         layout->config.channels[CHANNEL_4].enabled = false;
 #endif

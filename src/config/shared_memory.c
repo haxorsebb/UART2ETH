@@ -74,16 +74,21 @@ bool shared_memory_init(void) {
     
     atomic_store(&g_initialized,true);
     
-    // Initialize spinlock for log reservation
-    uint lock_num = spin_lock_claim_unused(true);
-    if (lock_num == -1) {
-        printf("ERROR: Failed to claim unused spinlock\n");
-        return false;  // Failed to claim spinlock
-    }
-    g_reservation_lock = spin_lock_init(lock_num);
-    if (!g_reservation_lock) {
-        printf("ERROR: Failed to initialize spinlock\n");
-        return false;
+    // Initialize spinlock for log reservation. Claim it once per boot and
+    // reuse it across re-initializations (factory reset, on-target tests):
+    // claiming a new lock on every shared_memory_force_reinit() leaks the
+    // previous one and exhausts the hardware spinlock pool.
+    if (g_reservation_lock == NULL) {
+        uint lock_num = spin_lock_claim_unused(true);
+        if (lock_num == -1) {
+            printf("ERROR: Failed to claim unused spinlock\n");
+            return false;  // Failed to claim spinlock
+        }
+        g_reservation_lock = spin_lock_init(lock_num);
+        if (!g_reservation_lock) {
+            printf("ERROR: Failed to initialize spinlock\n");
+            return false;
+        }
     }
     // Initialize shared memory structure
     memset(g_shared_memory, 0, TOTAL_SHARED_MEM_USABLE_SIZE);

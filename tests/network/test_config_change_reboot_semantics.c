@@ -187,6 +187,46 @@ void test_config_page_has_no_reboot_control_without_change(void) {
 }
 
 /**
+ * Test: A stored channel 4 port change survives the persistence round
+ * trip (save to flash, wipe RAM, load from flash).
+ *
+ * This is the boot path in miniature: with reboot-based semantics
+ * (ADR-019) the loader is the only apply path, so it must deliver the
+ * persisted values unchanged. Regression: the loader unconditionally
+ * overwrote channel 4's port with the mode default 4002, discarding every
+ * user change at boot. Channel 4 is used deliberately: it is the channel
+ * subject to the SHARK device mode enforcement block in
+ * flash_persistence_load_configuration().
+ */
+void test_ch4_port_change_survives_persistence_round_trip(void) {
+    // Every test in this suite re-inits shared memory to revision 1 and
+    // saves as revision 2, so the flash ring holds several revision-2
+    // blocks from earlier tests. Raise the revision so the block written
+    // here is unambiguously the newest one for the loader's best-block
+    // search.
+    g_layout->revision_counter = 1000000 + g_layout->revision_counter;
+
+    TEST_ASSERT_TRUE_MESSAGE(parse(POST_PREFIX "ch4_port=5001"),
+                             "Handler must report a configuration change");
+    TEST_ASSERT_EQUAL_UINT16(5001, g_layout->config.channels[CHANNEL_4].tcp_port);
+
+    // Simulate the reboot: wipe the RAM configuration, then load from flash
+    // like the boot sequence does.
+    TEST_ASSERT_TRUE_MESSAGE(shared_memory_force_reinit(),
+                             "RAM wipe (reboot simulation) required");
+    TEST_ASSERT_NOT_EQUAL_MESSAGE(5001,
+        shared_memory_get_layout()->config.channels[CHANNEL_4].tcp_port,
+        "Precondition: RAM wipe must discard the in-memory value");
+
+    TEST_ASSERT_TRUE_MESSAGE(flash_persistence_load_configuration(),
+                             "Configuration load from flash required");
+
+    TEST_ASSERT_EQUAL_UINT16_MESSAGE(5001,
+        shared_memory_get_layout()->config.channels[CHANNEL_4].tcp_port,
+        "Loader must deliver the persisted channel 4 port, not the mode default");
+}
+
+/**
  * Test: Port values below 1024 are rejected and the configuration is
  * left unchanged (privileged port range, matches boot-time validation
  * in flash_persistence.c).
@@ -229,6 +269,7 @@ int main(void) {
     RUN_TEST(test_config_change_does_not_signal_live_apply);
     RUN_TEST(test_config_page_offers_reboot_after_change);
     RUN_TEST(test_config_page_has_no_reboot_control_without_change);
+    RUN_TEST(test_ch4_port_change_survives_persistence_round_trip);
     RUN_TEST(test_privileged_port_is_rejected);
     RUN_TEST(test_non_numeric_port_is_rejected);
     return UNITY_END();
