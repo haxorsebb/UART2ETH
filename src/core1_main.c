@@ -41,6 +41,7 @@
 #include "device_mode.h"
 #include "flash_persistence.h"
 #include "update/update_manager.h"
+#include "update/deferred_reboot.h"
 
 // PHY link status poll period (ADR-007, "Core 1 idle wait")
 #define CORE1_LINK_POLL_INTERVAL_MS 500
@@ -72,7 +73,6 @@ static void core1_configuration_complete(void);
 
 // MAIN_STATE_OPERATIONAL functions
 static bool core1_check_for_pending_work(void);
-static void core1_apply_configuration_changes(void);
 static void core1_work_or_idle_wait(void);
 static void core1_idle_wait(void);
 static void core1_process_network_link_change(void);
@@ -293,19 +293,11 @@ static bool core1_check_for_pending_work(void) {
     }
     // ===== End link status polling =====
 
-    // Check for configuration changes (high priority)
-    shared_memory_layout_t* layout = shared_memory_get_layout();
-    if (layout && layout->config_change_pending) {
-        /*
-        printf("Core1: ⚙️ Configuration change detected - updating TCP servers ONLY\n");
-        printf("Core1: 🌐 HTTP server (Port 80) will remain active and untouched\n");
-        */
-        layout->config_change_pending = false;  // Clear the flag
-        
-        // Apply configuration changes (TCP servers only - HTTP protected)
-        core1_apply_configuration_changes();
-        return true;
-    }
+    // Configuration changes are persisted only and take effect at the next
+    // boot; there is no runtime apply (ADR-019). A reboot requested over the
+    // network is executed here once its grace period has expired, after the
+    // HTTP acknowledgement had time to leave the device.
+    deferred_reboot_poll();
 
     if(network_manager_link_change_pending()) {
         /*
@@ -434,6 +426,7 @@ static void core1_initialize(void) {
     // Let core 0 terminate our __wfi() via doorbell (ADR-007, "Cross-Core Wake-Up")
     state_machine_enable_wake_irq();
     core1_timer_init();
+    deferred_reboot_init();  // No reboot pending after start (ADR-019)
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 1);
     
     /* printf("DEBUG: Core1 initialize() completed\n"); */
@@ -1037,111 +1030,5 @@ static void core1_handle_error(void) {
 
     // Signal recovery attempt
     state_machine_process_main_event(MAIN_EVENT_ERROR_RECOVERED);
-}
-
-/**
- * @brief Apply configuration changes at runtime
- * 
- * This function handles runtime configuration updates by:
- * 1. Detecting network configuration changes (IP, DHCP, MAC)
- * 2. Applying network interface reconfiguration if needed
- * 3. Stopping existing TCP servers (but NOT HTTP server to preserve web access)
- * 4. Restarting TCP servers with new configuration
- */
-static void core1_apply_configuration_changes(void) {
-    shared_memory_layout_t* layout = shared_memory_get_layout();
-    if (!layout) {
-        /* printf("Core1: ERROR - Cannot access shared memory for config update\n"); */
-        return;
-    }
-    
-    /* printf("Core1: 🔧 Applying configuration changes...\n"); */
-    
-    // Step 1: Apply network interface configuration 
-    /* printf("Core1: 🌐 Applying network interface configuration\n");
-    printf("Core1: 📍 Target IP: %d.%d.%d.%d | DHCP: %s\n",
-           (int)((layout->config.network.static_ip.addr >> 0) & 0xFF),
-           (int)((layout->config.network.static_ip.addr >> 8) & 0xFF),
-           (int)((layout->config.network.static_ip.addr >> 16) & 0xFF),
-           (int)((layout->config.network.static_ip.addr >> 24) & 0xFF),
-           layout->config.network.use_dhcp ? "ENABLED" : "DISABLED");
-    
-    printf("Core1: ⚠️ Network interface may be briefly unavailable during reconfiguration\n");
-     */
-    bool reconfig_success = network_manager_reconfigure(&layout->config.network);
-    if (reconfig_success) {
-        /* printf("Core1: ✅ Network interface reconfigured successfully\n"); */
-        
-        // Brief delay to allow network to stabilize (PERFORMANCE: Reduced from 500ms to 100ms)
-        sleep_ms(100);
-        
-        // Log new network state
-        simple_ip_addr_t new_ip;
-        if (network_manager_get_ip_address(&new_ip)) {
-            /* printf("Core1: 📍 Active IP address: %d.%d.%d.%d\n",
-                   (new_ip.addr >> 0) & 0xFF,
-                   (new_ip.addr >> 8) & 0xFF,
-                   (new_ip.addr >> 16) & 0xFF,
-                   (new_ip.addr >> 24) & 0xFF); */
-        }
-    } else {
-        /* printf("Core1: ❌ Network reconfiguration FAILED - keeping old network settings\n"); */
-    }
-    
-    // Step 3: Update TCP servers (HTTP server remains untouched)
-    /* printf("Core1: 🔧 Updating TCP servers for UART channels\n");
-    printf("Core1: 🚨 HTTP Server (Port 80) remains completely untouched\n"); */
-    
-    // Stop all TCP servers 
-    /* printf("Core1: Stopping all TCP servers (Ports 4001-4004 range)\n"); */
-    multi_tcp_server_deinit_all();
-    
-    // Small delay to allow TCP sockets to properly close (PERFORMANCE: Reduced from 200ms to 50ms)
-    sleep_ms(50);
-    
-    // Step 4: Start TCP servers for enabled UART channels with new ports
-    int successful_channels = 0;
-    int failed_channels = 0;
-    
-    /* printf("Core1: Starting TCP servers for enabled channels\n"); */
-    
-    for (int ch = 1; ch < CHANNEL_MAX; ch++) {
-        // Skip channels not available in current device mode
-        if (!DEVICE_CHANNEL_AVAILABLE(ch)) {
-            /* printf("Core1: Channel %d not available in %s mode, skipping\n", ch, DEVICE_MODE_NAME); */
-            continue;
-        }
-        
-        if (layout->config.channels[ch].enabled) {
-            uint16_t tcp_port = layout->config.channels[ch].tcp_port;
-            
-            /* printf("Core1: Initializing TCP server for Channel %d on port %d\n", ch, tcp_port); */
-            
-            bool success = multi_tcp_server_init_channel(ch, tcp_port);
-            if (success) {
-                /* printf("Core1: ✅ Channel %d TCP server active on port %d\n", ch, tcp_port); */
-                successful_channels++;
-            } else {
-                /* printf("Core1: ❌ Failed to start Channel %d TCP server on port %d\n", ch, tcp_port); */
-                failed_channels++;
-            }
-        } else {
-            /* printf("Core1: Channel %d disabled - no TCP server\n", ch); */
-        }
-    }
-    
-    // Step 5: Summary
-    /* printf("Core1: ✅ Configuration update complete\n");
-    printf("Core1: 📊 Network: %s | TCP servers: %d active, %d failed | HTTP: PROTECTED\n",
-           reconfig_success ? "RECONFIGURED" : "failed",
-           successful_channels, failed_channels); */
-    
-    if (failed_channels > 0) {
-        /* printf("Core1: ⚠️ Some TCP servers failed to start - check port conflicts\n"); */
-    }
-    
-    if (reconfig_success) {
-        /* printf("Core1: 🌐 Network configuration applied immediately - web interface available on updated IP\n"); */
-    }
 }
 

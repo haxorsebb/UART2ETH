@@ -31,7 +31,7 @@ typedef enum {
     CORE1_TIMER_CONFIG_BACKUP,          // Configuration backup timer
     CORE1_TIMER_WATCHDOG_FEED,          // Watchdog feeding timer
     CORE1_TIMER_LINK_POLL,              // ENC28J60 PHY link status poll (ADR-007, core 1 idle wait)
-    CORE1_TIMER_RESERVED_2,             // Reserved for future use
+    CORE1_TIMER_REBOOT_GRACE,           // Deferred reboot grace period (ADR-019)
     CORE1_TIMER_RESERVED_3,             // Reserved for future use
     CORE1_TIMER_RESERVED_4,             // Reserved for future use
     CORE1_MAX_TIMERS = 16               // Maximum number of Core1 timers

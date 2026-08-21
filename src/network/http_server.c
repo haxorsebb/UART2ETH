@@ -20,6 +20,7 @@
 #include "device_mode.h"
 #include "log_manager.h"
 #include "update/update_manager.h"
+#include "update/deferred_reboot.h"
 #include "state_machine/state_machine.h"
 #include "debug.h"
 #include "pico/stdlib.h"
@@ -506,7 +507,7 @@ static void http_handle_config_get(http_connection_t* conn,
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     http_generate_config_page(response_buffer, sizeof(response_buffer),
-                              NULL, 0, NULL, 0);
+                              NULL, 0, NULL, 0, false);
     http_send_response(conn, response_buffer, strlen(response_buffer));
     http_close_connection_after_send(conn);
 }
@@ -598,13 +599,16 @@ static void http_handle_config_post(http_connection_t* conn,
     char error_msg[128] = {0};
     char success_msg[128] = {0};
     
-    http_parse_post_data(request_buffer, buffer_len,
-                         error_msg, sizeof(error_msg),
-                         success_msg, sizeof(success_msg));
-    
+    // A stored change takes effect at boot (ADR-019); offer the reboot as
+    // the required next user action directly on the response page.
+    bool config_changed = http_parse_post_data(request_buffer, buffer_len,
+                                               error_msg, sizeof(error_msg),
+                                               success_msg, sizeof(success_msg));
+
     http_generate_config_page(response_buffer, sizeof(response_buffer),
                               error_msg, strlen(error_msg),
-                              success_msg, strlen(success_msg));
+                              success_msg, strlen(success_msg),
+                              config_changed);
     http_send_response(conn, response_buffer, strlen(response_buffer));
 }
 
@@ -624,10 +628,11 @@ static void http_handle_password_post(http_connection_t* conn,
     http_handle_password_change(request_buffer, buffer_len,
                                 error_msg, sizeof(error_msg),
                                 success_msg, sizeof(success_msg));
-    
+
     http_generate_config_page(response_buffer, sizeof(response_buffer),
                               error_msg, strlen(error_msg),
-                              success_msg, strlen(success_msg));
+                              success_msg, strlen(success_msg),
+                              false /* password change needs no reboot */);
     http_send_response(conn, response_buffer, strlen(response_buffer));
 }
 
@@ -642,9 +647,8 @@ static void http_handle_reboot_post(http_connection_t* conn,
     
     static char response_buffer[HTTP_RESPONSE_BUFFER_SIZE];
     if (http_handle_reboot_request(request_buffer, buffer_len)) {
-        // Reboot initiated - show confirmation page
-        http_generate_update_page(response_buffer, sizeof(response_buffer), 
-            "Reboot initiated. Device will restart in a few seconds. Please wait and then refresh this page.");
+        // Reboot initiated - confirmation auto-refreshes to the status page
+        http_generate_reboot_page(response_buffer, sizeof(response_buffer));
         http_send_response(conn, response_buffer, strlen(response_buffer));
     } else {
         // Reboot failed
@@ -652,6 +656,11 @@ static void http_handle_reboot_post(http_connection_t* conn,
             "Error: Failed to initiate reboot.");
         http_send_response(conn, response_buffer, strlen(response_buffer));
     }
+    // Responses are HTTP/1.0 without Content-Length: the browser only
+    // detects the end of the body when the connection closes. Close it
+    // before the deferred reboot resets the link, otherwise the page
+    // never finishes loading.
+    http_close_connection_after_send(conn);
 }
 
 /**
@@ -715,11 +724,13 @@ static void http_handle_update_post(http_connection_t* conn,
         /* printf("HTTP Upload: Upload complete in single packet\n"); */
         multipart_reset_context(&conn->multipart_ctx);
         http_generate_update_page(response_buffer, sizeof(response_buffer),
-            "Firmware uploaded successfully! Device will reboot to apply the update.");
+            "Firmware uploaded successfully! Device needs reboot to apply the update.");
         http_send_response(conn, response_buffer, strlen(response_buffer));
-        
-        // Trigger reboot after short delay (allow response to be sent)
-        // TODO: Schedule reboot via state machine
+
+        // The user triggers the reboot via POST /reboot, which uses
+        // deferred_reboot_request() (ADR-019). If an automatic reboot after
+        // upload is wanted later, call
+        // deferred_reboot_request(REBOOT_REASON_UPDATE_COMPLETE) here.
     } else {
         // Multi-packet upload - connection will stay open for more data
         /* printf("HTTP Upload: Multi-packet upload in progress, waiting for more data...\n"); */
@@ -1002,9 +1013,11 @@ static void http_send_redirect(http_connection_t* conn, const char* location) {
 
 /**
  * @brief Handle reboot request
- * 
- * Triggers a system reboot via watchdog reset.
- * 
+ *
+ * Requests a deferred reboot (ADR-019). The reset happens after
+ * DEFERRED_REBOOT_GRACE_MS via the ADR-017 reboot path, so the HTTP
+ * response to this request is transmitted before the device resets.
+ *
  * @param post_data POST request data
  * @param data_len Length of POST data
  * @return true if reboot initiated successfully
@@ -1012,11 +1025,8 @@ static void http_send_redirect(http_connection_t* conn, const char* location) {
 static bool http_handle_reboot_request(const char* post_data, size_t data_len) {
     (void)post_data;  // Unused
     (void)data_len;   // Unused
-    
-    /* printf("HTTP Server: Initiating reboot via watchdog\n"); */
-    
-    // Trigger watchdog reset with 1ms timeout
-    watchdog_reboot(0, 0, 1);
-    
+
+    deferred_reboot_request(REBOOT_REASON_USER_REQUESTED);
+
     return true;
 }
