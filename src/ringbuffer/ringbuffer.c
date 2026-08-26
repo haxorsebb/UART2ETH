@@ -193,15 +193,10 @@ bool ringbuffer_enqueue_entry(ring_entry_t* entry) {
     // Update statistics
     g_ringbuffer.total_enqueued++;
     
-    // Get direction for doorbell signaling
-    uint8_t direction = entry->direction;
-    
-    if(direction==RX_TCP_TO_UART) {
-        wake_other_core(CORE1_WAKES_CORE0);
-    }
-    else {
-        wake_other_core(CORE0_WAKES_CORE1);
-    }
+    // The consumer of this entry runs on the other core; the doorbell to ring
+    // is fixed by the calling core (ADR-007, "Idle Wait Instruction and
+    // Doorbell Selection"), so the entry direction is not needed here.
+    wake_other_core();
 
     mutex_exit(&g_ringbuffer.access_mutex);
 

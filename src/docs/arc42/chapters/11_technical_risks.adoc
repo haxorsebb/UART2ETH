@@ -251,7 +251,7 @@ endif::arc42help[]
 |===
 | **Category** | Technical
 | **Description** | Core 1 idles in `__wfi()` (ADR-007, "Core 1 idle wait"). The ENC28J60 INT pin is a falling-edge GPIO IRQ, but the chip holds INT low until its interrupt flags are serviced, so no new edge occurs while INT is already low. If core 1 enters `__wfi()` with INT low and no pending work, no IRQ arrives from the Ethernet controller until a timer or doorbell wakes the core
-| **Probability** | Low - `core1_idle_wait()` refuses to sleep when the driver reports a pending interrupt or the INT pin reads low; an edge between the guard and `__wfi()` sets the NVIC pending bit and `__wfi()` returns immediately
+| **Probability** | Low - `core1_idle_wait()` refuses to sleep when the driver reports a pending interrupt or the INT pin reads low; an edge between the guard and the sleep instruction is serviced by the GPIO ISR, which sets the core's event register, so the `__wfe()` in `state_machine_wait_for_wake()` returns immediately (ADR-007, "Idle Wait Instruction and Doorbell Selection", TD-011)
 | **Impact** | High - Lost receive latency of up to one timer period (500 ms link poll timer) if the guard is ever bypassed or the driver clears INT without re-checking for new packets
 | **Risk Level** | **MEDIUM**
 | **Current Controls** | - Guard in `core1_idle_wait()` (pending flag and raw pin level)
@@ -349,6 +349,14 @@ The following technical debts have been identified and require future resolution
 **Priority:** Low +
 **Effort:** Trivial once TD-006 (schema versioning with migration) is resolved; blocked until then +
 **Resolution Plan:** Remove the field together with the first schema migration introduced under TD-006. Until then the field stays, documented as deprecated in `shared_memory.h`
+
+==== TD-011: Idle Wait with `__wfi()` Could Lose a Doorbell Wake-Up (resolved)
+
+**Description:** From the doorbell introduction (2026-08-19) until 2026-08-26 both idle paths checked their work conditions with interrupts enabled and then slept with `__wfi()`. A doorbell rung between the check and `__wfi()` was serviced immediately, its ISR cleared the doorbell, and `__wfi()` then slept with work already queued (`__wfi()` inspects only interrupts pending at the moment it executes). ADR-007 had documented this window as benign, which is only true with interrupts masked. In addition, `wake_other_core(direction)` selected the doorbell from a caller-supplied direction while the ISR cleared only the doorbell expected for its core; a mismatching call would have left a doorbell set and stormed `SIO_IRQ_BELL`. Random lock-ups were observed on the target in this period; a root cause was not confirmed on the target because the symptom disappeared before a debugger session +
+**Impact:** Core 0 has no periodic wake source, so one lost doorbell stalled all TCP→UART traffic until a UART RX interrupt or a flash operation on core 1 arrived; on core 1 the loss was bounded by the 500 ms link poll timer +
+**Priority:** High (resolved) +
+**Effort:** Low (1 day) +
+**Resolution Plan:** Resolved 2026-08-26 (ADR-007, "Idle Wait Instruction and Doorbell Selection"): idle waits use `__wfe()` via `state_machine_wait_for_wake()`, which returns immediately when an IRQ was taken since the last wait; `wake_other_core()` derives its doorbell from `get_core_num()`; the doorbell ISR clears all doorbells claimed on its core. Acceptance: `test_state_machine` cases `test_doorbell_rung_before_wait_is_not_lost` (fails with `__wfi()`, passes with `__wfe()`), `test_wake_other_core_uses_calling_core_doorbell`, `test_irq_handler_clears_foreign_doorbell`. Follow-up: if the lock-up reappears, capture both cores with `tools/gdb_hang_diag.gdb` before changing code
 
 === Risk Mitigation Plan
 

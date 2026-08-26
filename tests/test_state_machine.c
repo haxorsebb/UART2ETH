@@ -340,11 +340,34 @@ void test_wake_other_core_sets_doorbell(void) {
     multicore_doorbell_clear_other_core(doorbell);
     TEST_ASSERT_FALSE(multicore_doorbell_is_set_other_core(doorbell));
 
-    wake_other_core(CORE0_WAKES_CORE1);
+    wake_other_core();
 
     TEST_ASSERT_TRUE_MESSAGE(multicore_doorbell_is_set_other_core(doorbell),
                              "wake_other_core must set the doorbell of the other core");
     multicore_doorbell_clear_other_core(doorbell);
+}
+
+/**
+ * Test: wake_other_core() rings the doorbell that belongs to the calling core
+ *
+ * The test runner executes on core 0, so the CORE0_WAKES_CORE1 doorbell must
+ * be set on core 1 and the CORE1_WAKES_CORE0 doorbell must stay clear. The
+ * caller cannot select a doorbell any more (ADR-007, "Idle Wait Instruction
+ * and Doorbell Selection", problem 2).
+ */
+void test_wake_other_core_uses_calling_core_doorbell(void) {
+    int own = state_machine_get_wake_doorbell(CORE0_WAKES_CORE1);
+    int foreign = state_machine_get_wake_doorbell(CORE1_WAKES_CORE0);
+    multicore_doorbell_clear_other_core(own);
+    multicore_doorbell_clear_other_core(foreign);
+
+    wake_other_core();
+
+    TEST_ASSERT_TRUE_MESSAGE(multicore_doorbell_is_set_other_core(own),
+                             "core 0 must ring CORE0_WAKES_CORE1");
+    TEST_ASSERT_FALSE_MESSAGE(multicore_doorbell_is_set_other_core(foreign),
+                              "core 0 must not ring CORE1_WAKES_CORE0");
+    multicore_doorbell_clear_other_core(own);
 }
 
 /**
@@ -360,7 +383,7 @@ void test_wake_other_core_does_not_use_fifo(void) {
     TEST_ASSERT_TRUE(multicore_fifo_wready());
 
     for (int i = 0; i < 8; i++) {
-        wake_other_core(CORE0_WAKES_CORE1);
+        wake_other_core();
     }
 
     TEST_ASSERT_TRUE_MESSAGE(multicore_fifo_wready(),
@@ -409,7 +432,7 @@ void test_doorbell_wakes_core1_from_wfi(void) {
     sleep_ms(5);
 
     uint32_t before = g_core1_wakeups;
-    wake_other_core(CORE0_WAKES_CORE1);
+    wake_other_core();
 
     absolute_time_t deadline = make_timeout_time_ms(100);
     while (g_core1_wakeups == before && !time_reached(deadline)) {
@@ -437,7 +460,7 @@ void test_doorbell_is_cleared_by_irq_handler(void) {
     TEST_ASSERT_TRUE_MESSAGE(wait_for_condition(&g_core1_ready, 1000), "core 1 did not start");
     sleep_ms(5);
 
-    wake_other_core(CORE0_WAKES_CORE1);
+    wake_other_core();
     sleep_ms(20);
     bool still_set = multicore_doorbell_is_set_other_core(doorbell);
     uint32_t wakeups = g_core1_wakeups;
@@ -446,6 +469,107 @@ void test_doorbell_is_cleared_by_irq_handler(void) {
     TEST_ASSERT_FALSE_MESSAGE(still_set, "IRQ handler must clear the doorbell");
     TEST_ASSERT_TRUE_MESSAGE(wakeups >= 1 && wakeups < 10,
                              "doorbell must wake core 1 once, not storm");
+}
+
+/**
+ * Test: The wake IRQ handler also clears a doorbell it does not expect
+ *
+ * Core 0 sets the CORE1_WAKES_CORE0 doorbell on core 1, which core 1 never
+ * rings on itself in production. If the handler cleared only "its" doorbell,
+ * SIO_IRQ_BELL would stay asserted and core 1 would storm (ADR-007, "Idle
+ * Wait Instruction and Doorbell Selection", problem 2).
+ */
+void test_irq_handler_clears_foreign_doorbell(void) {
+    int foreign = state_machine_get_wake_doorbell(CORE1_WAKES_CORE0);
+    g_core1_wakeups = 0;
+    g_core1_ready = false;
+    multicore_reset_core1();
+    multicore_launch_core1(core1_wfi_helper);
+    TEST_ASSERT_TRUE_MESSAGE(wait_for_condition(&g_core1_ready, 1000), "core 1 did not start");
+    sleep_ms(5);
+
+    multicore_doorbell_set_other_core(foreign);
+    sleep_ms(20);
+    bool still_set = multicore_doorbell_is_set_other_core(foreign);
+    uint32_t wakeups = g_core1_wakeups;
+    multicore_reset_core1();
+    multicore_doorbell_clear_other_core(foreign);
+
+    TEST_ASSERT_FALSE_MESSAGE(still_set, "IRQ handler must clear a doorbell of the other direction too");
+    TEST_ASSERT_TRUE_MESSAGE(wakeups >= 1 && wakeups < 10,
+                             "foreign doorbell must not storm core 1");
+}
+
+/**
+ * Helper for the lost-wake-up test. Core 1 models the production idle path:
+ * a work check with interrupts enabled (here: an artificially long window,
+ * held open by core 0), followed by state_machine_wait_for_wake().
+ * The doorbell is rung while the window is open, so its IRQ is serviced and
+ * the doorbell is cleared before the wait instruction executes.
+ */
+static volatile bool g_core1_in_check_window = false;
+static volatile bool g_core1_release_window = false;
+
+static void core1_check_then_wait_helper(void) {
+    state_machine_enable_wake_irq();
+    g_core1_ready = true;
+    while (true) {
+        // Drain a stale event register bit (SEVs from the core 1 launch
+        // handshake) so that only the doorbell IRQ can end the wait below.
+        // SEV sets our own event register, WFE consumes it without sleeping.
+        busy_wait_us(500);
+        __sev();
+        __wfe();
+        g_core1_in_check_window = true;
+        while (!g_core1_release_window) {
+            tight_loop_contents();
+        }
+        g_core1_in_check_window = false;
+        g_core1_release_window = false;
+        state_machine_wait_for_wake();
+        g_core1_wakeups++;
+    }
+}
+
+/**
+ * Test: A doorbell rung between the work check and the wait is not lost
+ *
+ * This is the lost-wake-up defect of TD-011. With __wfi() as the sleep
+ * instruction core 1 stays asleep here; with __wfe() the serviced doorbell
+ * IRQ has set the event register and the wait returns at once.
+ *
+ * Core 0 must not issue SEV between ringing the doorbell and the check,
+ * otherwise the SDK's SEV (printf/mutex_exit, sleep_ms) would wake core 1
+ * for an unrelated reason and hide a lost wake-up. Only busy waits are used.
+ */
+void test_doorbell_rung_before_wait_is_not_lost(void) {
+    g_core1_wakeups = 0;
+    g_core1_ready = false;
+    g_core1_in_check_window = false;
+    g_core1_release_window = false;
+    multicore_reset_core1();
+    multicore_launch_core1(core1_check_then_wait_helper);
+    TEST_ASSERT_TRUE_MESSAGE(wait_for_condition(&g_core1_ready, 1000), "core 1 did not start");
+    TEST_ASSERT_TRUE_MESSAGE(wait_for_condition(&g_core1_in_check_window, 1000),
+                             "core 1 did not reach the check window");
+    busy_wait_us(1000);
+
+    // Ring while core 1 is still "checking": the IRQ is taken and cleared now.
+    wake_other_core();
+    busy_wait_us(1000);
+
+    // Let core 1 proceed to the wait instruction.
+    g_core1_release_window = true;
+
+    absolute_time_t deadline = make_timeout_time_ms(200);
+    while (g_core1_wakeups == 0 && !time_reached(deadline)) {
+        tight_loop_contents();
+    }
+    uint32_t wakeups = g_core1_wakeups;
+    multicore_reset_core1();
+
+    TEST_ASSERT_TRUE_MESSAGE(wakeups >= 1,
+                             "wake-up serviced before the wait must not be lost");
 }
 
 // Test runner
@@ -485,9 +609,12 @@ int main() {
     RUN_TEST(test_wake_doorbells_are_claimed_and_distinct);
     RUN_TEST(test_wake_doorbells_stable_across_reinit);
     RUN_TEST(test_wake_other_core_sets_doorbell);
+    RUN_TEST(test_wake_other_core_uses_calling_core_doorbell);
     RUN_TEST(test_wake_other_core_does_not_use_fifo);
     RUN_TEST(test_doorbell_wakes_core1_from_wfi);
     RUN_TEST(test_doorbell_is_cleared_by_irq_handler);
+    RUN_TEST(test_irq_handler_clears_foreign_doorbell);
+    RUN_TEST(test_doorbell_rung_before_wait_is_not_lost);
     
     while (true) {
         printf("Event-Driven State Machine Tests completed\n");

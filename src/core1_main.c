@@ -388,8 +388,10 @@ static void core1_work_or_idle_wait(void) {
  *
  * The ENC28J60 INT pin is edge-triggered but the chip holds INT low until its
  * flags are serviced, so no new edge arrives while INT is already low. Do not
- * sleep in that case (risk R-010). An edge between the guard and __wfi() sets
- * the NVIC pending bit and __wfi() returns at once, so that race is benign.
+ * sleep in that case (risk R-010). An edge between the guard and the wait is
+ * serviced by the GPIO ISR before the wait; state_machine_wait_for_wake()
+ * then returns immediately (ADR-007, "Idle Wait Instruction and Doorbell
+ * Selection").
  *
  * The inter-core FIFO is never read here; it belongs to the SDK lockout
  * mechanism behind flash_safe_execute().
@@ -398,7 +400,7 @@ static void core1_idle_wait(void) {
     if (enc28j60_wake_pending()) {
         return;
     }
-    __wfi();
+    state_machine_wait_for_wake();
 }
 
 

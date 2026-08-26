@@ -255,10 +255,12 @@ static void core0_init_complete(void) {
  */
 static void core0_idle_wait(void) {
     // Sleep until any interrupt: UART/DMA IRQs, the core 0 timer alarm, or the
-    // wake doorbell rung by core 1 (ADR-007, "Cross-Core Wake-Up").
+    // wake doorbell rung by core 1 (ADR-007, "Cross-Core Wake-Up"). An IRQ
+    // serviced between core0_check_for_pending_work() and this call still
+    // ends the wait (ADR-007, "Idle Wait Instruction and Doorbell Selection").
     // The inter-core FIFO is never touched here; it belongs to the SDK lockout
     // mechanism behind flash_safe_execute().
-    __wfi();
+    state_machine_wait_for_wake();
 }
 
 // MAIN_STATE_CONFIGURATION function implementations

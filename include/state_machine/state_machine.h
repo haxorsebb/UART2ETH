@@ -22,7 +22,10 @@
  * @brief Cross-core wake-up direction
  *
  * Each direction is backed by one RP2350 SIO doorbell claimed in
- * state_machine_init(). See ADR-007, "Cross-Core Wake-Up".
+ * state_machine_init(). Used for diagnostics and tests only; the doorbell
+ * rung by wake_other_core() is fixed by the calling core.
+ * See ADR-007, "Cross-Core Wake-Up" and "Idle Wait Instruction and Doorbell
+ * Selection".
  */
 typedef enum {
     CORE0_WAKES_CORE1 = 0,   
@@ -191,26 +194,41 @@ typedef enum {
 bool state_machine_init(void);
 
 /**
- * @brief Wake the other core from __wfi()
+ * @brief Wake the other core from state_machine_wait_for_wake()
  *
- * Rings the doorbell that belongs to @p direction. Non-blocking, idempotent,
- * safe to call while holding a mutex or from an ISR. The wake-up is a hint:
- * the woken core must re-check its work conditions. The inter-core FIFO is
- * never used; it is reserved for the SDK lockout behind flash_safe_execute().
- * See ADR-007, "Cross-Core Wake-Up".
- *
- * @param direction which core is to be woken
+ * Rings the doorbell assigned to the calling core (core 0 rings
+ * CORE0_WAKES_CORE1, core 1 rings CORE1_WAKES_CORE0). Non-blocking,
+ * idempotent, safe to call while holding a mutex or from an ISR. The wake-up
+ * is a hint: the woken core must re-check its work conditions. The inter-core
+ * FIFO is never used; it is reserved for the SDK lockout behind
+ * flash_safe_execute(). See ADR-007, "Cross-Core Wake-Up" and "Idle Wait
+ * Instruction and Doorbell Selection".
  */
-void wake_other_core(wake_direction_t direction);
+void wake_other_core(void);
 
 /**
  * @brief Enable the doorbell IRQ on the calling core
  *
- * Must be called once on each core before that core relies on __wfi() being
- * terminated by wake_other_core() from the other core. The handler only
- * clears the doorbell; it does no work.
+ * Must be called once on each core before that core relies on
+ * state_machine_wait_for_wake() being terminated by wake_other_core() from
+ * the other core. The handler only clears the doorbells routed to this core;
+ * it does no work.
  */
 void state_machine_enable_wake_irq(void);
+
+/**
+ * @brief Sleep until an interrupt or event, or return immediately if one
+ *        was already taken since the last wait
+ *
+ * Idle wait for both cores. Must be called after the caller has checked its
+ * work conditions with interrupts enabled. An interrupt (doorbell, timer,
+ * ENC28J60 edge, UART) that was serviced between that check and this call
+ * still terminates the wait, so no wake-up is lost. May also return without
+ * any of these having occurred (SEV from the SDK on either core). Callers
+ * must re-check their work conditions in a loop.
+ * See ADR-007, "Idle Wait Instruction and Doorbell Selection".
+ */
+void state_machine_wait_for_wake(void);
 
 /**
  * @brief Doorbell number used for a wake direction (diagnostics, tests)
