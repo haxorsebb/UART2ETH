@@ -153,28 +153,28 @@ static bool flush_sector_buffer(void) {
             resident_partition_t uf2_target_partition;
             rom_flash_flush_cache();
             rom_get_uf2_target_partition(g_update.workarea, sizeof(g_update.workarea), g_update.family_id, &uf2_target_partition);
-            printf("Code Target partition is %lx %lx\n", uf2_target_partition.permissions_and_location, uf2_target_partition.permissions_and_flags);
+            DEBUG_ONLY(printf("Code Target partition is %lx %lx\n", uf2_target_partition.permissions_and_location, uf2_target_partition.permissions_and_flags));
 
             uint16_t first_sector_number = (uf2_target_partition.permissions_and_location & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB;
             uint16_t last_sector_number = (uf2_target_partition.permissions_and_location & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB;
             uint32_t code_start_addr = first_sector_number * 0x1000;
             uint32_t code_end_addr = (last_sector_number + 1) * 0x1000;
             uint32_t code_size = code_end_addr - code_start_addr;
-            printf("Start %lx, End %lx, Size %lx\n", code_start_addr, code_end_addr, code_size);
+            DEBUG_ONLY(printf("Start %lx, End %lx, Size %lx\n", code_start_addr, code_end_addr, code_size));
 
             g_update.flash_update = code_start_addr + XIP_BASE;
             g_update.write_offset = code_start_addr + XIP_BASE - block->target_addr;
             g_update.write_size = code_size;
-            printf("UPDATE: Write Offset %lx, Size %lx\n", g_update.write_offset, g_update.write_size);
+            DEBUG_ONLY(printf("UPDATE: Write Offset %lx, Size %lx\n", g_update.write_offset, g_update.write_size));
         }
 
         //validation
         if (g_update.blocks_done != block->block_no) {
-            printf("block number mismatch - expected %d, got %d\n", g_update.blocks_done, block->block_no);
+            DEBUG_ONLY(printf("block number mismatch - expected %d, got %d\n", g_update.blocks_done, block->block_no));
             return false;
         }
         if (g_update.family_id != block->file_size) {
-            printf("family id mismatch\n");
+            DEBUG_ONLY(printf("family id mismatch\n"));
             return(false);
         }
 
@@ -194,8 +194,8 @@ static bool flush_sector_buffer(void) {
 
             int rc = flash_safe_execute(call_flash_erase_for_update, &params, UINT32_MAX);
             if (rc != PICO_OK || params.result != 0) {
-                printf("UPDATE: Flash erase FAILED at 0x%08X (rc=%d, result=%d)\n", 
-                     params.address, rc, params.result);
+                DEBUG_ONLY(printf("UPDATE: Flash erase FAILED at 0x%08X (rc=%d, result=%d)\n", 
+                     params.address, rc, params.result));
                 g_update.last_error_code = (rc != PICO_OK) ? rc : params.result;
                 return false;
             }
@@ -213,16 +213,16 @@ static bool flush_sector_buffer(void) {
         params.size = block->payload_size;
         params.data = block->data;
         
-        printf("UPDATE: Flash program of %u bytes, remaining: %u, START [%c][%c][%c]\n",
+        DEBUG_ONLY(printf("UPDATE: Flash program of %u bytes, remaining: %u, START [%c][%c][%c]\n",
                    block->payload_size, bytes_remaining, 
                 (g_update.sector_buffer + buffer_offset)[0],
                 (g_update.sector_buffer + buffer_offset)[1],
-                (g_update.sector_buffer + buffer_offset)[2]);
+                (g_update.sector_buffer + buffer_offset)[2]));
             
         int rc = flash_safe_execute(call_flash_program_for_update, &params, UINT32_MAX);
         if (rc != PICO_OK || params.result != 0) {
-            printf("UPDATE: Flash program FAILED at 0x%08X (rc=%d, result=%d)\n",
-                   params.address, rc, params.result);
+            DEBUG_ONLY(printf("UPDATE: Flash program FAILED at 0x%08X (rc=%d, result=%d)\n",
+                   params.address, rc, params.result));
             g_update.last_error_code = (rc != PICO_OK) ? rc : params.result;
             return false;
         }
@@ -277,7 +277,7 @@ bool update_init(void) {
         return true;
     }
     
-    printf("UPDATE: Initializing update module\n");
+    DEBUG_ONLY(printf("UPDATE: Initializing update module\n"));
     
     // Initialize state
     memset(&g_update, 0, sizeof(g_update));
@@ -291,22 +291,22 @@ bool update_init(void) {
     
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_READY, 0x0017);
     
-    printf("UPDATE: Module initialized\n");
+    DEBUG_ONLY(printf("UPDATE: Module initialized\n"));
     return true;
 }
 
 bool update_start_upload(uint32_t expected_size) {
     if (!g_update.initialized) {
-        printf("UPDATE: Module not initialized\n");
+        DEBUG_ONLY(printf("UPDATE: Module not initialized\n"));
         return false;
     }
     
     if (g_update.state == UPDATE_STATE_RECEIVING) {
-        printf("UPDATE: Upload already in progress\n");
+        DEBUG_ONLY(printf("UPDATE: Upload already in progress\n"));
         return false;
     }
     
-    printf("UPDATE: Starting upload, expected size: %u bytes\n", expected_size);
+    DEBUG_ONLY(printf("UPDATE: Starting upload, expected size: %u bytes\n", expected_size));
     
     // Get target partition using ROM function
     resident_partition_t target_partition;
@@ -315,7 +315,7 @@ bool update_start_upload(uint32_t expected_size) {
     int rc = rom_get_uf2_target_partition(g_update.workarea, sizeof(g_update.workarea),
                                           RP2350_FAMILY_ID, &target_partition);
     if (rc < PICO_OK) {
-        printf("UPDATE: Failed to get target partition (rc=%d)\n", rc);
+        DEBUG_ONLY(printf("UPDATE: Failed to get target partition (rc=%d)\n", rc));
         g_update.last_error_code = rc;
         return false;
     }
@@ -332,14 +332,14 @@ bool update_start_upload(uint32_t expected_size) {
     g_update.partition_end = (last_sector + 1) * FLASH_SECTOR_ERASE_SIZE;
     g_update.partition_size = g_update.partition_end - g_update.partition_start;
     
-    printf("UPDATE: Target partition: 0x%08X - 0x%08X (%u KB)\n",
+    DEBUG_ONLY(printf("UPDATE: Target partition: 0x%08X - 0x%08X (%u KB)\n",
            g_update.partition_start, g_update.partition_end, 
-           g_update.partition_size / 1024);
+           g_update.partition_size / 1024));
     
     // Validate size fits in partition
     if (expected_size > g_update.partition_size) {
-        printf("UPDATE: Firmware too large (%u > %u bytes)\n", 
-               expected_size, g_update.partition_size);
+        DEBUG_ONLY(printf("UPDATE: Firmware too large (%u > %u bytes)\n", 
+               expected_size, g_update.partition_size));
         g_update.last_error_code = -1;
         return false;
     }
@@ -347,7 +347,7 @@ bool update_start_upload(uint32_t expected_size) {
     // Calculate write offset (UF2 blocks target 0x10000000, but we write elsewhere)
     g_update.write_offset = g_update.partition_start + XIP_BASE - 0x10000000;
     
-    printf("UPDATE: Write offset: 0x%08X\n", g_update.write_offset);
+    DEBUG_ONLY(printf("UPDATE: Write offset: 0x%08X\n", g_update.write_offset));
     
     // Initialize upload session state
     g_update.state = UPDATE_STATE_RECEIVING;
@@ -374,7 +374,7 @@ bool update_write_block(uint8_t* data, uint32_t size, bool finished) {
     }
     
     if (g_update.state != UPDATE_STATE_RECEIVING) {
-        printf("UPDATE: Not in receiving state\n");
+        DEBUG_ONLY(printf("UPDATE: Not in receiving state\n"));
         return false;
     }
     
@@ -438,15 +438,15 @@ bool update_write_block(uint8_t* data, uint32_t size, bool finished) {
             }
         }
         
-        printf("UPDATE: Upload complete - %u bytes received, %u bytes written\n",
-               g_update.bytes_received, g_update.bytes_written);
+        DEBUG_ONLY(printf("UPDATE: Upload complete - %u bytes received, %u bytes written\n",
+               g_update.bytes_received, g_update.bytes_written));
         
         g_update.state = UPDATE_STATE_COMPLETE;
         log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, 
                   LOG_EVENT_FIRMWARE_UPDATE_COMPLETE, g_update.bytes_written);
 
         int ret = rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_FLASH_UPDATE, 1000, g_update.flash_update, 0);
-        printf("Done - rebooting for a flash update boot %d\n", ret);
+        DEBUG_ONLY(printf("Done - rebooting for a flash update boot %d\n", ret));
     }
     
     return true;
@@ -454,7 +454,7 @@ bool update_write_block(uint8_t* data, uint32_t size, bool finished) {
 
 void update_abort_upload(void) {
     if (g_update.state == UPDATE_STATE_RECEIVING) {
-        printf("UPDATE: Upload aborted\n");
+        DEBUG_ONLY(printf("UPDATE: Upload aborted\n"));
         log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_WARN, LOG_EVENT_FIRMWARE_UPDATE_FAILED, 0xABCD);
     }
     
@@ -481,27 +481,27 @@ void update_get_stats(update_stats_t* stats) {
 }
 
 bool update_buy_current_image(void) {
-    printf("UPDATE: Attempting to buy current image\n");
+    DEBUG_ONLY(printf("UPDATE: Attempting to buy current image\n"));
     
     // Check if this boot was a flash update boot
     boot_info_t boot_info = {0};
     int rc = rom_get_boot_info(&boot_info);
     
-    printf("UPDATE: Boot info - partition=%d, type=%d\n", 
-           boot_info.partition, rom_get_last_boot_type());
+    DEBUG_ONLY(printf("UPDATE: Boot info - partition=%d, type=%d\n", 
+           boot_info.partition, rom_get_last_boot_type()));
     
     if (rom_get_last_boot_type() != BOOT_TYPE_FLASH_UPDATE) {
-        printf("UPDATE: Not a flash update boot, nothing to buy\n");
+        DEBUG_ONLY(printf("UPDATE: Not a flash update boot, nothing to buy\n"));
         return true;  // Not an error, just nothing to do
     }
     
-    printf("UPDATE: Flash update boot detected, performing explicit buy\n");
+    DEBUG_ONLY(printf("UPDATE: Flash update boot detected, performing explicit buy\n"));
     
     if (boot_info.reboot_params[0]) {
-        printf("UPDATE: Flash update base was 0x%X\n", boot_info.reboot_params[0]);
+        DEBUG_ONLY(printf("UPDATE: Flash update base was 0x%X\n", boot_info.reboot_params[0]));
     }
     if (boot_info.tbyb_and_update_info) {
-        printf("UPDATE: TBYB info before buy: 0x%X\n", boot_info.tbyb_and_update_info);
+        DEBUG_ONLY(printf("UPDATE: TBYB info before buy: 0x%X\n", boot_info.tbyb_and_update_info));
     }
     
     // Perform explicit buy via flash_safe_execute
@@ -509,22 +509,22 @@ bool update_buy_current_image(void) {
     rc = flash_safe_execute(call_explicit_buy_internal, &buy_result, UINT32_MAX);
     
     if (rc != PICO_OK) {
-        printf("UPDATE: flash_safe_execute failed for buy (rc=%d)\n", rc);
+        DEBUG_ONLY(printf("UPDATE: flash_safe_execute failed for buy (rc=%d)\n", rc));
         log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_FIRMWARE_BUY_FAILED, rc);
         return false;
     }
     
     if (buy_result != 0) {
-        printf("UPDATE: rom_explicit_buy returned error %d\n", buy_result);
+        DEBUG_ONLY(printf("UPDATE: rom_explicit_buy returned error %d\n", buy_result));
         log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_ERROR, LOG_EVENT_FIRMWARE_BUY_FAILED, buy_result);
         return false;
     }
     
     // Verify buy succeeded
     rc = rom_get_boot_info(&boot_info);
-    printf("UPDATE: TBYB info after buy: 0x%X\n", boot_info.tbyb_and_update_info);
+    DEBUG_ONLY(printf("UPDATE: TBYB info after buy: 0x%X\n", boot_info.tbyb_and_update_info));
     
-    printf("UPDATE: Image bought successfully\n");
+    DEBUG_ONLY(printf("UPDATE: Image bought successfully\n"));
     log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_FIRMWARE_BUY_SUCCESS, 0);
     
     return true;
@@ -532,7 +532,7 @@ bool update_buy_current_image(void) {
 
 void update_set_reboot_reason(reboot_reason_t reason) {
     g_update.reboot_reason = reason;
-    printf("UPDATE: Reboot reason set to %s\n", update_reboot_reason_to_string(reason));
+    DEBUG_ONLY(printf("UPDATE: Reboot reason set to %s\n", update_reboot_reason_to_string(reason)));
 }
 
 reboot_reason_t update_get_reboot_reason(void) {
@@ -540,15 +540,15 @@ reboot_reason_t update_get_reboot_reason(void) {
 }
 
 void update_execute_reboot(void) {
-    printf("UPDATE: Executing reboot (reason: %s)\n", 
-           update_reboot_reason_to_string(g_update.reboot_reason));
+    DEBUG_ONLY(printf("UPDATE: Executing reboot (reason: %s)\n", 
+           update_reboot_reason_to_string(g_update.reboot_reason)));
     
     // Check if this is a firmware update reboot
     if (g_update.reboot_reason == REBOOT_REASON_UPDATE_COMPLETE && 
         g_update.state == UPDATE_STATE_COMPLETE &&
         g_update.flash_update != 0) {
         
-        printf("UPDATE: Triggering flash update reboot to 0x%08X\n", g_update.flash_update);
+        DEBUG_ONLY(printf("UPDATE: Triggering flash update reboot to 0x%08X\n", g_update.flash_update));
         log_event(EVENT_SOURCE_SYSTEM, LOG_LEVEL_INFO, LOG_EVENT_SYSTEM_REBOOT, 
                   (uint32_t)g_update.reboot_reason);
         
@@ -559,7 +559,7 @@ void update_execute_reboot(void) {
         int ret = rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_FLASH_UPDATE, 500, g_update.flash_update, 0);
         
         // If we get here, reboot failed
-        printf("UPDATE: Flash update reboot failed (ret=%d), falling back to watchdog\n", ret);
+        DEBUG_ONLY(printf("UPDATE: Flash update reboot failed (ret=%d), falling back to watchdog\n", ret));
     }
     
     // Regular reboot or fallback

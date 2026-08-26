@@ -865,25 +865,27 @@ bool network_manager_check_dhcp_status(void) {
     static uint32_t last_dhcp_debug = 0;
     if (current_time - last_dhcp_debug > 2000) {  // Print every 2 seconds
         last_dhcp_debug = current_time;
-        printf("=== DHCP Status @%ums ===\n", current_time);
-        printf("  netif: up=%d, link=%d\n", netif_is_up(g_netif), netif_is_link_up(g_netif));
+        DEBUG_ONLY(printf("=== DHCP Status @%ums ===\n", current_time));
+        DEBUG_ONLY(printf("  netif: up=%d, link=%d\n", netif_is_up(g_netif), netif_is_link_up(g_netif)));
         if (dhcp) {
             printf("  DHCP state: %d", dhcp->state);
             if (dhcp->state == 8 && state_8_start_time > 0) {
-                printf(" (ACD for %u ms)", current_time - state_8_start_time);
+                DEBUG_ONLY(printf(" (ACD for %u ms)", current_time - state_8_start_time));
             }
-            printf("\n");
-            if (!ip4_addr_isany(&dhcp->server_ip_addr)) {
-                printf("  Server: %s\n", ip4addr_ntoa(&dhcp->server_ip_addr));
-            }
-            printf("  Offered IP: %s\n", ip4addr_ntoa(&dhcp->offered_ip_addr));
+            DEBUG_ONLY(
+                printf("\n");
+                if (!ip4_addr_isany(&dhcp->server_ip_addr)) {
+                    printf("  Server: %s\n", ip4addr_ntoa(&dhcp->server_ip_addr));
+                }
+                printf("  Offered IP: %s\n", ip4addr_ntoa(&dhcp->offered_ip_addr));
+            );
         } else {
-            printf("  No DHCP data yet\n");
+            DEBUG_ONLY(printf("  No DHCP data yet\n"););
         }
         if (!ip4_addr_isany(netif_ip4_addr(g_netif))) {
-            printf("  Current IP: %s\n", ip4addr_ntoa(netif_ip4_addr(g_netif)));
+            DEBUG_ONLY(printf("  Current IP: %s\n", ip4addr_ntoa(netif_ip4_addr(g_netif))););
         }
-        printf("========================\n");
+        DEBUG_ONLY(printf("========================\n"););
     }
 
     // Check if we got an IP address (either from DHCP or static fallback)
@@ -893,15 +895,16 @@ bool network_manager_check_dhcp_status(void) {
         
         //g_network_status = NETWORK_STATUS_READY;
         
-        char ip_str[16];
-        sprintf(ip_str, "%u.%u.%u.%u",
-                (unsigned)ip4_addr1_16(netif_ip4_addr(g_netif)),
-                (unsigned)ip4_addr2_16(netif_ip4_addr(g_netif)),
-                (unsigned)ip4_addr3_16(netif_ip4_addr(g_netif)),
-                (unsigned)ip4_addr4_16(netif_ip4_addr(g_netif)));
+        
         
         const char* source = dhcp_supplied_address(g_netif) ? "DHCP" : "Static Fallback";
         DEBUG_ONLY({
+            char ip_str[16];
+            sprintf(ip_str, "%u.%u.%u.%u",
+                    (unsigned)ip4_addr1_16(netif_ip4_addr(g_netif)),
+                    (unsigned)ip4_addr2_16(netif_ip4_addr(g_netif)),
+                    (unsigned)ip4_addr3_16(netif_ip4_addr(g_netif)),
+                    (unsigned)ip4_addr4_16(netif_ip4_addr(g_netif)));
             printf("Network Manager: %s successful! IP: %s\n", source, ip_str);
             printf("Network Manager: Network ready for ping and TCP/IP operations\n");
         });
