@@ -11,11 +11,11 @@
 
 // Firmware version components
 #define FIRMWARE_VERSION_MAJOR 0
-#define FIRMWARE_VERSION_MINOR 10
+#define FIRMWARE_VERSION_MINOR 11
 #define FIRMWARE_VERSION_PATCH 0
 
 // Version string for display
-#define FIRMWARE_VERSION_STRING "0.10.0"
+#define FIRMWARE_VERSION_STRING "0.11.0"
 
 // Build type indicator
 #ifdef FACTORY_INTERNAL_VERSION
