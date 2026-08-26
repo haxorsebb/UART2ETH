@@ -25,7 +25,7 @@ if(DEBUG)
 else()
     message(STATUS "UART2ETH: Release mode")
     # add_compile_definitions(DEBUG=0)
-    add_compile_definitions(LOG_MINIMUM_LEVEL=LOG_LEVEL_DEBUG)
+    add_compile_definitions(LOG_MINIMUM_LEVEL=LOG_LEVEL_INFO)
     add_compile_options(-O2)     # Optimization for release
     set(CMAKE_BUILD_TYPE Release)
 endif()
