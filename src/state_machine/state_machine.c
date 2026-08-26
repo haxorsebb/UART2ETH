@@ -60,7 +60,7 @@ static void wake_other_core_after_main_state_change(main_state_t new_state);
 static bool claim_wake_doorbells(void);
 static int doorbell_for_direction(wake_direction_t direction);
 static int doorbell_rung_by_this_core(void);
-static wake_direction_t direction_targeting_this_core(void);
+static void clear_wake_doorbells_on_this_core(void);
 static void wake_doorbell_irq_handler(void);
 
 /**
@@ -1026,13 +1026,17 @@ static int doorbell_rung_by_this_core(void) {
 }
 
 /**
- * The wake direction whose doorbell rings on the calling core.
+ * Clear every doorbell this module has claimed on the calling core.
+ * Both doorbells share SIO_IRQ_BELL on each core, so clearing both is what
+ * guarantees the IRQ does not re-fire.
  */
-static wake_direction_t direction_targeting_this_core(void) {
-    if (get_core_num() == 0) {
-        return CORE1_WAKES_CORE0;
+static void clear_wake_doorbells_on_this_core(void) {
+    if (doorbell_core0_wakes_core1 >= 0) {
+        multicore_doorbell_clear_current_core((uint)doorbell_core0_wakes_core1);
     }
-    return CORE0_WAKES_CORE1;
+    if (doorbell_core1_wakes_core0 >= 0) {
+        multicore_doorbell_clear_current_core((uint)doorbell_core1_wakes_core0);
+    }
 }
 
 /**
@@ -1076,32 +1080,26 @@ void state_machine_wait_for_wake(void) {
 
 /**
  * Doorbell IRQ handler. Runs on the core that was rung.
- * Clears every doorbell this module has claimed on the current core, so the
- * IRQ does not re-fire even if a doorbell of the "wrong" direction was set.
- * The purpose of the interrupt is solely to terminate the core's idle wait.
+ * Clears every claimed doorbell on this core, so the IRQ does not re-fire
+ * even if a doorbell of the "wrong" direction was set. The purpose of the
+ * interrupt is solely to terminate the core's idle wait; it does no work.
  */
 static void wake_doorbell_irq_handler(void) {
-    if (doorbell_core0_wakes_core1 >= 0) {
-        multicore_doorbell_clear_current_core((uint)doorbell_core0_wakes_core1);
-    }
-    if (doorbell_core1_wakes_core0 >= 0) {
-        multicore_doorbell_clear_current_core((uint)doorbell_core1_wakes_core0);
-    }
+    clear_wake_doorbells_on_this_core();
 }
 
 /**
  * Enable the doorbell IRQ on the calling core.
  */
 void state_machine_enable_wake_irq(void) {
-    int doorbell = doorbell_for_direction(direction_targeting_this_core());
-    if (doorbell < 0) {
-        return;
+    if (doorbell_core0_wakes_core1 < 0 || doorbell_core1_wakes_core0 < 0) {
+        return;  // state_machine_init() not run or claim failed
     }
-    uint irq_num = multicore_doorbell_irq_num((uint)doorbell);
+    // Every doorbell maps to the same IRQ line on a core (SIO_IRQ_BELL).
+    uint irq_num = multicore_doorbell_irq_num((uint)doorbell_core0_wakes_core1);
     // Start clean: a doorbell rung before the IRQ was enabled would otherwise
-    // fire once immediately, which is harmless but noisy. All claimed
-    // doorbells share SIO_IRQ_BELL, so clear both.
-    wake_doorbell_irq_handler();
+    // fire once immediately, which is harmless but noisy.
+    clear_wake_doorbells_on_this_core();
     irq_set_exclusive_handler(irq_num, wake_doorbell_irq_handler);
     irq_set_enabled(irq_num, true);
 }
