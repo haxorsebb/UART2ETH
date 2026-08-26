@@ -3,7 +3,11 @@
 #   gdb-multiarch build/uart2eth.elf -batch -x tools/gdb_hang_diag.gdb | tee logs/hang_diag_$(date +%s).txt
 set pagination off
 set confirm off
+# g_ringbuffer is ~70 kB; the default max-value-size (64 kB) aborts the
+# script at the print below, which skips detach and leaves both cores halted.
+set max-value-size unlimited
 target extended-remote :3333
+source tools/restore_cpacr.gdb
 
 echo \n=== state machine ===\n
 print/d 'state_machine.c'::g_main_state
@@ -26,4 +30,5 @@ thread 2
 echo --- core1 ---\n
 bt 20
 info registers pc lr sp xpsr primask
+restore_cpacr
 detach

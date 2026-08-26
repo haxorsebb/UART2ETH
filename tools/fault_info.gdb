@@ -2,6 +2,7 @@
 set confirm off
 set pagination off
 target extended-remote :3333
+source tools/restore_cpacr.gdb
 monitor halt
 thread 1
 bt 15
@@ -15,5 +16,6 @@ printf "ICSR  %08x\n", *(unsigned int*)0xE000ED04
 x/12xw $sp
 thread 2
 bt 10
+restore_cpacr
 detach
 quit
