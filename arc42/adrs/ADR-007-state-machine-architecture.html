@@ -389,6 +389,7 @@
 <li><a href="#_event_driven_interface_design">Event-Driven Interface Design</a></li>
 <li><a href="#_concurrency_and_safety_model">Concurrency and Safety Model</a></li>
 <li><a href="#_cross_core_wake_up_decision_2026_08_19">Cross-Core Wake-Up (Decision 2026-08-19)</a></li>
+<li><a href="#_idle_wait_instruction_and_doorbell_selection_decision_2026_08_26">Idle Wait Instruction and Doorbell Selection (Decision 2026-08-26)</a></li>
 <li><a href="#_core_main_loop_architecture">Core Main Loop Architecture</a></li>
 <li><a href="#_complex_state_transition_examples">Complex State Transition Examples</a></li>
 <li><a href="#_condition_checking_functions">Condition Checking Functions</a></li>
@@ -763,10 +764,12 @@ comparison, so the core is guaranteed to wake for it;</p>
 driver&#8217;s block/unblock sequence in the TX path). <code>core1_idle_wait()</code> guards
 the sleep: if the driver reports a pending interrupt or the INT pin reads
 low, the core does not sleep. An edge that arrives between the guard and
-<code><em>wfi()</code> sets the NVIC pending bit, so <code></em>wfi()</code> returns immediately; this
-race is benign. Switching the GPIO IRQ to level-triggered was considered and
-rejected for now because it requires the ISR to mask itself and the driver&#8217;s
-service routine to unmask, touching a delicate part of the driver.</p>
+<code><em>wfi()</code> is handled by the GPIO ISR before the sleep instruction executes;
+the idle wait must therefore not lose a wake-up that was already serviced.
+This is guaranteed by the <code></em>wfe()</code> decision below. Switching the GPIO IRQ
+to level-triggered was considered and rejected for now because it requires
+the ISR to mask itself and the driver&#8217;s service routine to unmask, touching
+a delicate part of the driver.</p>
 </li>
 </ul>
 </div>
@@ -781,10 +784,13 @@ deliberately to keep <code>log_event()</code> free of cross-core side effects.</
 <div class="ulist">
 <ul>
 <li>
-<p><code><em>sev()</code>/<code></em>wfe()</code> instead of doorbells: no SIO resource needed, but the
-SDK lockout victim loop also uses <code>__wfe()</code>, so application events would
-spin the parked core and SDK events would wake application loops; works, but
-semantically muddier than a dedicated IRQ.</p>
+<p><code><em>sev()</code>/<code></em>wfe()</code> as the <strong>signalling</strong> mechanism instead of doorbells: no
+SIO resource needed, but the SDK lockout victim loop also uses <code><em>wfe()</code>, so
+application events would spin the parked core and SDK events would wake
+application loops; works, but semantically muddier than a dedicated IRQ.
+Note that <code></em>wfe()</code> is nevertheless used as the <strong>sleep instruction</strong> (see
+"Idle Wait Instruction and Doorbell Selection" below); the signal remains
+the doorbell IRQ.</p>
 </li>
 <li>
 <p>A custom <code>get_flash_safety_helper()</code> that parks the other core via a
@@ -797,6 +803,90 @@ and runtime configuration saves must not tear down the network core.</p>
 </li>
 </ul>
 </div>
+</div>
+<div class="sect2">
+<h3 id="_idle_wait_instruction_and_doorbell_selection_decision_2026_08_26">Idle Wait Instruction and Doorbell Selection (Decision 2026-08-26)</h3>
+<div class="paragraph">
+<p><strong>Problem 1: lost wake-up between work check and sleep.</strong> Both idle paths
+(<code>core0_work_or_idle_wait()</code>, <code>core1_work_or_idle_wait()</code>) check their work
+conditions with interrupts enabled and then execute the sleep instruction.
+If the other core rings the doorbell between the check and the sleep, the
+doorbell IRQ is taken immediately, the ISR clears the doorbell, and the NVIC
+pending bit is gone before the sleep instruction executes. With <code><em>wfi()</code> the
+core then sleeps although work is queued. <code></em>wfi()</code> has no memory: it only
+inspects interrupts pending at the moment it executes. The earlier statement
+in this ADR that "an edge between the guard and <code><em>wfi()</code> sets the NVIC
+pending bit and <code></em>wfi()</code> returns at once" holds only while interrupts are
+masked; with interrupts enabled the IRQ is serviced first and nothing stays
+pending.</p>
+</div>
+<div class="paragraph">
+<p>On core 1 the window is bounded by <code>CORE1_TIMER_LINK_POLL</code> (500 ms). Core 0
+has no periodic wake source: <code>core0_timer_init()</code> is not called by production
+code, so the only interrupts that end its sleep are UART RX, the doorbell and
+the SDK lockout FIFO IRQ from a flash operation on core 1. A single lost
+doorbell on core 0 stalls all TCP→UART traffic until one of those arrives.</p>
+</div>
+<div class="paragraph">
+<p><strong>Problem 2: doorbell chosen by caller-supplied direction.</strong>
+<code>wake_other_core(direction)</code> selected the doorbell from a direction argument,
+while <code>multicore_doorbell_set_other_core()</code> always targets the other core.
+The doorbell ISR cleared only the one doorbell it expected for its core. A
+call with a direction that does not match the calling core would set a
+doorbell on the receiving core that is never cleared; <code>SIO_IRQ_BELL</code> would
+then re-fire on every ISR exit and the receiving core would spend all its
+time in the handler (IRQ storm). No such call exists today; the interface
+merely allowed it.</p>
+</div>
+<div class="paragraph">
+<p><strong>Decision.</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The idle wait uses <code><em>wfe()</code> instead of <code></em>wfi()</code>, wrapped in
+<code>state_machine_wait_for_wake()</code>, which both <code>core0_idle_wait()</code> and
+<code>core1_idle_wait()</code> call. On the Cortex-M33 every taken exception sets the
+core&#8217;s one-bit event register; <code>__wfe()</code> returns immediately when the
+register is set and clears it. A doorbell (or ENC28J60 edge, or timer) IRQ
+that was serviced between the work check and the wait therefore terminates
+the wait at once. The check-then-wait sequence needs no interrupt masking,
+so the work checks may keep doing SPI traffic and firing state machine
+events. The Pico SDK relies on the same property for its own locks
+("a WFE which starts following the corresponding SEV is not missed").</p>
+</li>
+<li>
+<p><code><em>_wfe()</code> also returns on any <code>SEV</code> from either core. The SDK issues <code>SEV</code>
+from <code>mutex_exit()</code>, <code>sleep</em>*()</code> and the lockout code. These wake-ups are
+spurious for the idle loops. This is acceptable because the wake-up was
+already defined as a hint: every idle path re-checks its work conditions
+and goes back to sleep. Cost: a few additional loop iterations per SDK
+event; no functional change.</p>
+</li>
+<li>
+<p><code>wake_other_core()</code> takes no direction. It derives the doorbell to ring
+from <code>get_core_num()</code>: core 0 rings <code>doorbell_core0_wakes_core1</code>, core 1
+rings <code>doorbell_core1_wakes_core0</code>. The caller cannot select a doorbell
+that does not belong to its core.</p>
+</li>
+<li>
+<p>The doorbell ISR clears every doorbell claimed by this module on the
+current core, not only the one expected for its direction. A doorbell set
+by mistake can therefore not storm the IRQ.</p>
+</li>
+<li>
+<p><code>wake_direction_t</code> and <code>state_machine_get_wake_doorbell(direction)</code> remain
+for diagnostics and tests.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong>Consequences.</strong> <code>ringbuffer_enqueue_entry()</code> no longer needs to know on
+which core it runs; it calls <code>wake_other_core()</code> unconditionally. The
+interrupt-masked check-and-<code>__wfi()</code> variant was rejected because the work
+checks are too heavy to run with PRIMASK set. The defect and its history are
+recorded as TD-011 in chapter 11.</p>
+</div>
 <div class="paragraph">
 <p><strong>Implementation sketch:</strong></p>
 </div>
@@ -805,13 +895,22 @@ and runtime configuration saves must not tear down the network core.</p>
 <pre class="prettyprint highlight"><code data-lang="c">static int doorbell_core0_wakes_core1;   // claimed at init
 static int doorbell_core1_wakes_core0;   // claimed at init
 
-void wake_other_core(wake_direction_t direction) {
-    multicore_doorbell_set_other_core(doorbell_for(direction));
+void wake_other_core(void) {
+    // the doorbell this core rings is fixed by the core number
+    int doorbell = (get_core_num() == 0) ? doorbell_core0_wakes_core1
+                                         : doorbell_core1_wakes_core0;
+    multicore_doorbell_set_other_core(doorbell);
+}
+
+void state_machine_wait_for_wake(void) {
+    // returns on any IRQ taken since the last wait, on SEV, or spuriously
+    __wfe();
 }
 
 static void doorbell_irq_handler(void) {
-    // clear every doorbell routed to this core; nothing else to do
-    multicore_doorbell_clear_current_core(doorbell_for_this_core());
+    // clear every doorbell claimed by this module on this core; nothing else
+    multicore_doorbell_clear_current_core(doorbell_core0_wakes_core1);
+    multicore_doorbell_clear_current_core(doorbell_core1_wakes_core0);
 }</code></pre>
 </div>
 </div>

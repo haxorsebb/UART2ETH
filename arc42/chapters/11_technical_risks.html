@@ -1072,7 +1072,7 @@
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Probability</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Low - <code>core1_idle_wait()</code> refuses to sleep when the driver reports a pending interrupt or the INT pin reads low; an edge between the guard and <code><em>wfi()</code> sets the NVIC pending bit and <code></em>wfi()</code> returns immediately</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low - <code>core1_idle_wait()</code> refuses to sleep when the driver reports a pending interrupt or the INT pin reads low; an edge between the guard and the sleep instruction is serviced by the GPIO ISR, which sets the core&#8217;s event register, so the <code>__wfe()</code> in <code>state_machine_wait_for_wake()</code> returns immediately (ADR-007, "Idle Wait Instruction and Doorbell Selection", TD-011)</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Impact</strong></p></td>
@@ -1217,6 +1217,16 @@
 <strong>Priority:</strong> Low<br>
 <strong>Effort:</strong> Trivial once TD-006 (schema versioning with migration) is resolved; blocked until then<br>
 <strong>Resolution Plan:</strong> Remove the field together with the first schema migration introduced under TD-006. Until then the field stays, documented as deprecated in <code>shared_memory.h</code></p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_td_011_idle_wait_with_wfi_could_lose_a_doorbell_wake_up_resolved">TD-011: Idle Wait with <code>__wfi()</code> Could Lose a Doorbell Wake-Up (resolved)</h4>
+<div class="paragraph">
+<p><strong>Description:</strong> From the doorbell introduction (2026-08-19) until 2026-08-26 both idle paths checked their work conditions with interrupts enabled and then slept with <code><em>wfi()</code>. A doorbell rung between the check and <code></em>wfi()</code> was serviced immediately, its ISR cleared the doorbell, and <code><em>wfi()</code> then slept with work already queued (<code></em>wfi()</code> inspects only interrupts pending at the moment it executes). ADR-007 had documented this window as benign, which is only true with interrupts masked. In addition, <code>wake_other_core(direction)</code> selected the doorbell from a caller-supplied direction while the ISR cleared only the doorbell expected for its core; a mismatching call would have left a doorbell set and stormed <code>SIO_IRQ_BELL</code>. Random lock-ups were observed on the target in this period; a root cause was not confirmed on the target because the symptom disappeared before a debugger session<br>
+<strong>Impact:</strong> Core 0 has no periodic wake source, so one lost doorbell stalled all TCP→UART traffic until a UART RX interrupt or a flash operation on core 1 arrived; on core 1 the loss was bounded by the 500 ms link poll timer<br>
+<strong>Priority:</strong> High (resolved)<br>
+<strong>Effort:</strong> Low (1 day)<br>
+<strong>Resolution Plan:</strong> Resolved 2026-08-26 (ADR-007, "Idle Wait Instruction and Doorbell Selection"): idle waits use <code><em>wfe()</code> via <code>state_machine_wait_for_wake()</code>, which returns immediately when an IRQ was taken since the last wait; <code>wake_other_core()</code> derives its doorbell from <code>get_core_num()</code>; the doorbell ISR clears all doorbells claimed on its core. Acceptance: <code>test_state_machine</code> cases <code>test_doorbell_rung_before_wait_is_not_lost</code> (fails with <code></em>wfi()</code>, passes with <code>__wfe()</code>), <code>test_wake_other_core_uses_calling_core_doorbell</code>, <code>test_irq_handler_clears_foreign_doorbell</code>. Follow-up: if the lock-up reappears, capture both cores with <code>tools/gdb_hang_diag.gdb</code> before changing code</p>
 </div>
 </div>
 </div>
